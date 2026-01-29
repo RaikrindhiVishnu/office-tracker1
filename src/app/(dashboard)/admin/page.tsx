@@ -20,6 +20,7 @@ import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { exportMonthlyAttendance } from "@/lib/excel/exportMonthlyAttendance";
 import ProjectManagement from "./ProjectManagement";
+import type { AttendanceType } from "@/types/attendance";
 
 /* ================= TYPES ================= */
 type Session = {
@@ -123,7 +124,7 @@ const attendanceStyle: Record<AttendanceType, string> = {
   H: "bg-gray-200 text-gray-600",
 };
 
-type AttendanceType = "P" | "A" | "LOP" | "SL" | "H";
+// type AttendanceType = "P" | "A" | "L" | "SL" | "LOP" | "H";
 
 const ATTENDANCE_ORDER: AttendanceType[] = ["P", "A", "LOP", "SL"];
 
@@ -867,12 +868,13 @@ export default function AdminPage() {
                             month + 1
                           ).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
-                          const isHolidayDay =
-                            isSunday(year, month, day) ||
-                            isSecondSaturday(year, month, day) ||
-                            isFourthSaturday(year, month, day) ||
-                            isFifthSaturday(year, month, day) ||
-                            isHoliday(dateStr);
+                         const isHolidayDay =
+                          isSunday(year, month, day) ||
+                          isSecondSaturday(year, month, day) ||
+                          isFourthSaturday(year, month, day) ||
+                          isFifthSaturday(year, month, day) ||
+                          !!isHoliday(dateStr);
+
 
                           const autoStatus = getAutoStatus({
                             uid: u.uid,

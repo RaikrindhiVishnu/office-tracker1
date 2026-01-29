@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
+import type { AttendanceType } from "@/types/attendance";
 
-type AttendanceType = "P" | "A" | "LOP" | "SL" | "H";
+// type AttendanceType = "P" | "A" | "LOP" | "SL" | "H";
 
 export const exportMonthlyAttendance = async ({
   monthLabel,
