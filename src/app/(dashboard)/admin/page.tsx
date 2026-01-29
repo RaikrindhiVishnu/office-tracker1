@@ -115,6 +115,10 @@ const calculateTotalMinutes = (sessions: Session[]) => {
   return total;
 };
 
+// ✅ DEFINE TYPE FIRST
+// type AttendanceType = "P" | "A" | "L" | "SL" | "LOP" | "H";
+
+// ✅ THEN USE IT
 const attendanceStyle: Record<AttendanceType, string> = {
   P: "bg-green-100 text-green-700",
   A: "bg-red-100 text-red-700",
@@ -124,7 +128,6 @@ const attendanceStyle: Record<AttendanceType, string> = {
   H: "bg-gray-200 text-gray-600",
 };
 
-// type AttendanceType = "P" | "A" | "L" | "SL" | "LOP" | "H";
 
 const ATTENDANCE_ORDER: AttendanceType[] = ["P", "A", "LOP", "SL"];
 
