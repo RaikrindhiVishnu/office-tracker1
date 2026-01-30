@@ -158,8 +158,11 @@ export default function AdminPage() {
 // const [extraData, setExtraData] = useState({});
 
 
-const [extraCols, setExtraCols] = useState<string[]>([]);
-const [extraData, setExtraData] = useState<any>({});
+const [extraCols, setExtraCols] = useState<Record<string, string[]>>({});
+const [extraData, setExtraData] = useState<
+  Record<string, Record<string, string>>
+>({});
+
 
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
