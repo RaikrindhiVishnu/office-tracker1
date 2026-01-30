@@ -84,17 +84,26 @@ export default function ProjectManagement() {
 
   /* ================= LOAD DATA ================= */
   useEffect(() => {
-    // Auth listener
-    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
-      setCurrentUser(user);
-    });
+  let unsubscribeTickets: any;
+  let unsubscribeEmployees: any;
 
-    // Tickets listener
+  const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+    setCurrentUser(user);
+
+    // If not logged in → do nothing
+    if (!user) {
+      setTickets([]);
+      setEmployees([]);
+      return;
+    }
+
+    /* ================= TICKETS ================= */
     const ticketsQuery = query(
       collection(db, "tickets"),
       orderBy("updatedAt", "desc")
     );
-    const unsubscribeTickets = onSnapshot(ticketsQuery, (snap) => {
+
+    unsubscribeTickets = onSnapshot(ticketsQuery, (snap) => {
       setTickets(
         snap.docs.map((d) => {
           const data = d.data() as any;
@@ -109,12 +118,15 @@ export default function ProjectManagement() {
       );
     });
 
-    // Employees listener
+    /* ================= EMPLOYEES ================= */
     const employeesQuery = query(
       collection(db, "employees"),
       orderBy("name", "asc")
     );
-    const unsubscribeEmployees = onSnapshot(employeesQuery, (snap) => {
+
+    unsubscribeEmployees = onSnapshot(employeesQuery, (snap) => {
+      console.log("Employees Loaded:", snap.docs.length);
+
       setEmployees(
         snap.docs.map((d) => {
           const data = d.data() as any;
@@ -127,13 +139,15 @@ export default function ProjectManagement() {
         })
       );
     });
+  });
 
-    return () => {
-      unsubscribeAuth();
-      unsubscribeTickets();
-      unsubscribeEmployees();
-    };
-  }, []);
+  /* CLEANUP */
+  return () => {
+    unsubscribeAuth();
+    if (unsubscribeTickets) unsubscribeTickets();
+    if (unsubscribeEmployees) unsubscribeEmployees();
+  };
+}, []);
 
   /* ================= CREATE TICKET ================= */
   const createTicket = async () => {
@@ -387,7 +401,10 @@ export default function ProjectManagement() {
                 <td className="p-4">
                   <select
                     value={t.assignedTo || ""}
-                    onChange={(e) => updateAssignee(t.id, e.target.value)}
+                    onChange={(e) => {
+                      const selectedId = e.target.value;
+                      updateAssignee(t.id, selectedId);
+                    }}
                     className="text-xs px-3 py-1.5 rounded-lg bg-white border border-gray-300 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="">Unassigned</option>
@@ -456,55 +473,7 @@ export default function ProjectManagement() {
         </table>
       </div>
 
-      {/* EMPLOYEES TABLE
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-        <div className="p-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Employees</h2>
-        </div>
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="p-4 text-left font-semibold text-gray-700">Name</th>
-              <th className="p-4 text-left font-semibold text-gray-700">Email</th>
-              <th className="p-4 text-left font-semibold text-gray-700">Role</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {employees.map((emp) => (
-              <tr
-                key={emp.id}
-                className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
-              >
-                <td className="p-4 font-medium text-gray-900">
-                  {emp.name}
-                </td>
-
-                <td className="p-4 text-gray-600">
-                  {emp.email}
-                </td>
-
-                <td className="p-4">
-                  <span className="text-xs px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200 font-medium">
-                    {emp.role}
-                  </span>
-                </td>
-              </tr>
-            ))}
-
-            {employees.length === 0 && (
-              <tr>
-                <td
-                  colSpan={3}
-                  className="p-8 text-center text-gray-500"
-                >
-                  No employees found. Add employees to your Firebase "employees" collection.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div> */}
+     
     </div>
   );
 }

@@ -78,84 +78,84 @@ export default function LoginPage() {
     }
   };
 
-  return (
-    <div className="min-h-screen grid grid-cols-1 md:grid-cols-2 bg-[#062f33]">
-      
-      {/* LEFT SECTION */}
-      <div className="hidden md:flex flex-col justify-center items-center text-white px-16">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-12 h-12 bg-orange-500 rounded-md" />
-          <h1 className="text-3xl font-semibold">
-            Office Tracker
-          </h1>
-        </div>
+ return (
+  <div className="min-h-screen flex items-center justify-center bg-[#143d3d]">
 
-        <p className="text-gray-300 text-center max-w-md text-lg">
-          Attendance, work updates and real-time
-          monitoring — all in one place.
+    <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
+
+      {/* TITLE */}
+      <h2 className="text-2xl font-semibold text-gray-800 mb-1">
+        Login
+      </h2>
+      <p className="text-gray-500 mb-6 text-sm">
+        Please enter your credentials
+      </p>
+
+      {/* ERROR */}
+      {error && (
+        <p className="text-red-500 text-sm mb-4">
+          {error}
         </p>
+      )}
+
+      {/* FORM */}
+      <div className="space-y-4">
+        <input
+          type="email"
+          placeholder="Email address"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="
+            w-full px-4 py-3 rounded-md
+            border border-gray-300
+            text-gray-800
+            outline-none
+            focus:ring-2 focus:ring-orange-400
+          "
+        />
+
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="
+            w-full px-4 py-3 rounded-md
+            border border-gray-300
+            text-gray-800
+            outline-none
+            focus:ring-2 focus:ring-orange-400
+          "
+        />
+
+        <button
+          onClick={handleLogin}
+          disabled={loading}
+          className="
+            w-full bg-orange-500 hover:bg-orange-600
+            text-white py-3 rounded-md font-medium
+            transition disabled:opacity-60
+          "
+        >
+          {loading ? "Logging in..." : "Login"}
+        </button>
       </div>
 
-      {/* RIGHT SECTION */}
-      <div className="flex items-center justify-center px-10">
-        <div className="w-full max-w-lg text-white">
+      {/* FOOTER */}
+      <div className="mt-6 flex justify-between text-sm">
+        <span className="text-gray-500">
+          Admin & Employee access
+        </span>
 
-          <h2 className="text-3xl font-semibold mb-2">
-            Welcome
-          </h2>
-          <p className="text-gray-300 mb-10">
-            Please login to your dashboard
-          </p>
-
-          {error && (
-            <p className="text-red-400 mb-4">
-              {error}
-            </p>
-          )}
-
-          {/* INPUTS */}
-          <div className="space-y-6">
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-white text-gray-800 px-4 py-3 text-lg rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-            />
-
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-white text-gray-800 px-4 py-3 text-lg rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-            />
-
-            <button
-              onClick={handleLogin}
-              disabled={loading}
-              className="mt-8 w-full bg-orange-500 hover:bg-orange-600 text-white py-3 text-lg font-medium transition disabled:opacity-60"
-            >
-              {loading ? "Logging in..." : "Login"}
-            </button>
-          </div>
-
-          {/* BOTTOM ROW */}
-          <div className="mt-10 flex items-center justify-between text-sm">
-            <span className="text-gray-400">
-              Admin & Employee access
-            </span>
-
-            <button
-              onClick={() => router.push("/admin/add-user")}
-              className="text-orange-400 hover:text-orange-300 font-medium transition"
-            >
-              Add User
-            </button>
-          </div>
-
-        </div>
+        <button
+          onClick={() => router.push("/admin/add-user")}
+          className="text-orange-500 hover:underline font-medium"
+        >
+          Add User
+        </button>
       </div>
     </div>
-  );
+  </div>
+);
+
 }
