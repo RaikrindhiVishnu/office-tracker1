@@ -1,45 +1,23 @@
 @import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
 @import "handsontable/dist/handsontable.full.min.css";
 
+/* ---------- GLOBAL COLOR & FONT LOCK ---------- */
+:root {
+  --background: #f9fafb;   /* neutral light gray */
+  --foreground: #171717;   /* stable dark text */
+}
+
+/* ---------- HTML & BODY ---------- */
 html {
+  color-scheme: light; /* force light mode everywhere */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
 
 body {
+  margin: 0;
+  background-color: var(--background);
+  color: var(--foreground);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-html {
-  color-scheme: light;
-}
-
-body {
-  background-color: #f9fafb; /* fixed neutral */
 }
