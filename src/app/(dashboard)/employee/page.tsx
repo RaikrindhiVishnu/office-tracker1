@@ -368,11 +368,12 @@ export default function EmployeeDashboard() {
         {messages.length > 0 && (
           <div className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 text-white py-2 overflow-hidden shadow-lg">
             <div className="animate-marquee whitespace-nowrap px-6 flex gap-8">
-              {messages.concat(messages).map((m, i) => (
-                <span key={i} className="inline-flex items-center gap-2 font-medium">
-                  📣 {m}
-                </span>
-              ))}
+             {messages.map((m, i) => (
+  <span key={i} className="inline-flex items-center gap-2 font-medium">
+    📣 {m}
+  </span>
+))}
+
             </div>
           </div>
         )}
@@ -402,24 +403,24 @@ export default function EmployeeDashboard() {
             <>
               <div>
                 <h2 className="text-3xl font-bold">Welcome back, {user.email?.split("@")[0]}</h2>
-                <p className="text-gray-500 mt-1">{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
+                <p className="text-gray-700 mt-1">{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white rounded-xl shadow p-6 border-l-4 border-blue-500">
-                  <p className="text-gray-500 text-sm mb-2">Status</p>
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
+                  <p className="text-gray-700 text-sm mb-2">Status</p>
                   <p className="text-2xl font-semibold">{isCheckedIn ? "🟢 Online" : "⚫ Offline"}</p>
                 </div>
-                <div className="bg-white rounded-xl shadow p-6 border-l-4 border-purple-500">
-                  <p className="text-gray-500 text-sm mb-2">Current Session</p>
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
+                  <p className="text-gray-700 text-sm mb-2">Current Session</p>
                   <p className="text-2xl font-semibold">{onlineMinutes !== null ? formatTotal(onlineMinutes) : "--"}</p>
                 </div>
-                <div className="bg-white rounded-xl shadow p-6 border-l-4 border-green-500">
-                  <p className="text-gray-500 text-sm mb-2">Total Worked</p>
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
+                  <p className="text-gray-700 text-sm mb-2">Total Worked</p>
                   <p className="text-2xl font-semibold">{attendance?.totalMinutes ? formatTotal(attendance.totalMinutes) : "--"}</p>
                 </div>
-                <div className="bg-white rounded-xl shadow p-6 border-l-4 border-orange-500">
-                  <p className="text-gray-500 text-sm mb-2">Sessions Today</p>
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
+                  <p className="text-gray-700 text-sm mb-2">Sessions Today</p>
                   <p className="text-2xl font-semibold">{sessions.length}</p>
                 </div>
               </div>
@@ -522,7 +523,7 @@ export default function EmployeeDashboard() {
                           <p className="text-sm text-gray-600 mt-1">
                             📅 {new Date(leave.fromDate).toLocaleDateString("en-IN")} - {new Date(leave.toDate).toLocaleDateString("en-IN")}
                           </p>
-                          <p className="text-xs text-gray-500 mt-1">Click to mark as read</p>
+                          <p className="text-xs text-gray-700 mt-1">Click to mark as read</p>
                         </div>
                       </div>
                     </div>
@@ -558,7 +559,7 @@ export default function EmployeeDashboard() {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                 <div>
                   <h2 className="text-2xl font-bold text-slate-900 mb-1">Holiday Calendar</h2>
-                  <p className="text-sm text-slate-500">View holidays and weekends</p>
+                  <p className="text-sm text-slate-700">View holidays and weekends</p>
                 </div>
                 
                 <div className="flex items-center gap-3 flex-wrap">
@@ -629,36 +630,36 @@ export default function EmployeeDashboard() {
                   return (
                     <div
                       key={day}
-                      className={`h-20 sm:h-24 lg:h-28 border-2 rounded-xl p-2 lg:p-3 text-sm lg:text-base relative transition-all hover:shadow-lg ${
+                      className={`h-20 sm:h-24 lg:h-28 border rounded-lg p-3 text-sm lg:text-base relative transition hover:shadow-sm ${
                         isToday
-                          ? "border-indigo-500 ring-4 ring-indigo-200 bg-indigo-50 shadow-lg"
+                          ? "border-indigo-500 ring-2 ring-indigo-200 shadow-sm"
                           : isHolidayDay
-                          ? "bg-gradient-to-br from-rose-50 to-pink-50 border-rose-300"
+                          ? "bg-green-100 border-rose-300"
                           : isPresent
-                          ? "bg-gradient-to-br from-green-50 to-emerald-50 border-green-300"
+                          ? "bg-red-100 border-green-300"
                           : isAbsent
-                          ? "bg-gradient-to-br from-red-50 to-orange-50 border-red-300"
+                          ? "bg-rose-100 border-red-300"
                           : "bg-white border-slate-200 hover:border-slate-300"
                       }`}
                     >
                       <div className={`font-bold ${isToday ? 'text-indigo-700' : 'text-slate-900'}`}>{day}</div>
 
                       {isHolidayDay && (
-                        <div className="mt-1 lg:mt-2 text-[10px] lg:text-xs text-rose-600 font-semibold line-clamp-2">
+                        <div className="mt-1 lg:mt-2 text-xs lg:text-sm text-rose-600 font-semibold line-clamp-2">
                           {holiday ? holiday.title : sunday ? "Sunday" : secondSat ? "2nd Saturday" : fourthSat ? "4th Saturday" : fifthSat ? "5th Saturday" : ""}
                         </div>
                       )}
 
                       {isPresent && !isHolidayDay && (
-                        <div className="mt-1 text-[10px] lg:text-xs text-green-700 font-semibold">✓ Present</div>
+                        <div className="mt-1 text-xs lg:text-xs text-green-700 font-semibold">✓ Present</div>
                       )}
 
                       {isAbsent && !isHolidayDay && (
-                        <div className="mt-1 text-[10px] lg:text-xs text-red-700 font-semibold">✗ Absent</div>
+                        <div className="mt-1 text-xs lg:text-xs text-red-700 font-semibold">✗ Absent</div>
                       )}
 
                       {isToday && (
-                        <span className="absolute bottom-1 right-1 lg:bottom-2 lg:right-2 text-[9px] lg:text-xs text-indigo-700 font-bold bg-indigo-200 px-2 py-0.5 rounded-full">
+                        <span className="absolute bottom-1 right-1 lg:bottom-2 lg:right-2 text-xs lg:text-xs text-indigo-700 font-bold bg-indigo-200 px-2 py-0.5 rounded-full">
                           TODAY
                         </span>
                       )}
@@ -669,15 +670,15 @@ export default function EmployeeDashboard() {
 
               <div className="mt-6 flex flex-wrap gap-4 lg:gap-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg"></div>
+                  <div className="w-6 h-6 bg-green-50 border-2 border-green-300 rounded-lg"></div>
                   <span className="text-sm font-medium text-slate-700">Present</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-300 rounded-lg"></div>
+                  <div className="w-6 h-6 bg-red-50 border-2 border-red-300 rounded-lg"></div>
                   <span className="text-sm font-medium text-slate-700">Absent</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-gradient-to-br from-rose-50 to-pink-50 border-2 border-rose-300 rounded-lg"></div>
+                  <div className="w-6 h-6 bg-rose-50 to-pink-50 border-2 border-rose-300 rounded-lg"></div>
                   <span className="text-sm font-medium text-slate-700">Holiday/Weekend</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -694,7 +695,7 @@ export default function EmployeeDashboard() {
               {holidays.map((h, i) => (
                 <div key={i} className="flex justify-between items-center border-b py-3 hover:bg-gray-50 px-2 rounded transition">
                   <span className="font-medium">🎊 {h.title}</span>
-                  <span className="text-gray-500">{new Date(h.date).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</span>
+                  <span className="text-gray-700">{new Date(h.date).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</span>
                 </div>
               ))}
             </div>
@@ -822,26 +823,26 @@ export default function EmployeeDashboard() {
 
                 <div className="text-center">
                   <p className="text-lg font-semibold">{user.email?.split("@")[0]}</p>
-                  <p className="text-gray-500">{user.email}</p>
+                  <p className="text-gray-700">{user.email}</p>
                   <p className="text-sm text-gray-400">Employee</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="border-2 border-gray-200 rounded-lg p-4">
-                  <p className="text-sm text-gray-500">Email</p>
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <p className="text-sm text-gray-700">Email</p>
                   <p className="font-medium mt-1">{user.email}</p>
                 </div>
-                <div className="border-2 border-gray-200 rounded-lg p-4">
-                  <p className="text-sm text-gray-500">Role</p>
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <p className="text-sm text-gray-700">Role</p>
                   <p className="font-medium mt-1">Employee</p>
                 </div>
-                <div className="border-2 border-gray-200 rounded-lg p-4">
-                  <p className="text-sm text-gray-500">Status</p>
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <p className="text-sm text-gray-700">Status</p>
                   <p className="font-medium mt-1 text-green-600">● Active</p>
                 </div>
-                <div className="border-2 border-gray-200 rounded-lg p-4">
-                  <p className="text-sm text-gray-500">Joined</p>
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <p className="text-sm text-gray-700">Joined</p>
                   <p className="font-medium mt-1">{attendance?.joinedAt ? new Date(attendance.joinedAt).toLocaleDateString("en-IN") : "—"}</p>
                 </div>
               </div>
@@ -887,7 +888,7 @@ export default function EmployeeDashboard() {
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-2xl font-bold text-slate-900">📊 Monthly Summary</h3>
-              <button onClick={() => setShowAttendanceSummary(false)} className="text-gray-500 hover:text-gray-700">
+              <button onClick={() => setShowAttendanceSummary(false)} className="text-gray-700 hover:text-gray-700">
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -943,15 +944,21 @@ export default function EmployeeDashboard() {
         </div>
       )}
 
-      <style jsx>{`
-        @keyframes marquee {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-100%); }
-        }
-        .animate-marquee {
-          animation: marquee 25s linear infinite;
-        }
-      `}</style>
+     <style jsx>{`
+  @keyframes marquee {
+    0% { transform: translateX(100%); }   /* start from right */
+    100% { transform: translateX(-50%); } /* move to left */
+  }
+
+ .animate-marquee {
+  animation: marquee 30s linear infinite;
+  will-change: transform;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+`}</style>
+
+
     </div>
   );
 }

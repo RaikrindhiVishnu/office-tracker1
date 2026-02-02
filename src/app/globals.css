@@ -26,3 +26,20 @@ body {
 }
 @import "handsontable/dist/handsontable.full.min.css";
 
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background-color: #f9fafb; /* fixed neutral */
+}
