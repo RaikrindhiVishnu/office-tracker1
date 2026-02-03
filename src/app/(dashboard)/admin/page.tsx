@@ -21,6 +21,13 @@ import { useRouter } from "next/navigation";
 import { exportMonthlyAttendance } from "@/lib/excel/exportMonthlyAttendance";
 import ProjectManagement from "./ProjectManagement";
 import type { AttendanceType } from "@/types/attendance";
+// import CallCenter from "../calls/CallCenter";
+// import CallButton from "@/components/CallButton";
+// import CallHistory from "@/components/CallHistory";
+import MeetView from "@/components/MeetView";
+import IncomingCallListener from "@/components/IncomingCallListener";
+
+// <CallCenter />
 
 /* ================= TYPES ================= */
 type Session = {
@@ -77,7 +84,8 @@ type View =
   | "leaveReport"
   | "calendar"
   | "analytics"
-  | "Project Management";
+  | "Project Management"
+  | "Meet";
 
 const DECLARED_HOLIDAYS: Record<string, { title: string }> = {
   "2026-01-01": { title: "New Year" },
@@ -566,7 +574,30 @@ useEffect(() => {
             active={view === "messages"}
             onClick={() => { setView("messages"); setSidebarOpen(false); }}
           />
-          
+          <NavItem
+  icon={
+    <svg
+      className="w-5 h-5"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14m-6 4h5a2 2 0 002-2V8a2 2 0 00-2-2H9a2 2 0 00-2 2v8a2 2 0 002 2zm-6-2h.01"
+      />
+    </svg>
+  }
+  label="Meet"
+  active={view === "Meet"}
+  onClick={() => {
+    setView("Meet");
+    setSidebarOpen(false);
+  }}
+/>
+
           <div className="pt-4 border-t border-white/10">
             <NavItem
               icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>}
@@ -1022,174 +1053,209 @@ useEffect(() => {
           {/* EMPLOYEES VIEW */}
           {view === "employees" && (
             <>
-              {/* Mobile Card View */}
-              <div className="grid grid-cols-1 gap-4 lg:hidden">
-                {users.map((u) => (
-                  <div key={u.uid} className="bg-white rounded-2xl shadow-lg border border-slate-200 p-5 hover:shadow-xl transition-all">
-                    <div className="flex items-start gap-4 mb-4">
-                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold shadow-lg">
-                        {u.name[0]?.toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-lg text-slate-900 mb-1 truncate">{u.name}</h3>
-                        <p className="text-sm text-slate-500 truncate mb-2">{u.email}</p>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
-                            {u.designation}
-                          </span>
-                          <span className="px-3 py-1 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full">
-                            {u.accountType}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {u.salary && (
-                      <div className="mb-4 p-3 bg-emerald-50 rounded-lg border border-emerald-100">
-                        <p className="text-xs text-emerald-600 font-medium mb-1">Monthly Salary</p>
-                        <p className="text-xl font-bold text-emerald-700">₹{u.salary.toLocaleString()}</p>
-                      </div>
-                    )}
-                    
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setSelectedUser(u);
-                          setView("employeeDetails");
-                        }}
-                        className="flex-1 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all shadow-md"
-                      >
-                        View Details
-                      </button>
-                      <button
-                        onClick={() => deleteUser(u.uid)}
-                        className="px-4 py-2.5 bg-gradient-to-r from-rose-500 to-pink-600 text-white rounded-xl font-semibold hover:from-rose-600 hover:to-pink-700 transition-all shadow-md"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+             <div className="grid grid-cols-1 gap-4 lg:hidden">
+  {users.map((u) => (
+    <div
+      key={u.uid}
+      className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5"
+    >
+      <div className="flex items-start gap-4 mb-4">
+        <div className="w-14 h-14 rounded-xl bg-[#4f46e5] flex items-center justify-center text-white text-xl font-bold">
+          {u.name[0]?.toUpperCase()}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <h3 className="font-bold text-lg text-slate-900 truncate">
+            {u.name}
+          </h3>
+          <p className="text-sm text-slate-600 truncate">
+            {u.email}
+          </p>
+          <p className="text-sm text-slate-700 mt-1">
+            {u.designation} · {u.accountType}
+          </p>
+        </div>
+      </div>
+
+      {u.salary && (
+        <div className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+          <p className="text-xs text-slate-500 font-medium mb-1">
+            Monthly Salary
+          </p>
+          <p className="text-lg font-bold text-slate-900">
+            ₹{u.salary.toLocaleString()}
+          </p>
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          onClick={() => {
+            setSelectedUser(u);
+            setView("employeeDetails");
+          }}
+          className="flex-1 px-4 py-2.5 bg-[#4f46e5] hover:bg-[#4338ca] text-white rounded-xl font-semibold transition shadow-sm"
+        >
+          View Details
+        </button>
+
+        <button
+          onClick={() => deleteUser(u.uid)}
+          className="flex-1 px-4 py-2.5 bg-[#e11d48] hover:bg-[#be123c] text-white rounded-xl font-semibold transition shadow-sm"
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  ))}
+</div>
 
               {/* Desktop Table View */}
-              <div className="hidden lg:block bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gradient-to-r from-slate-50 to-slate-100">
-                      <tr>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Employee</th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Email</th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Designation</th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Account Type</th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Salary</th>
-                        <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">Actions</th>
-                      </tr>
-                    </thead>
+              <div className="hidden lg:block bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+  <div className="overflow-x-auto">
+    <table className="w-full">
+      <thead className="bg-slate-50">
+        <tr>
+          <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase">Employee</th>
+          <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase">Email</th>
+          <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase">Designation</th>
+          <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase">Account Type</th>
+          <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase">Salary</th>
+          <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase">Actions</th>
+        </tr>
+      </thead>
 
-                    <tbody className="divide-y divide-slate-100">
-                      {users.map((u) => (
-                        <tr key={u.uid} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-md">
-                                {u.name[0]?.toUpperCase()}
-                              </div>
-                              <span className="font-semibold text-slate-900">{u.name}</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-slate-700">{u.email}</td>
-                          <td className="px-6 py-4">
-                            <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">
-                              {u.designation}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="px-3 py-1 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full">
-                              {u.accountType}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 font-bold text-emerald-700">
-                            {u.salary ? `₹${u.salary.toLocaleString()}` : "—"}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => {
-                                  setSelectedUser(u);
-                                  setView("employeeDetails");
-                                }}
-                                className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition-all shadow-sm"
-                              >
-                                View
-                              </button>
-                              <button
-                                onClick={() => deleteUser(u.uid)}
-                                className="px-4 py-2 bg-gradient-to-r from-rose-500 to-pink-600 text-white rounded-lg font-medium hover:from-rose-600 hover:to-pink-700 transition-all shadow-sm"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+      <tbody className="divide-y divide-slate-100">
+        {users.map((u) => (
+          <tr key={u.uid} className="hover:bg-slate-50">
+            <td className="px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-[#575797] flex items-center justify-center text-white font-bold">
+                  {u.name[0]?.toUpperCase()}
                 </div>
+                <span className="font-semibold text-slate-900">
+                  {u.name}
+                </span>
               </div>
+            </td>
+
+            <td className="px-6 py-4 text-slate-700">{u.email}</td>
+            <td className="px-6 py-4 text-slate-700">{u.designation}</td>
+            <td className="px-6 py-4 text-slate-700">{u.accountType}</td>
+            <td className="px-6 py-4 font-semibold text-slate-900">
+              {u.salary ? `₹${u.salary.toLocaleString()}` : "—"}
+            </td>
+
+           <td className="px-6 py-4">
+  <div className="flex gap-2">
+    <button
+      onClick={() => {
+        setSelectedUser(u);
+        setView("employeeDetails");
+      }}
+      className="px-4 py-2 bg-[#9d99e1f0] hover:bg-[#4338ca] text-white rounded-lg font-medium transition shadow-sm"
+    >
+      View
+    </button>
+
+    {/* 📞 CALL */}
+    {/* <CallButton toUid={u.uid} /> */}
+     {/* <CallButton toUids={[u.uid]} /> */}
+
+
+    <button
+      onClick={() => deleteUser(u.uid)}
+      className="px-4 py-2 bg-[#ac9058f4] hover:bg-[#be123c] text-white rounded-lg font-medium transition shadow-sm"
+    >
+      Delete
+    </button>
+  </div>
+</td>
+
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</div>
+
             </>
           )}
 
           {/* EMPLOYEE DETAILS */}
-          {view === "employeeDetails" && selectedUser && (
-            <div className="max-w-3xl mx-auto">
-              <button
-                onClick={() => setView("employees")}
-                className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-semibold mb-6 transition-colors group"
-              >
-                <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                Back to Employees
-              </button>
-              
-              <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-                <div className="h-32 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600"></div>
-                
-                <div className="px-6 lg:px-8 pb-8">
-                  <div className="flex flex-col sm:flex-row items-start gap-6 -mt-16">
-                    <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-4xl font-bold shadow-2xl border-4 border-white">
-                      {selectedUser.name[0]?.toUpperCase()}
-                    </div>
-                    
-                    <div className="flex-1 pt-16 sm:pt-20">
-                      <h2 className="text-3xl font-bold text-slate-900 mb-2">{selectedUser.name}</h2>
-                      <p className="text-slate-500 mb-4">{selectedUser.email}</p>
-                    </div>
-                  </div>
+         {view === "employeeDetails" && selectedUser && (
+  <div className="max-w-3xl mx-auto">
+    {/* Back button */}
+    <button
+      onClick={() => setView("employees")}
+      className="flex items-center gap-2 text-indigo-700 hover:text-indigo-800 font-semibold mb-6 transition-colors group"
+    >
+      <svg
+        className="w-5 h-5 group-hover:-translate-x-1 transition-transform"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+      </svg>
+      Back to Employees
+    </button>
 
-                  <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200">
-                      <p className="text-xs font-medium text-blue-600 mb-1">Designation</p>
-                      <p className="text-lg font-bold text-blue-900">{selectedUser.designation}</p>
-                    </div>
-                    
-                    <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200">
-                      <p className="text-xs font-medium text-purple-600 mb-1">Account Type</p>
-                      <p className="text-lg font-bold text-purple-900">{selectedUser.accountType}</p>
-                    </div>
-                    
-                    {selectedUser.salary && (
-                      <div className="p-4 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl border border-emerald-200 sm:col-span-2">
-                        <p className="text-xs font-medium text-emerald-600 mb-1">Monthly Salary</p>
-                        <p className="text-2xl font-bold text-emerald-900">₹{selectedUser.salary.toLocaleString()}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+    <div className="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
+      {/* Header strip – solid */}
+      <div className="h-32 bg-[#4f46e5]" />
+
+      <div className="px-6 lg:px-8 pb-8">
+        <div className="flex flex-col sm:flex-row items-start gap-6 -mt-16">
+          {/* Avatar */}
+          <div className="w-32 h-32 rounded-2xl bg-[#4f46e5] flex items-center justify-center text-white text-4xl font-bold shadow-sm border-4 border-white">
+            {selectedUser.name[0]?.toUpperCase()}
+          </div>
+
+          {/* Name */}
+          <div className="flex-1 pt-16 sm:pt-20">
+            <h2 className="text-3xl font-bold text-slate-900 mb-2">
+              {selectedUser.name}
+            </h2>
+            <p className="text-slate-600 mb-4">{selectedUser.email}</p>
+          </div>
+        </div>
+
+        {/* Info cards */}
+        <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="p-4 bg-blue-100 rounded-xl border border-blue-300">
+            <p className="text-xs font-medium text-blue-700 mb-1">
+              Designation
+            </p>
+            <p className="text-lg font-bold text-blue-900">
+              {selectedUser.designation}
+            </p>
+          </div>
+
+          <div className="p-4 bg-purple-100 rounded-xl border border-purple-300">
+            <p className="text-xs font-medium text-purple-700 mb-1">
+              Account Type
+            </p>
+            <p className="text-lg font-bold text-purple-900">
+              {selectedUser.accountType}
+            </p>
+          </div>
+
+          {selectedUser.salary && (
+            <div className="p-4 bg-emerald-100 rounded-xl border border-emerald-300 sm:col-span-2">
+              <p className="text-xs font-medium text-emerald-700 mb-1">
+                Monthly Salary
+              </p>
+              <p className="text-2xl font-bold text-emerald-900">
+                ₹{selectedUser.salary.toLocaleString()}
+              </p>
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  </div>
+)}
 
           {/* MESSAGES */}
           {view === "messages" && (
@@ -2047,7 +2113,13 @@ useEffect(() => {
               <ProjectManagement />
             </div>
           )}
-
+{/* MEET */}
+{view === "Meet" && (
+  <MeetView
+    users={users.filter(u => u.uid !== user.uid)}
+  />
+)}
+<IncomingCallListener />
         </main>
 
         {/* FOOTER */}
@@ -2091,12 +2163,13 @@ function NavItem({ icon, label, active = false, onClick, badge }: any) {
       onClick={onClick}
       className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 ${
         active
-          ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/50"
+          ? "bg-[#58576358] text-white shadow-md"
           : "text-slate-300 hover:bg-white/10 hover:text-white"
       }`}
     >
-      <span className={active ? "text-white" : ""}>{icon}</span>
+      <span>{icon}</span>
       <span className="flex-1 text-left">{label}</span>
+
       {badge !== undefined && (
         <span className="px-2 py-0.5 bg-rose-500 text-white text-xs font-bold rounded-full">
           {badge}
@@ -2121,6 +2194,8 @@ function StatCard({ title, value, icon, gradient, trend }: any) {
       </div>
       <p className="text-slate-600 text-sm font-medium mb-1">{title}</p>
       <p className="text-3xl font-bold text-slate-900">{value}</p>
+      {/* <CallHistory /> */}
     </div>
+    
   );
 }

@@ -10,8 +10,16 @@ import { useAuth } from "@/context/AuthContext";
 import { auth, db, storage } from "@/lib/firebase";
 import { checkIn, checkOut, getTodayAttendance } from "@/lib/attendance";
 import { saveDailyUpdate } from "@/lib/dailyUpdates";
+import CallCenter from "../calls/CallCenter";
+import CallHistory from "@/components/CallHistory";
+import IncomingCallListener from "@/components/IncomingCallListener";
+import MeetView from "@/components/MeetView";
 
-type ViewType = "dashboard" | "work-update" | "attendance" | "notifications" | "calendar" | "holidays" | "leave-history" | "leave-request" | "profile" | "help";
+
+
+<CallCenter />
+
+type ViewType = "dashboard" | "work-update" | "attendance" | "notifications" | "calendar" | "holidays" | "leave-history" | "leave-request" | "profile" | "help"| "meet";
 
 type LeaveRequest = {
   id: string;
@@ -70,6 +78,7 @@ const isHoliday = (dateStr: string) => {
 export default function EmployeeDashboard() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const [users, setUsers] = useState<any[]>([]);
 
   const [activeView, setActiveView] = useState<ViewType>("dashboard");
   const [attendance, setAttendance] = useState<any>(null);
@@ -130,6 +139,15 @@ export default function EmployeeDashboard() {
     const q = query(collection(db, "messages"), orderBy("createdAt", "desc"));
     return onSnapshot(q, (snap) => setMessages(snap.docs.map((d) => d.data().text)));
   }, []);
+
+  useEffect(() => {
+  const q = query(collection(db, "users"));
+  return onSnapshot(q, (snap) => {
+    setUsers(
+      snap.docs.map(d => ({ uid: d.id, ...(d.data() as any) }))
+    );
+  });
+}, []);
 
   useEffect(() => {
     if (!user) return;
@@ -337,6 +355,7 @@ export default function EmployeeDashboard() {
             ["holidays", "Holidays", "M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"],
             ["profile", "Profile", "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"],
             ["help", "Help", "M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"],
+            ["meet", "Meet", "M17 20h5v-2a3 3 0 00-5.356-1.857"]
           ].map(([id, label, icon]) => (
             <button key={id} onClick={() => { setActiveView(id as ViewType); setMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition relative ${activeView === id ? "bg-white/10" : "hover:bg-white/5"}`}>
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -879,9 +898,16 @@ export default function EmployeeDashboard() {
               )}
             </div>
           )}
+
+
+
+{activeView === "meet" && (
+  <MeetView users={users.filter(u => u.uid !== user.uid)} />
+)}
+<CallHistory />
         </main>
       </div>
-
+ 
       {/* Monthly Attendance Summary Modal */}
       {showAttendanceSummary && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowAttendanceSummary(false)}>
@@ -959,6 +985,7 @@ export default function EmployeeDashboard() {
 `}</style>
 
 
+<IncomingCallListener />
     </div>
   );
 }
