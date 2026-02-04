@@ -1461,7 +1461,7 @@ useEffect(() => {
             const absentCount = dayStatuses.filter((s) => s === "A").length;
             const lopCount = dayStatuses.filter((s) => s === "LOP").length;
 
-            const salary = u.salary ?? 0;
+            const salary = u.salary ??0;
             const perDay = salary / daysInMonth;
             const netPay = Math.round(perDay * presentCount);
             
