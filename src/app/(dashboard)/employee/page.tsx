@@ -935,7 +935,8 @@ rounded-xl
   />
 )}
 
-<ProfileView />
+{activeView === "profile" && <ProfileView />}
+
 
          {activeView === "help" && (
   <HelpView
@@ -954,7 +955,8 @@ rounded-xl
             <MeetView users={users.filter((u) => u.uid !== user.uid)} />
           )}
 
-          <CallHistory />
+          {activeView === "dashboard" && <CallHistory />}
+
         </main>
       </div>
 
