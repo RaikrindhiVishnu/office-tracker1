@@ -13,7 +13,7 @@ type Leave = {
   leaveType: string;
   fromDate: string;
   toDate: string;
-  status: "Approved" | "Rejected";
+  status: "Pending" | "Approved" | "Rejected";
 };
 
 type EmployeeNotification = {
@@ -47,13 +47,26 @@ export default function NotificationsView({
     if (!user?.uid || userData?.role !== "admin") return;
 
     setLoading(true);
-    const unsubscribe = subscribeToNotifications(
-      user.uid,
-      (notifications) => {
-        setEmployeeNotifications(notifications);
-        setLoading(false);
-      }
-    );
+const unsubscribe = subscribeToNotifications(
+  user.uid,
+  (notifications) => {
+
+    const typedNotifications: EmployeeNotification[] =
+      notifications.map((n: any) => ({
+        id: n.id,
+        type: n.type,
+        employeeId: n.employeeId,
+        employeeName: n.employeeName,
+        message: n.message,
+        changes: n.changedFields ?? n.changes ?? null,
+        timestamp: n.createdAt ?? n.timestamp ?? null,
+        read: n.read ?? false,
+      }));
+
+    setEmployeeNotifications(typedNotifications);
+    setLoading(false);
+  }
+);
 
     return () => unsubscribe();
   }, [user?.uid, userData?.role]);

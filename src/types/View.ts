@@ -1,0 +1,15 @@
+export type View =
+  | "dashboard"
+  | "profile"
+  | "employees"
+  | "employeeDetails"
+  | "attendance"
+  | "messages"
+  | "monthlyReport"
+  | "leaveReport"
+  | "calendar"
+  | "Project Management"
+  | "Meet"
+  | "notifications"
+  | "accounts"
+  | "analytics";

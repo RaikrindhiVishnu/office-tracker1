@@ -24,8 +24,8 @@ import { useAuth } from "@/context/AuthContext";
 
 type User = {
   uid: string;
-  name?: string;
-  email: string;
+  name?: string | null;
+  email: string | null;  
   avatar?: string;
   online?: boolean;
   status?: "available" | "busy" | "dnd" | "brb" | "away" | "offline";
@@ -84,8 +84,16 @@ type Call = {
   endTime?: any;
 };
 
+const getUserName = (user?: Partial<User> | null): string =>
+  user?.name ??
+  user?.email ??
+  "User";
+
+
+
 export default function TeamsStyleChatUpdated({ users }: { users: User[] }) {
   const { user } = useAuth();
+
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
@@ -493,7 +501,10 @@ export default function TeamsStyleChatUpdated({ users }: { users: User[] }) {
         if (doc.id !== user?.uid && doc.data().typing) {
           const typingUser = users.find((u) => u.uid === doc.id);
           if (typingUser) {
-            typingUsers.push(typingUser.name || typingUser.email);
+           typingUsers.push(
+  typingUser.name ?? typingUser.email ?? "User"
+);
+
           }
         }
       });
@@ -544,7 +555,7 @@ export default function TeamsStyleChatUpdated({ users }: { users: User[] }) {
 
       const messageData: any = {
         senderUid: user.uid,
-        senderName: user.email,
+        senderName: getUserName(user),
         status: "sent",
         readBy: [user.uid],
         createdAt: serverTimestamp(),
@@ -567,7 +578,7 @@ export default function TeamsStyleChatUpdated({ users }: { users: User[] }) {
       for (const participantId of otherParticipants) {
         await addDoc(collection(db, "notifications"), {
           fromUid: user.uid,
-          fromName: user.email,
+          fromName: getUserName(user),
           toUid: participantId,
           message: text || fileName || "Sent a file",
           chatId: chatId,
@@ -658,6 +669,21 @@ export default function TeamsStyleChatUpdated({ users }: { users: User[] }) {
     }
   };
 
+  const otherUser = useMemo(() => {
+  if (!activeCall) return null;
+
+  const otherId =
+    activeCall.callerId === user?.uid
+      ? activeCall.receiverId
+      : activeCall.callerId;
+
+  return users.find(u => u.uid === otherId) ?? null;
+}, [users, activeCall, user]);
+
+// NOW you can use it safely
+const otherUserName = getUserName(otherUser);
+const otherUserInitial = otherUserName.charAt(0).toUpperCase();
+
   /* ---------------- CALL FUNCTIONS ---------------- */
   const initiateCall = async (type: "video" | "audio") => {
     if (!user || !selectedChat || selectedChat.isGroup) return;
@@ -701,7 +727,7 @@ export default function TeamsStyleChatUpdated({ users }: { users: User[] }) {
 
       const callDoc = await addDoc(collection(db, "calls"), {
         callerId: user.uid,
-        callerName: user.email,
+          callerName: getUserName(user), 
         receiverId: receiverUser.uid,
         type,
         status: "ringing",
@@ -716,7 +742,7 @@ export default function TeamsStyleChatUpdated({ users }: { users: User[] }) {
       setActiveCall({
         id: callDoc.id,
         callerId: user.uid,
-        callerName: user.email,
+        callerName: getUserName(user),
         receiverId: receiverUser.uid,
         type,
         status: "ringing",
@@ -854,7 +880,7 @@ export default function TeamsStyleChatUpdated({ users }: { users: User[] }) {
       callerId: incomingCall.callerId,
       callerName: incomingCall.callerName,
       receiverId: incomingCall.receiverId,
-      receiverName: user?.email || "",
+      receiverName: getUserName(user),
       type: incomingCall.type,
       status: "rejected",
       timestamp: serverTimestamp(),
@@ -891,7 +917,7 @@ export default function TeamsStyleChatUpdated({ users }: { users: User[] }) {
           callerId: activeCall.callerId,
           callerName: activeCall.callerName,
           receiverId: activeCall.receiverId,
-          receiverName: users.find(u => u.uid === activeCall.receiverId)?.email || "",
+          receiverName: getUserName(users.find(u => u.uid === activeCall.receiverId)),
           type: activeCall.type,
           status: activeCall.status === "accepted" ? "completed" : "missed",
           duration,
@@ -961,7 +987,7 @@ export default function TeamsStyleChatUpdated({ users }: { users: User[] }) {
     });
 
     await addDoc(collection(db, "groupChats", groupRef.id, "messages"), {
-      text: `${user.email} created the group "${groupName.trim()}"`,
+      text: `${getUserName(user)} created the group "${groupName.trim()}"`,
       senderUid: "system",
       senderName: "System",
       createdAt: serverTimestamp(),
@@ -1086,7 +1112,7 @@ export default function TeamsStyleChatUpdated({ users }: { users: User[] }) {
       const otherUser = users.find((u) => u.uid === otherUserId);
       return (
         otherUser?.name?.toLowerCase().includes(query) ||
-        otherUser?.email.toLowerCase().includes(query)
+        otherUser?.email?.toLowerCase().includes(query)
       );
     }
   });
@@ -1174,11 +1200,13 @@ export default function TeamsStyleChatUpdated({ users }: { users: User[] }) {
               <div className="w-full h-full flex items-center justify-center">
                 <div className="text-center">
                   <div className="w-32 h-32 bg-gradient-to-br from-purple-400 to-blue-400 rounded-full flex items-center justify-center text-white font-bold text-5xl mx-auto mb-4">
-                    {users.find(u => u.uid === (activeCall.callerId === user?.uid ? activeCall.receiverId : activeCall.callerId))?.email.charAt(0).toUpperCase() || "?"}
-                  </div>
-                  <p className="text-white text-xl font-semibold">
-                    {users.find(u => u.uid === (activeCall.callerId === user?.uid ? activeCall.receiverId : activeCall.callerId))?.email || "Unknown"}
-                  </p>
+  {otherUserInitial}
+</div>
+
+<p className="text-white text-xl font-semibold">
+  {otherUserName}
+</p>
+
                 </div>
               </div>
             )}
@@ -1317,7 +1345,7 @@ export default function TeamsStyleChatUpdated({ users }: { users: User[] }) {
                         )}
                       </div>
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-blue-400 flex items-center justify-center text-white font-bold text-xs">
-                        {(u.name || u.email).charAt(0).toUpperCase()}
+                        {getUserName(u).charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1 text-left">
                         <p className="font-semibold text-gray-800 text-sm">

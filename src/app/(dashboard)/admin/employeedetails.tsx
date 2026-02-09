@@ -9,13 +9,15 @@ import {
   markAllNotificationsAsRead,
 } from "@/lib/employeeSync";
 import { useAuth } from "@/context/AuthContext";
+import type { View } from "@/types/View";
 
 interface EmployeeDetailsProps {
   selectedUser: any;
-  setView: (view: string) => void;
+  setView: React.Dispatch<React.SetStateAction<View>>;
   setSelectedUser: (user: any) => void;
   onSave?: (updatedUser: any) => void;
 }
+
 
 export default function EmployeeDetails({
   selectedUser,
@@ -52,12 +54,12 @@ export default function EmployeeDetails({
     const unsubscribe = subscribeToEmployeeData(
       selectedUser.uid,
       (updatedData) => {
-        if (!updatedData?.id) return;
+        if (!updatedData?.uid) return;
 
-        const safeUser = {
-          uid: updatedData.id,
-          ...updatedData,
-        };
+const safeUser = {
+  uid: updatedData.uid,
+};
+
 
         setEditedUser(safeUser);
         setSelectedUser(safeUser);
@@ -94,13 +96,13 @@ export default function EmployeeDetails({
 
       // 🔥 NEVER send uid inside update payload
       const { uid, id, ...updates } = editedUser;
+await updateEmployeeData({
+  userId: uid,
+  updates,
+  updatedBy: uid,        // or admin id if admin edits employee
+  role: "admin",         // since this is admin panel
+});
 
-      await updateEmployeeData(
-        uid,
-        updates,
-        user?.uid || "admin",
-        userData?.role || "admin"
-      );
 
       setSelectedUser(editedUser);
       setIsEditing(false);

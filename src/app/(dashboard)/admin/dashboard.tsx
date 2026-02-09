@@ -1,28 +1,34 @@
 "use client";
 
 import { useState } from "react";
+import { View } from "@/types/View";
+import { EmployeeRow } from "@/types/EmployeeRow";
 
-interface Employee {
-  uid: string;
-  name: string;
-  email: string;
-  status: "ONLINE" | "OFFLINE";
-  morningCheckIn: number;
-  totalMinutes: number;
-  task: string;
-}
+
+// interface Employee {
+//   uid: string;
+//   name: string;
+//   email: string;
+//   status: "ONLINE" | "OFFLINE";
+//   morningCheckIn: number;
+//   totalMinutes: number;
+//   task: string;
+// }
 
 interface DashboardProps {
   totalEmployees: number;
   onlineEmployees: number;
   offlineEmployees: number;
   avgWorkTime: number;
-  rows: Employee[];
+  rows: EmployeeRow[];
   busy: boolean;
   formatTime: (minutes: number) => string;
   formatTotal: (minutes: number) => string;
-  setView: (view: string) => void;
-  setSelectedEmployee: (employee: Employee) => void;
+  setView: React.Dispatch<React.SetStateAction<View>>;
+  setSelectedEmployee: React.Dispatch<
+  React.SetStateAction<EmployeeRow | null>
+>;
+
 }
 
 interface StatCardProps {

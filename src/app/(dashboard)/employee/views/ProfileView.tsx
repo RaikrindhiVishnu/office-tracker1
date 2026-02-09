@@ -10,10 +10,10 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { updateEmployeeData } from "@/lib/employeeSync";
 
 export default function ProfileView() {
-  const { user, userData, refreshUserData } = useAuth();
+  const { user, userData } = useAuth();
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [localUserData, setLocalUserData] = useState(userData);
+  const [localUserData, setLocalUserData] = useState<any>(null);
   const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>("");
 
@@ -128,20 +128,22 @@ export default function ProfileView() {
       }
 
       // Prepare update data
-      const updatedData = {
-        ...form,
-        profilePhoto: photoURL,
-      };
+   const updatedData = {
+  ...form,
+  salary: form.salary ? Number(form.salary) : 0, // ⭐ FIX
+  profilePhoto: photoURL,
+};
+
 
       console.log("📝 Updating employee data...");
       
       // Use the employeeSync function to update and notify admins
-      await updateEmployeeData(
-        user.uid,
-        updatedData,
-        user.uid,
-        userData?.role || "employee"
-      );
+    await updateEmployeeData({
+  userId: user.uid,
+  updates: updatedData,
+  updatedBy: user.uid,
+  role: userData?.role || "employee",
+});
 
       console.log("✅ Profile updated successfully");
 
@@ -149,10 +151,7 @@ export default function ProfileView() {
       setLocalUserData({ ...localUserData, ...updatedData });
       
       // Refresh user data from Firebase
-      if (refreshUserData) {
-        await refreshUserData();
-      }
-
+     
       setEditing(false);
       setProfilePhoto(null);
       

@@ -1,18 +1,20 @@
 import React from 'react';
+import { View } from "@/types/View";
+import type { Employee } from "@/types/Employee";
 
-interface Session {
-  checkIn: any;
-  checkOut: any | null;
-}
+// interface Session {
+//   checkIn: any;
+//   checkOut: any | null;
+// }
 
-interface Employee {
-  uid: string;
-  name: string;
-  email: string;
-  status: string;
-  totalMinutes: number;
-  sessions: Session[];
-}
+// interface Employee {
+//   uid: string;
+//   name: string;
+//   email: string;
+//   status: string;
+//   totalMinutes: number;
+//   sessions: Session[];
+// }
 
 interface User {
   uid: string;
@@ -25,10 +27,13 @@ interface User {
 
 interface EmployeesViewProps {
   view: string;
-  setView: (view: string) => void;
+  setView: React.Dispatch<React.SetStateAction<View>>;
   selectedEmployee: Employee | null;
-  users: User[];
-  setSelectedUser: (user: User) => void;
+  users: Employee[];
+  setSelectedUser: React.Dispatch<
+  React.SetStateAction<Employee | null>
+>;
+
   deleteUser: (uid: string) => void;
   showAddUser: boolean;
   setShowAddUser: (show: boolean) => void;
@@ -46,7 +51,7 @@ interface EmployeesViewProps {
   handleAddUser: () => void;
   creatingUser: boolean;
   formatTime: (timestamp: any) => string;
-  formatTotal: (minutes: number) => string;
+  formatTotal: (minutes?: number) => string;
 }
 
 const EmployeesView: React.FC<EmployeesViewProps> = ({
@@ -126,7 +131,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                       {selectedEmployee.status}
                     </span>
                     <span className="px-4 py-2 rounded-xl text-sm font-bold bg-indigo-100 text-indigo-700 shadow-sm">
-                      Total: {formatTotal(selectedEmployee.totalMinutes)}
+                      Total: {formatTotal(selectedEmployee.totalMinutes ?? 0)}
                     </span>
                   </div>
                 </div>
@@ -153,7 +158,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {selectedEmployee.sessions.map((s, i) => {
+                    {(selectedEmployee.sessions ?? []).map((s, i) => {
                       const start = s.checkIn.toDate().getTime();
                       const end = s.checkOut ? s.checkOut.toDate().getTime() : Date.now();
                       const mins = Math.floor((end - start) / 60000);

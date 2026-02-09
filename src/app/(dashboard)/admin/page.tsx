@@ -37,6 +37,11 @@ import MessagesView from "./meassages";
 import MeetChatApp from "@/components/MeetChatAppUpdated";
 import AccountsDashboard from "./Accounts/AccountsDashboard";
 import AdminNotificationsPage from "./AdminNotificationBell";
+import { Employee } from "@/types/Employee";
+import { View } from "@/types/View";
+import { EmployeeRow } from "@/types/EmployeeRow";
+
+
 // <CallCenter />
 
 /* ================= TYPES ================= */
@@ -45,16 +50,6 @@ type Session = {
   checkOut: any;
 };
 
-type EmployeeRow = {
-  uid: string;
-  name: string;
-  email: string;
-  sessions: Session[];
-  morningCheckIn: any | null;
-  status: "ONLINE" | "OFFLINE";
-  totalMinutes: number;
-  task: string;
-};
 
 type User = {
   uid: string;
@@ -83,21 +78,21 @@ type LeaveRequest = {
   createdAt: any;
 };
 
-type View =
-  | "dashboard"
-  | "profile"
-  | "employees"
-  | "employeeDetails"
-  | "attendance"
-  | "messages"
-  | "monthlyReport"
-  | "leaveReport"
-  | "calendar"
-  // | "analytics"
-  | "Project Management"
-  | "Meet"
-  | "notifications"
-  | "accounts";
+// type View =
+//   | "dashboard"
+//   | "profile"
+//   | "employees"
+//   | "employeeDetails"
+//   | "attendance"
+//   | "messages"
+//   | "monthlyReport"
+//   | "leaveReport"
+//   | "calendar"
+//   // | "analytics"
+//   | "Project Management"
+//   | "Meet"
+//   | "notifications"
+//   | "accounts";
 
 const DECLARED_HOLIDAYS: Record<string, { title: string }> = {
   "2026-01-01": { title: "New Year" },
@@ -123,18 +118,37 @@ const formatTime = (ts: any) =>
       })
     : "--";
 
-const formatTotal = (m: number) => `${Math.floor(m / 60)}h ${m % 60}m`;
+const formatTotal = (m?: number): string => {
+  const minutes = m ?? 0;
+
+  const h = Math.floor(minutes / 60);
+  const min = minutes % 60;
+
+  if (h === 0 && min === 0) return "0m";
+
+  return h ? `${h}h ${min}m` : `${min}m`;
+};
 
 const calculateTotalMinutes = (sessions: Session[]) => {
   let total = 0;
+
   for (const s of sessions) {
     if (!s.checkIn) continue;
+
     const start = s.checkIn.toDate().getTime();
-    const end = s.checkOut ? s.checkOut.toDate().getTime() : Date.now();
+    const end = s.checkOut
+      ? s.checkOut.toDate().getTime()
+      : Date.now();
+
     total += Math.floor((end - start) / 60000);
   }
+
   return total;
 };
+
+/* ================= HELPERS ================= */
+
+
 
 const attendanceStyle: Record<AttendanceType, string> = {
   P: "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -196,10 +210,10 @@ const [extraData, setExtraData] = useState<
   Record<string, Record<string, string>>
 >({});
 
-const [selectedUser, setSelectedUser] = useState(null);
+const [selectedUser, setSelectedUser] = useState<Employee | null>(null);
 
 const [isEditing, setIsEditing] = useState(false);
-const [editedUser, setEditedUser] = useState({});
+const [editedUser, setEditedUser] = useState<Employee | null>(null);
 
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -259,7 +273,7 @@ useEffect(() => {
 
   const [view, setView] = useState<View>("dashboard");
   const [rows, setRows] = useState<EmployeeRow[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<Employee[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [newMsg, setNewMsg] = useState("");
@@ -269,11 +283,11 @@ useEffect(() => {
     null
   );
 const handleSaveEmployee = () => {
-  // Update the user in your database/state
-  // Example: updateEmployeeInFirebase(editedUser);
+  if (!editedUser) return; // prevents null crash
+
   setSelectedUser(editedUser);
   setIsEditing(false);
-  // Show success message
+
   alert("Employee details updated successfully!");
 };
 
@@ -306,31 +320,38 @@ const handleSaveEmployee = () => {
         doc(db, "dailyUpdates", `${uid}_${targetDate}`)
       );
 
-      rowsData.push({
-        uid,
-        name: userData.name,
-        email: userData.email,
-        sessions,
-        morningCheckIn,
-        status: isOnline ? "ONLINE" : "OFFLINE",
-        totalMinutes: calculateTotalMinutes(sessions),
-        task: updateSnap.exists() ? updateSnap.data().currentTask : "—",
-      });
+     const id = u.id;
+
+rowsData.push({
+  id, 
+  uid: id,
+  name: userData.name,
+  email: userData.email,
+  sessions,
+  morningCheckIn,
+  status: isOnline ? "ONLINE" : "OFFLINE",
+  totalMinutes: calculateTotalMinutes(sessions),
+  task: updateSnap.exists() ? updateSnap.data().currentTask : "—",
+});
+
     }
 
     setRows(rowsData);
     setBusy(false);
   };
 
-  const loadUsers = async () => {
-    const snap = await getDocs(collection(db, "users"));
-    setUsers(
-      snap.docs.map((d) => ({
-        uid: d.id,
-        ...(d.data() as any),
-      }))
-    );
-  };
+const loadUsers = async () => {
+  const snap = await getDocs(collection(db, "users"));
+
+  setUsers(
+    snap.docs.map((d) => ({
+      id: d.id,
+      ...(d.data() as Omit<Employee, "id">),
+    }))
+  );
+};
+
+
 
   const loadMessages = async () => {
     const snap = await getDocs(collection(db, "messages"));

@@ -5,18 +5,26 @@ import SalaryStructure from "./SalaryStructure";
 import PayrollGenerator from "./PayrollGenerator";
 import PayslipHistory from "./PayslipHistory";
 
-type Tab =
-  | "salary"
-  | "payroll"
-  | "history";
+/* ---------------- TYPES ---------------- */
+
+type Tab = "salary" | "payroll" | "history";
+
+interface User {
+  uid?: string;
+  name?: string;
+  email?: string;
+}
+
+interface AccountsDashboardProps {
+  selectedUser?: User | null;
+}
+
+/* ---------------- COMPONENT ---------------- */
 
 export default function AccountsDashboard({
   selectedUser,
-}: {
-  selectedUser?: any;
-}) {
-  const [activeTab, setActiveTab] =
-    useState<Tab>("salary");
+}: AccountsDashboardProps) {
+  const [activeTab, setActiveTab] = useState<Tab>("salary");
 
   const TabButton = ({
     id,
@@ -44,43 +52,28 @@ export default function AccountsDashboard({
         <h1 className="text-3xl font-bold">
           Accounts & Payroll
         </h1>
+
         <p className="text-gray-600">
-          Manage salaries, generate payroll, and
-          download payslips.
+          Manage salaries, generate payroll, and download payslips.
         </p>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-3">
-        <TabButton
-          id="salary"
-          label="Salary Structure"
-        />
-        <TabButton
-          id="payroll"
-          label="Payroll Generator"
-        />
-        <TabButton
-          id="history"
-          label="Payslip History"
-        />
+        <TabButton id="salary" label="Salary Structure" />
+        <TabButton id="payroll" label="Payroll Generator" />
+        <TabButton id="history" label="Payslip History" />
       </div>
 
       {/* Content */}
       <div>
         {activeTab === "salary" && (
-          <SalaryStructure
-            selectedUser={selectedUser}
-          />
+        <SalaryStructure />
         )}
 
-        {activeTab === "payroll" && (
-          <PayrollGenerator />
-        )}
+        {activeTab === "payroll" && <PayrollGenerator />}
 
-        {activeTab === "history" && (
-          <PayslipHistory />
-        )}
+        {activeTab === "history" && <PayslipHistory />}
       </div>
     </div>
   );

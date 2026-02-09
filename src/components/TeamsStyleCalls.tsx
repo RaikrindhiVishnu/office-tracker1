@@ -22,11 +22,13 @@ import { db } from "@/lib/firebase";
 
 type User = {
   uid: string;
-  name?: string;
-  email: string;
+  name?: string | null;
+  email?: string | null;
   avatar?: string;
   online?: boolean;
 };
+
+
 
 type Call = {
   id: string;
@@ -54,6 +56,12 @@ type CallHistory = {
   timestamp: any;
 };
 
+const getUserName = (user?: Partial<User> | null): string =>
+  user?.name ??
+  user?.email ??
+  "User";
+
+
 export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
@@ -69,7 +77,7 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
-  const timerIntervalRef = useRef<any>(null);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const STUN_SERVERS = {
     iceServers: [
@@ -77,6 +85,9 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
       { urls: "stun:stun1.l.google.com:19302" },
     ],
   };
+
+  const getInitial = (name?: string | null) =>
+  name?.charAt(0)?.toUpperCase() || "?";
 
   /* ---------------- CALL TIMER ---------------- */
   useEffect(() => {
@@ -148,6 +159,8 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
         return;
       }
 
+
+
       const call = { id: snapshot.id, ...snapshot.data() } as Call;
       setActiveCall(call);
 
@@ -210,35 +223,36 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
       });
 
       // Handle remote stream
-      peerConnection.ontrack = (event) => {
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = event.streams[0];
-        }
-      };
+     // Handle remote stream
+peerConnection.ontrack = (event) => {
+  if (remoteVideoRef.current) {
+    remoteVideoRef.current.srcObject = event.streams[0];
+  }
+};
 
-      // Create offer
-      const offer = await peerConnection.createOffer();
-      await peerConnection.setLocalDescription(offer);
+// Create offer
+const offer = await peerConnection.createOffer();
+await peerConnection.setLocalDescription(offer);
 
-      // Create call document
-      const callDoc = await addDoc(collection(db, "calls"), {
-        callerId: user.uid,
-        callerName: user.email,
-        receiverId: receiverUser.uid,
-        type,
-        status: "ringing",
-        offer: {
-          type: offer.type,
-          sdp: offer.sdp,
-        },
-        iceCandidates: [],
-        startTime: serverTimestamp(),
-      });
+// Create call document
+const callDoc = await addDoc(collection(db, "calls"), {
+  callerId: user.uid,
+  callerName: getUserName(user), // ✅ PUT IT HERE
+  receiverId: receiverUser.uid,
+  type,
+  status: "ringing",
+  offer: {
+    type: offer.type,
+    sdp: offer.sdp,
+  },
+  iceCandidates: [],
+  startTime: serverTimestamp(),
+});
 
       setActiveCall({
         id: callDoc.id,
         callerId: user.uid,
-        callerName: user.email,
+        callerName: getUserName(user), // ✅ FIXED: Use getUserName instead of user.email
         receiverId: receiverUser.uid,
         type,
         status: "ringing",
@@ -270,10 +284,9 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
       // Handle connection state
       peerConnection.onconnectionstatechange = () => {
         console.log("Connection state:", peerConnection.connectionState);
-        if (peerConnection.connectionState === "failed" || 
-            peerConnection.connectionState === "disconnected") {
-          endCall();
-        }
+       if (peerConnection.connectionState === "failed") {
+  endCall();
+}
       };
 
     } catch (error) {
@@ -392,7 +405,7 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
       callerId: incomingCall.callerId,
       callerName: incomingCall.callerName,
       receiverId: incomingCall.receiverId,
-      receiverName: user?.email || "",
+      receiverName: getUserName(user),
       type: incomingCall.type,
       status: "rejected",
       timestamp: serverTimestamp(),
@@ -434,7 +447,11 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
           callerId: activeCall.callerId,
           callerName: activeCall.callerName,
           receiverId: activeCall.receiverId,
-          receiverName: users.find(u => u.uid === activeCall.receiverId)?.email || "",
+          receiverName:
+  getUserName(
+    users.find(u => u.uid === activeCall.receiverId)
+  ),
+
           type: activeCall.type,
           status: activeCall.status === "accepted" ? "completed" : "missed",
           duration,
@@ -497,7 +514,8 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
     (u) =>
       u.uid !== user?.uid &&
       (u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        u.email.toLowerCase().includes(searchQuery.toLowerCase()))
+        u.email?.toLowerCase().includes(searchQuery.toLowerCase())
+)
   );
 
   return (
@@ -558,7 +576,12 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
               <div className="w-full h-full flex items-center justify-center">
                 <div className="text-center">
                   <div className="w-32 h-32 bg-gradient-to-br from-purple-400 to-blue-400 rounded-full flex items-center justify-center text-white font-bold text-5xl mx-auto mb-4">
-                    {users.find(u => u.uid === (activeCall.callerId === user?.uid ? activeCall.receiverId : activeCall.callerId))?.email.charAt(0).toUpperCase() || "?"}
+                    {users
+  .find(u => u.uid === (activeCall.callerId === user?.uid 
+      ? activeCall.receiverId 
+      : activeCall.callerId))
+  ?.email?.charAt(0)?.toUpperCase() || "?"
+}
                   </div>
                   <p className="text-white text-xl font-semibold">
                     {users.find(u => u.uid === (activeCall.callerId === user?.uid ? activeCall.receiverId : activeCall.callerId))?.email || "Unknown"}
@@ -707,7 +730,7 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
                       >
                         <div className="relative">
                           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-blue-400 flex items-center justify-center text-white font-bold text-sm">
-                            {(u.name || u.email).charAt(0).toUpperCase()}
+                            {getInitial(u.name || u.email)}
                           </div>
                           {u.online && (
                             <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
@@ -762,7 +785,8 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
                           className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors"
                         >
                           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-blue-400 flex items-center justify-center text-white font-bold text-sm">
-                            {otherPersonName.charAt(0).toUpperCase()}
+                            {(otherPersonName?.charAt(0) ?? "?")
+.toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="font-semibold text-gray-800 text-sm truncate">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { AttendanceType } from "@/types/attendance";
 
 interface User {
   uid: string;
@@ -13,35 +14,52 @@ interface MonthlyReportProps {
   users: User[];
   monthlyDate: Date;
   setMonthlyDate: (date: Date | ((prev: Date) => Date)) => void;
-  monthlyAttendance: Record<string, Record<string, string>>;
-  setMonthlyAttendance: React.Dispatch<React.SetStateAction<Record<string, Record<string, string>>>>;
-  sessionsByDate: Record<string, any>;
-  isHoliday: (dateStr: string) => any;
-  saveMonthlyAttendance: (uid: string, dateStr: string, status: string) => void;
+
+  monthlyAttendance: Record<string, Record<string, AttendanceType>>;
+
+  setMonthlyAttendance: React.Dispatch<
+    React.SetStateAction<Record<string, Record<string, AttendanceType>>>
+  >;
+
+  sessionsByDate: Record<string, any>; // ✅ FIX
+  isHoliday: (dateStr: string) => any; // (you were also using this)
+
+  saveMonthlyAttendance: (
+    uid: string,
+    dateStr: string,
+    status: AttendanceType
+  ) => void;
+
   getAutoStatus: (params: {
     uid: string;
     dateStr: string;
     sessionsByDate: Record<string, any>;
     isHolidayDay: boolean;
-  }) => string;
+  }) => AttendanceType;
+
   isSunday: (year: number, month: number, day: number) => boolean;
   isSecondSaturday: (year: number, month: number, day: number) => boolean;
   isFourthSaturday: (year: number, month: number, day: number) => boolean;
   isFifthSaturday: (year: number, month: number, day: number) => boolean;
 }
 
-const attendanceStyle: Record<string, string> = {
+
+const attendanceStyle: Partial<Record<AttendanceType, string>> = {
   P: "bg-emerald-100 text-emerald-700",
   A: "bg-rose-100 text-rose-700",
   LOP: "bg-violet-100 text-violet-700",
   H: "bg-slate-200 text-slate-600",
 };
 
-const nextStatus = (current: string): string => {
+
+
+const nextStatus = (current: AttendanceType): AttendanceType => {
+  if (current === "H") return "H";
   if (current === "P") return "A";
   if (current === "A") return "LOP";
   return "P";
 };
+
 
 export default function MonthlyReport({
   users,
@@ -186,7 +204,7 @@ export default function MonthlyReport({
                   });
 
                   return isHolidayDay
-                    ? "H"
+                    ? ("H" as AttendanceType)
                     : monthlyAttendance[u.uid]?.[dateStr] ?? autoStatus;
                 }
               );

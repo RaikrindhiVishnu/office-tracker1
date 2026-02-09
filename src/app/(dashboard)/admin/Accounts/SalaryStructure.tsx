@@ -11,84 +11,121 @@ import {
   getDocs,
 } from "firebase/firestore";
 
-export default function SalaryStructure() {
-  const emptySalary = {
-    basic: "",
-    hra: "",
-    specialAllowance: "",
-    pf: "",
-    pt: "",
-    tds: "",
-    bankAccount: "",
-    pan: "",
-  };
+/* ================= TYPES ================= */
 
-  const [employees, setEmployees] = useState<any[]>([]);
+interface Employee {
+  uid: string;
+  name?: string;
+  email?: string;
+}
+
+interface Salary {
+  basic: string;
+  hra: string;
+  specialAllowance: string;
+  pf: string;
+  pt: string;
+  tds: string;
+  bankAccount: string;
+  pan: string;
+}
+
+/* ================= EMPTY ================= */
+
+const emptySalary: Salary = {
+  basic: "",
+  hra: "",
+  specialAllowance: "",
+  pf: "",
+  pt: "",
+  tds: "",
+  bankAccount: "",
+  pan: "",
+};
+
+/* ================= COMPONENT ================= */
+
+export default function SalaryStructure() {
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployee, setSelectedEmployee] =
-    useState<any>(null);
-  const [salary, setSalary] = useState(emptySalary);
+    useState<Employee | null>(null);
+
+  const [salary, setSalary] =
+    useState<Salary>(emptySalary);
+
   const [loading, setLoading] = useState(false);
 
-  /* ================= LOAD EMPLOYEES ================= */
+/* ================= LOAD EMPLOYEES ================= */
 
   useEffect(() => {
     const loadEmployees = async () => {
-      const snap = await getDocs(collection(db, "users"));
+      try {
+        const snap = await getDocs(collection(db, "users"));
 
-      const list = snap.docs
-        .map((doc) => ({
-          uid: doc.id,
-          ...doc.data(),
-        }))
-        .sort((a: any, b: any) =>
-          a.name.localeCompare(b.name)
-        );
+        const list: Employee[] = snap.docs
+          .map((doc) => ({
+            uid: doc.id,
+            ...(doc.data() as Omit<Employee, "uid">),
+          }))
+          .sort((a, b) =>
+            (a.name || "").localeCompare(b.name || "")
+          );
 
-      setEmployees(list);
+        setEmployees(list);
+      } catch (err) {
+        console.error("Failed to load employees:", err);
+      }
     };
 
     loadEmployees();
   }, []);
 
-  /* ================= LOAD SALARY ================= */
+/* ================= LOAD SALARY ================= */
 
   useEffect(() => {
     if (!selectedEmployee) return;
 
     const loadSalary = async () => {
-      const ref = doc(
-        db,
-        "salaryStructures",
-        selectedEmployee.uid
-      );
+      try {
+        const ref = doc(
+          db,
+          "salaryStructures",
+          selectedEmployee.uid
+        );
 
-      const snap = await getDoc(ref);
+        const snap = await getDoc(ref);
 
-      if (snap.exists()) {
-        setSalary(snap.data() as any);
-      } else {
-        setSalary(emptySalary); // reset if none
+        if (snap.exists()) {
+          setSalary(snap.data() as Salary);
+        } else {
+          setSalary(emptySalary);
+        }
+      } catch (err) {
+        console.error("Failed to load salary:", err);
       }
     };
 
     loadSalary();
   }, [selectedEmployee]);
 
-  /* ================= CALCULATIONS ================= */
+/* ================= CALCULATIONS ================= */
 
   const gross =
     Number(salary.basic || 0) +
     Number(salary.hra || 0) +
     Number(salary.specialAllowance || 0);
 
-  const handleChange = (field: string, value: string) => {
+  const handleChange = (
+    field: keyof Salary,
+    value: string
+  ) => {
     setSalary((prev) => ({
       ...prev,
       [field]: value,
     }));
   };
 
-  /* ================= SAVE ================= */
+/* ================= SAVE ================= */
 
   const saveSalary = async () => {
     if (!selectedEmployee) {
@@ -118,7 +155,7 @@ export default function SalaryStructure() {
     setLoading(false);
   };
 
-  /* ================= UI ================= */
+/* ================= UI ================= */
 
   return (
     <div className="bg-white p-8 rounded-2xl shadow-lg max-w-3xl">
@@ -126,16 +163,16 @@ export default function SalaryStructure() {
         Salary Structure
       </h2>
 
-      {/* ⭐ Employee Dropdown */}
+      {/* Employee Dropdown */}
       <select
         className="border p-3 rounded-lg mb-6 w-full"
         onChange={(e) => {
           const emp = employees.find(
             (u) => u.uid === e.target.value
           );
-          setSelectedEmployee(emp);
+          setSelectedEmployee(emp || null);
         }}
-        defaultValue=""
+        value={selectedEmployee?.uid || ""}
       >
         <option value="" disabled>
           Select Employee
@@ -143,7 +180,7 @@ export default function SalaryStructure() {
 
         {employees.map((emp) => (
           <option key={emp.uid} value={emp.uid}>
-            {emp.name} ({emp.email})
+            {emp.name || "Unnamed"} ({emp.email})
           </option>
         ))}
       </select>
@@ -152,26 +189,18 @@ export default function SalaryStructure() {
       {selectedEmployee && (
         <>
           <div className="grid grid-cols-2 gap-4">
-            {[
-              "basic",
-              "hra",
-              "specialAllowance",
-              "pf",
-              "pt",
-              "tds",
-              "bankAccount",
-              "pan",
-            ].map((field) => (
-              <input
-                key={field}
-                placeholder={field}
-                value={(salary as any)[field]}
-                onChange={(e) =>
-                  handleChange(field, e.target.value)
-                }
-                className="border p-3 rounded-lg"
-              />
-            ))}
+            {(Object.keys(emptySalary) as (keyof Salary)[])
+              .map((field) => (
+                <input
+                  key={field}
+                  placeholder={field}
+                  value={salary[field]}
+                  onChange={(e) =>
+                    handleChange(field, e.target.value)
+                  }
+                  className="border p-3 rounded-lg"
+                />
+              ))}
           </div>
 
           {/* Gross */}

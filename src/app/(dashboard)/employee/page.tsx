@@ -935,15 +935,7 @@ rounded-xl
   />
 )}
 
-         {activeView === "profile" && (
-  <ProfileView
-    user={user}
-    profilePhoto={profilePhoto}
-    handlePhotoUpload={handlePhotoUpload}
-    uploading={uploading}
-    attendance={attendance}
-  />
-)}
+<ProfileView />
 
          {activeView === "help" && (
   <HelpView
