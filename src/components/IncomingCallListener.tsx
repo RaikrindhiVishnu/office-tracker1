@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import { collection, query, where, onSnapshot, updateDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 export default function IncomingCallListener() {
   const { user } = useAuth();
+  const router = useRouter();
   const [call, setCall] = useState<any>(null);
 
   useEffect(() => {
@@ -40,14 +42,15 @@ export default function IncomingCallListener() {
 
       <div className="flex gap-2 mt-4">
         <button
-          onClick={async () => {
-            await updateDoc(doc(db, "calls", call.id), { status: "active" });
-            window.open(call.meetUrl, "_blank");
-          }}
-          className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm font-medium"
-        >
-          Join
-        </button>
+  onClick={async () => {
+    await updateDoc(doc(db, "calls", call.id), { status: "active" });
+    // Use waiting room for better UX
+    router.push(`/call/${call.id}/waiting`);
+  }}
+  className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm font-medium"
+>
+  Join
+</button>
 
         <button
           onClick={async () => {
