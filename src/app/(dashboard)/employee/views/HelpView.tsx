@@ -23,18 +23,19 @@ export default function HelpView() {
   const [queries, setQueries] = useState<any[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [msg, setMsg] = useState("");
 
-  /* ================= LOAD EMPLOYEE QUERIES ================= */
+  // ───────── Load Queries ─────────
   useEffect(() => {
     if (!user?.uid) return;
 
     const q = query(
       collection(db, "employeeQueries"),
       where("employeeId", "==", user.uid),
-      orderBy("createdAt", "desc") // 🔥 requires index
+      orderBy("createdAt", "desc")
     );
 
-    const unsub = onSnapshot(q, async (snapshot) => {
+    const unsub = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map((d) => ({
         id: d.id,
         ...d.data(),
@@ -42,27 +43,23 @@ export default function HelpView() {
 
       setQueries(docs);
       setLoading(false);
-
-      // Mark replies as read
-      snapshot.docs.forEach(async (docSnap) => {
-        if (docSnap.data().employeeUnread) {
-          await updateDoc(doc(db, "employeeQueries", docSnap.id), {
-            employeeUnread: false,
-          });
-        }
-      });
     });
 
     return () => unsub();
   }, [user]);
 
-  /* ================= SUBMIT QUERY ================= */
+  // ───────── Submit Query ─────────
   const handleSubmit = async () => {
     if (!user?.uid) return;
-    if (!subject.trim() || !message.trim()) return;
+
+    if (!subject.trim() || !message.trim()) {
+      setMsg("Please fill all fields.");
+      return;
+    }
 
     try {
       setSubmitting(true);
+      setMsg("");
 
       await addDoc(collection(db, "employeeQueries"), {
         subject,
@@ -73,27 +70,26 @@ export default function HelpView() {
         adminReply: "",
         repliedAt: null,
         employeeUnread: false,
-        adminUnread: true, // 🔔 notify admin
+        adminUnread: true,
         createdAt: serverTimestamp(),
       });
 
       setSubject("");
       setMessage("");
+      setMsg("✅ Query submitted successfully!");
+
     } catch (err) {
       console.error(err);
+      setMsg("Something went wrong.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (!user) {
-    return <div className="p-6">Loading user...</div>;
-  }
+  if (!user) return <div className="p-6">Loading user...</div>;
 
   return (
     <div className="p-6 space-y-6">
-
-      <h2 className="text-2xl font-bold">🆘 Help & Support</h2>
 
       {/* Submit Form */}
       <div className="bg-white p-6 rounded-xl shadow space-y-4">
@@ -112,6 +108,14 @@ export default function HelpView() {
           className="w-full border rounded-lg px-4 py-3"
         />
 
+        {msg && (
+          <p className={`text-sm ${
+            msg.startsWith("✅") ? "text-green-600" : "text-red-500"
+          }`}>
+            {msg}
+          </p>
+        )}
+
         <button
           onClick={handleSubmit}
           disabled={submitting}
@@ -123,7 +127,7 @@ export default function HelpView() {
 
       {/* Query History */}
       <div className="space-y-4">
-        <h3 className="font-semibold text-lg">📋 My Queries</h3>
+        <h3 className="font-semibold text-lg">My Queries</h3>
 
         {loading && <p>Loading...</p>}
 
@@ -131,11 +135,13 @@ export default function HelpView() {
           <div key={q.id} className="bg-white p-5 rounded-xl shadow space-y-2">
             <div className="flex justify-between">
               <h4 className="font-semibold">{q.subject}</h4>
-              <span className={`px-2 py-1 rounded text-xs ${
-                q.status === "resolved"
-                  ? "bg-green-100 text-green-700"
-                  : "bg-yellow-100 text-yellow-700"
-              }`}>
+              <span
+                className={`px-2 py-1 rounded text-xs ${
+                  q.status === "resolved"
+                    ? "bg-green-100 text-green-700"
+                    : "bg-yellow-100 text-yellow-700"
+                }`}
+              >
                 {q.status}
               </span>
             </div>

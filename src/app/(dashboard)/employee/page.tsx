@@ -1319,16 +1319,9 @@ const totalNotifications = leaveNotifications.length + queryNotifications.length
             {activeView === "profile" && <ProfileView />}
 
             {activeView === "help" && (
-              <HelpView
-                querySubject={querySubject}
-                setQuerySubject={setQuerySubject}
-                queryMessage={queryMessage}
-                setQueryMessage={setQueryMessage}
-                handleSubmitQuery={handleSubmitQuery}
-                querySubmitting={querySubmitting}
-                queryMsg={queryMsg}
-              />
-            )}
+  <HelpView />
+)}
+
 
             {activeView === "meet" && (
               <MeetView users={users.filter((u) => u.uid !== user.uid)} />

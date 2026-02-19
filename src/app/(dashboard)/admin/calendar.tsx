@@ -9,6 +9,7 @@ interface CalendarViewProps {
   isSecondSaturday: (year: number, month: number, day: number) => boolean;
   isFourthSaturday: (year: number, month: number, day: number) => boolean;
   isFifthSaturday: (year: number, month: number, day: number) => boolean;
+  isHoliday: (dateStr: string) => any;
 }
 
 const CalendarView: React.FC<CalendarViewProps> = ({

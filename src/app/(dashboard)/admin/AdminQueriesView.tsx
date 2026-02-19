@@ -14,7 +14,13 @@ import { db } from "@/lib/firebase";
 
 const ITEMS_PER_PAGE = 5;
 
-export default function AdminQueriesView() {
+interface AdminQueriesViewProps {
+  user: any;
+  userData: any;
+}
+
+  export default function AdminQueriesView({ user, userData }: AdminQueriesViewProps) {
+
   const [queries, setQueries] = useState<any[]>([]);
   const [replyText, setReplyText] = useState<{ [key: string]: string }>({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
