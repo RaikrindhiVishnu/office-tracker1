@@ -7,8 +7,10 @@ export interface EmployeeNotification {
   employeeId: string;
   employeeName: string;
   message: string;
+  changes?: string[]; // ✅ FIX (array, not object)
   changedFields?: string[];
   read: boolean;
   createdAt?: Timestamp;
   readAt?: Timestamp;
+  profilePhoto?: string;
 }

@@ -11,4 +11,5 @@ export type EmployeeRow = Employee & {
   status: "ONLINE" | "OFFLINE";
   totalMinutes: number;
   task: string;
+  profilePhoto?: string;
 };

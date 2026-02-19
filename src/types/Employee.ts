@@ -16,4 +16,5 @@ export interface Employee {
   salary?: number;
   lastUpdated?: any;
   sessions?: Session[];
+  profilePhoto?: string;
 }

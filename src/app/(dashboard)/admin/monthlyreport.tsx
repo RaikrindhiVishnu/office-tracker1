@@ -173,7 +173,7 @@ export default function MonthlyReport({
               <th className="border px-2 bg-rose-50">A</th>
               <th className="border px-2 bg-violet-50">LOP</th>
               <th className="border px-2 py-2 bg-blue-100">Total Days</th>
-              <th className="border px-2 bg-green-100">Net</th>
+              {/* <th className="border px-2 bg-green-100">Net</th> */}
             </tr>
           </thead>
 
@@ -213,9 +213,9 @@ export default function MonthlyReport({
               const absentCount = dayStatuses.filter((s) => s === "A").length;
               const lopCount = dayStatuses.filter((s) => s === "LOP").length;
 
-              const salary = u.salary ?? 0;
-              const perDay = salary / daysInMonth;
-              const netPay = Math.round(perDay * presentCount);
+              // const salary = u.salary ?? 0;
+              // const perDay = salary / daysInMonth;
+              // const netPay = Math.round(perDay * presentCount);
 
               const totalWorkingDays = dayStatuses.filter(
                 (s) => s !== "H"
@@ -277,9 +277,9 @@ export default function MonthlyReport({
                     {totalWorkingDays}
                   </td>
 
-                  <td className="border text-center bg-green-100 font-bold text-green-700">
+                  {/* <td className="border text-center bg-green-100 font-bold text-green-700">
                     ₹{netPay}
-                  </td>
+                  </td> */}
                 </tr>
               );
             })}
@@ -387,7 +387,7 @@ export default function MonthlyReport({
                     <th className="border px-2 bg-rose-50">A</th>
                     <th className="border px-2 bg-violet-50">LOP</th>
                     <th className="border px-2 py-2 bg-blue-100">Total Days</th>
-                    <th className="border px-2 bg-green-100">Net</th>
+                    {/* <th className="border px-2 bg-green-100">Net</th> */}
 
                     {/* EXTRA HEADERS */}
                     {(() => {
@@ -529,9 +529,9 @@ export default function MonthlyReport({
                           {totalWorkingDays}
                         </td>
 
-                        <td className="border text-center bg-green-100 font-bold text-green-700">
+                        {/* <td className="border text-center bg-green-100 font-bold text-green-700">
                           ₹{netPay}
-                        </td>
+                        </td> */}
 
                         {/* EXTRA CELLS */}
                         {(extraCols[monthKey] || []).map((_, i) => (

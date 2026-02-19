@@ -8,6 +8,9 @@ import { useAuth } from "@/context/AuthContext";
 import { storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { updateEmployeeData } from "@/lib/employeeSync";
+import { uploadToCloudinary } from "@/lib/cloudinary";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function ProfileView() {
   const { user, userData } = useAuth();
@@ -26,6 +29,7 @@ export default function ProfileView() {
     }
   }, [userData]);
 
+  
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -106,64 +110,57 @@ export default function ProfileView() {
     multiple: false,
   });
 
-  const saveProfile = async () => {
-    if (!user?.uid) {
-      alert("User not authenticated");
-      return;
+ const saveProfile = async () => {
+  if (!user?.uid) {
+    alert("User not authenticated");
+    return;
+  }
+
+  setLoading(true);
+  console.log("🔄 Starting profile update...");
+
+  try {
+    let finalPhotoURL = localUserData?.profilePhoto || "";
+
+    // Upload profile photo if changed
+    if (profilePhoto) {
+      console.log("📸 Uploading profile photo...");
+      finalPhotoURL = await uploadToCloudinary(profilePhoto);
+      console.log("✅ Profile photo uploaded:", finalPhotoURL);
     }
 
-    setLoading(true);
-    console.log("🔄 Starting profile update...");
+    const updatedData = {
+      ...form,
+      salary: form.salary ? Number(form.salary) : 0,
+      profilePhoto: finalPhotoURL, // ✅ correct field
+    };
 
-    try {
-      let photoURL = localUserData?.profilePhoto || "";
+    console.log("📝 Updating employee data...");
 
-      // Upload profile photo if changed
-      if (profilePhoto) {
-        console.log("📸 Uploading profile photo...");
-        const storageRef = ref(storage, `profilePhotos/${user.uid}`);
-        await uploadBytes(storageRef, profilePhoto);
-        photoURL = await getDownloadURL(storageRef);
-        console.log("✅ Photo uploaded:", photoURL);
-      }
+    await updateEmployeeData({
+      userId: user.uid,
+      updates: updatedData,
+      updatedBy: user.uid,
+      role: userData?.role || "employee",
+    });
 
-      // Prepare update data
-   const updatedData = {
-  ...form,
-  salary: form.salary ? Number(form.salary) : 0, // ⭐ FIX
-  profilePhoto: photoURL,
+    console.log("✅ Profile updated successfully");
+
+    // Update local state properly
+    setLocalUserData(updatedData);
+    setPhotoPreview(finalPhotoURL);
+    setProfilePhoto(null);
+    setEditing(false);
+
+    alert("✅ Profile updated successfully!");
+  } catch (error) {
+    console.error("❌ Error saving profile:", error);
+    alert("Failed to update profile. Please try again.");
+  } finally {
+    setLoading(false);
+  }
 };
 
-
-      console.log("📝 Updating employee data...");
-      
-      // Use the employeeSync function to update and notify admins
-    await updateEmployeeData({
-  userId: user.uid,
-  updates: updatedData,
-  updatedBy: user.uid,
-  role: userData?.role || "employee",
-});
-
-      console.log("✅ Profile updated successfully");
-
-      // Update local state
-      setLocalUserData({ ...localUserData, ...updatedData });
-      
-      // Refresh user data from Firebase
-     
-      setEditing(false);
-      setProfilePhoto(null);
-      
-      alert("✅ Profile updated successfully! Admins have been notified.");
-      
-    } catch (error) {
-      console.error("❌ Error saving profile:", error);
-      alert("Failed to update profile. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const cancelEdit = () => {
     setEditing(false);
@@ -248,25 +245,32 @@ export default function ProfileView() {
         <div className="mb-8">
           <div className="flex items-center gap-6">
             <div
-              {...(editing ? getRootProps() : {})}
-              className={`relative w-32 h-32 rounded-full overflow-hidden border-4 border-gray-300 ${
-                editing ? "cursor-pointer hover:border-blue-500 transition" : ""
-              }`}
-            >
-              {editing && <input {...getInputProps()} />}
-              {photoPreview ? (
-                <img src={photoPreview} alt="Profile" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500 text-4xl font-bold">
-                  {localUserData.name?.[0]?.toUpperCase() || "?"}
-                </div>
-              )}
-              {editing && (
-                <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center text-white text-sm">
-                  {isDragActive ? "Drop here" : "Click or drag"}
-                </div>
-              )}
-            </div>
+  {...getRootProps()}
+  className={`relative w-32 h-32 rounded-full overflow-hidden border-4 border-gray-300 ${
+    editing ? "cursor-pointer hover:border-blue-500 transition" : ""
+  }`}
+>
+  <input {...getInputProps()} disabled={!editing} />
+
+  {photoPreview ? (
+    <img
+      src={photoPreview}
+      alt="Profile"
+      className="w-full h-full object-cover"
+    />
+  ) : (
+    <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-500 text-4xl font-bold">
+      {localUserData.name?.[0]?.toUpperCase() || "?"}
+    </div>
+  )}
+
+  {editing && (
+    <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-white text-sm">
+      {isDragActive ? "Drop here" : "Click or drag"}
+    </div>
+  )}
+</div>
+
             <div>
               <p className="text-sm text-gray-500">Complete employee information</p>
             </div>

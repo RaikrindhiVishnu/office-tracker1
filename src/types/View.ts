@@ -12,4 +12,5 @@ export type View =
   | "Meet"
   | "notifications"
   | "accounts"
+  | "queries" 
   | "analytics";

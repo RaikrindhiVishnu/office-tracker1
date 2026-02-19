@@ -3,6 +3,7 @@ import {
   collection,
   query,
   where,
+  orderBy,
   getDocs,
   addDoc,
   serverTimestamp,
@@ -43,17 +44,20 @@ export async function updateEmployeeData({
   const existingSnap = await getDoc(userRef);
   const existingData = existingSnap.data() as Employee | undefined;
 
-  const changedFields = Object.keys(updates).filter(
-    (key) => existingData?.[key as keyof Employee] !== updates[key as keyof Employee]
-  );
+  const changedFields = Object.keys(updates).filter((key) => {
+    const oldValue = existingData?.[key as keyof Employee];
+    const newValue = updates[key as keyof Employee];
+    return JSON.stringify(oldValue) !== JSON.stringify(newValue);
+  });
 
-  // ✅ Update employee safely
+  // ✅ Update employee
   await updateDoc(userRef, {
     ...updates,
     lastUpdated: serverTimestamp(),
+    lastUpdatedBy: updatedBy,
   });
 
-  // 🔥 Notify admins ONLY if something actually changed
+  // 🔔 Notify admins only if something changed
   if (changedFields.length > 0 && existingData?.name) {
     await notifyAdminsOfEmployeeUpdate(
       userId,
@@ -62,7 +66,6 @@ export async function updateEmployeeData({
     );
   }
 }
-
 
 /* =====================================================
    REALTIME EMPLOYEE LISTENER
@@ -78,13 +81,14 @@ export function subscribeToEmployeeData(
     callback(
       snapshot.exists()
         ? ({
-            id: snapshot.id,
-            ...(snapshot.data() as Omit<Employee, "id">),
-          })
+            uid: snapshot.id,   // ✅ FIXED
+            ...(snapshot.data() as Omit<Employee, "uid">),
+          } as Employee)
         : null
     );
   });
 }
+
 
 /* =====================================================
    ADMIN NOTIFICATION LISTENER
@@ -99,15 +103,17 @@ export function subscribeToNotifications(
   const q = query(
     collection(db, "notifications"),
     where("recipientId", "==", adminId),
-    where("read", "==", false)
+    where("read", "==", false),
+    orderBy("createdAt", "desc") // ✅ FIXED
   );
 
   return onSnapshot(q, (snapshot) => {
-    const notifications: EmployeeNotification[] =
-      snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...(doc.data() as Omit<EmployeeNotification, "id">),
-      }));
+    const notifications: EmployeeNotification[] = snapshot.docs.map(
+      (docSnap) => ({
+        id: docSnap.id,
+        ...(docSnap.data() as Omit<EmployeeNotification, "id">),
+      })
+    );
 
     callback(notifications);
   });
@@ -124,7 +130,7 @@ export async function notifyAdminsOfEmployeeUpdate(
 ): Promise<void> {
   const adminQuery = query(
     collection(db, "users"),
-    where("role", "==", "admin")
+    where("accountType", "==", "ADMIN")
   );
 
   const adminSnapshot = await getDocs(adminQuery);
@@ -136,10 +142,10 @@ export async function notifyAdminsOfEmployeeUpdate(
       recipientId: admin.id,
       employeeId,
       employeeName,
-      changedFields,
+      changes: changedFields, // ✅ matches AdminNotificationBell
       message: `${employeeName} updated their profile`,
       read: false,
-      createdAt: serverTimestamp(),
+      createdAt: serverTimestamp(), // ✅ FIXED
     })
   );
 
@@ -147,7 +153,7 @@ export async function notifyAdminsOfEmployeeUpdate(
 }
 
 /* =====================================================
-   MARK AS READ
+   MARK SINGLE NOTIFICATION AS READ
 ===================================================== */
 
 export async function markNotificationAsRead(
@@ -162,7 +168,7 @@ export async function markNotificationAsRead(
 }
 
 /* =====================================================
-   DELETE
+   DELETE NOTIFICATION
 ===================================================== */
 
 export async function deleteNotification(
@@ -174,7 +180,7 @@ export async function deleteNotification(
 }
 
 /* =====================================================
-   MARK ALL READ
+   MARK ALL NOTIFICATIONS AS READ
 ===================================================== */
 
 export async function markAllNotificationsAsRead(
@@ -210,9 +216,9 @@ export async function getEmployeeData(
   const snap = await getDoc(doc(db, "users", userId));
 
   return snap.exists()
-    ? ({
-        id: snap.id,
-        ...(snap.data() as Omit<Employee, "id">),
-      })
-    : null;
+  ? ({
+      uid: snap.id,
+      ...(snap.data() as Omit<Employee, "uid">),
+    } as Employee)
+  : null;
 }

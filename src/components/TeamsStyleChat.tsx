@@ -25,7 +25,8 @@ import { useAuth } from "@/context/AuthContext";
 type User = {
   uid: string;
   name?: string | null;
-  email: string | null;  
+  email: string | null;
+  profilePhoto?: string;  
   avatar?: string;
   online?: boolean;
   status?: "available" | "busy" | "dnd" | "brb" | "away" | "offline";
@@ -1149,9 +1150,22 @@ const otherUserInitial = otherUserName.charAt(0).toUpperCase();
       {incomingCall && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center animate-fade-in">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 text-center shadow-2xl">
-            <div className="w-24 h-24 bg-gradient-to-br from-purple-400 to-blue-400 rounded-full flex items-center justify-center text-white font-bold text-3xl mx-auto mb-4 animate-pulse">
-              {incomingCall.callerName.charAt(0).toUpperCase()}
-            </div>
+           {(() => {
+  const caller = users.find(u => u.uid === incomingCall.callerId);
+
+  return caller?.profilePhoto ? (
+    <img
+      src={caller.profilePhoto}
+      className="w-24 h-24 rounded-full object-cover mx-auto mb-4 animate-pulse"
+      alt="Caller"
+    />
+  ) : (
+    <div className="w-24 h-24 bg-gradient-to-br from-purple-400 to-blue-400 rounded-full flex items-center justify-center text-white font-bold text-3xl mx-auto mb-4 animate-pulse">
+      {incomingCall.callerName.charAt(0).toUpperCase()}
+    </div>
+  );
+})()}
+
             <h3 className="text-2xl font-bold text-gray-800 mb-2">
               {incomingCall.callerName}
             </h3>
@@ -1542,13 +1556,33 @@ const otherUserInitial = otherUserName.charAt(0).toUpperCase();
                     }`}
                   >
                     <div className="relative">
-                      <div className={`w-10 h-10 rounded-full ${
-                        chat.isGroup 
-                          ? "bg-gradient-to-br from-green-400 to-teal-400"
-                          : "bg-gradient-to-br from-purple-400 to-blue-400"
-                      } flex items-center justify-center text-white font-bold text-sm`}>
-                        {avatar}
-                      </div>
+                      <div className="relative w-10 h-10">
+  {(() => {
+    if (chat.isGroup) {
+      return (
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-teal-400 flex items-center justify-center text-white font-bold text-sm">
+          {avatar}
+        </div>
+      );
+    }
+
+    const otherUserId = chat.participants.find((p) => p !== user?.uid);
+    const otherUser = users.find((u) => u.uid === otherUserId);
+
+    return otherUser?.profilePhoto ? (
+      <img
+        src={otherUser.profilePhoto}
+        className="w-10 h-10 rounded-full object-cover"
+        alt="User"
+      />
+    ) : (
+      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-blue-400 flex items-center justify-center text-white font-bold text-sm">
+        {(otherUser?.name || otherUser?.email)?.charAt(0).toUpperCase()}
+      </div>
+    );
+  })()}
+</div>
+
                       {online && !chat.isGroup && (
                         <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
                       )}
@@ -1606,13 +1640,33 @@ const otherUserInitial = otherUserName.charAt(0).toUpperCase();
             <div className="h-16 bg-white border-b border-gray-200 px-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <div className={`w-10 h-10 rounded-full ${
-                    selectedChat.isGroup
-                      ? "bg-gradient-to-br from-green-400 to-teal-400"
-                      : "bg-gradient-to-br from-purple-400 to-blue-400"
-                  } flex items-center justify-center text-white font-bold`}>
-                    {getChatAvatar(selectedChat)}
-                  </div>
+                  <div className="w-10 h-10 rounded-full overflow-hidden">
+  {(() => {
+    if (selectedChat.isGroup) {
+      return (
+        <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-teal-400 flex items-center justify-center text-white font-bold">
+          {getChatAvatar(selectedChat)}
+        </div>
+      );
+    }
+
+    const otherUserId = selectedChat.participants.find((p) => p !== user?.uid);
+    const otherUser = users.find((u) => u.uid === otherUserId);
+
+    return otherUser?.profilePhoto ? (
+      <img
+        src={otherUser.profilePhoto}
+        className="w-full h-full object-cover"
+        alt="User"
+      />
+    ) : (
+      <div className="w-full h-full bg-gradient-to-br from-purple-400 to-blue-400 flex items-center justify-center text-white font-bold">
+        {(otherUser?.name || otherUser?.email)?.charAt(0).toUpperCase()}
+      </div>
+    );
+  })()}
+</div>
+
                   {isUserOnline(selectedChat) && !selectedChat.isGroup && (
                     <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
                   )}
@@ -1688,9 +1742,20 @@ const otherUserInitial = otherUserName.charAt(0).toUpperCase();
                   return (
                     <div key={m.id} className={`flex gap-3 mb-4 group ${mine ? "flex-row-reverse" : "flex-row"}`}>
                       {!mine && showAvatar ? (
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-blue-400 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                          {(senderUser?.name || m.senderName || "?").charAt(0).toUpperCase()}
-                        </div>
+                        <div className="w-8 h-8 rounded-full overflow-hidden shrink-0">
+  {senderUser?.profilePhoto ? (
+    <img
+      src={senderUser.profilePhoto}
+      className="w-full h-full object-cover"
+      alt="User"
+    />
+  ) : (
+    <div className="w-full h-full bg-gradient-to-br from-purple-400 to-blue-400 flex items-center justify-center text-white text-xs font-bold">
+      {(senderUser?.name || m.senderName || "?").charAt(0).toUpperCase()}
+    </div>
+  )}
+</div>
+
                       ) : (
                         !mine && <div className="w-8" />
                       )}

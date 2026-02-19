@@ -13,6 +13,7 @@ type User = {
   uid: string;
   name?: string;
   email: string;
+  profilePhoto?: string;
   avatar?: string;
   online?: boolean;
 };
@@ -48,6 +49,7 @@ export default function MeetChatAppUpdated({ users, isOpen = false, onClose }: M
   const statusMenuRef = useRef<HTMLDivElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
+  const currentUser = users.find(u => u.uid === user?.uid);
 
   // Update showFullScreen when isOpen prop changes
   useEffect(() => {
@@ -215,9 +217,24 @@ export default function MeetChatAppUpdated({ users, isOpen = false, onClose }: M
                         }}
                       >
                         <div className="flex items-start gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-blue-400 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                            {notif.fromName.charAt(0).toUpperCase()}
-                          </div>
+                         {(() => {
+  const sender = users.find(u => u.uid === notif.fromUid);
+
+  return (
+    <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-purple-400 to-blue-400 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+      {sender?.profilePhoto ? (
+        <img
+          src={sender.profilePhoto}
+          alt="Sender"
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        notif.fromName.charAt(0).toUpperCase()
+      )}
+    </div>
+  );
+})()}
+
                           <div className="flex-1 min-w-0">
                             <p className="font-semibold text-sm text-gray-800 truncate">
                               {notif.fromName}
@@ -245,9 +262,20 @@ export default function MeetChatAppUpdated({ users, isOpen = false, onClose }: M
               className="flex items-center gap-2 px-3 py-1 rounded hover:bg-[#5b5b7e] cursor-pointer transition-colors"
             >
               <div className="relative">
-                <div className="w-7 h-7 rounded-full bg-purple-500 flex items-center justify-center text-sm font-bold">
-                  {user?.email?.charAt(0).toUpperCase() || "U"}
-                </div>
+               <div className="w-7 h-7 rounded-full overflow-hidden bg-purple-500 flex items-center justify-center text-sm font-bold">
+  {currentUser?.profilePhoto ? (
+    <img
+      src={currentUser.profilePhoto}
+      alt="Profile"
+      className="w-full h-full object-cover"
+    />
+  ) : (
+    <span>
+      {user?.email?.charAt(0).toUpperCase() || "U"}
+    </span>
+  )}
+</div>
+
                 <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#464775] flex items-center justify-center ${getStatusColor(userStatus)}`}>
                   {getStatusIcon(userStatus)}
                 </div>
@@ -265,9 +293,20 @@ export default function MeetChatAppUpdated({ users, isOpen = false, onClose }: M
                 <div className="p-4 border-b border-gray-200">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="relative">
-                      <div className="w-12 h-12 rounded-full bg-purple-500 flex items-center justify-center text-white text-xl font-bold">
-                        {user?.email?.charAt(0).toUpperCase() || "U"}
-                      </div>
+                     <div className="w-12 h-12 rounded-full overflow-hidden bg-purple-500 flex items-center justify-center text-white text-xl font-bold">
+  {currentUser?.profilePhoto ? (
+    <img
+      src={currentUser.profilePhoto}
+      alt="Profile"
+      className="w-full h-full object-cover"
+    />
+  ) : (
+    <span>
+      {user?.email?.charAt(0).toUpperCase() || "U"}
+    </span>
+  )}
+</div>
+
                       <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center ${getStatusColor(userStatus)}`}>
                         {getStatusIcon(userStatus)}
                       </div>

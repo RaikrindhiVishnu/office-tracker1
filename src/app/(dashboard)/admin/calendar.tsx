@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 interface CalendarViewProps {
   showCalendar: boolean;
@@ -9,7 +9,6 @@ interface CalendarViewProps {
   isSecondSaturday: (year: number, month: number, day: number) => boolean;
   isFourthSaturday: (year: number, month: number, day: number) => boolean;
   isFifthSaturday: (year: number, month: number, day: number) => boolean;
-  isHoliday: (dateStr: string) => { title: string } | null;
 }
 
 const CalendarView: React.FC<CalendarViewProps> = ({
@@ -21,9 +20,18 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   isSecondSaturday,
   isFourthSaturday,
   isFifthSaturday,
-  isHoliday,
 }) => {
   if (!showCalendar) return null;
+
+  /* ✅ Recurring Company Holiday */
+  const getHoliday = (dateStr: string): { title: string } | null => {
+    const recurring: Record<string, { title: string }> = {
+      "12-04": { title: "🎉 Office Anniversary" },
+    };
+
+    const [, month, day] = dateStr.split("-");
+    return recurring[`${month}-${day}`] || null;
+  };
 
   return (
     <div
@@ -31,7 +39,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({
       onClick={() => setShowCalendar(false)}
     >
       <div className="w-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
-        {/* CLOSE BUTTON */}
+        
+        {/* CLOSE */}
         <div className="flex justify-end mb-2">
           <button
             onClick={() => setShowCalendar(false)}
@@ -41,13 +50,18 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           </button>
         </div>
 
-        {/* CALENDAR - COMPACT VERSION */}
+        {/* CALENDAR CARD */}
         <div className="bg-white rounded-xl shadow-xl border border-slate-200 p-4">
-          {/* Header */}
+          
+          {/* HEADER */}
           <div className="flex justify-between items-center mb-4">
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Holiday Calendar</h2>
-              <p className="text-xs text-slate-500">View holidays and weekends</p>
+              <h2 className="text-xl font-bold text-slate-900">
+                Holiday Calendar
+              </h2>
+              <p className="text-xs text-slate-500">
+                View holidays and company events
+              </p>
             </div>
 
             <div className="flex items-center gap-2">
@@ -61,7 +75,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                     )
                   )
                 }
-                className="px-3 py-1.5 border-2 border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium text-slate-700"
+                className="px-3 py-1.5 border-2 border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
               >
                 ← Previous
               </button>
@@ -83,14 +97,14 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                     )
                   )
                 }
-                className="px-3 py-1.5 border-2 border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium text-slate-700"
+                className="px-3 py-1.5 border-2 border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium"
               >
                 Next →
               </button>
             </div>
           </div>
 
-          {/* Day Headers */}
+          {/* DAYS HEADER */}
           <div className="grid grid-cols-7 text-center font-bold text-slate-700 mb-2 text-sm">
             {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
               <div key={d} className="py-2">
@@ -99,9 +113,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({
             ))}
           </div>
 
-          {/* Calendar Grid */}
+          {/* GRID */}
           <div className="grid grid-cols-7 gap-1.5">
-            {/* Empty cells for days before month starts */}
+            
+            {/* EMPTY CELLS */}
             {Array.from({
               length: new Date(
                 calendarDate.getFullYear(),
@@ -112,7 +127,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
               <div key={`e-${i}`} />
             ))}
 
-            {/* Days of the month */}
+            {/* DAYS */}
             {Array.from({
               length: new Date(
                 calendarDate.getFullYear(),
@@ -121,24 +136,29 @@ const CalendarView: React.FC<CalendarViewProps> = ({
               ).getDate(),
             }).map((_, i) => {
               const day = i + 1;
-              const currentYear = calendarDate.getFullYear();
-              const currentMonth = calendarDate.getMonth();
+              const year = calendarDate.getFullYear();
+              const month = calendarDate.getMonth();
+
+              const today = new Date();
 
               const isToday =
-                day === new Date().getDate() &&
-                currentMonth === new Date().getMonth() &&
-                currentYear === new Date().getFullYear();
+                day === today.getDate() &&
+                month === today.getMonth() &&
+                year === today.getFullYear();
 
-              const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(
+              const dateStr = `${year}-${String(month + 1).padStart(
                 2,
                 "0"
               )}-${String(day).padStart(2, "0")}`;
 
-              const sunday = isSunday(currentYear, currentMonth, day);
-              const secondSat = isSecondSaturday(currentYear, currentMonth, day);
-              const fourthSat = isFourthSaturday(currentYear, currentMonth, day);
-              const fifthSat = isFifthSaturday(currentYear, currentMonth, day);
-              const holiday = isHoliday(dateStr);
+              const sunday = isSunday(year, month, day);
+              const secondSat = isSecondSaturday(year, month, day);
+              const fourthSat = isFourthSaturday(year, month, day);
+              const fifthSat = isFifthSaturday(year, month, day);
+
+              const holiday = getHoliday(dateStr);
+              const isOfficeAnniversary =
+                holiday?.title === "🎉 Office Anniversary";
 
               const isHolidayDay =
                 sunday || secondSat || fourthSat || fifthSat || holiday;
@@ -146,24 +166,26 @@ const CalendarView: React.FC<CalendarViewProps> = ({
               return (
                 <div
                   key={day}
-                  className={`h-16 border-2 rounded-lg p-1.5 text-xs relative transition-all ${
+                  className={`h-20 border-2 rounded-lg p-1.5 text-xs relative transition-all
+                  
+                  ${
                     isToday
                       ? "border-indigo-500 ring-2 ring-indigo-200 bg-indigo-50"
+                      : isOfficeAnniversary
+                      ? "bg-gradient-to-br from-yellow-200 to-orange-300 border-yellow-500 shadow-md scale-[1.04]"
                       : isHolidayDay
                       ? "bg-gradient-to-br from-rose-50 to-pink-50 border-rose-300"
                       : "bg-white border-slate-200 hover:border-slate-300"
                   }`}
                 >
-                  <div
-                    className={`font-bold text-sm ${
-                      isToday ? "text-indigo-700" : "text-slate-900"
-                    }`}
-                  >
+                  {/* DAY */}
+                  <div className="font-bold text-sm text-slate-900">
                     {day}
                   </div>
 
+                  {/* HOLIDAY TEXT */}
                   {isHolidayDay && (
-                    <div className="mt-0.5 text-[9px] text-rose-600 font-semibold truncate">
+                    <div className="mt-1 text-[10px] leading-tight font-bold whitespace-normal">
                       {holiday
                         ? holiday.title
                         : sunday
@@ -178,8 +200,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                     </div>
                   )}
 
+                  {/* TODAY BADGE */}
                   {isToday && (
-                    <span className="absolute bottom-0.5 right-0.5 text-[8px] text-indigo-700 font-bold bg-indigo-200 px-1 py-0.5 rounded">
+                    <span className="absolute bottom-1 right-1 text-[8px] font-bold bg-indigo-600 text-white px-1 py-0.5 rounded">
                       TODAY
                     </span>
                   )}
@@ -188,23 +211,21 @@ const CalendarView: React.FC<CalendarViewProps> = ({
             })}
           </div>
 
-          {/* Legend - Compact */}
-          <div className="mt-3 flex flex-wrap gap-3 p-2.5 bg-slate-50 rounded-lg border border-slate-200">
+          {/* LEGEND */}
+          <div className="mt-3 flex flex-wrap gap-3 p-2.5 bg-slate-50 rounded-lg border">
+            <div className="flex items-center gap-1.5">
+              <div className="w-4 h-4 bg-gradient-to-br from-yellow-200 to-orange-300 border-2 border-yellow-500 rounded"></div>
+              <span className="text-xs font-medium">Company Event</span>
+            </div>
+
             <div className="flex items-center gap-1.5">
               <div className="w-4 h-4 bg-gradient-to-br from-rose-50 to-pink-50 border-2 border-rose-300 rounded"></div>
-              <span className="text-xs font-medium text-slate-700">
-                Holiday/Weekend
-              </span>
+              <span className="text-xs font-medium">Holiday / Weekend</span>
             </div>
+
             <div className="flex items-center gap-1.5">
               <div className="w-4 h-4 bg-indigo-50 border-2 border-indigo-500 rounded"></div>
-              <span className="text-xs font-medium text-slate-700">Today</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-4 h-4 bg-white border-2 border-slate-200 rounded"></div>
-              <span className="text-xs font-medium text-slate-700">
-                Regular Day
-              </span>
+              <span className="text-xs font-medium">Today</span>
             </div>
           </div>
         </div>
