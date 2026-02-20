@@ -19,7 +19,9 @@ interface EmployeesViewProps {
   designation: string;
   setDesignation: (designation: string) => void;
   accountType: "EMPLOYEE" | "ADMIN";
-  setAccountType: (accountType: string) => void;
+  setAccountType: React.Dispatch<
+  React.SetStateAction<"EMPLOYEE" | "ADMIN">
+>;
   handleAddUser: () => void;
   creatingUser: boolean;
   formatTime: (timestamp: any) => string;
@@ -460,10 +462,11 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
               </select>
 
               <select
-                value={accountType}
-                onChange={(e) => setAccountType(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5"
-              >
+  value={accountType}
+  onChange={(e) =>
+    setAccountType(e.target.value as "EMPLOYEE" | "ADMIN")
+  }
+>
                 <option value="EMPLOYEE">Employee</option>
                 <option value="ADMIN">Admin</option>
               </select>
