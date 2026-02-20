@@ -9,19 +9,29 @@ if (!admin.apps.length) {
   });
 }
 
-if (req.method === "GET") {
-  return res.status(200).send("OK");
-}
-
 const db = admin.firestore();
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  // ✅ Allow GET (device health check)
+  if (req.method === "GET") {
+    return res.status(200).send("OK");
+  }
+
   try {
-    const empCode = req.body.empCode || req.body.empcode || req.body.userid;
-    const time = req.body.time || req.body.timestamp;
+    const empCode =
+      req.body.empCode ||
+      req.body.empcode ||
+      req.body.userid ||
+      req.body.PIN;
+
+    const time =
+      req.body.time ||
+      req.body.timestamp ||
+      req.body.Time ||
+      req.body.DateTime;
 
     if (!empCode || !time) {
       return res.status(400).send("Invalid Data");
@@ -30,14 +40,12 @@ export default async function handler(
     const punchTime = new Date(time);
     const date = punchTime.toISOString().split("T")[0];
 
-    // Save raw log
     await db.collection("biometricLogs").add({
       empCode,
       punchTime,
       createdAt: new Date(),
     });
 
-    // Check attendance
     const snapshot = await db
       .collection("attendance")
       .where("empCode", "==", empCode)
@@ -60,9 +68,9 @@ export default async function handler(
       }
     }
 
-    res.status(200).send("OK");
+    return res.status(200).send("OK");
   } catch (error) {
     console.error(error);
-    res.status(500).send("Server Error");
+    return res.status(500).send("Server Error");
   }
 }
