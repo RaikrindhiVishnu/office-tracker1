@@ -41,6 +41,7 @@ import { EmployeeRow } from "@/types/EmployeeRow";
 import { View } from "@/types/View";
 import { updateEmployeeData } from "@/lib/employeeSync";
 import AdminNotificationBell from "./AdminNotificationBell";
+import CalendarModal from "../employee/views/CalendarView";
 
 /* ================= TYPES ================= */
 // type Session = {
@@ -164,6 +165,7 @@ export default function AdminPage() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
+const [holidays, setHolidays] = useState<any[]>([]);
 
   // form states
   const [name, setName] = useState("");
@@ -830,7 +832,18 @@ const handleAddUser = async () => {
 
           {view === "monthlyReport" && <MonthlyReport users={users} monthlyDate={monthlyDate} setMonthlyDate={setMonthlyDate} monthlyAttendance={monthlyAttendance} setMonthlyAttendance={setMonthlyAttendance} sessionsByDate={sessionsByDate} isHoliday={isHoliday} saveMonthlyAttendance={saveMonthlyAttendance} getAutoStatus={getAutoStatus} isSunday={isSunday} isSecondSaturday={isSecondSaturday} isFourthSaturday={isFourthSaturday} isFifthSaturday={isFifthSaturday} />}
 
-          <CalendarView showCalendar={showCalendar} setShowCalendar={setShowCalendar} calendarDate={calendarDate} setCalendarDate={setCalendarDate} isSunday={isSunday} isSecondSaturday={isSecondSaturday} isFourthSaturday={isFourthSaturday} isFifthSaturday={isFifthSaturday} isHoliday={isHoliday} />
+          <CalendarModal
+  show={showCalendar}
+  onClose={() => setShowCalendar(false)}
+  calendarDate={calendarDate}
+  setCalendarDate={setCalendarDate}
+  holidays={holidays}
+  isSunday={isSunday}
+  isSecondSaturday={isSecondSaturday}
+  isFourthSaturday={isFourthSaturday}
+  isFifthSaturday={isFifthSaturday}
+  isHoliday={isHoliday}
+/>
 
          {view === "leaveReport" && (
   <LeaveRequests
