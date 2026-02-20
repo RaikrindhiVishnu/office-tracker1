@@ -1,6 +1,4 @@
-import { Resend } from "resend";
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+import nodemailer from "nodemailer";
 
 export async function sendEmployeeWelcomeEmail({
   email,
@@ -11,37 +9,62 @@ export async function sendEmployeeWelcomeEmail({
   name: string;
   tempPassword: string;
 }) {
-  console.log("📧 Attempting to send email to:", email);
-  console.log("🔑 RESEND_API_KEY exists:", !!process.env.RESEND_API_KEY);
-
   try {
-    const result = await resend.emails.send({
-      from: "onboarding@resend.dev",  // ← this is the only allowed from on free plan
+    if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+      throw new Error("Missing Gmail environment variables");
+    }
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASSWORD,
+      },
+    });
+
+    // Optional: verify connection (helps debugging)
+    await transporter.verify();
+
+    const loginUrl =
+      process.env.NEXT_PUBLIC_APP_URL
+        ? `${process.env.NEXT_PUBLIC_APP_URL}/login`
+        : "https://office-tracker-1.vercel.app/login";
+
+    await transporter.sendMail({
+      from: `"Techgy Innovations" <${process.env.GMAIL_USER}>`,
       to: email,
       subject: "Welcome - Your Login Credentials",
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: auto; padding: 20px;">
-          <h2 style="color: #143d3d;">Welcome, ${name}!</h2>
-          <p>Your account has been created. Use the credentials below to log in:</p>
-          <div style="background: #f4f4f4; padding: 16px; border-radius: 8px; margin: 20px 0;">
+        <div style="font-family: Arial, sans-serif; padding:20px;">
+          <h2 style="color:#193677;">Welcome to Techgy Innovations, ${name}!</h2>
+
+          <p>Your employee account has been created.</p>
+
+          <div style="background:#f4f6f9;padding:15px;border-radius:8px;">
             <p><strong>Email:</strong> ${email}</p>
-            <p><strong>Temporary Password:</strong> 
-              <code style="font-size: 18px; background: #fff; padding: 4px 8px; border-radius: 4px;">
-                ${tempPassword}
-              </code>
-            </p>
+            <p><strong>Temporary Password:</strong> ${tempPassword}</p>
           </div>
-          <p style="color: red;"><strong>Please change your password after first login.</strong></p>
-          <p>Login at: <a href="${process.env.NEXT_PUBLIC_APP_URL}/login">${process.env.NEXT_PUBLIC_APP_URL}/login</a></p>
+
+          <p>Please change your password after first login.</p>
+
+          <p>
+            <a href="${loginUrl}" 
+               style="background:#193677;color:white;padding:10px 20px;
+                      text-decoration:none;border-radius:5px;">
+              Login Here
+            </a>
+          </p>
+
+          <p style="margin-top:20px;font-size:12px;color:gray;">
+            © ${new Date().getFullYear()} Techgy Innovations
+          </p>
         </div>
       `,
     });
 
-    console.log("✅ Resend response:", JSON.stringify(result));
-    return result;
-  } catch (error: any) {
-    console.error("❌ Resend error:", error.message);
-    console.error("❌ Full error:", JSON.stringify(error));
+    console.log("Email sent successfully to:", email);
+  } catch (error) {
+    console.error("Email sending failed:", error);
     throw error;
   }
 }

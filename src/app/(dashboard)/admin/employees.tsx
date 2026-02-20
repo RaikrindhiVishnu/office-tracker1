@@ -18,7 +18,7 @@ interface EmployeesViewProps {
   setEmail: (email: string) => void;
   designation: string;
   setDesignation: (designation: string) => void;
-  accountType: string;
+  accountType: "EMPLOYEE" | "ADMIN";
   setAccountType: (accountType: string) => void;
   handleAddUser: () => void;
   creatingUser: boolean;
@@ -279,7 +279,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                       <p className="text-sm text-slate-700 mt-1">{u.designation} · {u.accountType}</p>
                     </div>
                   </div>
-                  {u.salary && (
+                  {u.salary !== undefined && (
                     <div className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
                       <p className="text-xs text-slate-500 font-medium mb-1">Monthly Salary</p>
                       <p className="text-lg font-bold text-slate-900">₹{u.salary.toLocaleString()}</p>
@@ -342,7 +342,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                           </span>
                         </td>
                         <td className="px-6 py-4 font-semibold text-slate-900">
-                          {u.salary ? `₹${u.salary.toLocaleString()}` : "—"}
+                          {u.salary !== undefined ? `₹${u.salary.toLocaleString()}` : "—"}
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex gap-3 items-center">
