@@ -171,7 +171,7 @@ const [holidays, setHolidays] = useState<any[]>([]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [designation, setDesignation] = useState("Developer");
-  const [accountType, setAccountType] = useState("EMPLOYEE");
+  const [accountType, setAccountType] = useState<"EMPLOYEE" | "ADMIN">("EMPLOYEE");
   const [msg, setMsg] = useState("");
   const [creatingUser, setCreatingUser] = useState(false);
 
