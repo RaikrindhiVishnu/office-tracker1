@@ -9,6 +9,10 @@ if (!admin.apps.length) {
   });
 }
 
+if (req.method === "GET") {
+  return res.status(200).send("OK");
+}
+
 const db = admin.firestore();
 
 export default async function handler(
