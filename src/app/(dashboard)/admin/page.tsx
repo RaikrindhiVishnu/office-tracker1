@@ -41,7 +41,6 @@ import { EmployeeRow } from "@/types/EmployeeRow";
 import { View } from "@/types/View";
 import { updateEmployeeData } from "@/lib/employeeSync";
 import AdminNotificationBell from "./AdminNotificationBell";
-import CalendarModal from "../employee/views/CalendarView";
 
 /* ================= TYPES ================= */
 // type Session = {
@@ -832,12 +831,11 @@ const handleAddUser = async () => {
 
           {view === "monthlyReport" && <MonthlyReport users={users} monthlyDate={monthlyDate} setMonthlyDate={setMonthlyDate} monthlyAttendance={monthlyAttendance} setMonthlyAttendance={setMonthlyAttendance} sessionsByDate={sessionsByDate} isHoliday={isHoliday} saveMonthlyAttendance={saveMonthlyAttendance} getAutoStatus={getAutoStatus} isSunday={isSunday} isSecondSaturday={isSecondSaturday} isFourthSaturday={isFourthSaturday} isFifthSaturday={isFifthSaturday} />}
 
-          <CalendarModal
-  show={showCalendar}
-  onClose={() => setShowCalendar(false)}
+  <CalendarView
+  showCalendar={showCalendar}
+  setShowCalendar={setShowCalendar}
   calendarDate={calendarDate}
   setCalendarDate={setCalendarDate}
-  holidays={holidays}
   isSunday={isSunday}
   isSecondSaturday={isSecondSaturday}
   isFourthSaturday={isFourthSaturday}
