@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/iclock/cdata",
+      "destination": "/api/attendance"
+    },
+    {
+      "source": "/device/cdata",
+      "destination": "/api/attendance"
+    },
+    {
+      "source": "/",
+      "destination": "/api/attendance"
+    }
+  ]
+}
