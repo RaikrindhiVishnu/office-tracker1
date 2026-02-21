@@ -48,13 +48,19 @@ export async function sendEmployeeWelcomeEmail({
           <p>Please change your password after first login.</p>
 
           <p>
-            <a href="${loginUrl}" 
-               style="background:#193677;color:white;padding:10px 20px;
-                      text-decoration:none;border-radius:5px;">
-              Login Here
-            </a>
-          </p>
+  <a href="${loginUrl}" 
+     target="_blank"
+     style="display:inline-block;background:#193677;color:white;
+            padding:12px 24px;text-decoration:none;
+            border-radius:6px;font-weight:bold;">
+    Login to Office Tracker
+  </a>
+</p>
 
+ <p style="margin-top:25px;font-size:12px;color:#888;">
+        If you did not expect this email, please contact HR.
+      </p>
+      
           <p style="margin-top:20px;font-size:12px;color:gray;">
             © ${new Date().getFullYear()} Techgy Innovations
           </p>

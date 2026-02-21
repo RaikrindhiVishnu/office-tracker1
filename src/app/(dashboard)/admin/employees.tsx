@@ -1,13 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { View } from "@/types/View";
-import type { EmployeeRow } from "@/types/EmployeeRow";
+import type { Employee } from "@/types/Employee";
 
 interface EmployeesViewProps {
   view: string;
   setView: React.Dispatch<React.SetStateAction<View>>;
-  selectedEmployee: EmployeeRow | null;
-  users: EmployeeRow[];   // 🔥 IMPORTANT
-  setSelectedUser: React.Dispatch<React.SetStateAction<EmployeeRow | null>>;
+  selectedEmployee: Employee | null;
+  users: Employee[];   // ✅ FIXED
+  setSelectedUser: React.Dispatch<React.SetStateAction<Employee | null>>;
   deleteUser: (uid: string) => void;
   showAddUser: boolean;
   setShowAddUser: (show: boolean) => void;
@@ -450,15 +450,23 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                 onChange={(e) => setDesignation(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-4 py-2.5"
               >
-                <option>Developer</option>
-                <option>Tester</option>
-                <option>UI/UX Designer</option>
-                <option>DevOps Engineer</option>
-                <option>HR</option>
-                <option>Manager</option>
-                <option>Intern</option>
-                <option>Support</option>
-                <option>Data Analyst</option>
+                <option>Software Engineer</option>
+<option>Senior Software Engineer</option>
+<option>Frontend Engineer</option>
+<option>Backend Engineer</option>
+<option>Full Stack Engineer</option>
+<option>QA Engineer</option>
+<option>DevOps Engineer</option>
+<option>UI/UX Designer</option>
+<option>Data Analyst</option>
+<option>Project Manager</option>
+<option>HR Executive</option>
+<option>Graphic Designer</option>
+<option>3D Artist</option>
+<option>Motion Graphics Designer</option>
+<option>Creative Director</option>
+<option>Intern</option>
+
               </select>
 
               <select

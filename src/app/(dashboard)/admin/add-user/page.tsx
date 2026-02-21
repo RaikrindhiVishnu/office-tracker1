@@ -121,7 +121,7 @@ export default function AddUserPage() {
               <option>Intern</option>
               <option>Support</option>
               <option>Data Analyst</option>
-            </select>
+            </select> 
 
             {/* 🔹 Account Type */}
             <select

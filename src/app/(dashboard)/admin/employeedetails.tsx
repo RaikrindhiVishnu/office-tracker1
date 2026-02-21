@@ -33,8 +33,7 @@ export default function EmployeeDetails({
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  const isAdmin =
-    userData?.role === "admin" || userData?.accountType === "ADMIN";
+  const isAdmin = userData?.accountType === "ADMIN";
 
   /* -------------------------------------------------- */
   /* ✅ Admin Photo Upload */
@@ -361,7 +360,18 @@ export default function EmployeeDetails({
               <SelectField label="Employment Type" value={editedUser.employmentType} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, employmentType: v })} options={["Full-time", "Part-time", "Contract", "Intern"]} />
               <Field label="Work Location" value={editedUser.workLocation} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, workLocation: v })} placeholder="Office/Remote/Hybrid" />
               <Field label="Reporting Manager" value={editedUser.reportingManager} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, reportingManager: v })} placeholder="Manager name" />
-              <SelectField label="Account Type" value={editedUser.role || editedUser.accountType} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, role: v, accountType: v })} options={["admin", "employee", "manager"]} />
+              <SelectField
+  label="Account Type"
+  value={editedUser.accountType}
+  editing={isEditing}
+  onChange={(v) =>
+    setEditedUser({
+      ...editedUser,
+      accountType: v as "EMPLOYEE" | "ADMIN",
+    })
+  }
+  options={["EMPLOYEE", "ADMIN"]}
+/>
               <Field label="Work Experience" value={editedUser.workExperience} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, workExperience: v })} placeholder="5 years" />
             </div>
           </Section>
@@ -369,7 +379,19 @@ export default function EmployeeDetails({
           {/* Compensation & Benefits */}
           <Section title="Compensation & Benefits">
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <Field label="Monthly Salary" value={editedUser.salary} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, salary: v })} type="number" placeholder="50000" />
+              <Field
+  label="Monthly Salary"
+  value={editedUser.salary}
+  editing={isEditing}
+  onChange={(v) =>
+    setEditedUser({
+      ...editedUser,
+      salary: v === "" ? undefined : Number(v), // ✅ convert properly
+    })
+  }
+  type="number"
+  placeholder="50000"
+/>
               <Field label="Bank Name" value={editedUser.bankName} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, bankName: v })} placeholder="SBI, HDFC, etc." />
               <Field label="Account Number" value={editedUser.accountNumber} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, accountNumber: v })} placeholder="XXXXXXXXXXXX" />
               <Field label="IFSC Code" value={editedUser.ifscCode} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, ifscCode: v })} placeholder="SBIN0001234" />
@@ -431,12 +453,12 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Field({ label, value, editing, onChange, type = "text", placeholder = "" }: { label: string; value: string; editing: boolean; onChange: (v: string) => void; type?: string; placeholder?: string; }) {
+function Field({ label, value, editing, onChange, type = "text", placeholder = "" }: { label: string; value: string | number | undefined;  editing: boolean; onChange: (v: string) => void; type?: string; placeholder?: string; }) {
   return (
     <div>
       <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">{label}</label>
       {editing ? (
-        <input type={type} value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-gray-900 focus:outline-none transition-colors text-gray-900" />
+        <input type={type} value={value ?? ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-gray-900 focus:outline-none transition-colors text-gray-900" />
       ) : (
         <p className="text-lg font-semibold text-gray-900">
           {type === "date" && value ? new Date(value).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : value || "Not provided"}
@@ -446,12 +468,12 @@ function Field({ label, value, editing, onChange, type = "text", placeholder = "
   );
 }
 
-function SelectField({ label, value, editing, onChange, options }: { label: string; value: string; editing: boolean; onChange: (v: string) => void; options: string[]; }) {
+function SelectField({ label, value, editing, onChange, options }: { label: string;value: string | number | undefined;  editing: boolean; onChange: (v: string) => void; options: string[]; }) {
   return (
     <div>
       <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">{label}</label>
       {editing ? (
-        <select value={value || ""} onChange={(e) => onChange(e.target.value)} className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-gray-900 focus:outline-none transition-colors text-gray-900">
+        <select value={value ?? ""} onChange={(e) => onChange(e.target.value)} className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-gray-900 focus:outline-none transition-colors text-gray-900">
           <option value="">Select</option>
           {options.map((opt) => (<option key={opt} value={opt}>{opt}</option>))}
         </select>
@@ -462,12 +484,12 @@ function SelectField({ label, value, editing, onChange, options }: { label: stri
   );
 }
 
-function TextAreaField({ label, value, editing, onChange, placeholder = "" }: { label: string; value: string; editing: boolean; onChange: (v: string) => void; placeholder?: string; }) {
+function TextAreaField({ label, value, editing, onChange, placeholder = "" }: { label: string; value: string | number | undefined;  editing: boolean; onChange: (v: string) => void; placeholder?: string; }) {
   return (
     <div>
       <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-2">{label}</label>
       {editing ? (
-        <textarea value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} rows={3} className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-gray-900 focus:outline-none transition-colors text-gray-900" />
+        <textarea value={value ?? ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} rows={3} className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-gray-900 focus:outline-none transition-colors text-gray-900" />
       ) : (
         <p className="text-lg font-semibold text-gray-900">{value || "Not provided"}</p>
       )}

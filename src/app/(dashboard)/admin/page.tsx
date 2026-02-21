@@ -154,8 +154,11 @@ const getAutoStatus = ({
 /* ================= COMPONENT ================= */
 export default function AdminPage() {
   // ✅ STATES FIRST
+  const [selectedDashboardRow, setSelectedDashboardRow] =
+  useState<EmployeeRow | null>(null);
   const [editedUser, setEditedUser] = useState<Employee | null>(null);
-  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeRow | null>(null);
+  const [selectedEmployee, setSelectedEmployee] =
+  useState<Employee | null>(null);
   const { user, loading, userData } = useAuth();
   const router = useRouter();
   const [showMeet, setShowMeet] = useState(false);
@@ -261,15 +264,9 @@ useEffect(() => {
       updatedBy: user!.uid,
       role: userData?.accountType || "ADMIN",
     });
-    setSelectedEmployee({
-    ...editedUser,
-    sessions: editedUser.sessions || [],
-    morningCheckIn: editedUser.sessions?.[0]?.checkIn || null,
-    status: editedUser.status || "OFFLINE",
-    totalMinutes: editedUser.totalMinutes || 0,
-    task: "",
-  });
-
+   setSelectedEmployee({
+  ...editedUser,
+});
   setIsEditing(false);
   alert("Employee details updated successfully!");
 };
@@ -746,7 +743,28 @@ const handleAddUser = async () => {
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
-          {view === "dashboard" && <Dashboard totalEmployees={totalEmployees} onlineEmployees={onlineEmployees} offlineEmployees={offlineEmployees} avgWorkTime={avgWorkTime} rows={filteredRows} busy={busy} formatTime={formatTime} formatTotal={formatTotal} setView={setView} setSelectedEmployee={setSelectedEmployee} />}
+          {view === "dashboard" && (
+  <Dashboard
+    totalEmployees={totalEmployees}
+    onlineEmployees={onlineEmployees}
+    offlineEmployees={offlineEmployees}
+    avgWorkTime={avgWorkTime}
+    rows={filteredRows}
+    busy={busy}
+    formatTime={formatTime}
+    formatTotal={formatTotal}
+    setView={setView}
+    setSelectedEmployee={setSelectedDashboardRow}
+  />
+)}
+
+{view === "profile" && selectedDashboardRow && (
+  <EmployeeDetails
+    selectedUser={selectedDashboardRow}
+    setView={setView}
+    setSelectedUser={setSelectedDashboardRow}
+  />
+)}
 
           {view === "analytics" && (
             <div className="space-y-6">
@@ -823,7 +841,7 @@ const handleAddUser = async () => {
             </div>
           )}
 
-          <EmployeesView view={view} setView={setView} selectedEmployee={selectedEmployee} users={rows}setSelectedUser={setSelectedEmployee} deleteUser={deleteUser} showAddUser={showAddUser} setShowAddUser={setShowAddUser} msg={msg} name={name} setName={setName} email={email} setEmail={setEmail} designation={designation} setDesignation={setDesignation} accountType={accountType} setAccountType={setAccountType} handleAddUser={handleAddUser} creatingUser={creatingUser} formatTime={formatTime} formatTotal={formatTotal} />
+          <EmployeesView view={view} setView={setView} selectedEmployee={selectedEmployee} users={users} setSelectedUser={setSelectedEmployee} deleteUser={deleteUser} showAddUser={showAddUser} setShowAddUser={setShowAddUser} msg={msg} name={name} setName={setName} email={email} setEmail={setEmail} designation={designation} setDesignation={setDesignation} accountType={accountType} setAccountType={setAccountType} handleAddUser={handleAddUser} creatingUser={creatingUser} formatTime={formatTime} formatTotal={formatTotal} />
 
           {view === "employeeDetails" && selectedEmployee && <EmployeeDetails selectedUser={selectedEmployee} setView={setView} setSelectedUser={setSelectedEmployee} />}
 
