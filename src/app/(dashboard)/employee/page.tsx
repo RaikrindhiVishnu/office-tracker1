@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
+import Image from "next/image";
+
 import {
   collection,
   onSnapshot,
@@ -207,21 +209,18 @@ function AnnouncementBar({ messages }: { messages: string[] }) {
           </div>
 
           {/* Scrolling Messages */}
-          <div className="flex-1 overflow-hidden">
-            {/* <div className="marquee"> */}
-              <div className="marquee-track flex items-center">
-               {messages.map((m, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2 mx-6 whitespace-nowrap font-medium"
-                  >
-                    <span className="w-2 h-2 bg-white rounded-full"></span>
-                    {m}
-                  </div>
-                ))}
-              {/* </div> */}
-            </div>
-          </div>
+          {/* Scrolling Messages */}
+{/* Scrolling Messages */}
+<div className="flex-1 overflow-hidden marquee-container">
+  <div className="marquee-track flex items-center">
+    {messages.map((m, i) => (
+      <div key={i} className="flex items-center gap-2 mx-6 whitespace-nowrap font-medium">
+        <span className="w-2 h-2 bg-white rounded-full"></span>
+        {m}
+      </div>
+    ))}
+  </div>
+</div>
 
           {/* Right Controls */}
           <div className="flex items-center gap-2 px-4 z-10">
@@ -633,16 +632,22 @@ const totalNotifications = leaveNotifications.length + queryNotifications.length
     <div className="h-screen flex bg-gray-50 overflow-hidden">
       {/* SIDEBAR */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 bg-[#1b445c] text-white flex flex-col transform transition-all duration-300 ${
+        className={`fixed lg:static inset-y-0 left-0 z-50 bg-[#0d2e4f] text-white flex flex-col transform transition-all duration-300 ${
           sidebarCollapsed ? "w-16" : "w-64"
         } ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
         {/* Logo & Toggle */}
         <div className="p-4 flex items-center justify-between border-b border-white/10">
           {!sidebarCollapsed && (
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-lg">TGY CRM</span>
-            </div>
+            <div className="flex items-center gap-2 ml-4">
+  <Image
+    src="/logo.svg"
+    alt="TGY CRM Logo"
+    width={90}
+    height={70}
+    className="object-contain"
+  />
+</div> 
           )}
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -704,7 +709,7 @@ const totalNotifications = leaveNotifications.length + queryNotifications.length
               {sidebarGroups.flatMap((group) =>
                 group.items.map(([id, label, icon]) => (
                   <button
-                    key={id}
+                    key={`${group.title}-${id}`}
                     onClick={() => {
                       setActiveView(id as ViewType);
                       setMobileMenuOpen(false);
@@ -866,7 +871,7 @@ const totalNotifications = leaveNotifications.length + queryNotifications.length
         {/* RIGHT: All Controls */}
         <div className="flex items-center gap-3">
           {/* Timer */}
-          <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/20">
+         <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm  rounded-lg px-4 py-2 border border-white/20">
             <div className="font-mono font-bold text-lg text-amber-300 flex items-center gap-1">
               <span>⏱</span>
               <span className="tabular-nums">{formatTimer(totalSeconds)}</span>
@@ -1397,21 +1402,21 @@ const totalNotifications = leaveNotifications.length + queryNotifications.length
       )}
 
       <style jsx>{`
-  @keyframes scroll-left-to-right {
-    0% {
-      transform: translateX(-120%);
-    }
-    100% {
-      transform: translateX(120%);
-    }
+@keyframes marquee {
+  0% {
+    transform: translateX(100vw);
   }
+  100% {
+    transform: translateX(-100%);
+  }
+}
 
-  .marquee-track {
-    display: inline-block;
-    min-width: 100%;
-    white-space: nowrap;
-    animation: scroll-left-to-right 20s linear infinite;
-  }
+.marquee-track {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: marquee 12s linear;  /* no "infinite" = plays once */
+  animation-fill-mode: forwards;
+}
 
   .marquee-track:hover {
     animation-play-state: paused;

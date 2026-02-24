@@ -41,6 +41,7 @@ import { EmployeeRow } from "@/types/EmployeeRow";
 import { View } from "@/types/View";
 import { updateEmployeeData } from "@/lib/employeeSync";
 import AdminNotificationBell from "./AdminNotificationBell";
+import Image from "next/image";
 
 /* ================= TYPES ================= */
 // type Session = {
@@ -109,12 +110,28 @@ const formatTotal = (m?: number): string => {
 
 const calculateTotalMinutes = (sessions: Session[]) => {
   let total = 0;
+
   for (const s of sessions) {
-    if (!s.checkIn) continue;
-    const start = s.checkIn.toDate().getTime();
-    const end = s.checkOut ? s.checkOut.toDate().getTime() : Date.now();
-    total += Math.floor((end - start) / 60000);
+    if (!s?.checkIn) continue;
+
+    const start = s.checkIn?.toDate
+      ? s.checkIn.toDate().getTime()
+      : new Date(s.checkIn).getTime();
+
+    const end = s.checkOut
+      ? (s.checkOut?.toDate
+          ? s.checkOut.toDate().getTime()
+          : new Date(s.checkOut).getTime())
+      : Date.now();
+
+    const diff = end - start;
+
+    if (diff > 0) {
+      total += Math.floor(diff / 60000);
+    }
+    // if negative → ignore it
   }
+
   return total;
 };
 
@@ -570,10 +587,15 @@ const handleAddUser = async () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
               </div>
-              <div>
-                <h1 className="text-lg font-bold tracking-tight">TGY CRM</h1>
-                <p className="text-xs text-slate-400">Admin Panel</p>
-              </div>
+              <div className="flex items-center gap-2 ml-4">
+                <Image
+                  src="/logo.svg"
+                  alt="TGY CRM Logo"
+                  width={90}
+                  height={70}
+                  className="object-contain"
+                />
+              </div> 
             </div>
           ) : (
             <div className="w-10 h-10 rounded-xl bg-[#184199] flex items-center justify-center shadow-lg mx-auto">

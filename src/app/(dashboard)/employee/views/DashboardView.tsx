@@ -708,7 +708,7 @@ export default function DashboardView({
         <div className="relative px-6 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <p className="text-white/60 text-sm font-medium">{greetEmoji} {greeting}</p>
-            <h2 className="text-white text-2xl font-black mt-0.5 tracking-tight">Welcome back, {userName}!</h2>
+            <h2 className="text-white text-2xl font-black mt-0.5 tracking-tight">Welcome back, {userName}</h2>
             <p className="text-white/40 text-sm mt-1">
               {now.toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}
             </p>

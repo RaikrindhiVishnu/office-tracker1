@@ -368,7 +368,7 @@ const filteredRows = rows.filter((r) => {
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="w-12 h-12 rounded-xl overflow-hidden shadow-lg">
                     {r.profilePhoto ? <img src={r.profilePhoto} alt={r.name} className="w-full h-full object-cover" />
-                      : <div className="w-full h-full bg-[#7788ac] flex items-center justify-center text-white font-bold">{r.name[0]?.toUpperCase()}</div>}
+                      : <div className="w-full h-full bg-[#7788ac] flex items-center justify-center text-white font-bold">{r.name?.[0]?.toUpperCase() || "U"}</div>}
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-base truncate">{r.name}</h3>
@@ -407,7 +407,7 @@ const filteredRows = rows.filter((r) => {
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl overflow-hidden shadow-md">
                         {r.profilePhoto ? <img src={r.profilePhoto} alt={r.name} className="w-full h-full object-cover" />
-                          : <div className="w-full h-full bg-[#575797] flex items-center justify-center text-white font-bold">{r.name[0]?.toUpperCase()}</div>}
+                          : <div className="w-full h-full bg-[#575797] flex items-center justify-center text-white font-bold">{r.name?.[0]?.toUpperCase() || "U"}</div>}
                       </div>
                       <div>
                         <div className="font-semibold text-slate-900">{r.name}</div>

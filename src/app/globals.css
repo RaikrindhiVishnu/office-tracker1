@@ -28,17 +28,24 @@ body {
   position: relative;
 }
 
+/* MARQUEE */
+.marquee-container {
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
 .marquee-track {
-  display: flex;
-  width: max-content;
-  animation: marqueeScroll 15s linear infinite;
+  display: inline-flex;
+  white-space: nowrap;
+  animation: marqueeScroll 16s linear infinite;
 }
 
 @keyframes marqueeScroll {
-  from {
-    transform: translateX(0);
+  0% {
+    transform: translateX(180%);
   }
-  to {
-    transform: translateX(-33.33%);
+  100% {
+    transform: translateX(-100%);
   }
 }
