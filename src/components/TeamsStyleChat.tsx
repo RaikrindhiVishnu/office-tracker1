@@ -71,10 +71,250 @@ type Notification = {
   read: boolean;
 };
 
+type CallDoc = {
+  id: string;
+  callerUid: string;
+  callerName: string;
+  receiverUid: string;
+  roomName: string;
+  status: "ringing" | "accepted" | "rejected" | "ended" | "missed";
+  createdAt: any;
+};
+
 const getUserName = (user?: Partial<User> | null): string =>
   user?.name ?? user?.email ?? "User";
 
-/* ═══════════════════════ COMPONENT ═══════════════════════ */
+const CALL_TIMEOUT_SECONDS = 30;
+
+/* ═══════════════════════ INCOMING CALL MODAL ═══════════════════════ */
+
+function IncomingCallModal({
+  call,
+  callerName,
+  onAccept,
+  onReject,
+}: {
+  call: CallDoc;
+  callerName: string;
+  onAccept: () => void;
+  onReject: () => void;
+}) {
+  const [countdown, setCountdown] = useState(CALL_TIMEOUT_SECONDS);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          onReject(); // auto-reject on timeout
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [onReject]);
+
+  // Play ringtone
+  useEffect(() => {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    let stopped = false;
+
+    const playRing = () => {
+      if (stopped) return;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 440;
+      osc.type = "sine";
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.4);
+      setTimeout(() => {
+        if (!stopped) playRing();
+      }, 1200);
+    };
+
+    playRing();
+    return () => {
+      stopped = true;
+      ctx.close();
+    };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)" }}>
+      <div
+        className="relative rounded-3xl overflow-hidden shadow-2xl w-full max-w-sm"
+        style={{
+          background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
+          border: "1px solid rgba(255,255,255,0.1)",
+        }}
+      >
+        {/* Animated ring waves */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="absolute rounded-full border border-green-400"
+              style={{
+                width: `${120 + i * 60}px`,
+                height: `${120 + i * 60}px`,
+                opacity: 0,
+                animation: `ping 2s cubic-bezier(0,0,0.2,1) ${i * 0.4}s infinite`,
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="relative z-10 p-8 text-center">
+          {/* Caller avatar */}
+          <div className="relative inline-flex mb-6">
+            <div
+              className="w-24 h-24 rounded-full flex items-center justify-center text-3xl font-bold text-white"
+              style={{
+                background: "linear-gradient(135deg, #667eea, #764ba2)",
+                boxShadow: "0 0 0 4px rgba(102,126,234,0.3), 0 0 40px rgba(102,126,234,0.4)",
+              }}
+            >
+              {callerName.charAt(0).toUpperCase()}
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            </div>
+          </div>
+
+          <p className="text-gray-400 text-sm font-medium mb-1 tracking-widest uppercase">Incoming Call</p>
+          <h2 className="text-white text-2xl font-bold mb-2">{callerName}</h2>
+          <p className="text-gray-500 text-sm mb-8">
+            Auto-declining in{" "}
+            <span className={`font-bold ${countdown <= 10 ? "text-red-400" : "text-gray-300"}`}>
+              {countdown}s
+            </span>
+          </p>
+
+          {/* Countdown arc */}
+          <div className="flex justify-center mb-8">
+            <svg width="60" height="8" viewBox="0 0 60 8">
+              <rect x="0" y="2" width="60" height="4" rx="2" fill="rgba(255,255,255,0.1)" />
+              <rect
+                x="0" y="2"
+                width={`${(countdown / CALL_TIMEOUT_SECONDS) * 60}`}
+                height="4" rx="2"
+                fill={countdown <= 10 ? "#ef4444" : "#22c55e"}
+                style={{ transition: "width 1s linear, fill 0.3s" }}
+              />
+            </svg>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex gap-6 justify-center">
+            <button
+              onClick={onReject}
+              className="group flex flex-col items-center gap-2"
+            >
+              <div className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-400 flex items-center justify-center transition-all duration-200 shadow-lg hover:scale-110 active:scale-95"
+                style={{ boxShadow: "0 0 20px rgba(239,68,68,0.4)" }}>
+                <svg className="w-7 h-7 text-white rotate-135" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+              </div>
+              <span className="text-gray-400 text-xs font-medium">Decline</span>
+            </button>
+
+            <button
+              onClick={onAccept}
+              className="group flex flex-col items-center gap-2"
+            >
+              <div className="w-16 h-16 rounded-full bg-green-500 hover:bg-green-400 flex items-center justify-center transition-all duration-200 shadow-lg hover:scale-110 active:scale-95"
+                style={{ boxShadow: "0 0 20px rgba(34,197,94,0.4)" }}>
+                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+              </div>
+              <span className="text-gray-400 text-xs font-medium">Accept</span>
+            </button>
+          </div>
+        </div>
+
+        <style>{`
+          @keyframes ping {
+            0% { transform: scale(0.5); opacity: 0.8; }
+            100% { transform: scale(1.5); opacity: 0; }
+          }
+        `}</style>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════ OUTGOING CALL MODAL ═══════════════════════ */
+
+function OutgoingCallModal({
+  calleeName,
+  onCancel,
+}: {
+  calleeName: string;
+  onCancel: () => void;
+}) {
+  const [dots, setDots] = useState(".");
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDots((prev) => (prev.length >= 3 ? "." : prev + "."));
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)" }}>
+      <div
+        className="relative rounded-3xl overflow-hidden shadow-2xl w-full max-w-sm"
+        style={{
+          background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
+          border: "1px solid rgba(255,255,255,0.1)",
+        }}
+      >
+        <div className="relative z-10 p-8 text-center">
+          <div className="relative inline-flex mb-6">
+            <div
+              className="w-24 h-24 rounded-full flex items-center justify-center text-3xl font-bold text-white"
+              style={{
+                background: "linear-gradient(135deg, #667eea, #764ba2)",
+                boxShadow: "0 0 0 4px rgba(102,126,234,0.3), 0 0 40px rgba(102,126,234,0.4)",
+              }}
+            >
+              {calleeName.charAt(0).toUpperCase()}
+            </div>
+          </div>
+
+          <p className="text-gray-400 text-sm font-medium mb-1 tracking-widest uppercase">Calling</p>
+          <h2 className="text-white text-2xl font-bold mb-2">{calleeName}</h2>
+          <p className="text-gray-500 text-sm mb-10">Waiting for answer{dots}</p>
+
+          <button
+            onClick={onCancel}
+            className="flex flex-col items-center gap-2 mx-auto"
+          >
+            <div className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-400 flex items-center justify-center transition-all duration-200 shadow-lg hover:scale-110 active:scale-95"
+              style={{ boxShadow: "0 0 20px rgba(239,68,68,0.4)" }}>
+              <svg className="w-7 h-7 text-white rotate-135" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+              </svg>
+            </div>
+            <span className="text-gray-400 text-xs font-medium">Cancel</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════ MAIN COMPONENT ═══════════════════════ */
 
 export default function TeamsStyleChat({ users }: { users: User[] }) {
   const { user } = useAuth();
@@ -97,6 +337,12 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
   const [editText, setEditText]                 = useState("");
   const [selectedFile, setSelectedFile]         = useState<File | null>(null);
   const [uploading, setUploading]               = useState(false);
+
+  // Call state
+  const [incomingCall, setIncomingCall]         = useState<CallDoc | null>(null);
+  const [outgoingCallId, setOutgoingCallId]     = useState<string | null>(null);
+  const [outgoingCallee, setOutgoingCallee]     = useState<string>("");
+  const callTimeoutRef                          = useRef<any>(null);
 
   const messagesEndRef    = useRef<HTMLDivElement>(null);
   const typingTimeout     = useRef<any>(null);
@@ -242,7 +488,123 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
     });
   }, [chatId, selectedChat, user, users]);
 
-  /* ─────────── Handlers ─────────── */
+  /* ═══════════════════════ CALL SIGNALING ═══════════════════════ */
+
+  /* ─────────── Listen for INCOMING calls ─────────── */
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, "calls"),
+      where("receiverUid", "==", user.uid),
+      where("status", "==", "ringing")
+    );
+    return onSnapshot(q, (snap) => {
+      if (snap.empty) {
+        setIncomingCall(null);
+        return;
+      }
+      // Take the most recent ringing call
+      const callDoc = snap.docs[0];
+      const callData = { id: callDoc.id, ...callDoc.data() } as CallDoc;
+      setIncomingCall(callData);
+    });
+  }, [user]);
+
+  /* ─────────── Listen for OUTGOING call status (caller side) ─────────── */
+  useEffect(() => {
+    if (!user || !outgoingCallId) return;
+    const unsub = onSnapshot(doc(db, "calls", outgoingCallId), (snap) => {
+      if (!snap.exists()) return;
+      const call = snap.data() as CallDoc;
+
+      if (call.status === "accepted") {
+        clearTimeout(callTimeoutRef.current);
+        setOutgoingCallId(null);
+        setOutgoingCallee("");
+        setJitsiRoom(call.roomName);
+      }
+
+      if (call.status === "rejected" || call.status === "missed") {
+        clearTimeout(callTimeoutRef.current);
+        setOutgoingCallId(null);
+        setOutgoingCallee("");
+        // Brief toast-style notification
+        const msg = call.status === "rejected" ? "Call was declined." : "No answer.";
+        showToast(msg);
+      }
+    });
+    return () => unsub();
+  }, [user, outgoingCallId]);
+
+  /* ─────────── Toast helper ─────────── */
+  const [toast, setToast] = useState<string | null>(null);
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  /* ─────────── Initiate call ─────────── */
+  const initiateCall = async () => {
+    if (!selectedChat || !user || selectedChat.isGroup) return;
+    const receiverUid = selectedChat.participants.find(p => p !== user.uid);
+    if (!receiverUid) return;
+
+    const roomName = `office_${selectedChat.id}_${Date.now()}`;
+    const calleeName = getChatName(selectedChat);
+
+    const callRef = await addDoc(collection(db, "calls"), {
+      callerUid: user.uid,
+      callerName: getUserName(user),
+      receiverUid,
+      roomName,
+      status: "ringing",
+      createdAt: serverTimestamp(),
+    });
+
+    setOutgoingCallId(callRef.id);
+    setOutgoingCallee(calleeName);
+
+    // Auto-cancel after timeout
+    callTimeoutRef.current = setTimeout(async () => {
+      await updateDoc(doc(db, "calls", callRef.id), { status: "missed" });
+      setOutgoingCallId(null);
+      setOutgoingCallee("");
+      showToast("No answer.");
+    }, CALL_TIMEOUT_SECONDS * 1000);
+  };
+
+  /* ─────────── Cancel outgoing call ─────────── */
+  const cancelOutgoingCall = async () => {
+    if (!outgoingCallId) return;
+    clearTimeout(callTimeoutRef.current);
+    await updateDoc(doc(db, "calls", outgoingCallId), { status: "ended" });
+    setOutgoingCallId(null);
+    setOutgoingCallee("");
+  };
+
+  /* ─────────── Accept incoming call ─────────── */
+  const acceptIncomingCall = async () => {
+    if (!incomingCall) return;
+    await updateDoc(doc(db, "calls", incomingCall.id), { status: "accepted" });
+    setJitsiRoom(incomingCall.roomName);
+    setIncomingCall(null);
+  };
+
+  /* ─────────── Reject incoming call ─────────── */
+  const rejectIncomingCall = async () => {
+    if (!incomingCall) return;
+    await updateDoc(doc(db, "calls", incomingCall.id), { status: "rejected" });
+    setIncomingCall(null);
+  };
+
+  /* ─────────── End call (mark as ended in Firestore) ─────────── */
+  const handleEndCall = async () => {
+    setJitsiRoom(null);
+    // Optionally mark the call document as ended if you track active calls
+  };
+
+  /* ═══════════════════════ CHAT HANDLERS ═══════════════════════ */
+
   const handleTyping = async () => {
     if (!chatId || !user || !selectedChat) return;
     const path = selectedChat.isGroup ? `groupChats/${chatId}/typing` : `chats/${chatId}/typing`;
@@ -306,12 +668,6 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
   const goToChat = async (notif: Notification) => {
     const chat = chats.find(c => c.id === notif.chatId);
     if (chat) { setSelectedChat(chat); await updateDoc(doc(db, "notifications", notif.id), { read: true }); setShowNotifications(false); }
-  };
-
-  /* ─────────── Jitsi call ─────────── */
-  const initiateCall = () => {
-    if (!selectedChat || !user || selectedChat.isGroup) return;
-    setJitsiRoom(`office_${selectedChat.id}`);
   };
 
   /* ─────────── Create group ─────────── */
@@ -389,6 +745,31 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
   return (
     <>
       <input ref={fileInputRef} type="file" className="hidden" onChange={e => { if (e.target.files?.[0]) setSelectedFile(e.target.files[0]); }} />
+
+      {/* ── TOAST ── */}
+      {toast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-gray-800 text-white px-6 py-3 rounded-xl shadow-xl text-sm font-medium animate-fade-in">
+          {toast}
+        </div>
+      )}
+
+      {/* ── INCOMING CALL MODAL ── */}
+      {incomingCall && !jitsiRoom && (
+        <IncomingCallModal
+          call={incomingCall}
+          callerName={incomingCall.callerName || "Someone"}
+          onAccept={acceptIncomingCall}
+          onReject={rejectIncomingCall}
+        />
+      )}
+
+      {/* ── OUTGOING CALL MODAL ── */}
+      {outgoingCallId && !jitsiRoom && (
+        <OutgoingCallModal
+          calleeName={outgoingCallee}
+          onCancel={cancelOutgoingCall}
+        />
+      )}
 
       {/* ── CREATE GROUP MODAL ── */}
       {showCreateGroup && (
@@ -571,10 +952,14 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
                 </div>
               </div>
 
-              {/* Call buttons — only for direct chats */}
+              {/* Call button — only for direct chats */}
               {!selectedChat.isGroup && (
                 <div className="flex items-center gap-1">
-                  <button onClick={initiateCall} title="Start video/audio call" className="w-9 h-9 rounded-lg hover:bg-purple-50 flex items-center justify-center transition-colors group">
+                  <button
+                    onClick={initiateCall}
+                    title="Start video call"
+                    className="w-9 h-9 rounded-lg hover:bg-purple-50 flex items-center justify-center transition-colors group"
+                  >
                     <svg className="w-5 h-5 text-gray-500 group-hover:text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                   </button>
                 </div>
@@ -704,12 +1089,12 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
         )}
       </div>
 
-      {/* ── JITSI CALL — rendered INSIDE the return ── */}
+      {/* ── JITSI CALL ── */}
       {jitsiRoom && user && (
         <JitsiCall
           roomName={jitsiRoom}
           displayName={user.displayName || user.email || "User"}
-          onClose={() => setJitsiRoom(null)}
+          onClose={handleEndCall}
         />
       )}
     </>

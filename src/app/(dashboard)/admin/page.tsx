@@ -311,8 +311,26 @@ useEffect(() => {
       const uid = u.id;
       const userData = u.data();
       const attendanceSnap = await getDoc(doc(db, "attendance", `${uid}_${targetDate}`));
-      const sessions: Session[] = attendanceSnap.exists() ? attendanceSnap.data().sessions || [] : [];
-      const morningCheckIn = sessions.length > 0 ? sessions[0].checkIn : null;
+      const sessions: Session[] = attendanceSnap.exists()
+  ? attendanceSnap.data().sessions || []
+  : [];
+
+// ✅ Sort sessions by checkIn ascending (oldest first)
+const sortedSessions = [...sessions].sort((a, b) => {
+  const aTime = a.checkIn?.toDate
+    ? a.checkIn.toDate().getTime()
+    : new Date(a.checkIn).getTime();
+
+  const bTime = b.checkIn?.toDate
+    ? b.checkIn.toDate().getTime()
+    : new Date(b.checkIn).getTime();
+
+  return aTime - bTime;
+});
+
+// ✅ Always first check-in of the day
+const morningCheckIn =
+  sortedSessions.length > 0 ? sortedSessions[0].checkIn : null;
       const lastSession = sessions[sessions.length - 1];
       const isOnline = lastSession && !lastSession.checkOut;
       const updateSnap = await getDoc(doc(db, "dailyUpdates", `${uid}_${targetDate}`));
@@ -323,11 +341,11 @@ useEffect(() => {
   uid: id,
   name: userData.name,
   email: userData.email,
-  profilePhoto: userData.profilePhoto || "",   // ✅ ADD THIS LINE
-  sessions,
+  profilePhoto: userData.profilePhoto || "",
+  sessions: sortedSessions,
   morningCheckIn,
   status: isOnline ? "ONLINE" : "OFFLINE",
-  totalMinutes: calculateTotalMinutes(sessions),
+  totalMinutes: calculateTotalMinutes(sortedSessions),
   task: updateSnap.exists() ? updateSnap.data().currentTask : "—",
 });
 

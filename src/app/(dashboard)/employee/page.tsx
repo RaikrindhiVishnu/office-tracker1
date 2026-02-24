@@ -23,7 +23,6 @@ import { checkIn, checkOut, getTodayAttendance } from "@/lib/attendance";
 import { saveDailyUpdate } from "@/lib/dailyUpdates";
 
 // Import your existing components
-import CallCenter from "../calls/CallCenter";
 import CallHistory from "@/components/CallHistory";
 import MeetPanel from "@/components/MeetPanel";
 import IncomingCallListener from "@/components/IncomingCallListener";
