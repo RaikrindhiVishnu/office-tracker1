@@ -6,6 +6,7 @@ import {
   updateDoc, doc, serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { User as FirebaseUser } from "firebase/auth";
 
 const ITEMS_PER_PAGE = 8;
 
@@ -24,8 +25,8 @@ interface Query {
 }
 
 interface AdminQueriesViewProps {
-  user: Record<string, unknown>;
-  userData: Record<string, unknown>;
+  user: FirebaseUser | null;
+  userData: any;
 }
 
 const AVATAR_PALETTE: [string, string][] = [
