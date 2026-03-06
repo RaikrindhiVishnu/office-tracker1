@@ -1,0 +1,116 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return isAuth() && request.auth.token.superAdmin == true;
+    }
+
+    function belongsToCompany(companyId) {
+      return isAuth() && request.auth.token.companyId == companyId;
+    }
+
+    function hasAnyRole(companyId, roles) {
+      return belongsToCompany(companyId) && request.auth.token.role in roles;
+    }
+
+    // ── SUPER ADMIN ──────────────────────────────
+    match /superAdmin/{uid} {
+      allow read: if isSuperAdmin() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // ── NEW MULTI-TENANT PATHS ───────────────────
+    match /companies/{companyId} {
+      allow read: if isSuperAdmin() || belongsToCompany(companyId);
+      allow write: if isSuperAdmin();
+
+      match /settings/{doc} {
+        allow read, write: if isSuperAdmin() || hasAnyRole(companyId, ['owner', 'admin']);
+      }
+
+      match /users/{userId} {
+        allow read: if isSuperAdmin() || belongsToCompany(companyId);
+        allow create: if isSuperAdmin() || hasAnyRole(companyId, ['owner', 'admin', 'hr']);
+        allow update: if isSuperAdmin() || belongsToCompany(companyId);
+        allow delete: if isSuperAdmin() || hasAnyRole(companyId, ['owner', 'admin']);
+      }
+
+      match /attendance/{docId} {
+        allow read, write: if isSuperAdmin() || belongsToCompany(companyId);
+      }
+
+      match /leaves/{docId} {
+        allow read, write: if isSuperAdmin() || belongsToCompany(companyId);
+      }
+
+      match /tasks/{docId} {
+        allow read, write: if isSuperAdmin() || belongsToCompany(companyId);
+      }
+
+      match /projects/{docId} {
+        allow read: if isSuperAdmin() || belongsToCompany(companyId);
+        allow write: if isSuperAdmin() || hasAnyRole(companyId, ['owner', 'admin', 'manager', 'tech_lead']);
+      }
+
+      match /finance/{docId} {
+        allow read, write: if isSuperAdmin() || hasAnyRole(companyId, ['owner', 'admin', 'finance']);
+      }
+
+      match /announcements/{docId} {
+        allow read: if isSuperAdmin() || belongsToCompany(companyId);
+        allow write: if isSuperAdmin() || hasAnyRole(companyId, ['owner', 'admin']);
+      }
+
+      match /queries/{docId} {
+        allow read, write: if isSuperAdmin() || belongsToCompany(companyId);
+      }
+
+      match /departments/{docId} {
+        allow read: if isSuperAdmin() || belongsToCompany(companyId);
+        allow write: if isSuperAdmin() || hasAnyRole(companyId, ['owner', 'admin']);
+      }
+    }
+
+    // ── LEGACY PATHS — FULLY OPEN DURING MIGRATION ──
+    // These keep ALL existing app functionality working
+    // while you update collection paths in the code
+
+    match /users/{userId} {
+      allow read, write: if isAuth();
+    }
+
+    match /attendance/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    match /tasks/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    match /leaves/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    match /announcements/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    match /queries/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    match /projects/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    // ── DEFAULT ──────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

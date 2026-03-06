@@ -431,7 +431,7 @@ const morningCheckIn =
 
   if (loading)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-50 to-slate-100">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-[#193677] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-slate-600 font-medium">Loading dashboard...</p>
@@ -441,7 +441,7 @@ const morningCheckIn =
 
   if (!user)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-50 to-slate-100">
         <div className="text-center">
           <p className="text-slate-600 font-medium">Not authenticated</p>
         </div>
@@ -568,7 +568,7 @@ const handleAddUser = async () => {
 
   /* ================= UI ================= */
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50">
+    <div className="min-h-screen flex bg-linear-to-br from-slate-50 via-slate-100 to-slate-50">
       {/* MOBILE MENU BUTTON */}
       <button
         onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -820,7 +820,7 @@ const handleAddUser = async () => {
                         </span>
                       </div>
                       <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-emerald-500 to-green-500 rounded-full transition-all duration-500" style={{ width: `${(onlineEmployees / totalEmployees) * 100}%` }}></div>
+                        <div className="h-full bg-linear-to-r from-emerald-500 to-green-500 rounded-full transition-all duration-500" style={{ width: `${(onlineEmployees / totalEmployees) * 100}%` }}></div>
                       </div>
                     </div>
                     <div>
@@ -831,7 +831,7 @@ const handleAddUser = async () => {
                         </span>
                       </div>
                       <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-slate-400 to-slate-500 rounded-full transition-all duration-500" style={{ width: `${(offlineEmployees / totalEmployees) * 100}%` }}></div>
+                        <div className="h-full bg-linear-to-r from-slate-400 to-slate-500 rounded-full transition-all duration-500" style={{ width: `${(offlineEmployees / totalEmployees) * 100}%` }}></div>
                       </div>
                     </div>
                   </div>
@@ -863,9 +863,9 @@ const handleAddUser = async () => {
                     .sort((a, b) => b.totalMinutes - a.totalMinutes)
                     .slice(0, 5)
                     .map((r, index) => (
-                      <div key={r.id} className="flex items-center gap-4 p-4 bg-gradient-to-r from-slate-50 to-transparent rounded-xl hover:from-indigo-50 transition-colors">
+                      <div key={r.id} className="flex items-center gap-4 p-4 bg-linear-to-r from-slate-50 to-transparent rounded-xl hover:from-indigo-50 transition-colors">
                         <div className="text-2xl font-bold text-slate-300 w-8">{index + 1}</div>
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-lg">{r.name[0]?.toUpperCase()}</div>
+                        <div className="w-12 h-12 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-lg">{r.name[0]?.toUpperCase()}</div>
                         <div className="flex-1">
                           <p className="font-semibold text-slate-900">{r.name}</p>
                           <p className="text-sm text-slate-500">{r.email}</p>
@@ -972,7 +972,7 @@ function NavItem({ icon, label, active = false, onClick, badge, collapsed = fals
       } ${collapsed ? "justify-center" : ""}`}
       title={collapsed ? label : ""}
     >
-      <span className={collapsed ? "" : "flex-shrink-0"}>{icon}</span>
+      <span className={collapsed ? "" : "shrink-0"}>{icon}</span>
       {!collapsed && (
         <>
           <span className="flex-1 text-left">{label}</span>
@@ -988,7 +988,7 @@ function StatCard({ title, value, icon, gradient, trend }: any) {
   return (
     <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 hover:shadow-xl transition-all duration-300 group">
       <div className="flex items-start justify-between mb-4">
-        <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform`}>{icon}</div>
+        <div className={`w-14 h-14 rounded-xl bg-linear-to-br ${gradient} flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform`}>{icon}</div>
         {trend && <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">{trend}</span>}
       </div>
       <p className="text-slate-600 text-sm font-medium mb-1">{title}</p>

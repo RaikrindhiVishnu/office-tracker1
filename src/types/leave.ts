@@ -1,0 +1,1 @@
+export type LeaveType = "Casual" | "Sick" | "Work From Home";

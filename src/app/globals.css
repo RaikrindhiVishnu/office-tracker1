@@ -38,12 +38,12 @@ body {
 .marquee-track {
   display: inline-flex;
   white-space: nowrap;
-  animation: marqueeScroll 16s linear infinite;
+  animation: marqueeScroll 60s linear infinite;
 }
 
 @keyframes marqueeScroll {
   0% {
-    transform: translateX(180%);
+    transform: translateX(80%);
   }
   100% {
     transform: translateX(-100%);

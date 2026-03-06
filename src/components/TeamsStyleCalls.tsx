@@ -72,7 +72,6 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [callTimer, setCallTimer] = useState(0);
 
-  // 🔹 Active call — other user (computed above return, not inside JSX)
   const otherUser = activeCall
     ? users.find(
         (u) =>
@@ -179,7 +178,6 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
       const call = { id: snapshot.id, ...snapshot.data() } as Call;
       setActiveCall(call);
 
-      // Handle answer from receiver
       if (
         call.answer &&
         peerConnectionRef.current &&
@@ -190,7 +188,6 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
         );
       }
 
-      // Handle ICE candidates
       if (call.iceCandidates) {
         for (const candidate of call.iceCandidates) {
           if (
@@ -209,7 +206,6 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
         }
       }
 
-      // Handle call ended
       if (call.status === "ended" || call.status === "rejected") {
         endCall();
       }
@@ -503,16 +499,12 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
         u.email?.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  /* ================================================================
-     RENDER
-  ================================================================ */
   return (
     <>
       {/* INCOMING CALL MODAL */}
       {incomingCall && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center animate-fade-in">
           <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 text-center shadow-2xl">
-            {/* Caller avatar — no IIFE, computed inline with a variable */}
             {(() => {
               const caller = users.find((u) => u.uid === incomingCall.callerId);
               return caller?.profilePhoto ? (
@@ -590,7 +582,6 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
       {/* ACTIVE CALL INTERFACE */}
       {activeCall && (
         <div className="fixed inset-0 bg-gray-900 z-50 flex flex-col">
-          {/* Remote Video */}
           <div className="flex-1 relative bg-gray-800">
             {activeCall.type === "video" ? (
               <video
@@ -600,7 +591,6 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
                 className="w-full h-full object-cover"
               />
             ) : (
-              /* Audio call — uses otherUser / otherUserInitial computed above return */
               <div className="w-full h-full flex items-center justify-center">
                 <div className="text-center">
                   {otherUser?.profilePhoto ? (
@@ -621,7 +611,6 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
               </div>
             )}
 
-            {/* Local Video (Picture-in-Picture) */}
             {activeCall.type === "video" && (
               <div className="absolute top-4 right-4 w-48 h-36 bg-gray-800 rounded-lg overflow-hidden shadow-2xl border-2 border-gray-700">
                 <video
@@ -651,7 +640,6 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
               </div>
             )}
 
-            {/* Call Info */}
             <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2">
               <p className="text-white font-medium">
                 {activeCall.status === "ringing"
@@ -661,7 +649,6 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
             </div>
           </div>
 
-          {/* Call Controls */}
           <div className="bg-gray-800 p-6">
             <div className="flex justify-center gap-4">
               <button
@@ -820,7 +807,6 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
                         key={u.uid}
                         className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors group"
                       >
-                        {/* Avatar — single online dot, no duplicate */}
                         <div className="relative w-10 h-10 flex-shrink-0">
                           {u.profilePhoto ? (
                             <img
@@ -914,7 +900,6 @@ export default function TeamsStyleCallsEnhanced({ users }: { users: User[] }) {
                           key={call.id}
                           className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors"
                         >
-                          {/* History avatar — clean, no IIFE */}
                           {historyUser?.profilePhoto ? (
                             <img
                               src={historyUser.profilePhoto}
