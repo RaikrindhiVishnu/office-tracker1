@@ -5,11 +5,17 @@ import * as admin from "firebase-admin";
 
 // ✅ Put your service account JSON file in the scripts/ folder
 // and rename it to serviceAccount.json
-import serviceAccount from "./serviceAccount.json";
+
+
+import * as admin from "firebase-admin";
 
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+    }),
   });
 }
 
