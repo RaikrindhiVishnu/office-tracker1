@@ -78,7 +78,7 @@ export default function WorkUpdateView() {
       <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
 
         {/* Header */}
-        <div className="bg-gradient-to-r from-[#0b3a5a] to-[#1a5276] px-6 py-4">
+        <div className="bg-linear-to-r from-[#0b3a5a] to-[#1a5276] px-6 py-4">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             📝 <span>Work Update</span>
           </h2>
@@ -170,7 +170,7 @@ export default function WorkUpdateView() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="w-full py-3 bg-gradient-to-r from-[#0b3a5a] to-[#1a5276] text-white rounded-xl font-semibold text-sm hover:opacity-90 disabled:opacity-50 transition-all shadow-md hover:shadow-lg active:scale-[0.99]"
+            className="w-full py-3 bg-linear-to-r from-[#0b3a5a] to-[#1a5276] text-white rounded-xl font-semibold text-sm hover:opacity-90 disabled:opacity-50 transition-all shadow-md hover:shadow-lg active:scale-[0.99]"
           >
             {saving ? (
               <span className="flex items-center justify-center gap-2">

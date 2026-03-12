@@ -9,7 +9,7 @@ import {
 /* ── Fonts ─────────────────────────────────────────────── */
 const FONT = "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap";
 
-/* ── Design tokens – WHITE THEME ────────────────────────── */
+/* ── Design tokens ──────────────────────────────────────── */
 const T = {
   bg:       "#f0f2f8",
   surface:  "#ffffff",
@@ -19,7 +19,6 @@ const T = {
   sub:      "#334155",
   muted:    "#94a3b8",
   faint:    "#e2e8f0",
-
   blue:     "#3b82f6",
   sky:      "#0ea5e9",
   violet:   "#8b5cf6",
@@ -30,7 +29,18 @@ const T = {
   teal:     "#14b8a6",
   pink:     "#ec4899",
   indigo:   "#6366f1",
-};
+} as const;
+
+/* ── Types ──────────────────────────────────────────────── */
+interface BadgeCfg { bg: string; color: string; border: string; }
+
+type PriorityKey       = "Critical" | "High" | "Medium" | "Low";
+type StatusKey         = "Open" | "In Progress" | "Waiting" | "Resolved";
+type TabKey            = "overview" | "tickets" | "agents" | "reports" | "settings";
+type FilterKey         = "Today" | "This Week" | "This Month";
+type PriorityFilterKey = "All" | PriorityKey;
+type NotifState        = { email: boolean; sla: boolean; newTicket: boolean; dailyReport: boolean };
+type SlaHState         = { critical: string; high: string; medium: string };
 
 /* ── Demo data ─────────────────────────────────────────── */
 const ticketTrend = [
@@ -66,7 +76,7 @@ const agents = [
   { name:"Dev Patel",    initials:"DP", handled:33, resolved:29, time:"16m", csat:85, trend:"-3%", color:T.rose   },
 ];
 
-const queue = [
+const queue: { id:string; customer:string; issue:string; priority:PriorityKey; status:StatusKey; wait:string; ch:string }[] = [
   { id:"#4821", customer:"John Smith",   issue:"Login failure on mobile",    priority:"Critical", status:"Open",        wait:"2m",  ch:"💬" },
   { id:"#4822", customer:"Maria Garcia", issue:"Duplicate charge on card",   priority:"High",     status:"In Progress", wait:"6m",  ch:"✉️" },
   { id:"#4823", customer:"Ravi Kumar",   issue:"Password reset not working", priority:"High",     status:"Open",        wait:"9m",  ch:"📞" },
@@ -75,7 +85,7 @@ const queue = [
   { id:"#4826", customer:"Emma Johnson", issue:"Dark mode not saving",       priority:"Low",      status:"Open",        wait:"21m", ch:"✉️" },
 ];
 
-const sla = [
+const sla: { id:string; issue:string; priority:PriorityKey; breached:boolean; left:string }[] = [
   { id:"#4801", issue:"Payment Gateway Timeout", priority:"Critical", breached:true,  left:"Breached 28m ago"   },
   { id:"#4807", issue:"Auth Service Down",        priority:"Critical", breached:true,  left:"Breached 1h 4m ago" },
   { id:"#4815", issue:"Slow API Response",        priority:"High",     breached:false, left:"11m remaining"      },
@@ -97,23 +107,23 @@ const reportData = [
   { month:"Jul", tickets:580, resolved:540, csat:92 },
 ];
 
-/* ── Priority / Status config ─────────────────────────── */
-const priorityCfg = {
+/* ── Priority / Status configs ────────────────────────── */
+const priorityCfg: Record<PriorityKey, BadgeCfg> = {
   Critical: { bg:"#fff1f2", color:"#f43f5e", border:"#fecdd3" },
   High:     { bg:"#fff7ed", color:"#f97316", border:"#fed7aa" },
   Medium:   { bg:"#f5f3ff", color:"#8b5cf6", border:"#ddd6fe" },
   Low:      { bg:"#f0fdf4", color:"#10b981", border:"#a7f3d0" },
 };
 
-const statusCfg = {
+const statusCfg: Record<StatusKey, BadgeCfg> = {
   "Open":        { bg:"#eff6ff", color:"#3b82f6", border:"#bfdbfe" },
   "In Progress": { bg:"#f5f3ff", color:"#8b5cf6", border:"#ddd6fe" },
   "Waiting":     { bg:"#fffbeb", color:"#f59e0b", border:"#fde68a" },
   "Resolved":    { bg:"#f0fdf4", color:"#10b981", border:"#a7f3d0" },
 };
 
-/* ── Helpers ────────────────────────────────────────────── */
-function Badge({ label, cfg }) {
+/* ── Reusable components ────────────────────────────────── */
+function Badge({ label, cfg }: { label: string; cfg: BadgeCfg }) {
   return (
     <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 10px", borderRadius:99, fontSize:11, fontWeight:700, background:cfg.bg, color:cfg.color, border:`1px solid ${cfg.border}` }}>
       <span style={{ width:5, height:5, borderRadius:"50%", background:cfg.color, flexShrink:0 }} />
@@ -122,7 +132,8 @@ function Badge({ label, cfg }) {
   );
 }
 
-function Tip({ active, payload, label }) {
+interface TipProps { active?: boolean; payload?: { name:string; value:number; color:string }[]; label?: string; }
+function Tip({ active, payload, label }: TipProps) {
   if (!active || !payload?.length) return null;
   return (
     <div style={{ background:"#fff", border:`1px solid ${T.border}`, borderRadius:10, padding:"10px 14px", fontSize:12, boxShadow:"0 4px 20px rgba(0,0,0,0.08)" }}>
@@ -134,22 +145,18 @@ function Tip({ active, payload, label }) {
   );
 }
 
-function Counter({ to, suffix="" }) {
+function Counter({ to, suffix = "" }: { to: number; suffix?: string }) {
   const [val, setVal] = useState(0);
   useEffect(() => {
     let v = 0;
     const step = Math.max(1, Math.ceil(to / 40));
-    const t = setInterval(() => {
-      v = Math.min(v + step, to);
-      setVal(v);
-      if (v >= to) clearInterval(t);
-    }, 16);
+    const t = setInterval(() => { v = Math.min(v + step, to); setVal(v); if (v >= to) clearInterval(t); }, 16);
     return () => clearInterval(t);
   }, [to]);
   return <>{val.toLocaleString()}{suffix}</>;
 }
 
-function Panel({ children, style={} }) {
+function Panel({ children, style = {} }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
     <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:16, padding:20, boxShadow:"0 1px 4px rgba(0,0,0,0.04)", ...style }}>
       {children}
@@ -157,14 +164,12 @@ function Panel({ children, style={} }) {
   );
 }
 
-function SLabel({ children }) {
+function SLabel({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize:10, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", color:T.muted, marginBottom:12 }}>{children}</div>;
 }
 
-/* ── Ring ────────────────────────────────────────────────── */
-function Ring({ pct, color, size=90, stroke=8 }) {
-  const r = (size - stroke) / 2;
-  const circ = 2 * Math.PI * r;
+function Ring({ pct, color, size = 90, stroke = 8 }: { pct:number; color:string; size?:number; stroke?:number }) {
+  const r = (size - stroke) / 2, circ = 2 * Math.PI * r;
   return (
     <svg width={size} height={size} style={{ transform:"rotate(-90deg)" }}>
       <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={T.faint} strokeWidth={stroke} />
@@ -179,19 +184,26 @@ function Ring({ pct, color, size=90, stroke=8 }) {
    OVERVIEW TAB
 ══════════════════════════════════════════════════════════ */
 function OverviewTab() {
-  const kpis = [
-    { label:"Total Tickets",   value:1240, suffix:"",  color:T.blue,   bg:"#eff6ff", icon:"🎫", delta:"+12%", up:true  },
-    { label:"Open Tickets",    value:180,  suffix:"",  color:T.rose,   bg:"#fff1f2", icon:"🔴", delta:"+5%",  up:false },
-    { label:"Resolved",        value:1020, suffix:"",  color:T.green,  bg:"#f0fdf4", icon:"✅", delta:"+9%",  up:true  },
-    { label:"Pending",         value:40,   suffix:"",  color:T.amber,  bg:"#fffbeb", icon:"⏳", delta:"-2%",  up:true  },
-    { label:"Avg Response",    value:12,   suffix:"m", color:T.violet, bg:"#f5f3ff", icon:"⚡", delta:"-3m",  up:true  },
-    { label:"CSAT Score",      value:92,   suffix:"%", color:T.teal,   bg:"#f0fdfa", icon:"😊", delta:"+2%",  up:true  },
+  const kpis: { label:string; value:number; suffix:string; color:string; bg:string; icon:string; delta:string; up:boolean }[] = [
+    { label:"Total Tickets", value:1240, suffix:"",  color:T.blue,   bg:"#eff6ff", icon:"🎫", delta:"+12%", up:true  },
+    { label:"Open Tickets",  value:180,  suffix:"",  color:T.rose,   bg:"#fff1f2", icon:"🔴", delta:"+5%",  up:false },
+    { label:"Resolved",      value:1020, suffix:"",  color:T.green,  bg:"#f0fdf4", icon:"✅", delta:"+9%",  up:true  },
+    { label:"Pending",       value:40,   suffix:"",  color:T.amber,  bg:"#fffbeb", icon:"⏳", delta:"-2%",  up:true  },
+    { label:"Avg Response",  value:12,   suffix:"m", color:T.violet, bg:"#f5f3ff", icon:"⚡", delta:"-3m",  up:true  },
+    { label:"CSAT Score",    value:92,   suffix:"%", color:T.teal,   bg:"#f0fdfa", icon:"😊", delta:"+2%",  up:true  },
   ];
+
+  const statusBars: { l:string; pct:number; c:string }[] = [
+    { l:"Open",        pct:40, c:T.blue   },
+    { l:"In Progress", pct:25, c:T.violet },
+    { l:"Waiting",     pct:15, c:T.amber  },
+    { l:"Resolved",    pct:20, c:T.green  },
+  ];
+
+  const legend: { color:string; l:string }[] = [{ color:T.blue, l:"New" }, { color:T.green, l:"Resolved" }];
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-
-      {/* KPI Cards */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:12 }}>
         {kpis.map((k, i) => (
           <div key={k.label} style={{ background:T.surface, border:`1.5px solid ${T.border}`, borderRadius:16, padding:"18px 16px", position:"relative", overflow:"hidden", boxShadow:"0 2px 8px rgba(0,0,0,0.04)", animation:`fadeUp 0.35s ease ${i*0.06}s both` }}>
@@ -209,7 +221,6 @@ function OverviewTab() {
         ))}
       </div>
 
-      {/* Trend + Status */}
       <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gap:16 }}>
         <Panel>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18 }}>
@@ -218,7 +229,7 @@ function OverviewTab() {
               <div style={{ fontSize:16, fontWeight:700, color:T.text }}>Ticket Flow This Week</div>
             </div>
             <div style={{ display:"flex", gap:14 }}>
-              {[{color:T.blue,l:"New"},{color:T.green,l:"Resolved"}].map(x => (
+              {legend.map(x => (
                 <div key={x.l} style={{ display:"flex", alignItems:"center", gap:6, fontSize:11, color:T.muted, fontWeight:600 }}>
                   <div style={{ width:18, height:3, background:x.color, borderRadius:2 }} />{x.l}
                 </div>
@@ -230,16 +241,16 @@ function OverviewTab() {
               <defs>
                 <linearGradient id="ga" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%"  stopColor={T.blue}  stopOpacity={0.15} />
-                  <stop offset="95%" stopColor={T.blue}  stopOpacity={0} />
+                  <stop offset="95%" stopColor={T.blue}  stopOpacity={0}    />
                 </linearGradient>
                 <linearGradient id="gb" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%"  stopColor={T.green} stopOpacity={0.15} />
-                  <stop offset="95%" stopColor={T.green} stopOpacity={0} />
+                  <stop offset="95%" stopColor={T.green} stopOpacity={0}    />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke={T.faint} />
-              <XAxis dataKey="day" tick={{ fill:T.muted, fontSize:11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill:T.muted, fontSize:11 }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="day"      tick={{ fill:T.muted, fontSize:11 }} axisLine={false} tickLine={false} />
+              <YAxis                    tick={{ fill:T.muted, fontSize:11 }} axisLine={false} tickLine={false} />
               <Tooltip content={<Tip />} />
               <Area type="monotone" dataKey="new"      name="New"      stroke={T.blue}  strokeWidth={2.5} fill="url(#ga)" dot={false} />
               <Area type="monotone" dataKey="resolved" name="Resolved" stroke={T.green} strokeWidth={2.5} fill="url(#gb)" dot={false} />
@@ -259,12 +270,7 @@ function OverviewTab() {
                 </div>
               </div>
             </div>
-            {[
-              { l:"Open",       pct:40, c:T.blue   },
-              { l:"In Progress",pct:25, c:T.violet },
-              { l:"Waiting",    pct:15, c:T.amber  },
-              { l:"Resolved",   pct:20, c:T.green  },
-            ].map(s => (
+            {statusBars.map(s => (
               <div key={s.l} style={{ marginBottom:8 }}>
                 <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, marginBottom:4 }}>
                   <span style={{ color:T.sub, fontWeight:600 }}>{s.l}</span>
@@ -290,7 +296,10 @@ function OverviewTab() {
               <ResponsiveContainer width="100%" height={56}>
                 <LineChart data={csatMonths}>
                   <Line type="monotone" dataKey="s" stroke={T.green} strokeWidth={2.5} dot={false} />
-                  <Tooltip formatter={v=>[`${v}%`,"CSAT"]} contentStyle={{ background:"#fff", border:`1px solid ${T.border}`, borderRadius:8, fontSize:11 }} />
+                  <Tooltip
+                   formatter={(v: number | undefined) => [`${v ?? 0}%`, "CSAT"]}
+                    contentStyle={{ background:"#fff", border:`1px solid ${T.border}`, borderRadius:8, fontSize:11 }}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -298,7 +307,6 @@ function OverviewTab() {
         </div>
       </div>
 
-      {/* Issues + Channels */}
       <div style={{ display:"grid", gridTemplateColumns:"1fr 260px", gap:16 }}>
         <Panel>
           <SLabel>Issue Categories</SLabel>
@@ -328,9 +336,12 @@ function OverviewTab() {
           <div style={{ display:"flex", justifyContent:"center", marginBottom:16 }}>
             <PieChart width={130} height={130}>
               <Pie data={channelData} dataKey="value" cx="50%" cy="50%" innerRadius={38} outerRadius={60} paddingAngle={4}>
-                {channelData.map((e,i) => <Cell key={i} fill={e.color} />)}
+                {channelData.map((e, i) => <Cell key={i} fill={e.color} />)}
               </Pie>
-              <Tooltip formatter={v=>[`${v}%`]} contentStyle={{ background:"#fff", border:`1px solid ${T.border}`, fontSize:11, borderRadius:8 }} />
+              <Tooltip
+                formatter={(v: number | undefined) => [`${v ?? 0}%`]}
+                contentStyle={{ background:"#fff", border:`1px solid ${T.border}`, fontSize:11, borderRadius:8 }}
+              />
             </PieChart>
           </div>
           {channelData.map(c => (
@@ -357,29 +368,32 @@ function OverviewTab() {
    TICKETS TAB
 ══════════════════════════════════════════════════════════ */
 function TicketsTab() {
-  const [search, setSearch] = useState("");
-  const [filterP, setFilterP] = useState("All");
+  const [search,  setSearch]  = useState("");
+  const [filterP, setFilterP] = useState<PriorityFilterKey>("All");
 
   const filtered = queue.filter(t => {
     const matchSearch = t.customer.toLowerCase().includes(search.toLowerCase()) || t.issue.toLowerCase().includes(search.toLowerCase()) || t.id.includes(search);
-    const matchP = filterP === "All" || t.priority === filterP;
+    const matchP      = filterP === "All" || t.priority === filterP;
     return matchSearch && matchP;
   });
 
+  const stats: { label:string; value:number|string; color:string; icon:string; raw?:boolean }[] = [
+    { label:"Total Open",    value:180,  color:T.blue,   icon:"📂"           },
+    { label:"Critical",      value:2,    color:T.rose,   icon:"🔴"           },
+    { label:"High Priority", value:12,   color:T.orange, icon:"🟠"           },
+    { label:"Avg Wait Time", value:"9m", color:T.violet, icon:"⏱", raw:true },
+  ];
+
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-      {/* Stats row */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12 }}>
-        {[
-          { label:"Total Open",    value:180, color:T.blue,   icon:"📂" },
-          { label:"Critical",      value:2,   color:T.rose,   icon:"🔴" },
-          { label:"High Priority", value:12,  color:T.orange, icon:"🟠" },
-          { label:"Avg Wait Time", value:"9m",color:T.violet, icon:"⏱", raw:true },
-        ].map(s => (
+        {stats.map(s => (
           <div key={s.label} style={{ background:T.surface, border:`1.5px solid ${T.border}`, borderRadius:14, padding:"16px", display:"flex", alignItems:"center", gap:14, boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }}>
             <div style={{ width:44, height:44, borderRadius:12, background:`${s.color}12`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22 }}>{s.icon}</div>
             <div>
-              <div style={{ fontSize:24, fontWeight:800, color:s.color }}>{s.raw ? s.value : <Counter to={s.value} />}</div>
+              <div style={{ fontSize:24, fontWeight:800, color:s.color }}>
+                {s.raw ? s.value : <Counter to={s.value as number} />}
+              </div>
               <div style={{ fontSize:11, color:T.muted, fontWeight:600 }}>{s.label}</div>
             </div>
           </div>
@@ -387,22 +401,22 @@ function TicketsTab() {
       </div>
 
       <Panel>
-        {/* Filters */}
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:18, gap:12, flexWrap:"wrap" }}>
-          <div style={{ display:"flex", gap:8 }}>
-            <div style={{ display:"flex", background:T.bg, border:`1px solid ${T.border}`, borderRadius:10, padding:3, gap:2 }}>
-              {["All","Critical","High","Medium","Low"].map(p => (
-                <button key={p} onClick={() => setFilterP(p)} style={{ padding:"5px 12px", borderRadius:7, fontSize:11, fontWeight:700, border:"none", cursor:"pointer", transition:"all 0.15s", background:filterP===p ? T.blue : "transparent", color:filterP===p ? "#fff" : T.muted }}>{p}</button>
-              ))}
-            </div>
+          <div style={{ display:"flex", background:T.bg, border:`1px solid ${T.border}`, borderRadius:10, padding:3, gap:2 }}>
+            {(["All","Critical","High","Medium","Low"] as PriorityFilterKey[]).map(p => (
+              <button key={p} onClick={() => setFilterP(p)}
+                style={{ padding:"5px 12px", borderRadius:7, fontSize:11, fontWeight:700, border:"none", cursor:"pointer", transition:"all 0.15s", background:filterP===p?T.blue:"transparent", color:filterP===p?"#fff":T.muted }}>
+                {p}
+              </button>
+            ))}
           </div>
           <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tickets..." style={{ padding:"8px 14px", border:`1px solid ${T.border}`, borderRadius:10, fontSize:12, color:T.text, background:T.bg, outline:"none", width:220 }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tickets..."
+              style={{ padding:"8px 14px", border:`1px solid ${T.border}`, borderRadius:10, fontSize:12, color:T.text, background:T.bg, outline:"none", width:220 }} />
             <button style={{ padding:"8px 16px", background:T.blue, color:"#fff", border:"none", borderRadius:10, fontSize:12, fontWeight:700, cursor:"pointer" }}>+ New Ticket</button>
           </div>
         </div>
 
-        {/* Table header */}
         <div style={{ display:"grid", gridTemplateColumns:"90px 150px 1fr 110px 120px 70px 140px", gap:10, padding:"0 12px 10px", borderBottom:`2px solid ${T.faint}` }}>
           {["Ticket","Customer","Issue","Priority","Status","Wait","Actions"].map(h => (
             <div key={h} style={{ fontSize:10, fontWeight:800, letterSpacing:"0.1em", textTransform:"uppercase", color:T.muted }}>{h}</div>
@@ -414,10 +428,11 @@ function TicketsTab() {
         )}
 
         {filtered.map((t, i) => {
-          const ps = priorityCfg[t.priority] || {};
-          const ss = statusCfg[t.status] || {};
+          const ps = priorityCfg[t.priority];
+          const ss = statusCfg[t.status];
           return (
-            <div key={t.id} style={{ display:"grid", gridTemplateColumns:"90px 150px 1fr 110px 120px 70px 140px", gap:10, padding:"13px 12px", borderRadius:10, alignItems:"center", border:"1px solid transparent", transition:"all 0.15s", cursor:"pointer", background: i%2===0 ? "transparent" : T.surfaceHi }}
+            <div key={t.id}
+              style={{ display:"grid", gridTemplateColumns:"90px 150px 1fr 110px 120px 70px 140px", gap:10, padding:"13px 12px", borderRadius:10, alignItems:"center", border:"1px solid transparent", transition:"all 0.15s", cursor:"pointer", background:i%2===0?"transparent":T.surfaceHi }}
               onMouseEnter={e => { e.currentTarget.style.background="#eff6ff"; e.currentTarget.style.borderColor=T.blue+"44"; }}
               onMouseLeave={e => { e.currentTarget.style.background=i%2===0?"transparent":T.surfaceHi; e.currentTarget.style.borderColor="transparent"; }}>
               <div style={{ fontSize:12, fontWeight:800, color:T.blue, fontFamily:"monospace" }}>{t.id}</div>
@@ -435,12 +450,11 @@ function TicketsTab() {
         })}
       </Panel>
 
-      {/* SLA Alerts */}
       <Panel>
         <SLabel>SLA Monitoring</SLabel>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))", gap:10 }}>
           {sla.map(s => {
-            const ps = priorityCfg[s.priority] || {};
+            const ps = priorityCfg[s.priority];
             return (
               <div key={s.id} style={{ padding:"14px 16px", borderRadius:12, background:s.breached?"#fff1f2":"#fffbeb", border:`1.5px solid ${s.breached?"#fecdd3":"#fde68a"}` }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
@@ -471,12 +485,12 @@ function TicketsTab() {
 function AgentsTab() {
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
-      {/* Agent summary cards */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:12 }}>
         {agents.map((a, i) => {
           const resRate = Math.round((a.resolved / a.handled) * 100);
           return (
-            <div key={a.name} style={{ background:T.surface, border:`1.5px solid ${T.border}`, borderRadius:16, padding:"20px 16px", textAlign:"center", boxShadow:"0 2px 8px rgba(0,0,0,0.04)", transition:"transform 0.2s, box-shadow 0.2s", cursor:"pointer", position:"relative", overflow:"hidden" }}
+            <div key={a.name}
+              style={{ background:T.surface, border:`1.5px solid ${T.border}`, borderRadius:16, padding:"20px 16px", textAlign:"center", boxShadow:"0 2px 8px rgba(0,0,0,0.04)", transition:"transform 0.2s, box-shadow 0.2s", cursor:"pointer", position:"relative", overflow:"hidden" }}
               onMouseEnter={e => { e.currentTarget.style.transform="translateY(-3px)"; e.currentTarget.style.boxShadow=`0 8px 24px ${a.color}22`; e.currentTarget.style.borderColor=a.color; }}
               onMouseLeave={e => { e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow="0 2px 8px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor=T.border; }}>
               <div style={{ position:"absolute", top:0, left:0, right:0, height:4, background:a.color }} />
@@ -503,7 +517,6 @@ function AgentsTab() {
         })}
       </div>
 
-      {/* Agent table */}
       <Panel>
         <SLabel>Detailed Agent Performance</SLabel>
         <div style={{ overflowX:"auto" }}>
@@ -519,10 +532,13 @@ function AgentsTab() {
               {agents.map((a, i) => {
                 const resRate = Math.round((a.resolved / a.handled) * 100);
                 return (
-                  <tr key={a.name} style={{ borderBottom:`1px solid ${T.faint}`, transition:"background 0.15s", cursor:"pointer" }}
-                    onMouseEnter={e => e.currentTarget.style.background=T.surfaceHi}
-                    onMouseLeave={e => e.currentTarget.style.background="transparent"}>
-                    <td style={{ padding:"13px 14px" }}><div style={{ width:26, height:26, borderRadius:"50%", background:`${a.color}15`, color:a.color, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:800 }}>{i+1}</div></td>
+                  <tr key={a.name}
+                    style={{ borderBottom:`1px solid ${T.faint}`, transition:"background 0.15s", cursor:"pointer" }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.background = T.surfaceHi; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.background = "transparent"; }}>
+                    <td style={{ padding:"13px 14px" }}>
+                      <div style={{ width:26, height:26, borderRadius:"50%", background:`${a.color}15`, color:a.color, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:800 }}>{i+1}</div>
+                    </td>
                     <td style={{ padding:"13px 14px" }}>
                       <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                         <div style={{ width:34, height:34, borderRadius:"50%", background:`${a.color}15`, border:`1.5px solid ${a.color}40`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:800, color:a.color }}>{a.initials}</div>
@@ -557,14 +573,18 @@ function AgentsTab() {
    REPORTS TAB
 ══════════════════════════════════════════════════════════ */
 function ReportsTab() {
+  const cards: { label:string; value:string; color:string; icon:string; sub:string }[] = [
+    { label:"Total Tickets (YTD)", value:"3,980", color:T.blue,   icon:"🎫", sub:"↑ 18% vs last year"  },
+    { label:"Avg Resolution Time", value:"4.2h",  color:T.violet, icon:"⏱", sub:"↓ 0.8h improved"     },
+    { label:"CSAT Average (YTD)",  value:"91.2%", color:T.green,  icon:"😊", sub:"↑ 3.4% vs last year" },
+  ];
+
+  const barLegend: { c:string; l:string }[] = [{ c:T.blue, l:"Tickets" }, { c:T.green, l:"Resolved" }];
+
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
       <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12 }}>
-        {[
-          { label:"Total Tickets (YTD)", value:"3,980", color:T.blue,   icon:"🎫", sub:"↑ 18% vs last year" },
-          { label:"Avg Resolution Time", value:"4.2h",  color:T.violet, icon:"⏱", sub:"↓ 0.8h improved"    },
-          { label:"CSAT Average (YTD)",  value:"91.2%", color:T.green,  icon:"😊", sub:"↑ 3.4% vs last year" },
-        ].map(s => (
+        {cards.map(s => (
           <div key={s.label} style={{ background:T.surface, border:`1.5px solid ${T.border}`, borderRadius:16, padding:"20px", boxShadow:"0 2px 8px rgba(0,0,0,0.04)", borderTop:`4px solid ${s.color}` }}>
             <div style={{ fontSize:24, marginBottom:8 }}>{s.icon}</div>
             <div style={{ fontSize:28, fontWeight:800, color:s.color }}>{s.value}</div>
@@ -579,15 +599,15 @@ function ReportsTab() {
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={reportData} barSize={18} barGap={4}>
             <CartesianGrid strokeDasharray="3 3" stroke={T.faint} />
-            <XAxis dataKey="month" tick={{ fill:T.muted, fontSize:11 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill:T.muted, fontSize:11 }} axisLine={false} tickLine={false} />
+            <XAxis dataKey="month"   tick={{ fill:T.muted, fontSize:11 }} axisLine={false} tickLine={false} />
+            <YAxis                   tick={{ fill:T.muted, fontSize:11 }} axisLine={false} tickLine={false} />
             <Tooltip content={<Tip />} />
-            <Bar dataKey="tickets"  name="Tickets"  fill={T.blue}  radius={[4,4,0,0]} opacity={0.85} />
-            <Bar dataKey="resolved" name="Resolved" fill={T.green} radius={[4,4,0,0]} opacity={0.85} />
+            <Bar dataKey="tickets"  name="Tickets"  fill={T.blue}  radius={[4,4,0,0] as [number,number,number,number]} opacity={0.85} />
+            <Bar dataKey="resolved" name="Resolved" fill={T.green} radius={[4,4,0,0] as [number,number,number,number]} opacity={0.85} />
           </BarChart>
         </ResponsiveContainer>
         <div style={{ display:"flex", gap:20, justifyContent:"center", marginTop:12 }}>
-          {[{c:T.blue,l:"Tickets"},{c:T.green,l:"Resolved"}].map(x => (
+          {barLegend.map(x => (
             <div key={x.l} style={{ display:"flex", alignItems:"center", gap:6, fontSize:11, color:T.muted }}>
               <div style={{ width:12, height:12, borderRadius:3, background:x.c }} />{x.l}
             </div>
@@ -602,7 +622,7 @@ function ReportsTab() {
             <defs>
               <linearGradient id="gc" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%"  stopColor={T.teal} stopOpacity={0.2} />
-                <stop offset="95%" stopColor={T.teal} stopOpacity={0} />
+                <stop offset="95%" stopColor={T.teal} stopOpacity={0}   />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke={T.faint} />
@@ -621,29 +641,48 @@ function ReportsTab() {
    SETTINGS TAB
 ══════════════════════════════════════════════════════════ */
 function SettingsTab() {
-  const [notif, setNotif] = useState({ email:true, sla:true, newTicket:false, dailyReport:true });
-  const [slaH, setSlaH]   = useState({ critical:"1", high:"4", medium:"24" });
+  const [notif, setNotif] = useState<NotifState>({ email:true, sla:true, newTicket:false, dailyReport:true });
+  const [slaH,  setSlaH]  = useState<SlaHState>({ critical:"1", high:"4", medium:"24" });
+
+  const notifItems: { key: keyof NotifState; label:string; sub:string }[] = [
+    { key:"email",       label:"Email Alerts",         sub:"Receive ticket updates via email"         },
+    { key:"sla",         label:"SLA Breach Alerts",    sub:"Get notified when SLA is about to breach" },
+    { key:"newTicket",   label:"New Ticket Alerts",    sub:"Alert for every new ticket created"       },
+    { key:"dailyReport", label:"Daily Summary Report", sub:"Get a daily digest every morning"         },
+  ];
+
+  const slaItems: { key: keyof SlaHState; label:string; color:string }[] = [
+    { key:"critical", label:"Critical Priority", color:T.rose   },
+    { key:"high",     label:"High Priority",     color:T.orange },
+    { key:"medium",   label:"Medium Priority",   color:T.violet },
+  ];
+
+  const actions: { l:string; c:string }[] = [
+    { l:"🎫 Assign Ticket",     c:T.blue   },
+    { l:"🔺 Escalate Issue",    c:T.rose   },
+    { l:"🏷 Change Priority",   c:T.amber  },
+    { l:"💬 Reply to Customer", c:T.green  },
+    { l:"✅ Close Ticket",      c:T.teal   },
+    { l:"📊 Generate Report",   c:T.violet },
+    { l:"📤 Export Tickets",    c:T.indigo },
+    { l:"⚙️ SLA Rules",         c:T.orange },
+  ];
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
-        {/* Notifications */}
+
         <Panel>
           <SLabel>Notification Preferences</SLabel>
           <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
-            {[
-              { key:"email",       label:"Email Alerts",         sub:"Receive ticket updates via email"        },
-              { key:"sla",         label:"SLA Breach Alerts",    sub:"Get notified when SLA is about to breach"},
-              { key:"newTicket",   label:"New Ticket Alerts",    sub:"Alert for every new ticket created"      },
-              { key:"dailyReport", label:"Daily Summary Report", sub:"Get a daily digest every morning"        },
-            ].map(n => (
+            {notifItems.map(n => (
               <div key={n.key} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 16px", background:T.surfaceHi, borderRadius:12, border:`1px solid ${T.border}` }}>
                 <div>
                   <div style={{ fontSize:13, fontWeight:700, color:T.text }}>{n.label}</div>
                   <div style={{ fontSize:11, color:T.muted, marginTop:2 }}>{n.sub}</div>
                 </div>
                 <div
-                  onClick={() => setNotif(p => ({ ...p, [n.key]:!p[n.key] }))}
+                  onClick={() => setNotif(p => ({ ...p, [n.key]: !p[n.key] }))}
                   style={{ width:44, height:24, borderRadius:99, background:notif[n.key]?T.blue:T.faint, cursor:"pointer", position:"relative", transition:"background 0.2s" }}>
                   <div style={{ position:"absolute", top:2, left:notif[n.key]?22:2, width:20, height:20, borderRadius:"50%", background:"#fff", transition:"left 0.2s", boxShadow:"0 1px 4px rgba(0,0,0,0.15)" }} />
                 </div>
@@ -652,42 +691,35 @@ function SettingsTab() {
           </div>
         </Panel>
 
-        {/* SLA Hours */}
         <Panel>
           <SLabel>SLA Response Thresholds</SLabel>
           <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-            {[
-              { key:"critical", label:"Critical Priority", color:T.rose   },
-              { key:"high",     label:"High Priority",     color:T.orange },
-              { key:"medium",   label:"Medium Priority",   color:T.violet },
-            ].map(s => (
+            {slaItems.map(s => (
               <div key={s.key} style={{ padding:"14px 16px", background:T.surfaceHi, borderRadius:12, border:`1px solid ${T.border}`, borderLeft:`4px solid ${s.color}` }}>
                 <div style={{ fontSize:12, fontWeight:700, color:T.text, marginBottom:8 }}>{s.label}</div>
                 <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                  <input type="number" value={slaH[s.key]} onChange={e => setSlaH(p => ({ ...p, [s.key]:e.target.value }))} style={{ width:70, padding:"6px 10px", border:`1.5px solid ${s.color}50`, borderRadius:8, fontSize:13, fontWeight:700, color:s.color, background:"#fff", outline:"none", textAlign:"center" }} />
+                  <input
+                    type="number"
+                    value={slaH[s.key]}
+                    onChange={e => setSlaH(p => ({ ...p, [s.key]: e.target.value }))}
+                    style={{ width:70, padding:"6px 10px", border:`1.5px solid ${s.color}50`, borderRadius:8, fontSize:13, fontWeight:700, color:s.color, background:"#fff", outline:"none", textAlign:"center" }}
+                  />
                   <span style={{ fontSize:12, color:T.muted }}>hours response time</span>
                 </div>
               </div>
             ))}
-            <button style={{ padding:"11px", background:T.blue, color:"#fff", border:"none", borderRadius:10, fontSize:13, fontWeight:700, cursor:"pointer", marginTop:4 }}>Save SLA Settings</button>
+            <button style={{ padding:"11px", background:T.blue, color:"#fff", border:"none", borderRadius:10, fontSize:13, fontWeight:700, cursor:"pointer", marginTop:4 }}>
+              Save SLA Settings
+            </button>
           </div>
         </Panel>
 
-        {/* Quick Actions */}
         <Panel style={{ gridColumn:"1 / -1" }}>
           <SLabel>Quick Actions</SLabel>
           <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
-            {[
-              { l:"🎫 Assign Ticket",     c:T.blue   },
-              { l:"🔺 Escalate Issue",    c:T.rose   },
-              { l:"🏷 Change Priority",   c:T.amber  },
-              { l:"💬 Reply to Customer", c:T.green  },
-              { l:"✅ Close Ticket",      c:T.teal   },
-              { l:"📊 Generate Report",   c:T.violet },
-              { l:"📤 Export Tickets",    c:T.indigo },
-              { l:"⚙️ SLA Rules",         c:T.orange },
-            ].map(a => (
-              <button key={a.l} style={{ padding:"10px 18px", background:`${a.c}12`, border:`1.5px solid ${a.c}30`, color:a.c, borderRadius:10, fontSize:12, fontWeight:700, cursor:"pointer", transition:"all 0.15s" }}
+            {actions.map(a => (
+              <button key={a.l}
+                style={{ padding:"10px 18px", background:`${a.c}12`, border:`1.5px solid ${a.c}30`, color:a.c, borderRadius:10, fontSize:12, fontWeight:700, cursor:"pointer", transition:"all 0.15s" }}
                 onMouseEnter={e => { e.currentTarget.style.background=`${a.c}22`; e.currentTarget.style.transform="translateY(-2px)"; }}
                 onMouseLeave={e => { e.currentTarget.style.background=`${a.c}12`; e.currentTarget.style.transform="translateY(0)"; }}>
                 {a.l}
@@ -704,9 +736,9 @@ function SettingsTab() {
    MAIN APP
 ══════════════════════════════════════════════════════════ */
 export default function SupportDashboard() {
-  const [tab, setTab]       = useState("overview");
-  const [filter, setFilter] = useState("This Week");
-  const [now, setNow]       = useState(new Date());
+  const [tab,    setTab]    = useState<TabKey>("overview");
+  const [filter, setFilter] = useState<FilterKey>("This Week");
+  const [now,    setNow]    = useState(new Date());
 
   useEffect(() => {
     const link = document.createElement("link");
@@ -716,15 +748,15 @@ export default function SupportDashboard() {
     return () => clearInterval(t);
   }, []);
 
-  const navItems = [
-    { icon:"⊞",  id:"overview", label:"Overview"  },
-    { icon:"🎫", id:"tickets",  label:"Tickets"   },
-    { icon:"👥", id:"agents",   label:"Agents"    },
-    { icon:"📊", id:"reports",  label:"Reports"   },
-    { icon:"⚙️", id:"settings", label:"Settings"  },
+  const navItems: { icon:string; id:TabKey; label:string }[] = [
+    { icon:"⊞",  id:"overview", label:"Overview" },
+    { icon:"🎫", id:"tickets",  label:"Tickets"  },
+    { icon:"👥", id:"agents",   label:"Agents"   },
+    { icon:"📊", id:"reports",  label:"Reports"  },
+    { icon:"⚙️", id:"settings", label:"Settings" },
   ];
 
-  const tabContent = {
+  const tabContent: Record<TabKey, React.ReactNode> = {
     overview: <OverviewTab />,
     tickets:  <TicketsTab />,
     agents:   <AgentsTab />,
@@ -744,38 +776,25 @@ export default function SupportDashboard() {
         input[type=number]::-webkit-inner-spin-button{opacity:1}
       `}</style>
 
-      {/* ── SIDEBAR ──────────────────────────────────── */}
+      {/* SIDEBAR */}
       <aside style={{ width:72, background:T.surface, borderRight:`1px solid ${T.border}`, display:"flex", flexDirection:"column", alignItems:"center", padding:"20px 0", gap:4, position:"sticky", top:0, height:"100vh", flexShrink:0, boxShadow:"2px 0 8px rgba(0,0,0,0.04)" }}>
-        {/* Logo */}
         <div style={{ width:40, height:40, background:`linear-gradient(135deg,${T.blue},${T.violet})`, borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, marginBottom:20, boxShadow:`0 4px 14px ${T.blue}40` }}>🎧</div>
-
         {navItems.map(({ icon, id, label }) => {
           const active = tab === id;
           return (
-            <button key={id} onClick={() => setTab(id)} title={label} style={{
-              width:48, height:48, borderRadius:12, border:"none", cursor:"pointer", fontSize:18,
-              transition:"all 0.18s",
-              background: active ? `${T.blue}15` : "transparent",
-              color:      active ? T.blue : T.muted,
-              outline:    active ? `2px solid ${T.blue}30` : "none",
-              position:"relative",
-            }}>
+            <button key={id} onClick={() => setTab(id)} title={label}
+              style={{ width:48, height:48, borderRadius:12, border:"none", cursor:"pointer", fontSize:18, transition:"all 0.18s", background:active?`${T.blue}15`:"transparent", color:active?T.blue:T.muted, outline:active?`2px solid ${T.blue}30`:"none", position:"relative" }}>
               {icon}
               {active && <div style={{ position:"absolute", left:0, top:"50%", transform:"translateY(-50%)", width:3, height:24, background:T.blue, borderRadius:"0 3px 3px 0" }} />}
             </button>
           );
         })}
-
         <div style={{ flex:1 }} />
-
-        {/* Avatar */}
         <div style={{ width:36, height:36, borderRadius:"50%", background:`linear-gradient(135deg,${T.blue},${T.violet})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:800, color:"#fff", boxShadow:`0 2px 8px ${T.blue}30` }}>A</div>
       </aside>
 
-      {/* ── MAIN ──────────────────────────────────────── */}
+      {/* MAIN */}
       <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"auto" }}>
-
-        {/* TOPBAR */}
         <header style={{ background:`${T.surface}f0`, backdropFilter:"blur(12px)", borderBottom:`1px solid ${T.border}`, padding:"14px 28px", display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, zIndex:40, boxShadow:"0 1px 4px rgba(0,0,0,0.04)" }}>
           <div>
             <div style={{ fontSize:10, color:T.muted, letterSpacing:"0.12em", textTransform:"uppercase", marginBottom:2, fontWeight:700 }}>
@@ -783,27 +802,24 @@ export default function SupportDashboard() {
             </div>
             <h1 style={{ fontSize:20, fontWeight:800, color:T.text, letterSpacing:"-0.3px" }}>Customer Support Dashboard</h1>
           </div>
-
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            {/* Live pill */}
             <div style={{ display:"flex", alignItems:"center", gap:6, background:"#f0fdf4", border:"1px solid #bbf7d0", borderRadius:99, padding:"5px 12px" }}>
               <span style={{ width:6, height:6, borderRadius:"50%", background:T.green, display:"inline-block", animation:"pulse 2s infinite" }} />
               <span style={{ fontSize:11, color:T.green, fontWeight:700 }}>Live</span>
-              <span style={{ fontSize:10, color:T.muted }}>{now.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span>
+              <span style={{ fontSize:10, color:T.muted }}>{now.toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" })}</span>
             </div>
-
-            {/* Filters */}
             <div style={{ display:"flex", background:T.bg, border:`1px solid ${T.border}`, borderRadius:10, padding:3, gap:2 }}>
-              {["Today","This Week","This Month"].map(f => (
-                <button key={f} onClick={() => setFilter(f)} style={{ padding:"5px 12px", borderRadius:7, fontSize:11, fontWeight:700, border:"none", cursor:"pointer", transition:"all 0.15s", background:filter===f ? T.blue : "transparent", color:filter===f ? "#fff" : T.muted }}>{f}</button>
+              {(["Today","This Week","This Month"] as FilterKey[]).map(f => (
+                <button key={f} onClick={() => setFilter(f)}
+                  style={{ padding:"5px 12px", borderRadius:7, fontSize:11, fontWeight:700, border:"none", cursor:"pointer", transition:"all 0.15s", background:filter===f?T.blue:"transparent", color:filter===f?"#fff":T.muted }}>
+                  {f}
+                </button>
               ))}
             </div>
-
             <button style={{ padding:"7px 16px", background:T.blue, color:"#fff", border:"none", borderRadius:10, fontSize:12, fontWeight:700, cursor:"pointer", boxShadow:`0 2px 8px ${T.blue}40` }}>⬇ Export</button>
           </div>
         </header>
 
-        {/* PAGE CONTENT */}
         <main style={{ padding:"24px 28px", flex:1, animation:"fadeUp 0.3s ease" }}>
           {tabContent[tab]}
           <div style={{ textAlign:"center", color:T.muted, fontSize:11, marginTop:24, paddingBottom:8 }}>

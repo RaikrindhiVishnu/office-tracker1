@@ -63,7 +63,7 @@ const MessagesView: React.FC<MessagesViewProps> = ({
           <button
             onClick={sendMessage}
             disabled={!newMsg.trim()}
-            className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+            className="px-6 py-3 bg-linear-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
           >
             Send Message
           </button>
@@ -94,9 +94,9 @@ const MessagesView: React.FC<MessagesViewProps> = ({
             messages.map((m) => (
               <div
                 key={m.id}
-                className="flex items-start gap-4 p-4 bg-gradient-to-r from-white to-slate-50 border border-slate-200 rounded-xl hover:shadow-md transition-all group"
+                className="flex items-start gap-4 p-4 bg-linear-to-r from-white to-slate-50 border border-slate-200 rounded-xl hover:shadow-md transition-all group"
               >
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white flex-shrink-0 shadow-md">
+                <div className="w-10 h-10 rounded-lg bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shrink-0 shadow-md">
                   <svg
                     className="w-5 h-5"
                     fill="none"
@@ -111,7 +111,7 @@ const MessagesView: React.FC<MessagesViewProps> = ({
                     />
                   </svg>
                 </div>
-                <p className="flex-1 text-slate-700 break-words">{m.text}</p>
+                <p className="flex-1 text-slate-700 wrap-break-word">{m.text}</p>
                 <button
                   onClick={() => {
                     if (confirm("Delete this message?")) {

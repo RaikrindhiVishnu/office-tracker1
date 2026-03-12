@@ -197,7 +197,7 @@ function NotificationDropdown({
   const hasNone = total === 0;
 
   return (
-    <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 z-[200] flex flex-col overflow-hidden"
+    <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 z-200 flex flex-col overflow-hidden"
       style={{ maxHeight: "80vh" }}>
 
       {/* Header */}
@@ -251,7 +251,7 @@ function NotificationDropdown({
                   <button
                     className="flex items-start gap-3 flex-1 min-w-0 text-left"
                     onClick={() => { markChatRead(n.id); onGoToChat?.(n.chatId); onClose(); }}>
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm">
+                    <div className="w-9 h-9 rounded-full bg-linear-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm">
                       {n.fromName.charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -393,7 +393,6 @@ export default function ZohoStyleEmployeeDashboard() {
   const [sidebarCollapsed,       setSidebarCollapsed]       = useState(false);
   const [queryNotifications,     setQueryNotifications]     = useState<any[]>([]);
   const [dismissedAnnouncements, setDismissedAnnouncements] = useState<Set<string>>(new Set());
-  // ── NEW: notification bell dropdown ──
   const [showNotifDropdown,      setShowNotifDropdown]      = useState(false);
   const [chatNotifications,      setChatNotifications]      = useState<ChatNotif[]>([]);
   const notifDropdownRef = useRef<HTMLDivElement>(null);
@@ -401,7 +400,6 @@ export default function ZohoStyleEmployeeDashboard() {
   const year  = calendarDate.getFullYear();
   const month = calendarDate.getMonth();
 
-  // ── Close dropdown on outside click ──
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (notifDropdownRef.current && !notifDropdownRef.current.contains(e.target as Node)) {
@@ -412,7 +410,6 @@ export default function ZohoStyleEmployeeDashboard() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // ── Subscribe to chat notifications ──
   useEffect(() => {
     if (!user) return;
     return onSnapshot(
@@ -509,7 +506,6 @@ export default function ZohoStyleEmployeeDashboard() {
     l => (l.status === "Approved" || l.status === "Rejected") && !l.notificationRead
   );
 
-  // ── Total for sidebar / bell badge (leave + query + chat) ──
   const totalNotifications = leaveNotifications.length + queryNotifications.length + chatNotifications.length;
 
   const getMonthlyAttendanceSummary = () => {
@@ -532,7 +528,7 @@ export default function ZohoStyleEmployeeDashboard() {
         status   = sessionStorage.getItem("workUpdate_status")   || "In Progress";
         priority = sessionStorage.getItem("workUpdate_priority") || "Medium";
       } catch {}
-      await saveDailyUpdate(user.uid, task, notes, status, priority);
+      await saveDailyUpdate(user.uid, task, notes);
       setMsg("✅ Update saved"); setTask(""); setNotes("");
       try {
         sessionStorage.removeItem("workUpdate_status");
@@ -750,7 +746,7 @@ export default function ZohoStyleEmployeeDashboard() {
                 >
                   <img src="https://cdn-icons-png.flaticon.com/128/7184/7184217.png" alt="Notifications" className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" />
                   {totalNotifications > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center shadow-lg animate-pulse">
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-5 text-center shadow-lg animate-pulse">
                       {totalNotifications}
                     </span>
                   )}
@@ -766,8 +762,8 @@ export default function ZohoStyleEmployeeDashboard() {
                     markChatRead={markChatNotificationAsRead}
                     markAllRead={markAllNotificationsRead}
                     onClose={() => setShowNotifDropdown(false)}
-                    onGoToChat={(chatId) => {
-                      setActiveView("meet"); // switch to your chat tab
+                    onGoToChat={(_chatId) => {
+                      setActiveView("meet");
                       setShowNotifDropdown(false);
                     }}
                   />
@@ -791,7 +787,7 @@ export default function ZohoStyleEmployeeDashboard() {
                 {showUserMenu && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
-                    <div className="absolute right-0 mt-1 w-60 bg-white rounded-xl shadow-2xl border border-gray-200 z-[100] overflow-hidden">
+                    <div className="absolute right-0 mt-1 w-60 bg-white rounded-xl shadow-2xl border border-gray-200 z-100 overflow-hidden">
                       <div className="p-3 border-b bg-linear-to-br from-gray-50 to-white">
                         <div className="flex items-center gap-2.5 mb-1">
                           <div className="w-8 h-8 rounded-full overflow-hidden shadow-lg">
@@ -853,7 +849,7 @@ export default function ZohoStyleEmployeeDashboard() {
                       markChatRead={markChatNotificationAsRead}
                       markAllRead={markAllNotificationsRead}
                       onClose={() => setShowNotifDropdown(false)}
-                      onGoToChat={(chatId) => { setActiveView("meet"); setShowNotifDropdown(false); }}
+                      onGoToChat={(_chatId) => { setActiveView("meet"); setShowNotifDropdown(false); }}
                     />
                   )}
                 </div>
@@ -913,39 +909,49 @@ export default function ZohoStyleEmployeeDashboard() {
         <main className="flex-1 overflow-y-auto bg-gray-50">
           <div className="p-3 space-y-3">
 
+            {/* FIX 1: removed extra props that DashboardView doesn't accept */}
             {activeView === "dashboard" && (
-              <DashboardView
-                user={user} isCheckedIn={isCheckedIn} onlineMinutes={null}
-                attendance={attendance} sessions={sessions} formatTotal={formatTotal} formatTime={formatTime}
-                task={task} setTask={setTask} notes={notes} setNotes={setNotes}
-                handleSaveUpdate={handleSaveUpdate} saving={saving} msg={msg}
-                leaveType={leaveType} setLeaveType={handleSetLeaveType}
-                fromDate={fromDate} setFromDate={setFromDate}
-                toDate={toDate} setToDate={setToDate}
-                leaveReason={leaveReason} setLeaveReason={setLeaveReason}
-                handleSubmitLeave={handleSubmitLeave} submitting={submitting} leaveMsg={leaveMsg}
-                totalSeconds={totalSeconds}
-              />
-            )}
+  <DashboardView
+    user={user}                              // ← add this
+    isCheckedIn={!!isCheckedIn}              // ← add this
+    onlineMinutes={Math.floor(totalSeconds / 60)}  // ← add this
+    attendance={attendance}
+    sessions={sessions}
+    formatTotal={formatTotal}
+    formatTime={formatTime}
+    handleSaveUpdate={handleSaveUpdate}
+    saving={saving}
+    msg={msg}
+    leaveType={leaveType}
+    setLeaveType={handleSetLeaveType}
+    fromDate={fromDate}
+    setFromDate={setFromDate}
+    toDate={toDate}
+    setToDate={setToDate}
+    leaveReason={leaveReason}
+    setLeaveReason={setLeaveReason}
+    handleSubmitLeave={handleSubmitLeave}
+    submitting={submitting}
+    leaveMsg={leaveMsg}
+    totalSeconds={totalSeconds}
+    onGoToChat={(_chatId) => setActiveView("meet")}  // ← optional but clean to add
+  />
+)}
 
-            {activeView === "work-update"  && <WorkUpdateView task={task} setTask={setTask} notes={notes} setNotes={setNotes} handleSaveUpdate={handleSaveUpdate} saving={saving} msg={msg} />}
-            {activeView === "projects"     && <ProjectManagement user={user} projects={projects} users={users} />}
-            {activeView === "attendance"   && <AttendanceView sessions={sessions} formatTime={formatTime} />}
+           {activeView === "work-update" && (
+  <WorkUpdateView />
+)}
+            {activeView === "projects"   && <ProjectManagement user={user} projects={projects} users={users} />}
+            {activeView === "attendance" && <AttendanceView sessions={sessions} formatTime={formatTime} />}
 
+            {/* FIX 2: removed dismissedAnnouncements + onDismissAnnouncement — NotificationsView doesn't accept them */}
             {activeView === "notifications" && (
               <NotificationsView
                 leaveNotifications={leaveRequests.filter(l => (l.status === "Approved" || l.status === "Rejected") && !l.notificationRead)}
-                messages={messages}
                 markNotificationAsRead={markNotificationAsRead}
                 queryNotifications={queryNotifications}
                 markQueryNotificationAsRead={markQueryNotificationAsRead}
                 onClose={() => setActiveView("dashboard")}
-                dismissedAnnouncements={dismissedAnnouncements}
-                onDismissAnnouncement={(m: string) => {
-                  const next = new Set(dismissedAnnouncements).add(m);
-                  setDismissedAnnouncements(next);
-                  try { localStorage.setItem("tgy_dismissed_announcements", JSON.stringify([...next])); } catch {}
-                }}
               />
             )}
 
@@ -989,8 +995,8 @@ export default function ZohoStyleEmployeeDashboard() {
             <p className="text-slate-600 mb-4 text-sm">{calendarDate.toLocaleDateString("en-IN", { month: "long", year: "numeric" })}</p>
             <div className="space-y-3">
               {[
-                { label: "Present Days", value: monthlyStats.present,    bg: "bg-green-50",  border: "border-green-200",  clr: "text-green-700",  iconBg: "bg-green-500",  icon: "✓"  },
-                { label: "Absent Days",  value: monthlyStats.absent,     bg: "bg-red-50",    border: "border-red-200",    clr: "text-red-700",    iconBg: "bg-red-500",    icon: "×"  },
+                { label: "Present Days", value: monthlyStats.present,         bg: "bg-green-50",  border: "border-green-200",  clr: "text-green-700",  iconBg: "bg-green-500",  icon: "✓"  },
+                { label: "Absent Days",  value: monthlyStats.absent,          bg: "bg-red-50",    border: "border-red-200",    clr: "text-red-700",    iconBg: "bg-red-500",    icon: "×"  },
                 { label: "Attendance %", value: `${monthlyStats.percentage}%`, bg: "bg-indigo-50", border: "border-indigo-200", clr: "text-indigo-700", iconBg: "bg-indigo-500", icon: "📈" },
               ].map(s => (
                 <div key={s.label} className={`flex justify-between items-center p-3.5 ${s.bg} rounded-xl border-2 ${s.border}`}>

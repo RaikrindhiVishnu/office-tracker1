@@ -20,13 +20,13 @@ type Props = {
   sessions: any[];
   formatTotal: (min?: number) => string;
   formatTime: (ts: any) => string;
-  task: string;
-  setTask: (v: string) => void;
-  notes: string;
-  setNotes: (v: string) => void;
-  handleSaveUpdate: () => void;
-  saving: boolean;
-  msg: string;
+  task?: string;                                    // ← optional
+  setTask?: (v: string) => void;                    // ← optional
+  notes?: string;                                   // ← optional
+  setNotes?: (v: string) => void;                   // ← optional
+  handleSaveUpdate?: () => void | Promise<void>;    // ← optional + async
+  saving?: boolean;                                 // ← optional
+  msg?: string;                                     // ← optional
   leaveType: string;
   setLeaveType: (v: any) => void;
   fromDate: string;
@@ -35,13 +35,12 @@ type Props = {
   setToDate: (v: string) => void;
   leaveReason: string;
   setLeaveReason: (v: string) => void;
-  handleSubmitLeave: () => void;
+  handleSubmitLeave: () => void | Promise<void>;    // ← async
   submitting: boolean;
   leaveMsg: string;
   totalSeconds?: number;
   onGoToChat?: (chatId: string) => void;
 };
-
 // ─── Modal Shell ──────────────────────────────────────────────────────────────
 function Modal({ onClose, children, wide = false }: {
   onClose: () => void; children: React.ReactNode; wide?: boolean;
@@ -498,7 +497,8 @@ function MyLeavesModal({ user, onClose }: { user: any; onClose: () => void }) {
 // ─── MAIN DASHBOARD ───────────────────────────────────────────────────────────
 export default function DashboardView({
   user, isCheckedIn, onlineMinutes, attendance, sessions, formatTotal, formatTime,
-  task, setTask, notes, setNotes, handleSaveUpdate, saving, msg,
+  task = "", setTask = () => {}, notes = "", setNotes = () => {},
+  handleSaveUpdate = () => {}, saving = false, msg = "",
   leaveType, setLeaveType, fromDate, setFromDate, toDate, setToDate,
   leaveReason, setLeaveReason, handleSubmitLeave, submitting, leaveMsg,
   totalSeconds = 0,

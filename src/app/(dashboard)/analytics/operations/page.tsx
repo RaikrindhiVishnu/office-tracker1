@@ -1,24 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   BarChart, Bar, LineChart, Line,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
-  PieChart, Pie, Legend, RadialBarChart, RadialBar,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 
 // ── Types ─────────────────────────────────────────────────
 const FILTERS = ["Daily", "Weekly", "Monthly", "Quarterly"];
-
 const PALETTE = ["#0ea5e9", "#8b5cf6", "#f59e0b", "#10b981", "#ef4444", "#ec4899"];
 
 // ── Formatters ───────────────────────────────────────────
-const fmtMoney = (v) =>
-  v >= 1_000_000 ? `$${(v / 1_000_000).toFixed(2)}M`
-  : v >= 1_000   ? `$${(v / 1_000).toFixed(0)}K`
-  : `$${v}`;
-
-const fmtShort = (v) =>
+const fmtShort = (v: number): string =>
   v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M`
   : v >= 1_000   ? `${(v / 1_000).toFixed(0)}K`
   : String(v);
@@ -34,12 +27,12 @@ const DEMO = {
     { month: "Jun", inventoryMgmt: 28000, customerSvc: 11000, carryingCost: 19000, transport: 15000, warehousing: 12000 },
   ],
   orderFulfillment: [
-    { month: "Jan", onTime: 85, total: 100 },
-    { month: "Feb", onTime: 87, total: 100 },
-    { month: "Mar", onTime: 86, total: 100 },
-    { month: "Apr", onTime: 89, total: 100 },
-    { month: "May", onTime: 88, total: 100 },
-    { month: "Jun", onTime: 88.82, total: 100 },
+    { month: "Jan", onTime: 85 },
+    { month: "Feb", onTime: 87 },
+    { month: "Mar", onTime: 86 },
+    { month: "Apr", onTime: 89 },
+    { month: "May", onTime: 88 },
+    { month: "Jun", onTime: 88.82 },
   ],
   supplierPerformance: [
     { supplier: "Supplier A", onTime: 94, quality: 96, cost: 88 },
@@ -49,15 +42,15 @@ const DEMO = {
     { supplier: "Supplier E", onTime: 82, quality: 90, cost: 89 },
   ],
   inventoryLevels: [
-    { category: "Raw Materials", current: 4200, reorder: 1500, max: 6000 },
-    { category: "WIP",           current: 1800, reorder: 500,  max: 3000 },
-    { category: "Finished Goods",current: 3100, reorder: 1000, max: 5000 },
-    { category: "Spare Parts",   current: 900,  reorder: 300,  max: 2000 },
+    { category: "Raw Materials",  current: 4200, reorder: 1500, max: 6000 },
+    { category: "WIP",            current: 1800, reorder: 500,  max: 3000 },
+    { category: "Finished Goods", current: 3100, reorder: 1000, max: 5000 },
+    { category: "Spare Parts",    current: 900,  reorder: 300,  max: 2000 },
   ],
 };
 
 // ── Skeleton ─────────────────────────────────────────────
-function Skeleton({ h = 40, w = "100%", r = 8 }) {
+function Skeleton({ h = 40, w = "100%", r = 8 }: { h?: number; w?: string | number; r?: number }) {
   return (
     <div style={{
       height: h, width: w, borderRadius: r,
@@ -68,35 +61,28 @@ function Skeleton({ h = 40, w = "100%", r = 8 }) {
 }
 
 // ── Gauge Component ───────────────────────────────────────
-function GaugeChart({ value, label, color }) {
-  const radius = 60;
+function GaugeChart({ value, label, color }: { value: number; label: string; color: string }) {
   const strokeWidth = 12;
-  const normalizedRadius = radius - strokeWidth / 2;
-  const circumference = Math.PI * normalizedRadius; // half circle
+  const normalizedRadius = 60 - strokeWidth / 2;
   const pct = Math.min(value / 100, 1);
-  const offset = circumference - pct * circumference;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1 }}>
       <svg width={140} height={90} viewBox="0 0 140 90">
-        {/* Background arc */}
         <path
           d={`M ${strokeWidth / 2 + 10} 80 A ${normalizedRadius} ${normalizedRadius} 0 0 1 ${140 - strokeWidth / 2 - 10} 80`}
           fill="none" stroke="#f1f5f9" strokeWidth={strokeWidth} strokeLinecap="round"
         />
-        {/* Colored arc */}
         <path
           d={`M ${strokeWidth / 2 + 10} 80 A ${normalizedRadius} ${normalizedRadius} 0 0 1 ${140 - strokeWidth / 2 - 10} 80`}
           fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round"
           strokeDasharray={`${pct * Math.PI * normalizedRadius} ${Math.PI * normalizedRadius}`}
           style={{ transition: "stroke-dasharray 1s ease" }}
         />
-        {/* Zones */}
-        <text x="12" y="88" fill="#ef4444" fontSize="9" fontWeight="700">0</text>
-        <text x="62" y="20" fill="#f59e0b" fontSize="9" fontWeight="700" textAnchor="middle">50</text>
+        <text x="12"  y="88" fill="#ef4444" fontSize="9" fontWeight="700">0</text>
+        <text x="62"  y="20" fill="#f59e0b" fontSize="9" fontWeight="700" textAnchor="middle">50</text>
         <text x="118" y="88" fill="#10b981" fontSize="9" fontWeight="700">100</text>
-        {/* Value */}
-        <text x="70" y="72" textAnchor="middle" fill="#0f172a" fontSize="18" fontWeight="900">{value}%</text>
+        <text x="70"  y="72" textAnchor="middle" fill="#0f172a" fontSize="18" fontWeight="900">{value}%</text>
       </svg>
       <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textAlign: "center", marginTop: -6 }}>{label}</div>
     </div>
@@ -104,7 +90,10 @@ function GaugeChart({ value, label, color }) {
 }
 
 // ── KPI Card ─────────────────────────────────────────────
-function KPICard({ label, value, change, up, icon, accent, loading }) {
+function KPICard({ label, value, change, up, icon, accent, loading }: {
+  label: string; value: string; change: string; up: boolean;
+  icon: string; accent: string; loading: boolean;
+}) {
   return (
     <div style={{
       background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16,
@@ -129,7 +118,9 @@ function KPICard({ label, value, change, up, icon, accent, loading }) {
 }
 
 // ── Chart Card ───────────────────────────────────────────
-function Card({ title, subtitle, badge, children }) {
+function Card({ title, subtitle, badge, children }: {
+  title: string; subtitle?: string; badge?: string; children: React.ReactNode;
+}) {
   return (
     <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
@@ -147,12 +138,12 @@ function Card({ title, subtitle, badge, children }) {
 }
 
 // ── Chart Tooltip ────────────────────────────────────────
-function ChartTip({ active, payload, label }) {
+function ChartTip({ active, payload, label }: { active?: boolean; payload?: any[]; label?: string }) {
   if (!active || !payload?.length) return null;
   return (
     <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "10px 14px", fontSize: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }}>
       <p style={{ color: "#64748b", marginBottom: 6, fontWeight: 700 }}>{label}</p>
-      {payload.map(p => (
+      {payload.map((p: any) => (
         <p key={p.name} style={{ color: p.color, fontWeight: 700, margin: "2px 0" }}>
           {p.name}: {p.value > 999 ? fmtShort(p.value) : p.value}
         </p>
@@ -162,7 +153,9 @@ function ChartTip({ active, payload, label }) {
 }
 
 // ── Days Outstanding Card ─────────────────────────────────
-function DaysCard({ label, value, icon, color, subtitle }) {
+function DaysCard({ label, value, icon, color, subtitle }: {
+  label: string; value: number; icon: string; color: string; subtitle?: string;
+}) {
   return (
     <div style={{
       background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14,
@@ -170,7 +163,9 @@ function DaysCard({ label, value, icon, color, subtitle }) {
       borderLeft: `4px solid ${color}`,
     }}>
       <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>{icon} {label}</div>
-      <div style={{ fontSize: 28, fontWeight: 900, color: "#0f172a", letterSpacing: "-1px" }}>{value} <span style={{ fontSize: 13, color: "#94a3b8", fontWeight: 600 }}>days</span></div>
+      <div style={{ fontSize: 28, fontWeight: 900, color: "#0f172a", letterSpacing: "-1px" }}>
+        {value} <span style={{ fontSize: 13, color: "#94a3b8", fontWeight: 600 }}>days</span>
+      </div>
       {subtitle && <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{subtitle}</div>}
     </div>
   );
@@ -180,11 +175,10 @@ function DaysCard({ label, value, icon, color, subtitle }) {
 //  MAIN COMPONENT
 // ══════════════════════════════════════════════════════════
 export default function SupplyChainDashboard() {
-  const [filter, setFilter] = useState("Monthly");
-  const [loading, setLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState(null);
+  const [filter, setFilter]           = useState("Monthly");
+  const [loading, setLoading]         = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [orderStatus, setOrderStatus] = useState("Overview");
-  const [orderDate, setOrderDate] = useState("3/29/2025 - 9/17/2025");
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -202,21 +196,28 @@ export default function SupplyChainDashboard() {
     }, 800);
   };
 
-  const kpis = [
-    { label: "Total Net Sales",      value: "$52.60M", change: "8.4%",  up: true,  icon: "💰", accent: "#0ea5e9" },
-    { label: "Total Costs",          value: "$16.35M", change: "3.1%",  up: false, icon: "📊", accent: "#ef4444" },
-    { label: "On-Time Delivery",     value: "88.82%",  change: "2.3%",  up: true,  icon: "🚚", accent: "#10b981" },
-    { label: "Orders On Time",       value: "34,432",  change: "5.2%",  up: true,  icon: "✅", accent: "#8b5cf6" },
-    { label: "Orders Delivered",     value: "38,768",  change: "4.8%",  up: true,  icon: "📦", accent: "#f59e0b" },
-    { label: "Inventory Turnover",   value: "6.2x",    change: "1.1%",  up: true,  icon: "🔄", accent: "#ec4899" },
+  const kpis: { label: string; value: string; change: string; up: boolean; icon: string; accent: string }[] = [
+    { label: "Total Net Sales",    value: "$52.60M", change: "8.4%", up: true,  icon: "💰", accent: "#0ea5e9" },
+    { label: "Total Costs",        value: "$16.35M", change: "3.1%", up: false, icon: "📊", accent: "#ef4444" },
+    { label: "On-Time Delivery",   value: "88.82%",  change: "2.3%", up: true,  icon: "🚚", accent: "#10b981" },
+    { label: "Orders On Time",     value: "34,432",  change: "5.2%", up: true,  icon: "✅", accent: "#8b5cf6" },
+    { label: "Orders Delivered",   value: "38,768",  change: "4.8%", up: true,  icon: "📦", accent: "#f59e0b" },
+    { label: "Inventory Turnover", value: "6.2x",    change: "1.1%", up: true,  icon: "🔄", accent: "#ec4899" },
   ];
 
-  const costLegend = [
-    { key: "inventoryMgmt",  name: "Inventory Management", color: "#0ea5e9" },
-    { key: "customerSvc",    name: "Customer Service",     color: "#8b5cf6" },
-    { key: "carryingCost",   name: "Carrying Cost of Inv.",color: "#f59e0b" },
-    { key: "transport",      name: "Transport",            color: "#10b981" },
-    { key: "warehousing",    name: "Warehousing",          color: "#ef4444" },
+  const costLegend: { key: string; name: string; color: string }[] = [
+    { key: "inventoryMgmt", name: "Inventory Management",  color: "#0ea5e9" },
+    { key: "customerSvc",   name: "Customer Service",      color: "#8b5cf6" },
+    { key: "carryingCost",  name: "Carrying Cost of Inv.", color: "#f59e0b" },
+    { key: "transport",     name: "Transport",             color: "#10b981" },
+    { key: "warehousing",   name: "Warehousing",           color: "#ef4444" },
+  ];
+
+  const bottlenecks: { issue: string; severity: string; impact: string; region: string; color: string }[] = [
+    { issue: "Port Congestion",   severity: "High",   impact: "Transport delay +3 days", region: "West Coast",  color: "#ef4444" },
+    { issue: "Supplier Lead Time",severity: "Medium", impact: "Raw material shortage",   region: "Supplier A",  color: "#f59e0b" },
+    { issue: "Warehouse Capacity",severity: "Low",    impact: "Finished goods at 84%",   region: "Warehouse 2", color: "#10b981" },
+    { issue: "Customs Clearance", severity: "Medium", impact: "Delayed 12 shipments",    region: "East Port",   color: "#f59e0b" },
   ];
 
   return (
@@ -227,7 +228,7 @@ export default function SupplyChainDashboard() {
         * { box-sizing: border-box; margin: 0; padding: 0; }
       `}</style>
 
-      {/* ── HEADER ─────────────────────────────────────────── */}
+      {/* ── HEADER ── */}
       <header style={{
         background: "#fff", borderBottom: "1px solid #e2e8f0",
         padding: "14px 28px", position: "sticky", top: 0, zIndex: 50,
@@ -265,7 +266,7 @@ export default function SupplyChainDashboard() {
         </div>
       </header>
 
-      {/* ── BODY ─────────────────────────────────────────── */}
+      {/* ── BODY ── */}
       <main style={{ padding: "24px 28px", maxWidth: 1600, margin: "0 auto", animation: "fadeUp 0.35s ease" }}>
 
         {/* KPIs */}
@@ -280,23 +281,19 @@ export default function SupplyChainDashboard() {
           <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: "20px", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
             <h3 style={{ fontSize: 13, fontWeight: 800, color: "#0f172a", marginBottom: 14 }}>Order Status</h3>
             {["Overview", "Pending", "Processing", "Shipped", "Delivered", "Returns"].map(s => (
-              <div
-                key={s}
-                onClick={() => setOrderStatus(s)}
-                style={{
-                  padding: "8px 12px", borderRadius: 8, marginBottom: 4,
-                  fontSize: 12, fontWeight: 600, cursor: "pointer",
-                  background: orderStatus === s ? "#eff6ff" : "transparent",
-                  color: orderStatus === s ? "#0ea5e9" : "#64748b",
-                  borderLeft: orderStatus === s ? "3px solid #0ea5e9" : "3px solid transparent",
-                  transition: "all 0.15s",
-                }}
-              >{s}</div>
+              <div key={s} onClick={() => setOrderStatus(s)} style={{
+                padding: "8px 12px", borderRadius: 8, marginBottom: 4,
+                fontSize: 12, fontWeight: 600, cursor: "pointer",
+                background: orderStatus === s ? "#eff6ff" : "transparent",
+                color: orderStatus === s ? "#0ea5e9" : "#64748b",
+                borderLeft: orderStatus === s ? "3px solid #0ea5e9" : "3px solid transparent",
+                transition: "all 0.15s",
+              }}>{s}</div>
             ))}
             <div style={{ marginTop: 16, borderTop: "1px solid #f1f5f9", paddingTop: 14 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", marginBottom: 8 }}>Order Date</div>
               <div style={{ fontSize: 11, color: "#475569", background: "#f8fafc", padding: "7px 10px", borderRadius: 8, border: "1px solid #e2e8f0" }}>
-                📅 {orderDate}
+                📅 3/29/2025 – 9/17/2025
               </div>
             </div>
           </div>
@@ -317,7 +314,7 @@ export default function SupplyChainDashboard() {
                   <BarChart data={DEMO.costDistribution} barSize={14}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                     <XAxis dataKey="month" tick={{ fill: "#94a3b8", fontSize: 10 }} axisLine={false} tickLine={false} />
-                    <YAxis tickFormatter={(v) => fmtShort(v)} tick={{ fill: "#94a3b8", fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(v: number) => fmtShort(v)} tick={{ fill: "#94a3b8", fontSize: 10 }} axisLine={false} tickLine={false} />
                     <Tooltip content={<ChartTip />} />
                     {costLegend.map(l => (
                       <Bar key={l.key} dataKey={l.key} name={l.name} stackId="a" fill={l.color} />
@@ -340,30 +337,24 @@ export default function SupplyChainDashboard() {
         <Card title="Operational Performance Metrics" subtitle="Key rate indicators" badge="● Live">
           {loading ? <Skeleton h={160} /> : (
             <div style={{ display: "flex", justifyContent: "space-around", flexWrap: "wrap", gap: 16, padding: "8px 0" }}>
-              <GaugeChart value={97.94} label="Perfect Order Rate"   color="#10b981" />
-              <GaugeChart value={97.83} label="Order Accuracy Rate"  color="#0ea5e9" />
-              <GaugeChart value={97.88} label="Fill Rate"            color="#8b5cf6" />
-              <GaugeChart value={88.82} label="On-Time Delivery"     color="#f59e0b" />
+              <GaugeChart value={97.94} label="Perfect Order Rate"  color="#10b981" />
+              <GaugeChart value={97.83} label="Order Accuracy Rate" color="#0ea5e9" />
+              <GaugeChart value={97.88} label="Fill Rate"           color="#8b5cf6" />
+              <GaugeChart value={88.82} label="On-Time Delivery"    color="#f59e0b" />
             </div>
           )}
         </Card>
 
-        {/* Row 3 — On-Time Delivery Trend + Supplier Performance */}
+        {/* Row 3 — Trends + Supplier */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(400px,1fr))", gap: 16, marginTop: 16, marginBottom: 16 }}>
 
           <Card title="On-Time Delivery Rate Trend" subtitle="Monthly performance" badge="● Live">
             {loading ? <Skeleton h={220} /> : (
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={DEMO.orderFulfillment}>
-                  <defs>
-                    <linearGradient id="otg" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#10b981" stopOpacity={0.15} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="month"   tick={{ fill: "#94a3b8", fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis domain={[80, 100]} tickFormatter={(v) => `${v}%`} tick={{ fill: "#94a3b8", fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="month" tick={{ fill: "#94a3b8", fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis domain={[80, 100]} tickFormatter={(v: number) => `${v}%`} tick={{ fill: "#94a3b8", fontSize: 10 }} axisLine={false} tickLine={false} />
                   <Tooltip content={<ChartTip />} />
                   <Line type="monotone" dataKey="onTime" stroke="#10b981" strokeWidth={2.5} name="On-Time %" dot={{ r: 5, fill: "#10b981" }} activeDot={{ r: 7 }} />
                 </LineChart>
@@ -388,7 +379,7 @@ export default function SupplyChainDashboard() {
           </Card>
         </div>
 
-        {/* Row 4 — Inventory Levels Table */}
+        {/* Row 4 — Inventory Table */}
         <Card title="Inventory Levels" subtitle="current stock vs reorder point" badge="4 categories">
           {loading ? <Skeleton h={160} /> : (
             <div style={{ overflowX: "auto" }}>
@@ -407,11 +398,9 @@ export default function SupplyChainDashboard() {
                     const statusColor = isLow ? "#ef4444" : pct > 80 ? "#f59e0b" : "#10b981";
                     const statusLabel = isLow ? "Low Stock" : pct > 80 ? "Near Full" : "Optimal";
                     return (
-                      <tr
-                        key={item.category}
-                        style={{ borderBottom: "1px solid #f8fafc", transition: "background 0.15s" }}
-                        onMouseEnter={e => e.currentTarget.style.background = "#f8fafc"}
-                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                      <tr key={item.category} style={{ borderBottom: "1px solid #f8fafc", transition: "background 0.15s" }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "#f8fafc")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                       >
                         <td style={{ padding: "13px 14px" }}>
                           <div style={{ width: 26, height: 26, borderRadius: "50%", background: PALETTE[idx] + "22", color: PALETTE[idx], display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800 }}>{idx + 1}</div>
@@ -445,12 +434,7 @@ export default function SupplyChainDashboard() {
           <Card title="Active Bottlenecks & Delays" subtitle="real-time issue tracking" badge="● Live">
             {loading ? <Skeleton h={120} /> : (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 14, marginTop: 4 }}>
-                {[
-                  { issue: "Port Congestion",       severity: "High",   impact: "Transport delay +3 days",  region: "West Coast", color: "#ef4444" },
-                  { issue: "Supplier Lead Time",     severity: "Medium", impact: "Raw material shortage",    region: "Supplier A", color: "#f59e0b" },
-                  { issue: "Warehouse Capacity",     severity: "Low",    impact: "Finished goods at 84%",    region: "Warehouse 2",color: "#10b981" },
-                  { issue: "Customs Clearance",      severity: "Medium", impact: "Delayed 12 shipments",     region: "East Port",  color: "#f59e0b" },
-                ].map((b, i) => (
+                {bottlenecks.map(b => (
                   <div key={b.issue} style={{
                     background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12,
                     padding: "14px 16px", borderLeft: `4px solid ${b.color}`,

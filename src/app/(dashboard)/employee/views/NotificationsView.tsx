@@ -146,7 +146,7 @@ export default function NotificationsView({
                 }`}
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className={`w-11 h-11 rounded-full flex items-center justify-center text-xl flex-shrink-0 ${
+                  <div className={`w-11 h-11 rounded-full flex items-center justify-center text-xl shrink-0 ${
                     leave.status === "Approved" ? "bg-green-100" : "bg-red-100"
                   }`}>
                     {leave.status === "Approved" ? "✅" : "❌"}
@@ -169,7 +169,7 @@ export default function NotificationsView({
                 <button
                   onClick={() => handleLeaveRead(leave.id)}
                   title="Mark as read"
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white hover:bg-red-100 border border-gray-200 transition-colors text-gray-400 hover:text-red-600 flex-shrink-0 ml-3 shadow-sm"
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white hover:bg-red-100 border border-gray-200 transition-colors text-gray-400 hover:text-red-600 shrink-0 ml-3 shadow-sm"
                 >
                   <XIcon />
                 </button>
@@ -194,7 +194,7 @@ export default function NotificationsView({
                 className="flex items-start justify-between p-4 rounded-xl bg-purple-50 border border-purple-200"
               >
                 <div className="flex items-start gap-3 flex-1 min-w-0">
-                  <div className="w-11 h-11 rounded-full bg-purple-100 flex items-center justify-center text-xl flex-shrink-0">💬</div>
+                  <div className="w-11 h-11 rounded-full bg-purple-100 flex items-center justify-center text-xl shrink-0">💬</div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-gray-800 text-sm">Admin replied to your query</p>
                     <p className="text-xs text-purple-700 font-medium mt-0.5 truncate">Subject: {q.subject}</p>
@@ -208,7 +208,7 @@ export default function NotificationsView({
                 <button
                   onClick={() => handleQueryRead(q.id)}
                   title="Mark as read"
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white hover:bg-purple-100 border border-gray-200 transition-colors text-gray-400 hover:text-purple-600 flex-shrink-0 ml-3 shadow-sm mt-0.5"
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white hover:bg-purple-100 border border-gray-200 transition-colors text-gray-400 hover:text-purple-600 shrink-0 ml-3 shadow-sm mt-0.5"
                 >
                   <XIcon />
                 </button>
@@ -240,7 +240,7 @@ export default function NotificationsView({
                     onGoToChat?.(n.chatId);
                   }}
                 >
-                  <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-sm">
+                  <div className="w-11 h-11 rounded-full bg-linear-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold text-lg shrink-0 shadow-sm">
                     {n.fromName.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -266,7 +266,7 @@ export default function NotificationsView({
                 <button
                   onClick={() => handleChatRead(n.id)}
                   title="Mark as read"
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white hover:bg-blue-100 border border-gray-200 transition-colors text-gray-400 hover:text-blue-600 flex-shrink-0 ml-3 shadow-sm mt-0.5"
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white hover:bg-blue-100 border border-gray-200 transition-colors text-gray-400 hover:text-blue-600 shrink-0 ml-3 shadow-sm mt-0.5"
                 >
                   <XIcon />
                 </button>
@@ -295,7 +295,7 @@ export default function NotificationsView({
                 {hasNone ? "You're all caught up!" : `${totalCount} unread notification${totalCount !== 1 ? "s" : ""}`}
               </p>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
               {!hasNone && (
                 <button
                   onClick={handleMarkAllRead}
