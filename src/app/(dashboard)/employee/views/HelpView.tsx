@@ -9,11 +9,38 @@ import {
   where,
   orderBy,
   onSnapshot,
-  updateDoc,
-  doc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
+
+const SUBJECT_LIMIT = 100;
+const MESSAGE_LIMIT = 1000;
+const PREVIEW_LENGTH = 150; // chars before "See More"
+
+function ExpandableText({
+  text,
+  previewLength = PREVIEW_LENGTH,
+}: {
+  text: string;
+  previewLength?: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = text.length > previewLength;
+
+  return (
+    <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
+      {isLong && !expanded ? text.slice(0, previewLength) + "…" : text}
+      {isLong && (
+        <button
+          onClick={() => setExpanded((prev) => !prev)}
+          className="ml-1 text-[#0b3a5a] font-medium underline text-xs"
+        >
+          {expanded ? "See Less" : "See More"}
+        </button>
+      )}
+    </p>
+  );
+}
 
 export default function HelpView() {
   const { user } = useAuth();
@@ -36,11 +63,7 @@ export default function HelpView() {
     );
 
     const unsub = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      }));
-
+      const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
       setQueries(docs);
       setLoading(false);
     });
@@ -77,7 +100,6 @@ export default function HelpView() {
       setSubject("");
       setMessage("");
       setMsg("✅ Query submitted successfully!");
-
     } catch (err) {
       console.error(err);
       setMsg("Something went wrong.");
@@ -93,25 +115,42 @@ export default function HelpView() {
 
       {/* Submit Form */}
       <div className="bg-white p-6 rounded-xl shadow space-y-4">
-        <input
-          value={subject}
-          onChange={(e) => setSubject(e.target.value)}
-          placeholder="Subject"
-          className="w-full border rounded-lg px-4 py-3"
-        />
 
-        <textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Describe your issue..."
-          rows={4}
-          className="w-full border rounded-lg px-4 py-3"
-        />
+        {/* Subject */}
+        <div className="space-y-1">
+          <input
+            value={subject}
+            onChange={(e) => {
+              if (e.target.value.length <= SUBJECT_LIMIT) setSubject(e.target.value);
+            }}
+            placeholder="Subject"
+            maxLength={SUBJECT_LIMIT}
+            className="w-full border rounded-lg px-4 py-3"
+          />
+          <p className={`text-xs text-right ${subject.length >= SUBJECT_LIMIT ? "text-red-500" : "text-gray-400"}`}>
+            {subject.length}/{SUBJECT_LIMIT}
+          </p>
+        </div>
+
+        {/* Message */}
+        <div className="space-y-1">
+          <textarea
+            value={message}
+            onChange={(e) => {
+              if (e.target.value.length <= MESSAGE_LIMIT) setMessage(e.target.value);
+            }}
+            placeholder="Describe your issue..."
+            rows={4}
+            maxLength={MESSAGE_LIMIT}
+            className="w-full border rounded-lg px-4 py-3 resize-none"
+          />
+          <p className={`text-xs text-right ${message.length >= MESSAGE_LIMIT ? "text-red-500" : "text-gray-400"}`}>
+            {message.length}/{MESSAGE_LIMIT}
+          </p>
+        </div>
 
         {msg && (
-          <p className={`text-sm ${
-            msg.startsWith("✅") ? "text-green-600" : "text-red-500"
-          }`}>
+          <p className={`text-sm ${msg.startsWith("✅") ? "text-green-600" : "text-red-500"}`}>
             {msg}
           </p>
         )}
@@ -133,10 +172,16 @@ export default function HelpView() {
 
         {queries.map((q) => (
           <div key={q.id} className="bg-white p-5 rounded-xl shadow space-y-2">
-            <div className="flex justify-between">
-              <h4 className="font-semibold">{q.subject}</h4>
+
+            {/* Subject + Status */}
+            <div className="flex justify-between items-start gap-2">
+              <h4 className="font-semibold break-words flex-1">
+                {q.subject.length > 80
+                  ? <ExpandableText text={q.subject} previewLength={80} />
+                  : q.subject}
+              </h4>
               <span
-                className={`px-2 py-1 rounded text-xs ${
+                className={`shrink-0 px-2 py-1 rounded text-xs ${
                   q.status === "resolved"
                     ? "bg-green-100 text-green-700"
                     : "bg-yellow-100 text-yellow-700"
@@ -146,12 +191,14 @@ export default function HelpView() {
               </span>
             </div>
 
-            <p>{q.message}</p>
+            {/* Message with expand */}
+            <ExpandableText text={q.message} />
 
+            {/* Admin Reply with expand */}
             {q.adminReply && (
               <div className="bg-green-50 p-3 rounded">
-                <p className="font-semibold text-green-700">Admin Reply:</p>
-                <p>{q.adminReply}</p>
+                <p className="font-semibold text-green-700 text-sm mb-1">Admin Reply:</p>
+                <ExpandableText text={q.adminReply} />
               </div>
             )}
           </div>

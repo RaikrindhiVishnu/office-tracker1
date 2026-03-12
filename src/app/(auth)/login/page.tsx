@@ -1,10 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  signInWithEmailAndPassword,
-  sendPasswordResetEmail,
-} from "firebase/auth";
+import { signInWithEmailAndPassword } from "firebase/auth";
 import {
   doc,
   getDoc,
@@ -43,48 +40,33 @@ function getTodayString(): string {
 }
 
 // ── Check if employee has an approved WFH leave for today ─
-// Returns: { allowed: boolean, indexUrl?: string }
 async function checkWFHApproved(uid: string): Promise<{ allowed: boolean; indexUrl?: string }> {
   const today = getTodayString();
-
   try {
-    // This composite query REQUIRES a Firestore index:
-    //   Collection: leaveRequests
-    //   Fields: uid (ASC), leaveType (ASC), status (ASC)
-    // If the index doesn't exist, Firebase throws an error
-    // containing the URL to create it.
     const q = query(
       collection(db, "leaveRequests"),
       where("uid",       "==", uid),
       where("leaveType", "==", "Work From Home"),
       where("status",    "==", "Approved")
     );
-
     const snap = await getDocs(q);
-
     let wfhAllowed = false;
-
     snap.forEach((docSnap) => {
       const data = docSnap.data();
       const fromDate: string = data.fromDate ?? "";
       const toDate:   string = data.toDate   ?? "";
-
-      // fromDate and toDate are stored as "YYYY-MM-DD" strings
       if (fromDate && toDate && today >= fromDate && today <= toDate) {
         wfhAllowed = true;
       }
     });
-
     return { allowed: wfhAllowed };
   } catch (e: any) {
     if (isIndexError(e)) {
-      // Return the Firebase Console URL so login page can show it
       return {
         allowed: false,
         indexUrl: extractIndexUrl(e.message) ?? undefined,
       };
     }
-    // Any other Firestore error → treat as WFH not approved (safe default)
     console.error("WFH check error:", e);
     return { allowed: false };
   }
@@ -100,7 +82,7 @@ function getCurrentPosition(): Promise<GeolocationPosition> {
     navigator.geolocation.getCurrentPosition(resolve, reject, {
       enableHighAccuracy: true,
       timeout: 15000,
-      maximumAge: 0,   // always fresh — no cached position
+      maximumAge: 0,
     });
   });
 }
@@ -116,13 +98,10 @@ export default function LoginPage() {
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState("");
   const [success,  setSuccess]  = useState("");
-
-  // If Firestore index is missing, we show a clickable link
   const [indexUrl, setIndexUrl] = useState<string | null>(null);
+  const [step,     setStep]     = useState("");
 
-  // Step-by-step status shown while logging in
-  const [step, setStep] = useState("");
-
+  // ── Sign In ───────────────────────────────────────────
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
       setError("Please enter your email and password.");
@@ -136,7 +115,7 @@ export default function LoginPage() {
       setIndexUrl(null);
       setStep("");
 
-      // ── STEP 1: Firebase Auth ──────────────────────────
+      // STEP 1: Firebase Auth
       setStep("Verifying credentials...");
       const cred = await signInWithEmailAndPassword(
         auth,
@@ -144,47 +123,36 @@ export default function LoginPage() {
         password.trim()
       );
 
-      // ── STEP 2: Fetch user profile from Firestore ──────
+      // STEP 2: Fetch user profile
       setStep("Loading your profile...");
       const userRef  = doc(db, "users", cred.user.uid);
       const userSnap = await getDoc(userRef);
 
-      if (!userSnap.exists()) {
-        throw new Error("PROFILE_NOT_FOUND");
-      }
+      if (!userSnap.exists()) throw new Error("PROFILE_NOT_FOUND");
 
       const userData = userSnap.data();
       const role = (userData?.accountType ?? "").toString().trim().toUpperCase();
 
-      // ── STEP 3: Force password change if flagged ───────
+      // STEP 3: Force password change if flagged
       if (userData?.mustChangePassword === true) {
         router.replace("/change-password");
         return;
       }
 
-      // ── STEP 4: Location check (EMPLOYEES ONLY) ────────
-      // Admin, SuperAdmin, BusinessOwner skip location entirely.
-      // Only EMPLOYEE role is subject to office location enforcement.
+      // STEP 4: Location check (EMPLOYEES ONLY)
       if (role === "EMPLOYEE") {
         setStep("Checking work-from-home status...");
-
-        // Check if employee has an approved WFH leave for today
         const wfhResult = await checkWFHApproved(cred.user.uid);
 
         if (wfhResult.indexUrl) {
-          // Firestore index missing — show the fix link
           setIndexUrl(wfhResult.indexUrl);
           throw new Error("INDEX_MISSING");
         }
 
         if (wfhResult.allowed) {
-          // ✅ WFH approved for today → skip location check
-          // Employee can log in from anywhere
           setStep("WFH approved — bypassing location check...");
         } else {
-          // ❌ No approved WFH → MUST be physically inside office
           setStep("Checking your location...");
-
           let position: GeolocationPosition;
           try {
             position = await getCurrentPosition();
@@ -202,7 +170,6 @@ export default function LoginPage() {
           const insideOffice = isInsideOffice(latitude, longitude);
 
           if (!insideOffice) {
-            // Log the attempt for audit purposes (optional)
             console.warn(
               `[LOGIN BLOCKED] uid=${cred.user.uid} ` +
               `lat=${latitude.toFixed(6)} lng=${longitude.toFixed(6)} ` +
@@ -215,95 +182,56 @@ export default function LoginPage() {
         }
       }
 
-      // ── STEP 5: Route by role ──────────────────────────
+      // STEP 5: Route by role
       setStep("Redirecting...");
-
       switch (role) {
-        case "SUPERADMIN":
-          router.replace("/superadmin");
-          break;
-        case "ADMIN":
-          router.replace("/admin");
-          break;
+        case "SUPERADMIN":      router.replace("/superadmin");      break;
+        case "ADMIN":           router.replace("/admin");           break;
         case "BUSINESSOWNER":
-        case "BUSINESS_OWNER":
-          router.replace("/business-owner");
-          break;
-        case "EMPLOYEE":
-          router.replace("/employee");
-          break;
-        default:
-          throw new Error("INVALID_ROLE");
+        case "BUSINESS_OWNER":  router.replace("/business-owner");  break;
+        case "EMPLOYEE":        router.replace("/employee");        break;
+        default:                throw new Error("INVALID_ROLE");
       }
 
     } catch (err: any) {
       console.error("Login error:", err?.code, err?.message);
       setStep("");
 
-      // ── Map every possible error to a user-friendly message ──
       switch (true) {
         case err.message === "INDEX_MISSING":
-          setError(
-            "A Firestore index is required. Click the button below to create it, " +
-            "then try logging in again."
-          );
+          setError("A Firestore index is required. Click the button below to create it, then try logging in again.");
           break;
-
         case err.message === "GEO_DENIED":
-          setError(
-            "📍 Location permission denied.\n" +
-            "Please allow location access in your browser and try again.\n" +
-            "You must be inside the office to log in."
-          );
+          setError("📍 Location permission denied.\nPlease allow location access in your browser and try again.\nYou must be inside the office to log in.");
           break;
-
         case err.message === "GEO_NOT_SUPPORTED":
-          setError(
-            "📍 Geolocation is not supported on this device or browser."
-          );
+          setError("📍 Geolocation is not supported on this device or browser.");
           break;
-
         case err.message === "GEO_TIMEOUT":
-          setError(
-            "📍 Could not get your location (timeout). " +
-            "Please check your GPS signal and try again."
-          );
+          setError("📍 Could not get your location (timeout). Please check your GPS signal and try again.");
           break;
-
         case err.message === "OUTSIDE_OFFICE":
-          setError(
-            "🚫 Login blocked.\n" +
-            "You are outside office premises.\n" +
-            "You must be within 100 meters of the office to log in.\n" +
-            "If you're working from home, your WFH request must be approved first."
-          );
+          setError("🚫 Login blocked.\nYou are outside office premises.\nYou must be within 100 meters of the office to log in.\nIf you're working from home, your WFH request must be approved first.");
           break;
-
         case err.message === "PROFILE_NOT_FOUND":
           setError("User profile not found. Please contact your administrator.");
           break;
-
         case err.message === "INVALID_ROLE":
           setError("Your account has no valid role assigned. Contact admin.");
           break;
-
         case err.code === "auth/invalid-credential":
         case err.code === "auth/wrong-password":
           setError("Invalid email or password. Please try again.");
           break;
-
         case err.code === "auth/user-not-found":
           setError("No account found with this email address.");
           break;
-
         case err.code === "auth/too-many-requests":
           setError("Too many failed attempts. Account temporarily locked. Try again later.");
           break;
-
         case err.code === "auth/network-request-failed":
           setError("Network error. Please check your internet connection.");
           break;
-
         default:
           setError("Login failed. Please try again.");
       }
@@ -312,32 +240,44 @@ export default function LoginPage() {
     }
   };
 
+  // ── Forgot Password — calls branded email API ─────────
   const handlePasswordReset = async () => {
     if (!email.trim()) {
       setError("Please enter your email address first.");
       return;
     }
-
     try {
       setLoading(true);
       setError("");
       setSuccess("");
-      await sendPasswordResetEmail(auth, email.trim().toLowerCase());
-      setSuccess("✅ Password reset email sent. Please check your inbox.");
+      setStep("Sending reset email...");
+
+      const res = await fetch("/api/send-password-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send reset email.");
+
+      setSuccess("✅ Password reset email sent! Please check your inbox.");
     } catch (err: any) {
-      if      (err.code === "auth/user-not-found")  setError("No account found with this email.");
-      else if (err.code === "auth/invalid-email")   setError("Invalid email address.");
-      else                                           setError("Failed to send reset email. Try again.");
+      setError(err.message || "Failed to send reset email. Try again.");
     } finally {
       setLoading(false);
+      setStep("");
     }
   };
 
-  // ── Handle Enter key ──────────────────────────────────
+  // ── Enter key support ─────────────────────────────────
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !loading) handleLogin();
   };
 
+  // ─────────────────────────────────────────────────────
+  //  RENDER
+  // ─────────────────────────────────────────────────────
   return (
     <div style={{
       minHeight: "100vh",
@@ -361,7 +301,8 @@ export default function LoginPage() {
         {/* Logo / Brand */}
         <div style={{ textAlign: "center", marginBottom: 28 }}>
           <div style={{
-            width: 56, height: 56, background: "linear-gradient(135deg, #143d3d, #1a5c5c)",
+            width: 56, height: 56,
+            background: "linear-gradient(135deg, #143d3d, #1a5c5c)",
             borderRadius: 16, display: "flex", alignItems: "center",
             justifyContent: "center", margin: "0 auto 14px", fontSize: 26,
             boxShadow: "0 4px 16px rgba(20,61,61,0.35)",
@@ -486,9 +427,11 @@ export default function LoginPage() {
             onClick={handleLogin}
             disabled={loading}
             style={{
-              padding: "13px", background: loading ? "#94a3b8" : "#143d3d",
+              padding: "13px",
+              background: loading ? "#94a3b8" : "#143d3d",
               color: "#fff", border: "none", borderRadius: 12,
-              fontSize: 15, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer",
+              fontSize: 15, fontWeight: 700,
+              cursor: loading ? "not-allowed" : "pointer",
               transition: "background 0.2s",
               boxShadow: loading ? "none" : "0 4px 16px rgba(20,61,61,0.35)",
             }}
@@ -511,29 +454,6 @@ export default function LoginPage() {
             Forgot Password?
           </button>
         </div>
-
-        {/* Role legend */}
-        {/* <div style={{
-          marginTop: 24, padding: "14px 16px",
-          background: "#f8fafc", borderRadius: 12,
-          border: "1px solid #e2e8f0",
-        }}>
-          <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-            Login Rules
-          </p>
-          {[
-            { role: "Employee",      rule: "Must be in office OR have approved WFH", icon: "👤" },
-            { role: "Admin",         rule: "No location restriction",                icon: "🛡️" },
-            { role: "SuperAdmin",    rule: "No location restriction",                icon: "⚡" },
-            { role: "BusinessOwner", rule: "No location restriction",                icon: "💼" },
-          ].map(({ role, rule, icon }) => (
-            <div key={role} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, fontSize: 12 }}>
-              <span>{icon}</span>
-              <strong style={{ color: "#334155", minWidth: 110 }}>{role}:</strong>
-              <span style={{ color: "#64748b" }}>{rule}</span>
-            </div>
-          ))}
-        </div> */}
 
       </div>
 

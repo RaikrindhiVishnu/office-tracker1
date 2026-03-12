@@ -3,12 +3,6 @@
 
 import * as admin from "firebase-admin";
 
-// ✅ Put your service account JSON file in the scripts/ folder
-// and rename it to serviceAccount.json
-
-
-import * as admin from "firebase-admin";
-
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({

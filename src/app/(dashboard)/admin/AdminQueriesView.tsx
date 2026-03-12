@@ -9,6 +9,8 @@ import { db } from "@/lib/firebase";
 import { User as FirebaseUser } from "firebase/auth";
 
 const ITEMS_PER_PAGE = 8;
+const REPLY_LIMIT = 1000;
+const PREVIEW_LENGTH = 120; // chars before "See More" in expanded panel
 
 interface Query {
   id: string;
@@ -51,6 +53,45 @@ function timeAgo(ts: { seconds?: number } | string | undefined): string {
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+
+// ── Expandable text with See More / See Less ──
+function ExpandableText({
+  text,
+  previewLength = PREVIEW_LENGTH,
+  style,
+}: {
+  text: string;
+  previewLength?: number;
+  style?: React.CSSProperties;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = text.length > previewLength;
+
+  return (
+    <span style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", ...style }}>
+      {isLong && !expanded ? text.slice(0, previewLength) + "…" : text}
+      {isLong && (
+        <button
+          onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
+          style={{
+            marginLeft: 6,
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: "#1a6ed8",
+            fontSize: 11,
+            fontWeight: 800,
+            fontFamily: "inherit",
+            textDecoration: "underline",
+            padding: 0,
+          }}
+        >
+          {expanded ? "See Less" : "See More"}
+        </button>
+      )}
+    </span>
+  );
 }
 
 export default function AdminQueriesView({ user, userData }: AdminQueriesViewProps) {
@@ -107,22 +148,22 @@ export default function AdminQueriesView({ user, userData }: AdminQueriesViewPro
   const resolvedCount = queries.filter((q) => q.status === "resolved").length;
   const unreadCount   = queries.filter((q) => q.adminUnread).length;
 
-  // ── inline styles matching the dashboard theme ──
   const S = {
-    wrap:      { fontFamily: "'Nunito',-apple-system,sans-serif", padding: "24px 28px 32px", background: "#f0f4f8", minHeight: "100%" } as React.CSSProperties,
-    card:      { background: "#fff", borderRadius: 16, border: "1px solid #e2eaf3", boxShadow: "0 1px 4px rgba(15,23,42,0.06)", overflow: "hidden" } as React.CSSProperties,
-    thead:     { display: "grid", gridTemplateColumns: "2fr 2.8fr 1fr 160px", background: "#234567" } as React.CSSProperties,
-    th:        { padding: "12px 18px", fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.45)", textTransform: "uppercase" as const, letterSpacing: "0.1em" },
-    row:       { display: "grid", gridTemplateColumns: "2fr 2.8fr 1fr 160px", alignItems: "center", borderBottom: "1px solid #f1f5f9", cursor: "pointer", transition: "background 0.13s" } as React.CSSProperties,
-    td:        { padding: "13px 18px" },
-    chip:      (bg: string, color: string, border: string) => ({ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, padding: "4px 11px", borderRadius: 20, background: bg, color, border: `1.5px solid ${border}`, whiteSpace: "nowrap" as const }),
-    badge:     (bg: string, color: string) => ({ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10, fontWeight: 800, padding: "3px 9px", borderRadius: 20, background: bg, color, textTransform: "uppercase" as const, letterSpacing: "0.05em", whiteSpace: "nowrap" as const }),
-    dot:       (color: string) => ({ width: 5, height: 5, borderRadius: "50%", background: color, display: "inline-block", flexShrink: 0 }),
-    panel:     { background: "#f7faff", borderTop: "1px solid #e2eaf3", borderBottom: "1px solid #e2eaf3", padding: "20px 22px" } as React.CSSProperties,
-    msgBox:    { background: "#fff", border: "1.5px solid #e2eaf3", borderRadius: 12, padding: "14px 16px", fontSize: 13, color: "#334155", lineHeight: 1.75, fontWeight: 500 } as React.CSSProperties,
-    replyBox:  { background: "#f0fdf4", border: "1.5px solid #bbf7d0", borderRadius: 12, padding: "14px 16px", fontSize: 13, color: "#166534", lineHeight: 1.75, fontWeight: 500 } as React.CSSProperties,
-    label:     { fontSize: 10, fontWeight: 800, color: "#94a3b8", textTransform: "uppercase" as const, letterSpacing: "0.09em", marginBottom: 8 },
-    meta:      { fontSize: 11, color: "#94a3b8", fontWeight: 600, marginTop: 7 },
+    wrap:     { fontFamily: "'Nunito',-apple-system,sans-serif", padding: "24px 28px 32px", background: "#f0f4f8", minHeight: "100%" } as React.CSSProperties,
+    card:     { background: "#fff", borderRadius: 16, border: "1px solid #e2eaf3", boxShadow: "0 1px 4px rgba(15,23,42,0.06)", overflow: "hidden" } as React.CSSProperties,
+    thead:    { display: "grid", gridTemplateColumns: "2fr 2.8fr 1fr 160px", background: "#234567" } as React.CSSProperties,
+    th:       { padding: "12px 18px", fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.45)", textTransform: "uppercase" as const, letterSpacing: "0.1em" },
+    row:      { display: "grid", gridTemplateColumns: "2fr 2.8fr 1fr 160px", alignItems: "center", borderBottom: "1px solid #f1f5f9", cursor: "pointer", transition: "background 0.13s" } as React.CSSProperties,
+    td:       { padding: "13px 18px" },
+    chip:     (bg: string, color: string, border: string) => ({ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, padding: "4px 11px", borderRadius: 20, background: bg, color, border: `1.5px solid ${border}`, whiteSpace: "nowrap" as const }),
+    badge:    (bg: string, color: string) => ({ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10, fontWeight: 800, padding: "3px 9px", borderRadius: 20, background: bg, color, textTransform: "uppercase" as const, letterSpacing: "0.05em", whiteSpace: "nowrap" as const }),
+    dot:      (color: string) => ({ width: 5, height: 5, borderRadius: "50%", background: color, display: "inline-block", flexShrink: 0 }),
+    panel:    { background: "#f7faff", borderTop: "1px solid #e2eaf3", borderBottom: "1px solid #e2eaf3", padding: "20px 22px" } as React.CSSProperties,
+    msgBox:   { background: "#fff", border: "1.5px solid #e2eaf3", borderRadius: 12, padding: "14px 16px", fontSize: 13, color: "#334155", lineHeight: 1.75, fontWeight: 500 } as React.CSSProperties,
+    replyBox: { background: "#f0fdf4", border: "1.5px solid #bbf7d0", borderRadius: 12, padding: "14px 16px", fontSize: 13, color: "#166534", lineHeight: 1.75, fontWeight: 500 } as React.CSSProperties,
+    label:    { fontSize: 10, fontWeight: 800, color: "#94a3b8", textTransform: "uppercase" as const, letterSpacing: "0.09em", marginBottom: 8 },
+    meta:     { fontSize: 11, color: "#94a3b8", fontWeight: 600, marginTop: 7 },
+    charHint: (atLimit: boolean) => ({ fontSize: 11, color: atLimit ? "#ef4444" : "#94a3b8", fontWeight: 600, textAlign: "right" as const, marginTop: 4 }),
   };
 
   return (
@@ -267,6 +308,8 @@ export default function AdminQueriesView({ user, userData }: AdminQueriesViewPro
           {paginated.map((q) => {
             const [ac, abg] = getAvatar(q.employeeName || "U");
             const isOpen = expandedId === q.id;
+            const currentReply = replyText[q.id] || "";
+
             return (
               <div key={q.id}>
                 <div
@@ -288,7 +331,7 @@ export default function AdminQueriesView({ user, userData }: AdminQueriesViewPro
                     </div>
                   </div>
 
-                  {/* Subject */}
+                  {/* Subject — always truncated in row, full text in expanded panel */}
                   <div style={{ ...S.td, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.subject || "—"}</div>
                     <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.message || ""}</div>
@@ -323,20 +366,34 @@ export default function AdminQueriesView({ user, userData }: AdminQueriesViewPro
                   </div>
                 </div>
 
-                {/* Expanded */}
+                {/* ── Expanded Panel ── */}
                 {isOpen && (
                   <div className="aq-panel-anim" style={S.panel}>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, maxWidth: 820 }}>
+
+                      {/* Left — Original Message with See More */}
                       <div>
                         <div style={S.label}>📩 Original Message</div>
-                        <div style={S.msgBox}>{q.message || "—"}</div>
+                        <div style={S.msgBox}>
+                          {/* Subject full text with See More */}
+                          {q.subject && (
+                            <div style={{ fontWeight: 700, color: "#1e293b", marginBottom: 6, fontSize: 13 }}>
+                              <ExpandableText text={q.subject} previewLength={80} />
+                            </div>
+                          )}
+                          <ExpandableText text={q.message || "—"} />
+                        </div>
                         <div style={S.meta}>Submitted {timeAgo(q.createdAt as { seconds?: number } | string)}</div>
                       </div>
+
+                      {/* Right — Reply or Reply Form */}
                       <div>
                         {q.adminReply ? (
                           <>
                             <div style={S.label}>✅ Reply Sent</div>
-                            <div style={S.replyBox}>{q.adminReply}</div>
+                            <div style={S.replyBox}>
+                              <ExpandableText text={q.adminReply} />
+                            </div>
                             <div style={S.meta}>Replied {timeAgo(q.repliedAt as { seconds?: number } | string)}</div>
                           </>
                         ) : (
@@ -346,14 +403,22 @@ export default function AdminQueriesView({ user, userData }: AdminQueriesViewPro
                               className="aq-textarea"
                               rows={4}
                               placeholder="Type your reply here…"
-                              value={replyText[q.id] || ""}
-                              onChange={(e) => setReplyText((p) => ({ ...p, [q.id]: e.target.value }))}
+                              maxLength={REPLY_LIMIT}
+                              value={currentReply}
+                              onChange={(e) => {
+                                if (e.target.value.length <= REPLY_LIMIT)
+                                  setReplyText((p) => ({ ...p, [q.id]: e.target.value }));
+                              }}
                               onClick={(e) => e.stopPropagation()}
                             />
+                            {/* Character counter */}
+                            <div style={S.charHint(currentReply.length >= REPLY_LIMIT)}>
+                              {currentReply.length}/{REPLY_LIMIT}
+                            </div>
                             <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                               <button
                                 className="aq-btn aq-btn-primary"
-                                disabled={!replyText[q.id]?.trim()}
+                                disabled={!currentReply.trim()}
                                 onClick={(e) => { e.stopPropagation(); handleReply(q.id); }}
                                 style={{ padding: "9px 18px", fontSize: 13 }}
                               >
