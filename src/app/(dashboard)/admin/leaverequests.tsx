@@ -1,173 +1,239 @@
 "use client";
-// ============================================================
-// ADMIN LEAVE REQUESTS DASHBOARD
-// Usage: <AdminLeaveRequests leaveRequests={[...]} users={[...]} updateLeaveStatus={fn} holidays={[...]} />
-// ============================================================
 
-import React, { useState, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import {
+  Calendar, Clock, CheckCircle, XCircle,
+  Users, Palmtree, Stethoscope, Home,
+} from "lucide-react";
+import {
+  collection,
+  query,
+  orderBy,
+  onSnapshot,
+  updateDoc,
+  doc,
+  serverTimestamp,
+  Timestamp,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
-// ── TYPES ──────────────────────────────────────────────────
-type LeaveStatus = "Approved" | "Rejected";
-type TabKey      = "requests" | "holidays";
-type ViewMode    = "table" | "cards";
+// ─── Types ─────────────────────────────────────────────────────────────────────
 
-interface User {
-  uid: string;
-  name: string;
-  email: string;
-  profilePhoto?: string;
-}
+type LeaveType = "Casual" | "Sick" | "Work From Home";
+type LeaveStatus = "Pending" | "Approved" | "Rejected";
+type HolidayType = "national" | "optional";
 
 interface LeaveRequest {
   id: string;
-  uid: string;
+  uid?: string;
   userName?: string;
   userEmail?: string;
-  leaveType: string;
-  fromDate: string;
-  toDate: string;
+  department?: string;
+  leaveType?: string;   // string — Firestore may send unexpected values
+  fromDate?: string;
+  toDate?: string;
   reason?: string;
-  status: string;
+  status?: string;      // string — Firestore may send unexpected values
+  createdAt?: Timestamp | null;
+  reviewedAt?: Timestamp | null;
 }
 
 interface Holiday {
+  id: string;
   date: string;
   name: string;
-  type: "national" | "optional";
+  type: HolidayType;
 }
 
-interface ConfirmAction {
-  id: string;
-  action: LeaveStatus;
+interface LeaveCfgEntry {
+  bg: string;
+  color: string;
+  dot: string;
+  Icon: React.ComponentType<{ size?: number }>;
 }
 
-interface AdminHolidayCalendarProps {
-  holidays: Holiday[];
-  leaveRequests: LeaveRequest[];
-  users: User[];
+interface StatusCfgEntry {
+  bg: string;
+  color: string;
+  border: string;
+  dot: string;
+  label: string;
 }
 
-interface AdminLeaveRequestsProps {
-  leaveRequests?: LeaveRequest[];
-  users?: User[];
-  holidays?: Holiday[];
-  updateLeaveStatus?: (id: string, status: LeaveStatus) => void | Promise<void>;
+interface AvatarColor {
+  bg: string;
+  color: string;
 }
 
-// ── CONSTANTS ──────────────────────────────────────────────
-const LEAVE_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
-  Casual:           { bg: "#EFF6FF", text: "#1D4ED8", dot: "#3B82F6" },
-  Sick:             { bg: "#FFF7ED", text: "#C2410C", dot: "#F97316" },
-  "Work From Home": { bg: "#F0FDF4", text: "#15803D", dot: "#22C55E" },
+// ─── Constants ─────────────────────────────────────────────────────────────────
+
+const LEAVE_CFG: Record<LeaveType, LeaveCfgEntry> = {
+  Casual:           { bg: "#eff6ff", color: "#1d4ed8", dot: "#3b82f6", Icon: Palmtree   },
+  Sick:             { bg: "#fff7ed", color: "#c2410c", dot: "#f97316", Icon: Stethoscope },
+  "Work From Home": { bg: "#f0fdf4", color: "#15803d", dot: "#22c55e", Icon: Home        },
 };
+const LEAVE_CFG_DEFAULT: LeaveCfgEntry = { bg: "#f1f5f9", color: "#475569", dot: "#94a3b8", Icon: Calendar };
 
-const LEAVE_ICONS: Record<string, string> = {
-  Casual:           "🌴",
-  Sick:             "🤒",
-  "Work From Home": "🏠",
+const STATUS_CFG: Record<LeaveStatus, StatusCfgEntry> = {
+  Pending:  { bg: "#fffbeb", color: "#92400e", border: "#fcd34d", dot: "#f59e0b",  label: "Pending"  },
+  Approved: { bg: "#f0fdf4", color: "#14532d", border: "#86efac", dot: "#22c55e",  label: "Approved" },
+  Rejected: { bg: "#fff1f2", color: "#881337", border: "#fda4af", dot: "#f43f5e",  label: "Rejected" },
 };
+const STATUS_CFG_DEFAULT: StatusCfgEntry = { bg: "#f1f5f9", color: "#475569", border: "#e2e8f0", dot: "#94a3b8", label: "Unknown" };
 
-const STATUS_CFG: Record<string, { bg: string; text: string; ring: string; icon: string; label: string }> = {
-  Pending:  { bg: "#FFFBEB", text: "#92400E", ring: "#F59E0B", icon: "⏳", label: "Pending"  },
-  Approved: { bg: "#F0FDF4", text: "#14532D", ring: "#22C55E", icon: "✅", label: "Approved" },
-  Rejected: { bg: "#FFF1F2", text: "#881337", ring: "#F43F5E", icon: "❌", label: "Rejected" },
-};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getLeaveCfg(leaveType: any): LeaveCfgEntry {
+  if (typeof leaveType !== "string") return LEAVE_CFG_DEFAULT;
+  return (LEAVE_CFG as Record<string, LeaveCfgEntry>)[leaveType] ?? LEAVE_CFG_DEFAULT;
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getStatusCfg(status: any): StatusCfgEntry {
+  if (typeof status !== "string") return STATUS_CFG_DEFAULT;
+  return (STATUS_CFG as Record<string, StatusCfgEntry>)[status] ?? STATUS_CFG_DEFAULT;
+}
+
+const AVATAR_COLORS: AvatarColor[] = [
+  { bg: "#eff0ff", color: "#6366f1" },
+  { bg: "#fce7f3", color: "#db2777" },
+  { bg: "#d1fae5", color: "#059669" },
+  { bg: "#fffbeb", color: "#d97706" },
+  { bg: "#ede9fe", color: "#7c3aed" },
+  { bg: "#e0f2fe", color: "#0284c7" },
+  { bg: "#fef9c3", color: "#ca8a04" },
+  { bg: "#fee2e2", color: "#dc2626" },
+];
 
 const MONTH_NAMES = [
   "January","February","March","April","May","June",
   "July","August","September","October","November","December",
-];
-const SHORT_DAYS = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+] as const;
 
-// ── HELPERS ────────────────────────────────────────────────
+const SHORT_DAYS = ["Su","Mo","Tu","We","Th","Fr","Sa"] as const;
+
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
+function getAvatarStyle(name?: string | null): AvatarColor {
+  const idx = ((name ?? "").charCodeAt(0) || 65) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[idx];
+}
+
+function getInitials(name?: string | null): string {
+  return (name ?? "").split(" ").slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
+}
+
 function todayStr(): string {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function getDays(from: string, to: string): number {
   if (!from || !to) return 1;
-  const d = (new Date(to).getTime() - new Date(from).getTime()) / 86400000;
+  const d = (new Date(to).getTime() - new Date(from).getTime()) / 86_400_000;
   return d >= 0 ? d + 1 : 1;
 }
 
-// ── DEMO DATA ──────────────────────────────────────────────
-const DEMO_USERS: User[] = [
-  { uid: "u1", name: "Arjun Sharma", email: "arjun@acme.com" },
-  { uid: "u2", name: "Priya Nair",   email: "priya@acme.com" },
-  { uid: "u3", name: "Ravi Kumar",   email: "ravi@acme.com"  },
-  { uid: "u4", name: "Sneha Patel",  email: "sneha@acme.com" },
-  { uid: "u5", name: "Meera Reddy",  email: "meera@acme.com" },
-];
+function fmtDate(str: string): string {
+  if (!str) return "—";
+  const d = new Date(str + "T00:00:00");
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
 
-const DEMO_REQUESTS: LeaveRequest[] = [
-  { id:"1", uid:"u1", userName:"Arjun Sharma", userEmail:"arjun@acme.com", leaveType:"Casual",        fromDate:"2025-07-10", toDate:"2025-07-12", reason:"Annual family vacation to Ooty. Parents have been planning this trip for over 3 months.",    status:"Pending"  },
-  { id:"2", uid:"u2", userName:"Priya Nair",   userEmail:"priya@acme.com", leaveType:"Sick",           fromDate:"2025-07-05", toDate:"2025-07-06", reason:"Diagnosed with viral fever and body aches. Doctor has recommended complete bed rest.",       status:"Approved" },
-  { id:"3", uid:"u3", userName:"Ravi Kumar",   userEmail:"ravi@acme.com",  leaveType:"Work From Home", fromDate:"2025-07-15", toDate:"2025-07-17", reason:"Ongoing home renovation. Will be fully available and productive remotely.",                  status:"Pending"  },
-  { id:"4", uid:"u4", userName:"Sneha Patel",  userEmail:"sneha@acme.com", leaveType:"Sick",           fromDate:"2025-07-20", toDate:"2025-07-20", reason:"Urgent personal appointment at hospital for routine check-up.",                             status:"Rejected" },
-  { id:"5", uid:"u1", userName:"Arjun Sharma", userEmail:"arjun@acme.com", leaveType:"Sick",           fromDate:"2025-06-20", toDate:"2025-06-21", reason:"Severe migraine headache. Doctor prescribed medication and rest.",                          status:"Approved" },
-  { id:"6", uid:"u5", userName:"Meera Reddy",  userEmail:"meera@acme.com", leaveType:"Casual",         fromDate:"2025-08-14", toDate:"2025-08-16", reason:"Sister's wedding ceremony and related family events.",                                      status:"Pending"  },
-  { id:"7", uid:"u2", userName:"Priya Nair",   userEmail:"priya@acme.com", leaveType:"Work From Home", fromDate:"2025-08-04", toDate:"2025-08-06", reason:"Internet broadband upgrade at home scheduled for these days.",                              status:"Approved" },
-  { id:"8", uid:"u3", userName:"Ravi Kumar",   userEmail:"ravi@acme.com",  leaveType:"Casual",         fromDate:"2025-09-05", toDate:"2025-09-05", reason:"Ganesh Chaturthi family pooja at ancestral home.",                                         status:"Pending"  },
-];
+function timeAgo(ts: Timestamp | null | undefined): string {
+  if (!ts) return "—";
+  const d = ts?.seconds ? new Date(ts.seconds * 1000) : new Date();
+  const diff = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (diff < 60)     return "Just now";
+  if (diff < 3_600)  return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86_400) return `${Math.floor(diff / 3_600)}h ago`;
+  if (diff < 604_800)return `${Math.floor(diff / 86_400)}d ago`;
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
 
-const DEMO_HOLIDAYS: Holiday[] = [
-  { date:"2025-01-14", name:"Makar Sankranti",      type:"national" },
-  { date:"2025-01-26", name:"Republic Day",          type:"national" },
-  { date:"2025-03-17", name:"Holi",                  type:"national" },
-  { date:"2025-04-14", name:"Dr. Ambedkar Jayanti",  type:"optional" },
-  { date:"2025-04-18", name:"Good Friday",           type:"national" },
-  { date:"2025-05-12", name:"Buddha Purnima",        type:"optional" },
-  { date:"2025-06-07", name:"Eid ul-Adha",           type:"national" },
-  { date:"2025-07-06", name:"Bonalu",                type:"optional" },
-  { date:"2025-08-15", name:"Independence Day",      type:"national" },
-  { date:"2025-08-27", name:"Janmashtami",           type:"national" },
-  { date:"2025-09-05", name:"Ganesh Chaturthi",      type:"national" },
-  { date:"2025-10-02", name:"Gandhi Jayanti",        type:"national" },
-  { date:"2025-10-20", name:"Diwali",                type:"national" },
-  { date:"2025-11-15", name:"Guru Nanak Jayanti",    type:"national" },
-  { date:"2025-12-25", name:"Christmas",             type:"national" },
-];
+// ─── Sub-components ────────────────────────────────────────────────────────────
 
-// ══════════════════════════════════════════════════════════
-//  HOLIDAY + EMPLOYEE LEAVES CALENDAR
-// ══════════════════════════════════════════════════════════
-const navBtnStyle: React.CSSProperties = {
-  width:32, height:32, borderRadius:8, border:"1px solid #e2e8f0",
-  background:"#fff", cursor:"pointer", fontSize:18, fontWeight:700,
-  color:"#334155", display:"flex", alignItems:"center", justifyContent:"center",
-};
+interface AvatarProps { name?: string | null; size?: number; }
+function Avatar({ name, size = 36 }: AvatarProps) {
+  const { bg, color } = getAvatarStyle(name);
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%",
+      background: bg, color, border: `1.5px solid ${color}30`,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize: size * 0.35, fontWeight: 700, flexShrink: 0, letterSpacing: "-0.3px",
+    }}>
+      {getInitials(name) || "?"}
+    </div>
+  );
+}
 
-function AdminHolidayCalendar({ holidays, leaveRequests, users }: AdminHolidayCalendarProps) {
+interface ChipProps {
+  label: string;
+  bg: string;
+  color: string;
+  border?: string;
+  dot?: string;
+}
+function Chip({ label, bg, color, border, dot }: ChipProps) {
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 4,
+      fontSize: 10, fontWeight: 700, padding: "2px 8px",
+      borderRadius: 20, background: bg, color,
+      border: border ? `1px solid ${border}` : "none",
+      whiteSpace: "nowrap",
+    }}>
+      {dot && <span style={{ width: 5, height: 5, borderRadius: "50%", background: dot }} />}
+      {label}
+    </span>
+  );
+}
+
+interface LoadingSpinnerProps { label?: string; }
+function LoadingSpinner({ label = "Loading…" }: LoadingSpinnerProps) {
+  return (
+    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, color: "#94a3b8" }}>
+      <div style={{ width: 32, height: 32, border: "3px solid #e2e8f0", borderTopColor: "#6366f1", borderRadius: "50%", animation: "alr-spin 0.8s linear infinite" }} />
+      <span style={{ fontSize: 13, fontWeight: 500 }}>{label}</span>
+    </div>
+  );
+}
+
+// ─── Holiday Mini Calendar ─────────────────────────────────────────────────────
+
+interface HolidayCalendarProps {
+  holidays: Holiday[];
+  leaveRequests: LeaveRequest[];
+}
+function HolidayCalendar({ holidays, leaveRequests }: HolidayCalendarProps) {
   const now = new Date();
-  const [month, setMonth] = useState<number>(now.getMonth());
-  const [year,  setYear]  = useState<number>(now.getFullYear());
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [month, setMonth] = useState(now.getMonth());
+  const [year,  setYear]  = useState(now.getFullYear());
+  const [selDate, setSelDate] = useState<string | null>(null);
   const today = todayStr();
 
-  const prev = (): void => { if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1); };
-  const next = (): void => { if (month === 11) { setMonth(0);  setYear(y => y + 1); } else setMonth(m => m + 1); };
+  const prev = () => { if (month === 0) { setMonth(11); setYear((y) => y - 1); } else setMonth((m) => m - 1); };
+  const next = () => { if (month === 11) { setMonth(0);  setYear((y) => y + 1); } else setMonth((m) => m + 1); };
 
   const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
 
-  const monthHols = useMemo(() =>
-    holidays.filter(h => h.date.startsWith(monthKey)),
-    [holidays, monthKey]
+  const monthHols = useMemo(
+    () => holidays.filter((h) => h.date.startsWith(monthKey)),
+    [holidays, monthKey],
   );
-  const holSet = new Set(monthHols.map(h => h.date));
+  const holSet = new Set(monthHols.map((h) => h.date));
 
-  const leavesPerDate = useMemo((): Record<string, LeaveRequest[]> => {
+  const leavesPerDate = useMemo<Record<string, LeaveRequest[]>>(() => {
     const map: Record<string, LeaveRequest[]> = {};
-    leaveRequests.forEach(leave => {
-      if (leave.status === "Rejected") return;
-      const from = new Date(leave.fromDate + "T00:00:00");
-      const to   = new Date(leave.toDate   + "T00:00:00");
+    leaveRequests.forEach((l) => {
+      if ((l.status ?? "") === "Rejected") return;
+      const from = new Date((l.fromDate ?? "") + "T00:00:00");
+      const to   = new Date((l.toDate ?? "") + "T00:00:00");
       const cur  = new Date(from);
       while (cur <= to) {
-        const ds = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,"0")}-${String(cur.getDate()).padStart(2,"0")}`;
+        const ds = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
         if (ds.startsWith(monthKey)) {
           if (!map[ds]) map[ds] = [];
-          map[ds].push(leave);
+          map[ds].push(l);
         }
         cur.setDate(cur.getDate() + 1);
       }
@@ -175,224 +241,185 @@ function AdminHolidayCalendar({ holidays, leaveRequests, users }: AdminHolidayCa
     return map;
   }, [leaveRequests, monthKey]);
 
-  const empOnLeaveThisMonth = useMemo((): User[] => {
-    const ids = new Set<string>();
-    Object.values(leavesPerDate).forEach(leaves => leaves.forEach(l => ids.add(l.uid)));
-    return [...ids]
-      .map(uid => users.find(u => u.uid === uid))
-      .filter((u): u is User => u !== undefined);
-  }, [leavesPerDate, users]);
+  const firstDow  = new Date(year, month, 1).getDay();
+  const daysInMon = new Date(year, month + 1, 0).getDate();
+  const selLeaves = selDate ? (leavesPerDate[selDate] ?? []) : [];
+  const selHols   = selDate ? monthHols.filter((h) => h.date === selDate) : [];
+  const natCount  = holidays.filter((h) => h.date.startsWith(String(year)) && h.type === "national").length;
+  const optCount  = holidays.filter((h) => h.date.startsWith(String(year)) && h.type === "optional").length;
 
-  const firstDayDow  = new Date(year, month, 1).getDay();
-  const daysInMonth  = new Date(year, month + 1, 0).getDate();
-  const selectedLeaves   = selectedDate ? (leavesPerDate[selectedDate] ?? []) : [];
-  const selectedHolidays = selectedDate ? monthHols.filter(h => h.date === selectedDate) : [];
-  const natCount = holidays.filter(h => h.date.startsWith(String(year)) && h.type === "national").length;
-  const optCount = holidays.filter(h => h.date.startsWith(String(year)) && h.type === "optional").length;
+  const onLeaveThisMonth = useMemo<string[]>(() => {
+    const names = new Set<string>();
+    Object.values(leavesPerDate).forEach((ls) => ls.forEach((l) => names.add(l.userName ?? "—")));
+    return [...names];
+  }, [leavesPerDate]);
 
   return (
-    <div>
+    <div style={{ padding: "20px 24px", flex: 1, overflowY: "auto" }}>
       {/* Year pills */}
-      <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:16, flexWrap:"wrap" }}>
-        <div style={{ background:"#1E3A5F", color:"#fff", borderRadius:10, padding:"5px 14px", fontSize:13, fontWeight:700 }}>
-          📅 {year}
-        </div>
-        <span style={{ background:"#dcfce7", color:"#166534", borderRadius:20, padding:"4px 12px", fontSize:12, fontWeight:700 }}>
-          🏖️ {natCount} National
-        </span>
-        <span style={{ background:"#eff6ff", color:"#1d4ed8", borderRadius:20, padding:"4px 12px", fontSize:12, fontWeight:700 }}>
-          ✨ {optCount} Optional
-        </span>
-        {empOnLeaveThisMonth.length > 0 && (
-          <span style={{ background:"#fdf4ff", color:"#7e22ce", borderRadius:20, padding:"4px 12px", fontSize:12, fontWeight:700 }}>
-            👥 {empOnLeaveThisMonth.length} emp on leave this month
-          </span>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        <div style={{ background: "#1e3a5f", color: "#fff", borderRadius: 10, padding: "5px 14px", fontSize: 12, fontWeight: 700 }}>📅 {year}</div>
+        <span style={{ background: "#dcfce7", color: "#166534", borderRadius: 20, padding: "4px 12px", fontSize: 11, fontWeight: 700 }}>🏖 {natCount} National</span>
+        <span style={{ background: "#eff6ff", color: "#1d4ed8", borderRadius: 20, padding: "4px 12px", fontSize: 11, fontWeight: 700 }}>✨ {optCount} Optional</span>
+        {onLeaveThisMonth.length > 0 && (
+          <span style={{ background: "#fdf4ff", color: "#7e22ce", borderRadius: 20, padding: "4px 12px", fontSize: 11, fontWeight: 700 }}>👥 {onLeaveThisMonth.length} on leave</span>
         )}
       </div>
 
-      {/* Month navigator */}
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
-        <button onClick={prev} style={navBtnStyle}>&#8249;</button>
-        <span style={{ fontSize:16, fontWeight:800, color:"#0f172a" }}>{MONTH_NAMES[month]} {year}</span>
-        <button onClick={next} style={navBtnStyle}>&#8250;</button>
-      </div>
-
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
-
-        {/* Mini Calendar */}
-        <div style={{ background:"#f8fafc", borderRadius:14, padding:14, border:"1px solid #e2e8f0" }}>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", marginBottom:6 }}>
-            {SHORT_DAYS.map(d => (
-              <div key={d} style={{ textAlign:"center", fontSize:10, fontWeight:700, color:"#94a3b8", padding:"3px 0" }}>{d}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+        {/* Calendar grid */}
+        <div style={{ background: "#f8fafc", borderRadius: 14, padding: 14, border: "1px solid #e2e8f0" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <button onClick={prev} className="alr-nav-btn">&#8249;</button>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{MONTH_NAMES[month]} {year}</span>
+            <button onClick={next} className="alr-nav-btn">&#8250;</button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", marginBottom: 4 }}>
+            {SHORT_DAYS.map((d) => (
+              <div key={d} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, color: "#94a3b8", padding: "2px 0" }}>{d}</div>
             ))}
           </div>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:2 }}>
-            {Array.from({ length: firstDayDow }).map((_, i) => <div key={`e${i}`} />)}
-            {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
-              const ds       = `${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
-              const isHol    = holSet.has(ds);
-              const isTdy    = ds === today;
-              const isSel    = ds === selectedDate;
-              const dow      = new Date(year, month, day).getDay();
-              const isWkd    = dow === 0 || dow === 6;
-              const leaves   = leavesPerDate[ds] ?? [];
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 2 }}>
+            {Array.from({ length: firstDow }).map((_, i) => <div key={`e${i}`} />)}
+            {Array.from({ length: daysInMon }, (_, i) => i + 1).map((day) => {
+              const ds      = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+              const isHol   = holSet.has(ds);
+              const isTdy   = ds === today;
+              const isSel   = ds === selDate;
+              const dow     = new Date(year, month, day).getDay();
+              const isWkd   = dow === 0 || dow === 6;
+              const leaves  = leavesPerDate[ds] ?? [];
               const hasLeave = leaves.length > 0;
               return (
-                <div key={day}
-                  onClick={() => setSelectedDate(isSel ? null : ds)}
-                  title={isHol ? monthHols.filter(h => h.date === ds).map(h => h.name).join(", ") : hasLeave ? `${leaves.length} employee(s) on leave` : ""}
+                <div
+                  key={day}
+                  onClick={() => (hasLeave || isHol) && setSelDate(isSel ? null : ds)}
                   style={{
-                    textAlign:"center", padding:"5px 2px", borderRadius:7, fontSize:12,
+                    textAlign: "center", padding: "5px 2px", borderRadius: 7, fontSize: 11,
                     fontWeight: isHol || isTdy || hasLeave ? 800 : 400,
-                    background: isSel ? "#4F46E5" : isTdy ? "#1E3A5F" : isHol ? "#fef9c3" : hasLeave ? "#fdf4ff" : "transparent",
+                    background: isSel ? "#4f46e5" : isTdy ? "#1e3a5f" : isHol ? "#fef9c3" : hasLeave ? "#fdf4ff" : "transparent",
                     color: isSel ? "#fff" : isTdy ? "#fff" : isHol ? "#92400e" : hasLeave ? "#7e22ce" : isWkd ? "#ef4444" : "#334155",
                     cursor: (hasLeave || isHol) ? "pointer" : "default",
-                    position:"relative",
-                    border: isSel ? "2px solid #4F46E5" : "2px solid transparent",
-                    transition:"all 0.12s",
-                  }}>
+                    border: isSel ? "2px solid #4f46e5" : "2px solid transparent",
+                    position: "relative", transition: "all 0.12s",
+                  }}
+                >
                   {day}
                   {hasLeave && !isSel && !isTdy && (
-                    <div style={{ position:"absolute", bottom:1, left:"50%", transform:"translateX(-50%)", width: leaves.length > 1 ? "auto" : 5, height:5, borderRadius:4, background:"#a855f7", padding: leaves.length > 1 ? "0 3px" : 0, fontSize:7, color:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:900 }}>
+                    <div style={{
+                      position: "absolute", bottom: 1, left: "50%", transform: "translateX(-50%)",
+                      width: leaves.length > 1 ? "auto" : 5, height: 5, borderRadius: 4,
+                      background: "#a855f7", padding: leaves.length > 1 ? "0 3px" : 0,
+                      fontSize: 7, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900,
+                    }}>
                       {leaves.length > 1 ? leaves.length : ""}
                     </div>
                   )}
                   {isHol && !isTdy && !isSel && !hasLeave && (
-                    <div style={{ position:"absolute", bottom:1, left:"50%", transform:"translateX(-50%)", width:4, height:4, borderRadius:"50%", background:"#f59e0b" }} />
+                    <div style={{ position: "absolute", bottom: 1, left: "50%", transform: "translateX(-50%)", width: 4, height: 4, borderRadius: "50%", background: "#f59e0b" }} />
                   )}
                 </div>
               );
             })}
           </div>
           {/* Legend */}
-          <div style={{ display:"flex", gap:8, marginTop:12, flexWrap:"wrap" }}>
-            {[
-              { label:"Today",      box:"#1E3A5F",     border:"none"                  },
-              { label:"Holiday",    box:"#fef9c3",     border:"none"                  },
-              { label:"Emp. Leave", box:"#fdf4ff",     border:"none"                  },
-              { label:"Weekend",    box:"transparent", border:"1px solid #fca5a5"     },
-            ].map(l => (
-              <div key={l.label} style={{ display:"flex", alignItems:"center", gap:4, fontSize:10 }}>
-                <div style={{ width:12, height:12, borderRadius:3, background:l.box, border:l.border }} />
-                <span style={{ color:"#64748b", fontWeight:600 }}>{l.label}</span>
+          <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+            {([ { label: "Today", box: "#1e3a5f" }, { label: "Holiday", box: "#fef9c3" }, { label: "Leave", box: "#fdf4ff" } ] as const).map((l) => (
+              <div key={l.label} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10 }}>
+                <div style={{ width: 11, height: 11, borderRadius: 3, background: l.box, border: "1px solid #e2e8f0" }} />
+                <span style={{ color: "#64748b", fontWeight: 600 }}>{l.label}</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Right Panel */}
+        {/* Right info panel */}
         <div>
-          {selectedDate ? (
+          {selDate ? (
             <div>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-                <div style={{ fontSize:13, fontWeight:800, color:"#0f172a" }}>
-                  {new Date(selectedDate + "T00:00:00").toLocaleDateString("en-IN", { weekday:"long", day:"numeric", month:"long" })}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
+                  {new Date(selDate + "T00:00:00").toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}
                 </div>
-                <button onClick={() => setSelectedDate(null)} style={{ border:"none", background:"#f1f5f9", borderRadius:8, padding:"4px 10px", fontSize:12, cursor:"pointer", color:"#64748b", fontWeight:600 }}>&#x2715; Close</button>
+                <button onClick={() => setSelDate(null)} style={{ border: "none", background: "#f1f5f9", borderRadius: 8, padding: "4px 10px", fontSize: 12, cursor: "pointer", color: "#64748b", fontWeight: 600 }}>✕ Close</button>
               </div>
-              {selectedHolidays.map((h, i) => (
-                <div key={i} style={{ background:"#fffbeb", border:"1px solid #fcd34d", borderRadius:12, padding:"10px 14px", marginBottom:8, display:"flex", alignItems:"center", gap:10 }}>
-                  <span style={{ fontSize:22 }}>🏖️</span>
+              {selHols.map((h, i) => (
+                <div key={i} style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 12, padding: "10px 14px", marginBottom: 8, display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 20 }}>🏖</span>
                   <div>
-                    <div style={{ fontSize:13, fontWeight:700, color:"#92400e" }}>{h.name}</div>
-                    <span style={{ fontSize:10, fontWeight:700, padding:"2px 8px", borderRadius:20, background: h.type === "national" ? "#dcfce7" : "#eff6ff", color: h.type === "national" ? "#166534" : "#1d4ed8" }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#92400e" }}>{h.name}</div>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: h.type === "national" ? "#dcfce7" : "#eff6ff", color: h.type === "national" ? "#166534" : "#1d4ed8" }}>
                       {h.type === "national" ? "National" : "Optional"}
                     </span>
                   </div>
                 </div>
               ))}
-              {selectedLeaves.length === 0 ? (
-                <div style={{ textAlign:"center", padding:"24px 0", color:"#94a3b8", fontSize:13, background:"#f8fafc", borderRadius:12, border:"1px dashed #e2e8f0" }}>
-                  <div style={{ fontSize:26, marginBottom:6 }}>✅</div>
-                  No employees on leave
+              {selLeaves.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "20px 0", color: "#94a3b8", fontSize: 12, background: "#f8fafc", borderRadius: 12, border: "1px dashed #e2e8f0" }}>
+                  <div style={{ fontSize: 22, marginBottom: 4 }}>✅</div>No employees on leave
                 </div>
-              ) : (
-                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                  {selectedLeaves.map((leave, i) => {
-                    const emp = users.find(u => u.uid === leave.uid);
-                    const lc  = LEAVE_COLORS[leave.leaveType] ?? LEAVE_COLORS["Casual"];
-                    const sc  = STATUS_CFG[leave.status]      ?? STATUS_CFG["Pending"];
-                    return (
-                      <div key={i} style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:12, padding:"12px 14px", borderLeft:`4px solid ${lc.dot}` }}>
-                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-                          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                            <div style={{ width:32, height:32, borderRadius:"50%", background:"linear-gradient(135deg,#6366F1,#8B5CF6)", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:800, fontSize:13, flexShrink:0 }}>
-                              {(leave.userName ?? emp?.name ?? "U")[0].toUpperCase()}
-                            </div>
-                            <div>
-                              <div style={{ fontSize:13, fontWeight:700, color:"#111827" }}>{leave.userName ?? emp?.name}</div>
-                              <div style={{ fontSize:11, color:"#9ca3af" }}>{leave.userEmail ?? emp?.email}</div>
-                            </div>
-                          </div>
-                          <span style={{ background:sc.bg, color:sc.text, border:`1px solid ${sc.ring}`, borderRadius:8, padding:"3px 9px", fontSize:11, fontWeight:700 }}>{sc.icon} {sc.label}</span>
+              ) : selLeaves.map((leave, i) => {
+                const lc = getLeaveCfg(leave.leaveType);
+                const sc = getStatusCfg(leave.status);
+                return (
+                  <div key={i} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "12px 14px", marginBottom: 8, borderLeft: `4px solid ${lc.dot}` }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <Avatar name={leave.userName ?? "—"} size={30} />
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#111827" }}>{leave.userName ?? "—"}</div>
+                          <div style={{ fontSize: 11, color: "#9ca3af" }}>{leave.userEmail ?? "—"}</div>
                         </div>
-                        <div style={{ display:"flex", gap:8, marginTop:8, flexWrap:"wrap" }}>
-                          <span style={{ background:lc.bg, color:lc.text, borderRadius:8, padding:"3px 10px", fontSize:11, fontWeight:700 }}>
-                            {LEAVE_ICONS[leave.leaveType] ?? ""} {leave.leaveType}
-                          </span>
-                          <span style={{ background:"#f3f4f6", color:"#374151", borderRadius:8, padding:"3px 10px", fontSize:11, fontWeight:500 }}>
-                            {leave.fromDate} &#8594; {leave.toDate}
-                          </span>
-                        </div>
-                        {leave.reason && (
-                          <div style={{ fontSize:12, color:"#6b7280", marginTop:8, lineHeight:1.5 }}>
-                            {leave.reason.slice(0, 100)}{leave.reason.length > 100 ? "…" : ""}
-                          </div>
-                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                      <Chip label={sc.label} bg={sc.bg} color={sc.color} border={sc.border} dot={sc.dot} />
+                    </div>
+                    <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                      <Chip label={leave.leaveType ?? "Unknown"} bg={lc.bg} color={lc.color} dot={lc.dot} />
+                      <span style={{ background: "#f3f4f6", color: "#374151", borderRadius: 8, padding: "2px 8px", fontSize: 10, fontWeight: 500 }}>
+                        {leave.fromDate ?? "—"} → {leave.toDate ?? "—"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div>
-              <div style={{ fontSize:13, fontWeight:800, color:"#0f172a", marginBottom:10, display:"flex", alignItems:"center", gap:8 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
                 {MONTH_NAMES[month]} Holidays
-                {monthHols.length > 0 && (
-                  <span style={{ background:"#fef9c3", color:"#92400e", borderRadius:20, padding:"2px 8px", fontSize:11, fontWeight:700 }}>{monthHols.length}</span>
-                )}
+                {monthHols.length > 0 && <span style={{ background: "#fef9c3", color: "#92400e", borderRadius: 20, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>{monthHols.length}</span>}
               </div>
               {monthHols.length === 0 ? (
-                <div style={{ textAlign:"center", padding:"24px 0", color:"#94a3b8", fontSize:13, background:"#f8fafc", borderRadius:12, border:"1px dashed #e2e8f0" }}>
-                  <div style={{ fontSize:28, marginBottom:6 }}>🎉</div>
-                  No holidays this month
+                <div style={{ textAlign: "center", padding: "24px 0", color: "#94a3b8", fontSize: 12, background: "#f8fafc", borderRadius: 12, border: "1px dashed #e2e8f0" }}>
+                  <div style={{ fontSize: 26, marginBottom: 4 }}>🎉</div>No holidays this month
                 </div>
-              ) : (
-                <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-                  {monthHols.map((h, i) => {
-                    const d    = new Date(h.date + "T00:00:00");
-                    const dayN = d.getDate();
-                    const dow  = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
-                    const past = h.date < today;
-                    return (
-                      <div key={i} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", borderRadius:12, background:past ? "#f8fafc" : "#fffbeb", border:`1px solid ${past ? "#e2e8f0" : "#fcd34d"}`, opacity:past ? 0.6 : 1 }}>
-                        <div style={{ width:42, height:42, borderRadius:10, flexShrink:0, background:past ? "#e2e8f0" : "#1E3A5F", color:past ? "#64748b" : "#fff", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", lineHeight:1.2 }}>
-                          <span style={{ fontSize:15, fontWeight:900 }}>{dayN}</span>
-                          <span style={{ fontSize:9, fontWeight:600, opacity:0.8 }}>{dow}</span>
-                        </div>
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontSize:13, fontWeight:700, color:"#0f172a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{h.name}</div>
-                          <div style={{ fontSize:11, color:"#64748b", marginTop:2 }}>{MONTH_NAMES[month]} {dayN}, {year}</div>
-                        </div>
-                        <span style={{ fontSize:10, fontWeight:700, padding:"3px 8px", borderRadius:20, flexShrink:0, background:h.type === "national" ? "#dcfce7" : "#eff6ff", color:h.type === "national" ? "#166534" : "#1d4ed8" }}>
-                          {h.type === "national" ? "National" : "Optional"}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              {empOnLeaveThisMonth.length > 0 && (
-                <div style={{ marginTop:16 }}>
-                  <div style={{ fontSize:12, fontWeight:800, color:"#7e22ce", textTransform:"uppercase", letterSpacing:0.6, marginBottom:8 }}>
-                    👥 Employees on Leave
+              ) : monthHols.map((h, i) => {
+                const d    = new Date(h.date + "T00:00:00");
+                const past = h.date < today;
+                return (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 12, background: past ? "#f8fafc" : "#fffbeb", border: `1px solid ${past ? "#e2e8f0" : "#fcd34d"}`, opacity: past ? 0.6 : 1, marginBottom: 6 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, background: past ? "#e2e8f0" : "#1e3a5f", color: past ? "#64748b" : "#fff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", lineHeight: 1.2 }}>
+                      <span style={{ fontSize: 14, fontWeight: 900 }}>{d.getDate()}</span>
+                      <span style={{ fontSize: 8, fontWeight: 600, opacity: 0.8 }}>
+                        {(["Sun","Mon","Tue","Wed","Thu","Fri","Sat"] as const)[d.getDay()]}
+                      </span>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.name}</div>
+                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 1 }}>{fmtDate(h.date)}</div>
+                    </div>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, flexShrink: 0, background: h.type === "national" ? "#dcfce7" : "#eff6ff", color: h.type === "national" ? "#166534" : "#1d4ed8" }}>
+                      {h.type === "national" ? "National" : "Optional"}
+                    </span>
                   </div>
-                  <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
-                    {empOnLeaveThisMonth.map(emp => (
-                      <div key={emp.uid} style={{ background:"#fdf4ff", border:"1px solid #e9d5ff", borderRadius:20, padding:"4px 12px", fontSize:12, fontWeight:600, color:"#7e22ce" }}>
-                        {emp.name}
-                      </div>
+                );
+              })}
+              {onLeaveThisMonth.length > 0 && (
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#7e22ce", textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 7 }}>👥 On Leave This Month</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                    {onLeaveThisMonth.map((name) => (
+                      <span key={name} style={{ background: "#fdf4ff", border: "1px solid #e9d5ff", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 600, color: "#7e22ce" }}>{name}</span>
                     ))}
                   </div>
                 </div>
@@ -403,22 +430,19 @@ function AdminHolidayCalendar({ holidays, leaveRequests, users }: AdminHolidayCa
       </div>
 
       {/* Month quick-jump */}
-      <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:16 }}>
+      <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 16 }}>
         {MONTH_NAMES.map((name, i) => {
           const k  = `${year}-${String(i + 1).padStart(2, "0")}`;
-          const hc = holidays.filter(h => h.date.startsWith(k)).length;
-          const leaveEmpSet = new Set<string>();
-          leaveRequests.forEach(l => {
-            if (l.status === "Rejected") return;
-            if (l.fromDate.startsWith(k) || l.toDate.startsWith(k)) leaveEmpSet.add(l.uid);
-          });
-          const lc  = leaveEmpSet.size;
+          const hc = holidays.filter((h) => h.date.startsWith(k)).length;
+          const lc = leaveRequests.filter((l) => (l.status ?? "") !== "Rejected" && ((l.fromDate ?? "").startsWith(k) || (l.toDate ?? "").startsWith(k))).length;
           const sel = i === month;
           return (
-            <button key={name} onClick={() => setMonth(i)} style={{ padding:"5px 12px", borderRadius:8, fontSize:11, fontWeight:700, border:"none", cursor:"pointer", position:"relative", background:sel ? "#1E3A5F" : hc > 0 ? "#fef9c3" : "#f1f5f9", color:sel ? "#fff" : hc > 0 ? "#92400e" : "#64748b" }}>
+            <button key={name} onClick={() => setMonth(i)} style={{ padding: "5px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer", position: "relative", background: sel ? "#1e3a5f" : hc > 0 ? "#fef9c3" : "#f1f5f9", color: sel ? "#fff" : hc > 0 ? "#92400e" : "#64748b" }}>
               {name.slice(0, 3)}
               {(hc > 0 || lc > 0) && !sel && (
-                <span style={{ position:"absolute", top:-5, right:-5, width:15, height:15, borderRadius:"50%", background: lc > 0 ? "#a855f7" : "#f59e0b", color:"#fff", fontSize:8, fontWeight:900, display:"flex", alignItems:"center", justifyContent:"center" }}>{lc || hc}</span>
+                <span style={{ position: "absolute", top: -5, right: -5, width: 14, height: 14, borderRadius: "50%", background: lc > 0 ? "#a855f7" : "#f59e0b", color: "#fff", fontSize: 7, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {lc || hc}
+                </span>
               )}
             </button>
           );
@@ -428,420 +452,464 @@ function AdminHolidayCalendar({ holidays, leaveRequests, users }: AdminHolidayCa
   );
 }
 
-// ══════════════════════════════════════════════════════════
-//  MAIN ADMIN COMPONENT
-// ══════════════════════════════════════════════════════════
-export default function AdminLeaveRequests({
-  leaveRequests     = DEMO_REQUESTS,
-  users             = DEMO_USERS,
-  holidays          = DEMO_HOLIDAYS,
-  updateLeaveStatus = () => {},
-}: AdminLeaveRequestsProps) {
-  const [tab,             setTab]             = useState<TabKey>("requests");
-  const [search,          setSearch]          = useState<string>("");
-  const [statusFilter,    setStatusFilter]    = useState<string>("All");
-  const [leaveTypeFilter, setLeaveTypeFilter] = useState<string>("All");
-  const [expandedId,      setExpandedId]      = useState<string | null>(null);
-  const [currentPage,     setCurrentPage]     = useState<number>(1);
-  const [viewMode,        setViewMode]        = useState<ViewMode>("table");
-  const [confirmAction,   setConfirmAction]   = useState<ConfirmAction | null>(null);
-  const ITEMS = 8;
+// ─── Main Component ────────────────────────────────────────────────────────────
 
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return leaveRequests.filter(l => {
-      const emp   = users.find(u => u.uid === l.uid);
-      const name  = (l.userName  ?? emp?.name  ?? "").toLowerCase();
-      const email = (l.userEmail ?? emp?.email ?? "").toLowerCase();
-      const matchSearch = !q || name.includes(q) || email.includes(q) ||
-        l.leaveType.toLowerCase().includes(q) ||
-        (l.reason ?? "").toLowerCase().includes(q);
-      const matchStatus = statusFilter    === "All" || l.status    === statusFilter;
-      const matchType   = leaveTypeFilter === "All" || l.leaveType === leaveTypeFilter;
-      return matchSearch && matchStatus && matchType;
-    });
-  }, [leaveRequests, users, search, statusFilter, leaveTypeFilter]);
+export default function AdminLeaveRequests() {
+  const [requests,   setRequests]   = useState<LeaveRequest[]>([]);
+  const [holidays,   setHolidays]   = useState<Holiday[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState<string | null>(null);
+  const [tab,        setTab]        = useState<"requests" | "calendar">("requests");
+  const [filter,     setFilter]     = useState<"all" | "pending" | "approved" | "rejected">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | LeaveType>("all");
+  const [search,     setSearch]     = useState("");
+  const [selected,   setSelected]   = useState<LeaveRequest | null>(null);
+  const [confirm,    setConfirm]    = useState<{ id: string; action: LeaveStatus } | null>(null);
+  const [updating,   setUpdating]   = useState(false);
+  const detailRef = useRef<HTMLDivElement>(null);
 
-  const totalPages = Math.ceil(filtered.length / ITEMS);
-  const paginated  = filtered.slice((currentPage - 1) * ITEMS, currentPage * ITEMS);
+  // ── Firestore listeners ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const q = query(collection(db, "leaveRequests"), orderBy("createdAt", "desc"));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const data = snap.docs.map((d) => ({ id: d.id, ...d.data() } as LeaveRequest));
+        setRequests(data);
+        setLoading(false);
+        setSelected((prev) => (prev ? data.find((r) => r.id === prev.id) ?? prev : null));
+      },
+      (err) => { console.error(err); setError("Failed to load leave requests."); setLoading(false); },
+    );
+    return () => unsub();
+  }, []);
 
-  const handleAction = (id: string, action: LeaveStatus): void => {
-    setConfirmAction({ id, action });
-  };
+  useEffect(() => {
+    const unsub = onSnapshot(
+      collection(db, "holidays"),
+      (snap) => setHolidays(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Holiday))),
+      (err) => console.error("holidays:", err),
+    );
+    return () => unsub();
+  }, []);
 
-  const confirmDo = (): void => {
-    if (confirmAction) {
-      updateLeaveStatus(confirmAction.id, confirmAction.action);
+  // ── Actions ──────────────────────────────────────────────────────────────────
+  const handleUpdateStatus = async (id: string, status: LeaveStatus) => {
+    setUpdating(true);
+    try {
+      await updateDoc(doc(db, "leaveRequests", id), { status, reviewedAt: serverTimestamp() });
+    } catch (e) {
+      console.error("Update error:", e);
+      alert("Failed to update status. Check Firestore permissions.");
+    } finally {
+      setUpdating(false);
+      setConfirm(null);
     }
-    setConfirmAction(null);
   };
 
-  const TABS: Array<{ key: TabKey; label: string }> = [
-    { key:"requests", label:"📋 Leave Requests"    },
-    { key:"holidays", label:"🗓️ Holiday Calendar" },
-  ];
+  // ── Derived stats ────────────────────────────────────────────────────────────
+  const total    = requests.length;
+  const pending  = requests.filter((r) => (r.status ?? "") === "Pending").length;
+  const approved = requests.filter((r) => (r.status ?? "") === "Approved").length;
+  const rejected = requests.filter((r) => (r.status ?? "") === "Rejected").length;
 
-  const VIEW_MODES: Array<{ mode: ViewMode; icon: string }> = [
-    { mode:"table", icon:"☰" },
-    { mode:"cards", icon:"⊞" },
-  ];
+  const filtered = requests.filter((r) => {
+    const matchFilter =
+      filter === "all" ||
+      (filter === "pending"  && (r.status ?? "") === "Pending")  ||
+      (filter === "approved" && (r.status ?? "") === "Approved") ||
+      (filter === "rejected" && (r.status ?? "") === "Rejected");
+    const matchType = typeFilter === "all" || r.leaveType === typeFilter;
+    const s = search.toLowerCase();
+    const matchSearch = !s ||
+      (r.userName   || "").toLowerCase().includes(s) ||
+      (r.userEmail  || "").toLowerCase().includes(s) ||
+      (r.leaveType  || "").toLowerCase().includes(s) ||
+      (r.reason     || "").toLowerCase().includes(s) ||
+      (r.department || "").toLowerCase().includes(s);
+    return matchFilter && matchType && matchSearch;
+  });
 
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div style={S.root}>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&display=swap');
+        * { box-sizing: border-box; }
+        .alr-root { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; background: #f4f6fb; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        @keyframes alr-spin    { to { transform: rotate(360deg); } }
+        @keyframes alr-slideIn { from { opacity:0; transform:translateX(14px); } to { opacity:1; transform:translateX(0); } }
+        @keyframes alr-fadeUp  { from { opacity:0; transform:translateY(6px);  } to { opacity:1; transform:translateY(0); } }
+        .alr-slide  { animation: alr-slideIn 0.2s ease; }
+        .alr-fadeup { animation: alr-fadeUp  0.18s ease; }
 
-      {/* Tabs */}
-      <div style={{ display:"flex", gap:8, marginBottom:20 }}>
-        {TABS.map(({ key, label }) => (
-          <button key={key} onClick={() => setTab(key)} style={{ ...S.tab, ...(tab === key ? S.tabActive : {}) }}>
-            {label}
-          </button>
-        ))}
-      </div>
+        .alr-topbar { background:#fff; border-bottom:1px solid #e8ecf3; padding:0 24px; height:54px; display:flex; align-items:center; gap:12px; flex-shrink:0; }
+        .alr-logo   { width:30px; height:30px; border-radius:9px; background:linear-gradient(135deg,#6366f1,#8b5cf6); display:flex; align-items:center; justify-content:center; color:#fff; font-size:15px; flex-shrink:0; }
+        .alr-topbar-title { font-size:15px; font-weight:800; color:#0f172a; letter-spacing:-0.4px; }
+        .alr-topbar-sep   { width:1px; height:18px; background:#e2e8f0; }
+        .alr-topbar-sub   { font-size:13px; color:#64748b; font-weight:500; }
+        .alr-pending-badge { background:#f59e0b; color:#fff; font-size:11px; font-weight:800; padding:2px 9px; border-radius:20px; margin-left:auto; }
+        .alr-admin-av { width:30px; height:30px; border-radius:50%; background:linear-gradient(135deg,#6366f1,#8b5cf6); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; }
 
-      {/* ══ LEAVE REQUESTS TAB ══ */}
-      {tab === "requests" && (
-        <>
-          {/* Filters */}
-          <div style={S.filterBar}>
-            <div style={S.searchWrap}>
-              <span style={S.searchIcon}>🔍</span>
-              <input
-                placeholder="Search employee, leave type, reason..."
-                value={search}
-                onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
-                style={S.searchInput}
-              />
-              {search && <button onClick={() => setSearch("")} style={S.searchClear}>&#x2715;</button>}
+        .alr-tabbar { display:flex; gap:4px; padding:14px 24px 0; flex-shrink:0; }
+        .alr-tab    { font-size:12px; font-weight:700; padding:7px 16px; border-radius:9px; border:1.5px solid #e2e8f0; background:#fff; color:#64748b; cursor:pointer; font-family:inherit; transition:all 0.13s; }
+        .alr-tab.on { background:#0f172a; color:#fff; border-color:#0f172a; }
+        .alr-tab:not(.on):hover { background:#f1f5f9; }
+
+        .alr-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; padding:14px 24px 0; flex-shrink:0; }
+        .alr-stat-card { background:#fff; border:1px solid #e8ecf3; border-radius:14px; padding:18px 20px; display:flex; align-items:center; gap:14px; min-width:0; }
+        .alr-stat-icon { width:46px; height:46px; border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .alr-stat-val  { font-size:28px; font-weight:700; color:#0f172a; line-height:1; letter-spacing:-1px; }
+        .alr-stat-lbl  { font-size:12px; color:#64748b; font-weight:400; margin-top:4px; }
+
+        .alr-main  { display:flex; gap:0; flex:1; min-height:0; margin:14px 24px 24px; border-radius:16px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.06); border:1px solid #e8ecf3; }
+
+        .alr-left      { width:390px; flex-shrink:0; display:flex; flex-direction:column; background:#fff; border-right:1px solid #f1f5f9; }
+        .alr-left-head { padding:14px 14px 10px; border-bottom:1px solid #f1f5f9; flex-shrink:0; }
+        .alr-search-wrap { position:relative; margin-bottom:10px; }
+        .alr-search      { width:100%; padding:8px 12px 8px 34px; border:1.5px solid #e8ecf3; border-radius:10px; font-size:12px; font-family:inherit; font-weight:500; color:#1e293b; background:#f8fafc; outline:none; transition:border-color 0.15s; }
+        .alr-search:focus { border-color:#6366f1; background:#fff; box-shadow:0 0 0 3px rgba(99,102,241,0.09); }
+        .alr-search::placeholder { color:#cbd5e1; }
+        .alr-search-icon { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:#94a3b8; font-size:13px; pointer-events:none; }
+        .alr-filter-row  { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+        .alr-filters     { display:flex; gap:3px; background:#f1f5f9; padding:3px; border-radius:9px; flex:1; }
+        .alr-filter-btn  { flex:1; font-size:10px; font-weight:700; padding:5px 6px; border-radius:7px; border:none; cursor:pointer; background:transparent; color:#64748b; font-family:inherit; transition:all 0.13s; white-space:nowrap; }
+        .alr-filter-btn.on { background:#0f172a; color:#fff; }
+        .alr-filter-btn:not(.on):hover { background:#e2e8f0; color:#334155; }
+        .alr-type-sel  { font-size:11px; font-weight:600; padding:5px 8px; border:1.5px solid #e2e8f0; border-radius:8px; background:#fff; color:#475569; cursor:pointer; outline:none; font-family:inherit; }
+        .alr-type-sel:focus { border-color:#6366f1; }
+
+        .alr-rlist { flex:1; overflow-y:auto; padding:8px; display:flex; flex-direction:column; gap:4px; }
+        .alr-rlist::-webkit-scrollbar { width:4px; }
+        .alr-rlist::-webkit-scrollbar-thumb { background:#d1d5db; border-radius:6px; }
+        .alr-rcard { padding:12px; border-radius:10px; border:1px solid #e8ecf3; cursor:pointer; transition:all 0.13s; position:relative; background:#fff; }
+        .alr-rcard:hover  { background:#f8faff; border-color:#dde6f7; }
+        .alr-rcard.active { background:#eff0ff; border-color:#a5b4fc; box-shadow:0 0 0 1px #a5b4fc; }
+        .alr-pending-bar  { position:absolute; left:0; top:50%; transform:translateY(-50%); width:3px; height:55%; background:#f59e0b; border-radius:0 3px 3px 0; }
+        .alr-rcard-row    { display:flex; gap:10px; align-items:flex-start; }
+        .alr-rcard-body   { flex:1; min-width:0; }
+        .alr-rcard-nameline { display:flex; align-items:center; justify-content:space-between; margin-bottom:1px; }
+        .alr-rcard-name  { font-size:12px; font-weight:700; color:#0f172a; }
+        .alr-rcard-time  { font-size:10px; color:#94a3b8; font-weight:500; flex-shrink:0; }
+        .alr-rcard-email { font-size:11px; color:#94a3b8; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .alr-rcard-subj  { font-size:12px; font-weight:600; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:3px; }
+        .alr-rcard-reason{ font-size:11px; color:#64748b; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; line-height:1.5; }
+        .alr-rcard-chips { display:flex; gap:4px; margin-top:8px; flex-wrap:wrap; }
+
+        .alr-right { flex:1; display:flex; flex-direction:column; background:#fff; min-width:0; }
+        .alr-empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:#94a3b8; }
+
+        .alr-det-head { padding:16px 20px; border-bottom:1px solid #f1f5f9; flex-shrink:0; }
+        .alr-det-top  { display:flex; align-items:flex-start; gap:12px; }
+        .alr-det-meta { flex:1; min-width:0; }
+        .alr-det-name { font-size:15px; font-weight:800; color:#0f172a; letter-spacing:-0.3px; margin-bottom:3px; }
+        .alr-det-info { font-size:12px; color:#64748b; }
+        .alr-det-chips{ display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; align-items:center; }
+        .alr-close-btn{ font-size:12px; font-weight:600; padding:6px 12px; border:1.5px solid #e2e8f0; border-radius:9px; background:transparent; cursor:pointer; color:#64748b; font-family:inherit; flex-shrink:0; transition:all 0.13s; }
+        .alr-close-btn:hover { background:#f1f5f9; }
+
+        .alr-det-body { flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:16px; }
+        .alr-det-body::-webkit-scrollbar { width:4px; }
+        .alr-det-body::-webkit-scrollbar-thumb { background:#d1d5db; border-radius:6px; }
+
+        .alr-info-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+        .alr-info-box  { background:#f8fafc; border:1px solid #f1f5f9; border-radius:12px; padding:14px 16px; }
+        .alr-info-lbl  { font-size:10px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.6px; margin-bottom:6px; }
+        .alr-info-val  { font-size:14px; font-weight:700; color:#0f172a; }
+        .alr-info-sub  { font-size:11px; color:#64748b; margin-top:2px; }
+        .alr-reason-box{ background:#f8fafc; border:1px solid #f1f5f9; border-radius:12px; padding:14px 16px; }
+        .alr-reason-text{ font-size:13px; color:#334155; line-height:1.75; margin-top:6px; }
+
+        .alr-act-footer { border-top:1px solid #f1f5f9; padding:14px 20px; background:#fafbfc; flex-shrink:0; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+        .alr-approve-btn { font-size:13px; font-weight:700; padding:9px 22px; background:#16a34a; color:#fff; border:none; border-radius:10px; cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:6px; transition:background 0.13s; }
+        .alr-approve-btn:hover { background:#15803d; }
+        .alr-reject-btn  { font-size:13px; font-weight:700; padding:9px 22px; background:#dc2626; color:#fff; border:none; border-radius:10px; cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:6px; transition:background 0.13s; }
+        .alr-reject-btn:hover  { background:#b91c1c; }
+        .alr-act-footer button:disabled { opacity:0.45; cursor:not-allowed; }
+        .alr-done-bar  { padding:12px 20px; background:#f0fdf4; border-top:1px solid #bbf7d0; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+        .alr-done-text { font-size:12px; color:#15803d; font-weight:600; }
+        .alr-rejected-bar { padding:12px 20px; background:#fff1f2; border-top:1px solid #fda4af; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+        .alr-rejected-text{ font-size:12px; color:#881337; font-weight:600; }
+        .alr-reopen-btn{ font-size:11px; font-weight:700; padding:6px 13px; border:1.5px solid #e2e8f0; border-radius:8px; background:#f8fafc; cursor:pointer; color:#64748b; font-family:inherit; }
+        .alr-reopen-btn:hover { background:#f1f5f9; }
+
+        .alr-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:999; }
+        .alr-modal   { background:#fff; border-radius:20px; padding:36px; max-width:360px; width:90%; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,0.2); }
+
+        .alr-cal-main { flex:1; min-height:0; margin:14px 24px 24px; border-radius:16px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.06); border:1px solid #e8ecf3; background:#fff; display:flex; flex-direction:column; overflow-y:auto; }
+        .alr-nav-btn  { width:30px; height:30px; border-radius:8px; border:1px solid #e2e8f0; background:#fff; cursor:pointer; font-size:17px; font-weight:700; color:#334155; display:flex; align-items:center; justify-content:center; }
+
+        .alr-error { flex:1; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:10px; color:#ef4444; padding:20px; text-align:center; }
+      `}</style>
+
+      <div className="alr-root">
+
+        {/* ── TOP BAR ─────────────────────────────────────────────────────── */}
+        <div className="alr-topbar">
+          <div className="alr-logo"><Calendar size={16} /></div>
+          <span className="alr-topbar-title">Leave Requests</span>
+          <div className="alr-topbar-sep" />
+          <span className="alr-topbar-sub">Admin Console</span>
+          {pending > 0 && <div className="alr-pending-badge">{pending} pending</div>}
+          <div className="alr-admin-av" style={{ marginLeft: pending > 0 ? 0 : "auto" }}>A</div>
+        </div>
+
+        {/* ── TABS ────────────────────────────────────────────────────────── */}
+        <div className="alr-tabbar">
+          {([
+            { key: "requests", label: "📋 Leave Requests"   },
+            { key: "calendar", label: "🗓 Holiday Calendar" },
+          ] as const).map(({ key, label }) => (
+            <button key={key} className={`alr-tab${tab === key ? " on" : ""}`} onClick={() => setTab(key)}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── STAT CARDS ──────────────────────────────────────────────────── */}
+        <div className="alr-stats">
+          {([
+            { icon: <Users       size={22} color="#534ab7" />, bg: "#eeedfe", label: "Total Requests", value: total    },
+            { icon: <Clock       size={22} color="#854f0b" />, bg: "#faeeda", label: "Pending",         value: pending  },
+            { icon: <CheckCircle size={22} color="#3b6d11" />, bg: "#eaf3de", label: "Approved",        value: approved },
+            { icon: <XCircle     size={22} color="#be123c" />, bg: "#ffe4e6", label: "Rejected",        value: rejected },
+          ] as const).map(({ icon, bg, label, value }) => (
+            <div className="alr-stat-card" key={label}>
+              <div className="alr-stat-icon" style={{ background: bg }}>{icon}</div>
+              <div>
+                <div className="alr-stat-val">{value}</div>
+                <div className="alr-stat-lbl">{label}</div>
+              </div>
             </div>
-            <div style={S.pills}>
-              {["All","Pending","Approved","Rejected"].map(s => (
-                <button key={s} onClick={() => { setStatusFilter(s); setCurrentPage(1); }}
-                  style={{ ...S.pill, background:statusFilter === s ? "#1E3A5F" : "#F3F4F6", color:statusFilter === s ? "#fff" : "#6B7280" }}>
-                  {s}
-                </button>
-              ))}
-            </div>
-            <select value={leaveTypeFilter} onChange={e => { setLeaveTypeFilter(e.target.value); setCurrentPage(1); }} style={S.select}>
-              <option value="All">All Types</option>
-              {["Casual","Sick","Work From Home"].map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-            <div style={S.viewToggle}>
-              {VIEW_MODES.map(({ mode, icon }) => (
-                <button key={mode} onClick={() => setViewMode(mode)}
-                  style={{ ...S.viewBtn, background:viewMode === mode ? "#1E3A5F" : "transparent", color:viewMode === mode ? "#fff" : "#9CA3AF" }}>
-                  {icon}
-                </button>
-              ))}
-            </div>
-          </div>
+          ))}
+        </div>
 
-          <div style={S.resultCount}>
-            Showing <strong>{filtered.length}</strong> of <strong>{leaveRequests.length}</strong> requests
-          </div>
+        {/* ── REQUESTS TAB ────────────────────────────────────────────────── */}
+        {tab === "requests" && (
+          <div className="alr-main">
 
-          {/* Empty state */}
-          {filtered.length === 0 && (
-            <div style={S.empty}>
-              <div style={{ fontSize:52 }}>📭</div>
-              <div style={{ fontSize:20, fontWeight:800, color:"#374151", marginTop:12 }}>No requests found</div>
-              <div style={{ color:"#9CA3AF", marginTop:6 }}>Try adjusting filters or search query</div>
-            </div>
-          )}
-
-          {/* Table View */}
-          {viewMode === "table" && filtered.length > 0 && (
-            <div style={S.tableWrap}>
-              <table style={S.table}>
-                <thead>
-                  <tr style={S.theadRow}>
-                    {["Employee","Leave Type","Duration","Days","Status","Reason","Actions"].map(h => (
-                      <th key={h} style={S.th}>{h}</th>
+            {/* Left: request list */}
+            <div className="alr-left">
+              <div className="alr-left-head">
+                <div className="alr-search-wrap">
+                  <span className="alr-search-icon">🔍</span>
+                  <input
+                    className="alr-search"
+                    placeholder="Search name, type, reason…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+                <div className="alr-filter-row">
+                  <div className="alr-filters">
+                    {([
+                      ["all",      `All (${total})`],
+                      ["pending",  `Pending (${pending})`],
+                      ["approved", `Approved (${approved})`],
+                      ["rejected", `Rejected (${rejected})`],
+                    ] as const).map(([f, label]) => (
+                      <button key={f} className={`alr-filter-btn${filter === f ? " on" : ""}`} onClick={() => setFilter(f)}>
+                        {label}
+                      </button>
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginated.map((leave, i) => {
-                    const emp   = users.find(u => u.uid === leave.uid);
-                    const lc    = LEAVE_COLORS[leave.leaveType] ?? LEAVE_COLORS["Casual"];
-                    const sc    = STATUS_CFG[leave.status]      ?? STATUS_CFG["Pending"];
-                    const days  = getDays(leave.fromDate, leave.toDate);
-                    const isExp = expandedId === leave.id;
-                    return (
-                      <React.Fragment key={leave.id}>
-                        <tr style={{ ...S.tbodyRow, background:i % 2 === 0 ? "#FAFAFA" : "#fff" }}>
-                          <td style={S.td}>
-                            <div style={S.empCell}>
-                              <div style={S.empAvatar}>
-                                {emp?.profilePhoto
-                                  ? <img src={emp.profilePhoto} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
-                                  : <div style={S.empInitial}>{(leave.userName ?? emp?.name ?? "U")[0].toUpperCase()}</div>
-                                }
-                              </div>
-                              <div>
-                                <div style={S.empName}>{leave.userName ?? emp?.name ?? "Unknown"}</div>
-                                <div style={S.empEmail}>{leave.userEmail ?? emp?.email ?? "—"}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td style={S.td}>
-                            <span style={{ ...S.badge, background:lc.bg, color:lc.text }}>
-                              <span style={{ width:6, height:6, borderRadius:"50%", background:lc.dot, display:"inline-block", marginRight:5 }} />
-                              {LEAVE_ICONS[leave.leaveType] ?? ""} {leave.leaveType}
-                            </span>
-                          </td>
-                          <td style={S.td}>
-                            <div style={S.durationCell}>
-                              <div style={S.dateChip}>{leave.fromDate}</div>
-                              <span style={{ color:"#9CA3AF", fontSize:11 }}>&#8594;</span>
-                              <div style={S.dateChip}>{leave.toDate}</div>
-                            </div>
-                          </td>
-                          <td style={S.td}><div style={S.daysChip}>{days}d</div></td>
-                          <td style={S.td}>
-                            <span style={{ ...S.statusBadge, background:sc.bg, color:sc.text, border:`1px solid ${sc.ring}` }}>
-                              {sc.icon} {sc.label}
-                            </span>
-                          </td>
-                          <td style={S.td}>
-                            <button onClick={() => setExpandedId(isExp ? null : leave.id)}
-                              style={{ ...S.reasonToggleBtn, background:isExp ? "#EEF2FF" : "#F9FAFB", color:isExp ? "#4F46E5" : "#6B7280", border:isExp ? "1.5px solid #C7D2FE" : "1.5px solid #E5E7EB" }}>
-                              <span>{isExp ? "▲" : "▼"}</span>
-                              <span>{isExp ? "Hide" : "View Reason"}</span>
-                            </button>
-                          </td>
-                          <td style={{ ...S.td, textAlign:"center" }}>
-                            {leave.status === "Pending" ? (
-                              <div style={S.actionBtns}>
-                                <button onClick={() => handleAction(leave.id, "Approved")} style={S.approveBtn}>&#10003; Approve</button>
-                                <button onClick={() => handleAction(leave.id, "Rejected")} style={S.rejectBtn}>&#10005; Reject</button>
-                              </div>
-                            ) : <span style={{ color:"#9CA3AF", fontSize:12 }}>—</span>}
-                          </td>
-                        </tr>
-                        {isExp && (
-                          <tr style={{ background:"#F5F7FF" }}>
-                            <td colSpan={7} style={{ padding:0, borderBottom:"2px solid #C7D2FE" }}>
-                              <div style={S.expandedPanel}>
-                                <div style={S.expandedAccent} />
-                                <div style={S.expandedSection}>
-                                  <div style={S.expandedSectionLabel}>👤 Employee</div>
-                                  <div style={S.expandedSectionValue}>{leave.userName ?? emp?.name ?? "Unknown"}</div>
-                                  <div style={S.expandedSectionSub}>{leave.userEmail ?? emp?.email ?? "—"}</div>
-                                </div>
-                                <div style={S.expandedDivider} />
-                                <div style={S.expandedSection}>
-                                  <div style={S.expandedSectionLabel}>📋 Leave Type</div>
-                                  <div style={{ marginTop:6 }}>
-                                    <span style={{ ...S.badge, background:lc.bg, color:lc.text }}>
-                                      <span style={{ width:6, height:6, borderRadius:"50%", background:lc.dot, display:"inline-block", marginRight:5 }} />
-                                      {LEAVE_ICONS[leave.leaveType] ?? ""} {leave.leaveType}
-                                    </span>
-                                  </div>
-                                </div>
-                                <div style={S.expandedDivider} />
-                                <div style={S.expandedSection}>
-                                  <div style={S.expandedSectionLabel}>📅 Period</div>
-                                  <div style={S.expandedSectionValue}>{leave.fromDate} &#8594; {leave.toDate}</div>
-                                  <div style={S.expandedSectionSub}>{days} {days === 1 ? "day" : "days"} total</div>
-                                </div>
-                                <div style={S.expandedDivider} />
-                                <div style={{ ...S.expandedSection, flex:1 }}>
-                                  <div style={S.expandedSectionLabel}>📝 Full Reason</div>
-                                  <div style={S.expandedReasonText}>{leave.reason ?? "No reason provided."}</div>
-                                </div>
-                                <div style={S.expandedDivider} />
-                                <div style={{ ...S.expandedSection, justifyContent:"space-between", gap:12 }}>
-                                  <div>
-                                    <div style={S.expandedSectionLabel}>🔖 Status</div>
-                                    <span style={{ ...S.statusBadge, background:sc.bg, color:sc.text, border:`1px solid ${sc.ring}`, marginTop:6, display:"inline-block" }}>
-                                      {sc.icon} {sc.label}
-                                    </span>
-                                  </div>
-                                  <button onClick={() => setExpandedId(null)} style={S.collapseBtn}>&#x2715; Close</button>
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </div>
+                  <select className="alr-type-sel" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as "all" | LeaveType)}>
+                    <option value="all">All Types</option>
+                    <option value="Casual">Casual</option>
+                    <option value="Sick">Sick</option>
+                    <option value="Work From Home">WFH</option>
+                  </select>
+                </div>
+              </div>
 
-          {/* Card View */}
-          {viewMode === "cards" && filtered.length > 0 && (
-            <div style={S.cardsGrid}>
-              {paginated.map(leave => {
-                const emp    = users.find(u => u.uid === leave.uid);
-                const lc     = LEAVE_COLORS[leave.leaveType] ?? LEAVE_COLORS["Casual"];
-                const sc     = STATUS_CFG[leave.status]      ?? STATUS_CFG["Pending"];
-                const days   = getDays(leave.fromDate, leave.toDate);
-                const isExp  = expandedId === leave.id;
-                const reason = leave.reason ?? "No reason.";
-                return (
-                  <div key={leave.id} style={{ ...S.leaveCard, borderTop:`4px solid ${lc.dot}` }}>
-                    <div style={S.cardHeader}>
-                      <div style={S.empCell}>
-                        <div style={S.empAvatar}>
-                          {emp?.profilePhoto
-                            ? <img src={emp.profilePhoto} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }} />
-                            : <div style={S.empInitial}>{(leave.userName ?? emp?.name ?? "U")[0].toUpperCase()}</div>
-                          }
-                        </div>
-                        <div>
-                          <div style={S.empName}>{leave.userName ?? emp?.name ?? "Unknown"}</div>
-                          <div style={S.empEmail}>{leave.userEmail ?? emp?.email ?? "—"}</div>
+              <div className="alr-rlist">
+                {loading ? (
+                  <LoadingSpinner label="Loading requests…" />
+                ) : error ? (
+                  <div className="alr-error">
+                    <span style={{ fontSize: 28 }}>⚠️</span>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{error}</div>
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "50px 16px", color: "#94a3b8" }}>
+                    <div style={{ fontSize: 36, marginBottom: 10 }}>📭</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#475569", marginBottom: 4 }}>No requests found</div>
+                    <div style={{ fontSize: 12 }}>{search ? "Try a different search" : "Nothing here yet"}</div>
+                  </div>
+                ) : filtered.map((req) => {
+                  const lc    = getLeaveCfg(req.leaveType);
+                  const sc    = getStatusCfg(req.status);
+                  const days  = getDays(req.fromDate ?? "", req.toDate ?? "");
+                  const isAct = selected?.id === req.id;
+                  const isPend = (req.status ?? "") === "Pending";
+                  return (
+                    <div
+                      key={req.id}
+                      className={`alr-rcard${isAct ? " active" : ""}`}
+                      style={{ borderLeft: isPend ? "3px solid #f59e0b" : "3px solid transparent" }}
+                      onClick={() => setSelected(req)}
+                    >
+                      {isPend && <div className="alr-pending-bar" />}
+                      <div className="alr-rcard-row">
+                        <Avatar name={req.userName} size={34} />
+                        <div className="alr-rcard-body">
+                          <div className="alr-rcard-nameline">
+                            <span className="alr-rcard-name">{req.userName || "Unknown"}</span>
+                            <span className="alr-rcard-time">{timeAgo(req.createdAt)}</span>
+                          </div>
+                          <div className="alr-rcard-email">{req.userEmail ?? "—"} · {req.department ?? "—"}</div>
+                          <div className="alr-rcard-subj">{req.leaveType ?? "Unknown"} Leave — {days} {days === 1 ? "day" : "days"}</div>
+                          <div className="alr-rcard-reason">{req.reason || "No reason provided."}</div>
+                          <div className="alr-rcard-chips">
+                            <Chip label={req.leaveType ?? "Unknown"} bg={lc.bg} color={lc.color} dot={lc.dot} />
+                            <Chip label={sc.label} bg={sc.bg} color={sc.color} border={sc.border} dot={sc.dot} />
+                            <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 500, alignSelf: "center" }}>
+                              📅 {fmtDate(req.fromDate ?? "")} → {fmtDate(req.toDate ?? "")}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                      <span style={{ ...S.statusBadge, background:sc.bg, color:sc.text, border:`1px solid ${sc.ring}` }}>
-                        {sc.icon} {sc.label}
-                      </span>
                     </div>
-                    <div style={S.cardBody}>
-                      <span style={{ ...S.badge, background:lc.bg, color:lc.text }}>
-                        <span style={{ width:6, height:6, borderRadius:"50%", background:lc.dot, display:"inline-block", marginRight:5 }} />
-                        {LEAVE_ICONS[leave.leaveType] ?? ""} {leave.leaveType}
-                      </span>
-                      <span style={S.daysChip}>{days} {days === 1 ? "day" : "days"}</span>
-                    </div>
-                    <div style={S.cardDates}>📅 {leave.fromDate} &#8594; {leave.toDate}</div>
-                    <div style={S.cardReason} onClick={() => setExpandedId(isExp ? null : leave.id)}>
-                      <div style={S.cardReasonLabel}>📝 Reason</div>
-                      <div style={{ fontSize:13, color:"#374151", lineHeight:1.6 }}>
-                        {isExp ? reason : reason.slice(0, 80) + (reason.length > 80 ? "…" : "")}
-                      </div>
-                      {reason.length > 80 && (
-                        <div style={{ fontSize:11, color:"#6366F1", fontWeight:600, marginTop:4 }}>
-                          {isExp ? "▲ Show less" : "▼ Read full reason"}
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Right: detail panel */}
+            <div className="alr-right">
+              {!selected ? (
+                <div className="alr-empty">
+                  <div style={{ fontSize: 44 }}>📋</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#475569" }}>Select a request</div>
+                  <div style={{ fontSize: 13 }}>Click any request on the left to review it</div>
+                </div>
+              ) : (
+                <div className="alr-slide" style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+                  <div className="alr-det-head">
+                    <div className="alr-det-top">
+                      <Avatar name={selected.userName} size={46} />
+                      <div className="alr-det-meta">
+                        <div className="alr-det-name">{selected.userName}</div>
+                        <div className="alr-det-info">{selected.userEmail ?? "—"} · {selected.department ?? "—"}</div>
+                        <div className="alr-det-chips">
+                          {(() => {
+                            const lc = getLeaveCfg(selected.leaveType);
+                            const sc = getStatusCfg(selected.status);
+                            return (
+                              <>
+                                <Chip label={selected.leaveType ?? "—"} bg={lc.bg} color={lc.color} dot={lc.dot} />
+                                <Chip label={sc.label} bg={sc.bg} color={sc.color} border={sc.border} dot={sc.dot} />
+                                <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500 }}>🕐 {timeAgo(selected.createdAt)}</span>
+                              </>
+                            );
+                          })()}
                         </div>
-                      )}
+                      </div>
+                      <button className="alr-close-btn" onClick={() => setSelected(null)}>✕ Close</button>
                     </div>
-                    {leave.status === "Pending" && (
-                      <div style={S.cardActions}>
-                        <button onClick={() => handleAction(leave.id, "Approved")} style={S.approveBtn}>&#10003; Approve</button>
-                        <button onClick={() => handleAction(leave.id, "Rejected")} style={S.rejectBtn}>&#10005; Reject</button>
+                  </div>
+
+                  <div className="alr-det-body" ref={detailRef}>
+                    <div className="alr-info-grid">
+                      <div className="alr-info-box">
+                        <div className="alr-info-lbl">📅 From Date</div>
+                        <div className="alr-info-val">{fmtDate(selected.fromDate ?? "")}</div>
+                        <div className="alr-info-sub">{selected.fromDate ?? "—"}</div>
+                      </div>
+                      <div className="alr-info-box">
+                        <div className="alr-info-lbl">📅 To Date</div>
+                        <div className="alr-info-val">{fmtDate(selected.toDate ?? "")}</div>
+                        <div className="alr-info-sub">{selected.toDate ?? "—"}</div>
+                      </div>
+                      <div className="alr-info-box">
+                        <div className="alr-info-lbl">⏱ Duration</div>
+                        <div className="alr-info-val">{getDays(selected.fromDate ?? "", selected.toDate ?? "")} Days</div>
+                        <div className="alr-info-sub">{selected.leaveType ?? "—"}</div>
+                      </div>
+                      <div className="alr-info-box">
+                        <div className="alr-info-lbl">📌 Department</div>
+                        <div className="alr-info-val" style={{ fontSize: 13 }}>{selected.department || "—"}</div>
+                        <div className="alr-info-sub">{selected.userEmail}</div>
+                      </div>
+                    </div>
+
+                    <div className="alr-reason-box">
+                      <div className="alr-info-lbl">📝 Reason for Leave</div>
+                      <div className="alr-reason-text">{selected.reason || "No reason provided."}</div>
+                    </div>
+
+                    {selected.reviewedAt && (
+                      <div style={{ background: "#f8fafc", border: "1px solid #f1f5f9", borderRadius: 12, padding: "12px 16px" }}>
+                        <div className="alr-info-lbl">🔖 Reviewed</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#475569", marginTop: 4 }}>
+                          {timeAgo(selected.reviewedAt)}
+                        </div>
                       </div>
                     )}
                   </div>
-                );
-              })}
-            </div>
-          )}
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div style={S.pagination}>
-              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
-                style={{ ...S.pageBtn, opacity:currentPage === 1 ? 0.4 : 1 }}>&#8592; Prev</button>
-              <div style={S.pageNumbers}>
-                {Array.from({ length:totalPages }, (_, i) => i + 1).map(n => (
-                  <button key={n} onClick={() => setCurrentPage(n)}
-                    style={{ ...S.pageNum, background:currentPage === n ? "#1E3A5F" : "#F3F4F6", color:currentPage === n ? "#fff" : "#6B7280" }}>{n}</button>
-                ))}
-              </div>
-              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-                style={{ ...S.pageBtn, opacity:currentPage === totalPages ? 0.4 : 1 }}>Next &#8594;</button>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* ══ HOLIDAY CALENDAR TAB ══ */}
-      {tab === "holidays" && (
-        <div style={{ background:"#fff", borderRadius:20, padding:28, boxShadow:"0 4px 24px #0000000F" }}>
-          <div style={{ fontSize:18, fontWeight:800, color:"#111827", marginBottom:20 }}>🗓️ Holiday Calendar &amp; Employee Leaves</div>
-          <AdminHolidayCalendar holidays={holidays} leaveRequests={leaveRequests} users={users} />
-        </div>
-      )}
-
-      {/* Confirm Modal */}
-      {confirmAction && (
-        <div style={S.modalOverlay}>
-          <div style={S.modal}>
-            <div style={S.modalIcon}>{confirmAction.action === "Approved" ? "✅" : "❌"}</div>
-            <div style={S.modalTitle}>{confirmAction.action === "Approved" ? "Approve Leave?" : "Reject Leave?"}</div>
-            <div style={S.modalSub}>This action will update the leave status immediately.</div>
-            <div style={S.modalBtns}>
-              <button onClick={() => setConfirmAction(null)} style={S.modalCancel}>Cancel</button>
-              <button onClick={confirmDo}
-                style={{ ...S.modalConfirm, background:confirmAction.action === "Approved" ? "#16A34A" : "#DC2626" }}>
-                Confirm {confirmAction.action}
-              </button>
+                  {(selected.status ?? "") === "Approved" ? (
+                    <div className="alr-done-bar">
+                      <span className="alr-done-text">✓ This request has been approved</span>
+                      <button className="alr-reopen-btn" onClick={() => handleUpdateStatus(selected.id, "Pending")}>Reopen</button>
+                    </div>
+                  ) : (selected.status ?? "") === "Rejected" ? (
+                    <div className="alr-rejected-bar">
+                      <span className="alr-rejected-text">✗ This request was rejected</span>
+                      <button className="alr-reopen-btn" onClick={() => handleUpdateStatus(selected.id, "Pending")}>Reopen</button>
+                    </div>
+                  ) : (
+                    <div className="alr-act-footer">
+                      <button className="alr-approve-btn" disabled={updating} onClick={() => setConfirm({ id: selected.id, action: "Approved" })}>✓ Approve</button>
+                      <button className="alr-reject-btn"  disabled={updating} onClick={() => setConfirm({ id: selected.id, action: "Rejected" })}>✗ Reject</button>
+                      <span style={{ fontSize: 12, color: "#94a3b8", marginLeft: 4 }}>
+                        {getDays(selected.fromDate ?? "", selected.toDate ?? "")}-day {selected.leaveType ?? "Unknown"} leave request
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+
+        {/* ── CALENDAR TAB ────────────────────────────────────────────────── */}
+        {tab === "calendar" && (
+          <div className="alr-cal-main">
+            <HolidayCalendar holidays={holidays} leaveRequests={requests} />
+          </div>
+        )}
+
+        {/* ── CONFIRM MODAL ─────────────────────────────────────────────── */}
+        {confirm && (
+          <div className="alr-overlay">
+            <div className="alr-modal">
+              <div style={{ fontSize: 48, marginBottom: 12 }}>
+                {confirm.action === "Approved" ? "✅" : "❌"}
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: "#111827", marginBottom: 8 }}>
+                {confirm.action === "Approved" ? "Approve Leave?" : "Reject Leave?"}
+              </div>
+              <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 24 }}>
+                This will immediately update the leave status and notify the employee.
+              </div>
+              <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+                <button onClick={() => setConfirm(null)} style={{ background: "#f3f4f6", color: "#374151", border: "none", borderRadius: 10, padding: "10px 22px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleUpdateStatus(confirm.id, confirm.action)}
+                  disabled={updating}
+                  style={{ background: confirm.action === "Approved" ? "#16a34a" : "#dc2626", color: "#fff", border: "none", borderRadius: 10, padding: "10px 22px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: updating ? 0.5 : 1 }}
+                >
+                  {updating ? "Updating…" : `Confirm ${confirm.action}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </>
   );
 }
-
-// ── STYLES ────────────────────────────────────────────────
-const S: Record<string, React.CSSProperties> = {
-  root:                { fontFamily:"'DM Sans','Segoe UI',sans-serif", maxWidth:1100, margin:"0 auto", padding:24, background:"#F8FAFC", minHeight:"100vh" },
-  tab:                 { padding:"10px 20px", borderRadius:12, border:"2px solid #E5E7EB", background:"#fff", fontSize:13, fontWeight:600, cursor:"pointer", color:"#6B7280" },
-  tabActive:           { background:"#1E3A5F", color:"#fff", border:"2px solid #1E3A5F" },
-  filterBar:           { background:"#fff", borderRadius:14, padding:"14px 18px", display:"flex", gap:12, alignItems:"center", flexWrap:"wrap", boxShadow:"0 2px 12px #0000000D", marginBottom:16 },
-  searchWrap:          { flex:1, minWidth:220, position:"relative", display:"flex", alignItems:"center" },
-  searchIcon:          { position:"absolute", left:12, fontSize:14 },
-  searchInput:         { width:"100%", paddingLeft:36, paddingRight:32, paddingTop:9, paddingBottom:9, border:"1.5px solid #E5E7EB", borderRadius:10, fontSize:13, outline:"none", boxSizing:"border-box" },
-  searchClear:         { position:"absolute", right:10, background:"none", border:"none", cursor:"pointer", fontSize:12, color:"#9CA3AF" },
-  pills:               { display:"flex", gap:6 },
-  pill:                { border:"none", borderRadius:8, padding:"7px 14px", fontSize:12, fontWeight:600, cursor:"pointer" },
-  select:              { border:"1.5px solid #E5E7EB", borderRadius:10, padding:"8px 12px", fontSize:13, outline:"none", cursor:"pointer" },
-  viewToggle:          { display:"flex", background:"#F3F4F6", borderRadius:8, overflow:"hidden" },
-  viewBtn:             { border:"none", padding:"8px 12px", cursor:"pointer", fontSize:15, transition:"all 0.15s" },
-  resultCount:         { fontSize:13, color:"#6B7280", marginBottom:12 },
-  empty:               { textAlign:"center", padding:"80px 0", background:"#fff", borderRadius:16 },
-  tableWrap:           { background:"#fff", borderRadius:16, overflow:"hidden", boxShadow:"0 2px 12px #0000000D" },
-  table:               { width:"100%", borderCollapse:"collapse" },
-  theadRow:            { background:"#1E3A5F" },
-  th:                  { padding:"14px 18px", textAlign:"left", fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.85)", textTransform:"uppercase", letterSpacing:0.7 },
-  tbodyRow:            { transition:"background 0.15s" },
-  td:                  { padding:"14px 18px", verticalAlign:"middle" },
-  empCell:             { display:"flex", alignItems:"center", gap:10 },
-  empAvatar:           { width:38, height:38, borderRadius:"50%", overflow:"hidden", flexShrink:0, background:"#E5E7EB" },
-  empInitial:          { width:"100%", height:"100%", background:"linear-gradient(135deg,#6366F1,#8B5CF6)", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:800, fontSize:15 },
-  empName:             { fontSize:13, fontWeight:700, color:"#111827" },
-  empEmail:            { fontSize:11, color:"#9CA3AF", marginTop:1 },
-  badge:               { display:"inline-flex", alignItems:"center", borderRadius:8, padding:"4px 10px", fontSize:12, fontWeight:700 },
-  durationCell:        { display:"flex", alignItems:"center", gap:4, flexWrap:"wrap" },
-  dateChip:            { background:"#F3F4F6", borderRadius:6, padding:"3px 7px", fontSize:11, color:"#374151", fontWeight:500 },
-  daysChip:            { background:"#EEF2FF", color:"#4F46E5", borderRadius:8, padding:"3px 10px", fontSize:12, fontWeight:700, display:"inline-block" },
-  statusBadge:         { borderRadius:8, padding:"4px 10px", fontSize:12, fontWeight:700, whiteSpace:"nowrap" },
-  reasonToggleBtn:     { display:"inline-flex", alignItems:"center", gap:5, borderRadius:8, padding:"6px 12px", fontSize:12, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" },
-  expandedPanel:       { display:"flex", flexDirection:"row", alignItems:"stretch", minHeight:90, borderTop:"1px solid #C7D2FE" },
-  expandedAccent:      { width:5, background:"linear-gradient(180deg,#6366F1,#8B5CF6)", flexShrink:0 },
-  expandedSection:     { display:"flex", flexDirection:"column", justifyContent:"center", padding:"14px 22px", minWidth:140 },
-  expandedSectionLabel:{ fontSize:10, fontWeight:700, color:"#6366F1", textTransform:"uppercase", letterSpacing:0.8, marginBottom:5 },
-  expandedSectionValue:{ fontSize:13, fontWeight:700, color:"#111827" },
-  expandedSectionSub:  { fontSize:11, color:"#9CA3AF", marginTop:2 },
-  expandedDivider:     { width:1, background:"#E0E7FF", flexShrink:0, margin:"10px 0" },
-  expandedReasonText:  { fontSize:13, color:"#1E293B", lineHeight:1.7, marginTop:2 },
-  collapseBtn:         { marginTop:8, background:"#EEF2FF", color:"#4F46E5", border:"1.5px solid #C7D2FE", borderRadius:8, padding:"6px 14px", fontSize:12, fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" },
-  actionBtns:          { display:"flex", gap:6, justifyContent:"center" },
-  approveBtn:          { background:"#16A34A", color:"#fff", border:"none", borderRadius:8, padding:"7px 14px", fontSize:12, fontWeight:700, cursor:"pointer" },
-  rejectBtn:           { background:"#DC2626", color:"#fff", border:"none", borderRadius:8, padding:"7px 14px", fontSize:12, fontWeight:700, cursor:"pointer" },
-  cardsGrid:           { display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))", gap:16 },
-  leaveCard:           { background:"#fff", borderRadius:16, padding:20, boxShadow:"0 2px 12px #0000000D" },
-  cardHeader:          { display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:14 },
-  cardBody:            { display:"flex", gap:8, alignItems:"center", marginBottom:10 },
-  cardDates:           { fontSize:12, color:"#6B7280", marginBottom:12 },
-  cardReason:          { background:"#F9FAFB", borderRadius:10, padding:"12px 14px", cursor:"pointer", marginBottom:12 },
-  cardReasonLabel:     { fontSize:11, fontWeight:700, color:"#6B7280", textTransform:"uppercase", marginBottom:5 },
-  cardActions:         { display:"flex", gap:8 },
-  pagination:          { display:"flex", justifyContent:"center", alignItems:"center", gap:12, marginTop:24 },
-  pageBtn:             { background:"#1E3A5F", color:"#fff", border:"none", borderRadius:10, padding:"9px 18px", fontSize:13, fontWeight:600, cursor:"pointer" },
-  pageNumbers:         { display:"flex", gap:6 },
-  pageNum:             { border:"none", borderRadius:8, width:36, height:36, fontSize:13, fontWeight:600, cursor:"pointer" },
-  modalOverlay:        { position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:999 },
-  modal:               { background:"#fff", borderRadius:20, padding:36, maxWidth:380, width:"90%", textAlign:"center", boxShadow:"0 20px 60px #00000033" },
-  modalIcon:           { fontSize:48, marginBottom:12 },
-  modalTitle:          { fontSize:22, fontWeight:800, color:"#111827", marginBottom:8 },
-  modalSub:            { fontSize:14, color:"#6B7280", marginBottom:24 },
-  modalBtns:           { display:"flex", gap:12, justifyContent:"center" },
-  modalCancel:         { background:"#F3F4F6", color:"#374151", border:"none", borderRadius:10, padding:"11px 24px", fontSize:14, fontWeight:600, cursor:"pointer" },
-  modalConfirm:        { color:"#fff", border:"none", borderRadius:10, padding:"11px 24px", fontSize:14, fontWeight:700, cursor:"pointer" },
-};

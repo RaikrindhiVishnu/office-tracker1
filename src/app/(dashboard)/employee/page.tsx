@@ -31,13 +31,14 @@ import ProfileView     from "./views/ProfileView";
 import HelpView        from "./views/HelpView";
 import ProjectManagement from "./views/projectmanagement";
 import { LeaveType } from "@/types/leave";
+import Payslips from "./views/Payslips";
 
 // ── Types ─────────────────────────────────────────────────
 type ViewType =
   | "dashboard" | "work-update" | "attendance" | "notifications"
   | "calendar"  | "holidays"    | "leave-history" | "leave-request"
   | "profile"   | "help"        | "projects" | "meet"
-  | "tasks"     | "team"        | "reports"  | "settings";
+  | "tasks"     | "team"        | "reports"  | "settings"  | "payslips";
 
 type LeaveRequest = {
   id: string;
@@ -89,7 +90,10 @@ const isSunday         = (y: number, m: number, d: number) => new Date(y, m, d).
 const isSecondSaturday = (y: number, m: number, d: number) => new Date(y, m, d).getDay() === 6 && d >= 8  && d <= 14;
 const isFourthSaturday = (y: number, m: number, d: number) => new Date(y, m, d).getDay() === 6 && d >= 22 && d <= 28;
 const isFifthSaturday  = (y: number, m: number, d: number) => new Date(y, m, d).getDay() === 6 && d >= 29;
-const isHoliday        = (dateStr: string) => holidays.find(h => h.date === dateStr);
+const isHoliday = (dateStr: string): { title: string } | null => {
+  const holiday = holidays.find(h => h.date === dateStr);
+  return holiday ? { title: holiday.title } : null;
+};
 
 const sidebarGroups = [
   { title: "WORKSPACE",          items: [["dashboard","Dashboard","📊"]] },
@@ -98,6 +102,7 @@ const sidebarGroups = [
   { title: "LEAVE & HOLIDAYS",   items: [["leave-request","Apply Leave","📋"],["leave-history","Leave History","📜"],["holidays","Holidays","🎉"]] },
   { title: "COMMUNICATION",      items: [["notifications","Notifications","🔔"]] },
   { title: "ACCOUNT",            items: [["profile","Profile","👤"],["help","Help","❓"]] },
+  { title: "PAYSLIPS", items: [["payslips","Payslips","💰"]] }
 ];
 
 // ── Announcement Bar ──────────────────────────────────────
@@ -973,17 +978,24 @@ export default function ZohoStyleEmployeeDashboard() {
             {activeView === "tasks"    && <TasksView user={user} />}
             {activeView === "reports"  && <ReportsView user={user} attendance={attendance} />}
             {activeView === "settings" && <SettingsView user={user} />}
+            {activeView === "payslips" && <Payslips />}
           </div>
         </main>
       </div>
 
       {/* ── CALENDAR MODAL ── */}
       <CalendarModal
-        show={showCalendar} onClose={() => setShowCalendar(false)}
-        calendarDate={calendarDate} setCalendarDate={setCalendarDate}
-        holidays={holidays} isSunday={isSunday} isSecondSaturday={isSecondSaturday}
-        isFourthSaturday={isFourthSaturday} isFifthSaturday={isFifthSaturday} isHoliday={isHoliday}
-      />
+  showCalendar={showCalendar}
+  setShowCalendar={setShowCalendar}
+  calendarDate={calendarDate}
+  setCalendarDate={setCalendarDate}
+  holidays={holidays}
+  isSunday={isSunday}
+  isSecondSaturday={isSecondSaturday}
+  isFourthSaturday={isFourthSaturday}
+  isFifthSaturday={isFifthSaturday}
+  isHoliday={isHoliday}
+/>
 
       {showAttendanceSummary && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowAttendanceSummary(false)}>

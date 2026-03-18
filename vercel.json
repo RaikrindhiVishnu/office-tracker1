@@ -1,4 +1,3 @@
-
 {
   "rewrites": [
     {
@@ -8,6 +7,16 @@
     {
       "source": "/device/cdata",
       "destination": "/api/attendance"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/send-birthday-emails",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/scheduler/daily",
+      "schedule": "30 2 * * *"
     }
   ]
 }

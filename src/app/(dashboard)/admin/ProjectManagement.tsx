@@ -90,10 +90,7 @@ const Avatar = ({ name, size="sm", color }: { name?: string; size?: "xs"|"sm"|"m
   const colors = ["#6366f1","#8b5cf6","#ec4899","#f59e0b","#10b981","#3b82f6"];
   const bg = color || colors[(name?.charCodeAt(0)||0) % colors.length];
   return (
-    <div
-      className={`${s[size]} rounded-full flex items-center justify-center font-bold text-white shrink-0 ring-2 ring-white`}
-      style={{background:bg}}
-    >
+    <div className={`${s[size]} rounded-full flex items-center justify-center font-bold text-white shrink-0 ring-2 ring-white`} style={{background:bg}}>
       {name?.[0]?.toUpperCase()||"?"}
     </div>
   );
@@ -173,8 +170,6 @@ function KanbanBoard({ tasks, projectColor, onTaskClick, onStatusChange }: {
             onDragOver={e => handleDragOver(e, colId)}
             onDrop={e => handleDrop(e, colId)}
             onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverCol(null); }}>
-
-            {/* Column header */}
             <div className="shrink-0 border-b" style={{ background: cfg.headerBg, borderColor: cfg.border }}>
               <div className="flex items-center justify-between px-4 py-2.5">
                 <div className="flex items-center gap-2">
@@ -186,13 +181,10 @@ function KanbanBoard({ tasks, projectColor, onTaskClick, onStatusChange }: {
                   {col.length > 0 && <span className="text-[10px] text-gray-400">{col.reduce((s,t)=>s+(t.estimatedHours||0),0)}h</span>}
                 </div>
               </div>
-              {/* Sub-header */}
               <div className="grid px-4 py-1 border-t text-[10px] font-bold text-gray-400 uppercase tracking-wider gap-2" style={{gridTemplateColumns:"1fr auto auto auto", borderColor: cfg.border+"60"}}>
                 <span>Task</span><span>Pri</span><span>Due</span><span>Who</span>
               </div>
             </div>
-
-            {/* Task rows */}
             <div className="flex-1 overflow-y-auto">
               {col.length === 0 && !isOver && (
                 <div className="flex flex-col items-center justify-center h-24 text-gray-200 mt-4">
@@ -205,7 +197,6 @@ function KanbanBoard({ tasks, projectColor, onTaskClick, onStatusChange }: {
               {isOver && col.length === 0 && (
                 <div className="mx-3 mt-3 h-1 rounded-full" style={{background: cfg.color}} />
               )}
-
               {col.map((task) => {
                 const pc = PRIORITY_CONFIG[task.priority];
                 const isDragging = draggingId === task.id;
@@ -255,8 +246,6 @@ function KanbanBoard({ tasks, projectColor, onTaskClick, onStatusChange }: {
                 <div className="mx-3 h-0.5 rounded-full mt-1" style={{background: cfg.color}} />
               )}
             </div>
-
-            {/* Column footer */}
             <div className="shrink-0 border-t px-4 py-1.5" style={{borderColor: cfg.border, background: cfg.headerBg+"80"}}>
               <span className="text-[10px] font-semibold" style={{color: cfg.color+"99"}}>
                 {col.reduce((s,t)=>s+(t.actualHours||0),0)}h logged / {col.reduce((s,t)=>s+(t.estimatedHours||0),0)}h est
@@ -327,7 +316,6 @@ function AdminDailySheet({ user, users, projects }: { user:any; users:any[]; pro
 
   return (
     <div className="space-y-5">
-      {/* Controls */}
       <div className="bg-white border border-gray-200 rounded-2xl p-4 flex items-center gap-3 flex-wrap shadow-sm">
         <div className="flex items-center gap-1 bg-gray-100 rounded-xl px-1 py-1">
           <button onClick={prevMonth} className="w-7 h-7 rounded-lg hover:bg-white flex items-center justify-center text-gray-500 text-sm transition">←</button>
@@ -336,7 +324,7 @@ function AdminDailySheet({ user, users, projects }: { user:any; users:any[]; pro
         </div>
         <select value={selectedUser} onChange={e=>setSelectedUser(e.target.value)} className="text-xs border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
           <option value="all">All Employees</option>
-          {users.map((u:any)=><option key={u.uid} value={u.uid}>{u.email?.split("@")[0]}</option>)}
+          {users.map((u:any)=><option key={u.uid} value={u.uid}>{u.displayName||u.name||u.email?.split("@")[0]||"Unknown"}</option>)}
         </select>
         <select value={selectedProject} onChange={e=>setSelectedProject(e.target.value)} className="text-xs border border-gray-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
           <option value="all">All Projects</option>
@@ -351,8 +339,6 @@ function AdminDailySheet({ user, users, projects }: { user:any; users:any[]; pro
           })}
         </div>
       </div>
-
-      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           {label:"Total Hours", val:`${totalHours}h`, color:"#6366f1"},
@@ -366,8 +352,6 @@ function AdminDailySheet({ user, users, projects }: { user:any; users:any[]; pro
           </div>
         ))}
       </div>
-
-      {/* TABLE VIEW */}
       {sheetView==="table" && (
         <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
@@ -390,9 +374,7 @@ function AdminDailySheet({ user, users, projects }: { user:any; users:any[]; pro
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-2">
                             <span className={`w-2 h-2 rounded-full shrink-0 ${row.entryStatus==="submitted"?"bg-green-400":"bg-yellow-400"}`} />
-                            <div>
-                              <p className="text-sm font-semibold text-gray-800">{d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}</p>
-                            </div>
+                            <p className="text-sm font-semibold text-gray-800">{d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}</p>
                           </div>
                         </td>
                         <td className="px-5 py-3.5">
@@ -428,8 +410,6 @@ function AdminDailySheet({ user, users, projects }: { user:any; users:any[]; pro
           </div>
         </div>
       )}
-
-      {/* BY USER VIEW */}
       {sheetView==="byuser" && (
         <div className="space-y-4">
           {userSummary.length===0
@@ -439,7 +419,7 @@ function AdminDailySheet({ user, users, projects }: { user:any; users:any[]; pro
               <div className="flex items-center gap-4 p-5 border-b border-gray-50">
                 <Avatar name={u.email} size="md" />
                 <div className="flex-1">
-                  <p className="font-black text-gray-900">{u.email?.split("@")[0]}</p>
+                  <p className="font-black text-gray-900">{u.displayName||u.name||u.email?.split("@")[0]||"Unknown"}</p>
                   <p className="text-xs text-gray-400">{u.email}</p>
                 </div>
                 <div className="flex gap-6">
@@ -476,7 +456,6 @@ function AdminDailySheet({ user, users, projects }: { user:any; users:any[]; pro
                   </div>
                 </div>
               </div>
-              {/* User task table */}
               <div className="border-t border-gray-50 overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50">
@@ -504,8 +483,6 @@ function AdminDailySheet({ user, users, projects }: { user:any; users:any[]; pro
           ))}
         </div>
       )}
-
-      {/* CALENDAR VIEW */}
       {sheetView==="calendar" && (
         <AdminCalendar entries={entries} viewMonth={viewMonth} year={year} month={month} />
       )}
@@ -520,7 +497,6 @@ function AdminCalendar({ entries, viewMonth, year, month }: { entries: DailyEntr
 
   return (
     <>
-      {/* Day detail popup */}
       {popupDate && popupEntries.length > 0 && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={()=>setPopupDate(null)}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
@@ -585,7 +561,6 @@ function AdminCalendar({ entries, viewMonth, year, month }: { entries: DailyEntr
           </div>
         </div>
       )}
-
       <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
         <div className="grid grid-cols-7 border-b border-gray-100">
           {WEEKDAYS.map(d=><div key={d} className="py-3 text-center text-xs font-black text-gray-400 uppercase tracking-widest border-r border-gray-50 last:border-r-0">{d}</div>)}
@@ -604,9 +579,7 @@ function AdminCalendar({ entries, viewMonth, year, month }: { entries: DailyEntr
             return (
               <div key={dateStr}
                 onClick={()=>hasData&&setPopupDate(dateStr)}
-                className={`h-28 border-r border-b border-gray-50 p-2 flex flex-col transition-all ${
-                  isToday?"bg-indigo-50/40":""}
-                  ${hasData?"cursor-pointer hover:bg-gray-50":""}`}>
+                className={`h-28 border-r border-b border-gray-50 p-2 flex flex-col transition-all ${isToday?"bg-indigo-50/40":""} ${hasData?"cursor-pointer hover:bg-gray-50":""}`}>
                 <div className="flex items-center justify-between mb-1">
                   <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${isToday?"bg-indigo-600 text-white":"text-gray-400"}`}>{day}</div>
                   {hasData && <span className="text-[10px] font-black text-indigo-500">{totalDayH}h</span>}
@@ -634,6 +607,148 @@ function AdminCalendar({ entries, viewMonth, year, month }: { entries: DailyEntr
 }
 
 /* ═══════════════════════════════════════════
+   MEMBER PICKER (search + name display)
+═══════════════════════════════════════════ */
+function MemberPicker({ users, currentUid, selected, onChange }: {
+  users: any[]; currentUid: string; selected: string[]; onChange: (s: string[]) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const eligible = users.filter((u:any) => u.uid !== currentUid);
+  const filtered = eligible.filter((u:any) => {
+    const name = (u.displayName || u.name || u.email?.split("@")[0] || "").toLowerCase();
+    const email = (u.email || "").toLowerCase();
+    return name.includes(search.toLowerCase()) || email.includes(search.toLowerCase());
+  });
+  const toggle = (uid: string) => {
+    onChange(selected.includes(uid) ? selected.filter(id => id !== uid) : [...selected, uid]);
+  };
+  const getName = (u: any) => u.displayName || u.name || u.email?.split("@")[0] || "Unknown";
+  const colors = ["#6366f1","#7c3aed","#db2777","#d97706","#059669","#0891b2","#dc2626","#16a34a"];
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <label className="text-xs font-medium text-gray-500">Team Members</label>
+        {selected.length > 0 && (
+          <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{selected.length} selected</span>
+        )}
+      </div>
+      {/* Search bar */}
+      <div className="relative mb-2">
+        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">🔍</span>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search by name or email..."
+          className="w-full border border-gray-200 rounded-lg pl-7 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 bg-white transition"
+        />
+        {search && (
+          <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 text-xs">✕</button>
+        )}
+      </div>
+      {/* Member list */}
+      <div className="border border-gray-200 rounded-xl overflow-hidden">
+        <div className="max-h-44 overflow-y-auto divide-y divide-gray-50">
+          {filtered.length === 0 ? (
+            <div className="py-6 text-center text-xs text-gray-400">No members found</div>
+          ) : filtered.map((u: any) => {
+            const name = getName(u);
+            const checked = selected.includes(u.uid);
+            const colorIdx = (name.charCodeAt(0) || 0) % colors.length;
+            return (
+              <div key={u.uid}
+                onClick={() => toggle(u.uid)}
+                className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition ${checked ? "bg-indigo-50" : "bg-white hover:bg-gray-50"}`}>
+                <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:colors[colorIdx]}}>
+                  {name[0]?.toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-gray-800 truncate">{name}</p>
+                  <p className="text-[10px] text-gray-400 truncate">{u.email}</p>
+                </div>
+                <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition ${checked ? "bg-indigo-600 border-indigo-600" : "border-gray-300 bg-white"}`}>
+                  {checked && <span className="text-white text-[9px] font-bold">✓</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   SPRINT PICKER with delete
+═══════════════════════════════════════════ */
+function SprintPicker({ sprints, activeSprint, onSelect, onDelete }: {
+  sprints: Sprint[]; activeSprint: Sprint|null;
+  onSelect: (s: Sprint|null) => void;
+  onDelete: (s: Sprint) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white hover:bg-gray-50 transition focus:outline-none"
+        style={{minWidth:"130px"}}
+      >
+        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{background: activeSprint ? "#8b5cf6" : "#d1d5db"}} />
+        <span className="flex-1 text-left text-gray-700 truncate">{activeSprint ? activeSprint.name : "All Sprints"}</span>
+        <span className="text-gray-400 text-[10px] shrink-0">{open ? "▴" : "▾"}</span>
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1" style={{minWidth:"200px", maxWidth:"240px", boxShadow:"0 8px 24px rgba(0,0,0,0.12)"}}>
+          {/* All Sprints */}
+          <div
+            onClick={() => { onSelect(null); setOpen(false); }}
+            className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition text-xs ${!activeSprint ? "bg-indigo-50 text-indigo-700 font-semibold" : "hover:bg-gray-50 text-gray-700"}`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-300 shrink-0" />
+            <span className="flex-1">All Sprints</span>
+            {!activeSprint && <span className="text-indigo-500 text-[10px]">✓</span>}
+          </div>
+
+          {sprints.length > 0 && <div className="border-t border-gray-100 my-1" />}
+
+          {sprints.length === 0 ? (
+            <div className="px-3 py-3 text-[11px] text-gray-400 text-center">No sprints created yet</div>
+          ) : sprints.map(s => (
+            <div key={s.id}
+              className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition group/spr ${activeSprint?.id === s.id ? "bg-purple-50" : "hover:bg-gray-50"}`}
+              onClick={() => { onSelect(s); setOpen(false); }}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className={`text-xs truncate ${activeSprint?.id === s.id ? "text-purple-700 font-semibold" : "text-gray-700"}`}>{s.name}</p>
+                {(s.startDate || s.endDate) && (
+                  <p className="text-[10px] text-gray-400 mt-0.5 truncate">{s.startDate||"?"} → {s.endDate||"?"}</p>
+                )}
+              </div>
+              {activeSprint?.id === s.id && <span className="text-purple-500 text-[10px] shrink-0">✓</span>}
+              <button
+                onClick={e => { e.stopPropagation(); onDelete(s); setOpen(false); }}
+                className="opacity-0 group-hover/spr:opacity-100 w-5 h-5 rounded flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 transition shrink-0 text-[11px]"
+                title="Delete sprint"
+              >✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
    MAIN COMPONENT
 ═══════════════════════════════════════════ */
 export default function AdminProjectManagement({ user, projects, users }: { user: any; projects: any[]; users: any[] }) {
@@ -648,7 +763,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
   const [comments, setComments] = useState<any[]>([]);
   const [taskFiles, setTaskFiles] = useState<any[]>([]);
   const [subtasks, setSubtasks] = useState<any[]>([]);
-  const [viewMode, setViewMode] = useState<"kanban"|"list"|"timeline"|"workload"|"reports"|"gantt">("kanban");
+  const [viewMode, setViewMode] = useState<"dashboard"|"kanban"|"list"|"timeline"|"workload"|"reports"|"gantt">("dashboard");
   const [filterPriority, setFilterPriority] = useState("all");
   const [filterAssignee, setFilterAssignee] = useState("all");
   const [search, setSearch] = useState("");
@@ -770,6 +885,13 @@ export default function AdminProjectManagement({ user, projects, users }: { user
     setSf({name:"",startDate:"",endDate:""}); setShowSprintForm(false);
   };
 
+  const handleDeleteSprint = async (sprint: Sprint) => {
+    if (!confirm(`Delete sprint "${sprint.name}"? Tasks in this sprint will remain but won't be linked to it.`)) return;
+    await deleteDoc(doc(db,"sprints",sprint.id));
+    if (activeSprint?.id === sprint.id) setActiveSprint(null);
+    await logActivity(activeProject!.id,"deleted sprint",`Deleted sprint "${sprint.name}"`);
+  };
+
   const handleCreateMilestone = async () => {
     if (!mf.title.trim()) return;
     await addDoc(collection(db,"milestones"),{title:mf.title,dueDate:mf.dueDate,projectId:activeProject!.id,status:"pending",createdAt:serverTimestamp()});
@@ -835,7 +957,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
     const subtaskPct=subtasks.length?Math.round((subtasksDone/subtasks.length)*100):0;
     return (
       <div className="fixed inset-0 z-50 flex items-stretch" style={{fontFamily:"'DM Sans', system-ui, sans-serif"}}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap');`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap'); .hide-sb::-webkit-scrollbar{display:none;}.hide-sb{scrollbar-width:none;}`}</style>
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={()=>setActiveTask(null)} />
         <div className="relative ml-auto w-full max-w-3xl h-full bg-white shadow-2xl flex flex-col overflow-hidden">
           <div className="shrink-0" style={{background:`linear-gradient(135deg,${activeProject?.color||"#6366f1"} 0%,${activeProject?.color||"#6366f1"}dd 100%)`}}>
@@ -868,7 +990,6 @@ export default function AdminProjectManagement({ user, projects, users }: { user
               ))}
             </div>
           </div>
-
           <div className="flex-1 overflow-y-auto p-5 bg-gray-50">
             {taskDetailTab==="details" && (
               <div className="space-y-4">
@@ -876,7 +997,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                 <div className="grid grid-cols-2 gap-3">
                   {[
                     {label:"Status",content:<select value={activeTask.status} onChange={async e=>{await handleTaskStatusChange(activeTask.id,e.target.value);setActiveTask({...activeTask,status:e.target.value as Task["status"]});}} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">{COLS.map(c=><option key={c} value={c}>{COL_CONFIG[c].label}</option>)}</select>},
-                    {label:"Assignee",content:<select value={activeTask.assignedTo||""} onChange={e=>handleAssignTask(activeTask.id,e.target.value)} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"><option value="">Unassigned</option>{users.map((u:any)=><option key={u.uid} value={u.uid}>{u.email?.split("@")[0]}</option>)}</select>},
+                    {label:"Assignee",content:<select value={activeTask.assignedTo||""} onChange={e=>handleAssignTask(activeTask.id,e.target.value)} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"><option value="">Unassigned</option>{users.map((u:any)=><option key={u.uid} value={u.uid}>{u.displayName||u.name||u.email?.split("@")[0]||"Unknown"}</option>)}</select>},
                     {label:"Priority",content:<select value={activeTask.priority} onChange={async e=>{await updateDoc(doc(db,"projectTasks",activeTask.id),{priority:e.target.value});setActiveTask({...activeTask,priority:e.target.value as Task["priority"]});}} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">{["Low","Medium","High","Critical"].map(p=><option key={p}>{p}</option>)}</select>},
                     {label:"Due Date",content:<input type="date" defaultValue={activeTask.dueDate?.split("T")[0]||""} onChange={async e=>{await updateDoc(doc(db,"projectTasks",activeTask.id),{dueDate:e.target.value});}} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300" />},
                   ].map(({label,content})=>(
@@ -1014,11 +1135,11 @@ export default function AdminProjectManagement({ user, projects, users }: { user
   /* ══ PROJECT VIEW ══ */
   if (activeProject) {
     return (
-      <div className="h-screen flex flex-col bg-gray-50 overflow-hidden" style={{fontFamily:"'DM Sans', system-ui, sans-serif"}}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap');`}</style>
+      <div className="h-screen flex flex-col bg-gray-50 overflow-hidden" style={{fontFamily:"'Inter', 'DM Sans', system-ui, sans-serif"}}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap'); .hide-sb::-webkit-scrollbar{display:none;}.hide-sb{scrollbar-width:none;}`}</style>
         <div className="shrink-0 bg-white border-b border-gray-200 shadow-sm">
           <div className="px-6 py-3 flex items-center gap-4">
-            <button onClick={()=>{setActiveProject(null);setActiveSprint(null);}} className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-gray-900 transition">← Projects</button>
+            <button onClick={()=>{setActiveProject(null);setActiveSprint(null);setViewMode("dashboard");}} className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-gray-900 transition">← Projects</button>
             <div className="w-px h-5 bg-gray-200" />
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full" style={{background:activeProject.color||"#6366f1"}} />
@@ -1034,21 +1155,53 @@ export default function AdminProjectManagement({ user, projects, users }: { user
               <div className="flex -space-x-2">{projectMembers.slice(0,5).map((u:any)=><Avatar key={u.uid} name={u.email} size="xs" />)}</div>
             </div>
           </div>
-          <div className="px-6 py-2 flex items-center gap-2 bg-gray-50 border-t border-gray-100">
-            <div className="flex bg-white border border-gray-200 rounded-lg overflow-hidden">
-              {[["kanban","⊞"],["list","☰"],["timeline","📅"],["workload","👥"],["reports","📊"],["gantt","📈"]].map(([m,icon])=>(
-                <button key={m} onClick={()=>setViewMode(m as typeof viewMode)} className={`px-3 py-1.5 text-xs font-semibold transition ${viewMode===m?"text-white":"text-gray-500 hover:bg-gray-50"}`} style={viewMode===m?{background:activeProject.color||"#6366f1"}:{}}>{icon} {m.charAt(0).toUpperCase()+m.slice(1)}</button>
+          {/* ── View tabs row ── */}
+          <div className="px-4 flex items-center bg-white border-t border-gray-100" style={{borderBottom:"1px solid #f3f4f6"}}>
+            <div className="flex items-center overflow-x-auto hide-sb" style={{scrollbarWidth:"none", msOverflowStyle:"none"}}>
+              {([
+                ["dashboard","📊 Dashboard"],
+                ["kanban","⊞ Kanban"],
+                ["list","☰ List"],
+                ["timeline","📅 Timeline"],
+                ["workload","👥 Workload"],
+                ["reports","📊 Reports"],
+                ["gantt","📈 Gantt"],
+              ] as const).map(([m,label])=>(
+                <button key={m} onClick={()=>setViewMode(m as typeof viewMode)}
+                  className="px-3 py-2.5 text-xs font-semibold border-b-2 transition-all whitespace-nowrap shrink-0"
+                  style={viewMode===m
+                    ? {borderBottomColor:activeProject.color||"#4f46e5",color:activeProject.color||"#4f46e5",background:"transparent"}
+                    : {borderBottomColor:"transparent",color:"#6b7280"}}
+                >{label}</button>
               ))}
             </div>
-            <div className="w-px h-5 bg-gray-200" />
-            <select value={activeSprint?.id||""} onChange={e=>setActiveSprint(sprints.find(s=>s.id===e.target.value)||null)} className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none"><option value="">All Sprints</option>{sprints.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select>
-            <select value={filterPriority} onChange={e=>setFilterPriority(e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none"><option value="all">Priority</option>{["Low","Medium","High","Critical"].map(p=><option key={p}>{p}</option>)}</select>
-            <select value={filterAssignee} onChange={e=>setFilterAssignee(e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none"><option value="all">Assignee</option>{projectMembers.map((u:any)=><option key={u.uid} value={u.uid}>{u.email?.split("@")[0]}</option>)}</select>
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Search..." className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none w-40" />
-            <div className="flex-1" />
-            <button onClick={()=>setShowMilestoneForm(!showMilestoneForm)} className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-amber-200 bg-amber-50 text-amber-700">🏁 Milestone</button>
-            <button onClick={()=>setShowSprintForm(!showSprintForm)} className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-purple-200 bg-purple-50 text-purple-700">🏃 Sprint</button>
-            <button onClick={()=>setShowTaskForm(!showTaskForm)} className="text-xs font-bold px-4 py-1.5 rounded-lg text-white shadow-sm" style={{background:activeProject.color||"#6366f1"}}>+ New Task</button>
+          </div>
+
+          {/* ── Controls row ── */}
+          <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-2 flex-wrap">
+            {viewMode!=="dashboard"&&(
+              <div className="flex items-center gap-2 flex-wrap flex-1">
+                <SprintPicker sprints={sprints} activeSprint={activeSprint} onSelect={(s)=>setActiveSprint(s)} onDelete={handleDeleteSprint} />
+                <select value={filterPriority} onChange={e=>setFilterPriority(e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none">
+                  <option value="all">All Priorities</option>
+                  {["Low","Medium","High","Critical"].map(p=><option key={p}>{p}</option>)}
+                </select>
+                <select value={filterAssignee} onChange={e=>setFilterAssignee(e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none">
+                  <option value="all">All Assignees</option>
+                  {projectMembers.map((u:any)=><option key={u.uid} value={u.uid}>{u.displayName||u.name||u.email?.split("@")[0]||"Unknown"}</option>)}
+                </select>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-[11px]">🔍</span>
+                  <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search tasks..." className="text-xs border border-gray-200 rounded-lg pl-7 pr-3 py-1.5 bg-white focus:outline-none w-36" />
+                </div>
+              </div>
+            )}
+            {viewMode==="dashboard" && <div className="flex-1" />}
+            <div className="flex items-center gap-2 shrink-0 ml-auto">
+              <button onClick={()=>setShowMilestoneForm(!showMilestoneForm)} className="text-xs font-medium px-3 py-1.5 rounded-lg border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition">🏁 Milestone</button>
+              <button onClick={()=>setShowSprintForm(!showSprintForm)} className="text-xs font-medium px-3 py-1.5 rounded-lg border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 transition">🏃 Sprint</button>
+              {viewMode!=="dashboard"&&<button onClick={()=>setShowTaskForm(!showTaskForm)} className="text-xs font-semibold px-4 py-1.5 rounded-lg text-white transition hover:opacity-90" style={{background:activeProject.color||"#4f46e5"}}>+ New Task</button>}
+            </div>
           </div>
         </div>
 
@@ -1079,7 +1232,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                   <input value={tf.description} onChange={e=>setTf({...tf,description:e.target.value})} placeholder="Description" className="flex-1 text-xs border border-indigo-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none" />
                   <select value={tf.priority} onChange={e=>setTf({...tf,priority:e.target.value as Task["priority"]})} className="text-xs border border-indigo-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none">{["Low","Medium","High","Critical"].map(p=><option key={p}>{p}</option>)}</select>
                   <select value={tf.status} onChange={e=>setTf({...tf,status:e.target.value as Task["status"]})} className="text-xs border border-indigo-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none">{COLS.map(c=><option key={c} value={c}>{COL_CONFIG[c].label}</option>)}</select>
-                  <select value={tf.assignedTo} onChange={e=>setTf({...tf,assignedTo:e.target.value})} className="text-xs border border-indigo-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"><option value="">Assign to...</option>{users.map((u:any)=><option key={u.uid} value={u.uid}>{u.email?.split("@")[0]}</option>)}</select>
+                  <select value={tf.assignedTo} onChange={e=>setTf({...tf,assignedTo:e.target.value})} className="text-xs border border-indigo-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"><option value="">Assign to...</option>{users.map((u:any)=><option key={u.uid} value={u.uid}>{u.displayName||u.name||u.email?.split("@")[0]||"Unknown"}</option>)}</select>
                   <input type="date" value={tf.dueDate} onChange={e=>setTf({...tf,dueDate:e.target.value})} className="text-xs border border-indigo-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none" />
                   <input type="number" value={tf.estimatedHours} onChange={e=>setTf({...tf,estimatedHours:e.target.value})} placeholder="Est. hrs" className="w-20 text-xs border border-indigo-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none" />
                   <input value={tf.tags} onChange={e=>setTf({...tf,tags:e.target.value})} placeholder="tags, csv" className="w-28 text-xs border border-indigo-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none" />
@@ -1090,14 +1243,220 @@ export default function AdminProjectManagement({ user, projects, users }: { user
         )}
 
         <div className="flex-1 overflow-auto">
-          {/* KANBAN */}
+          {/* ── DASHBOARD ── */}
+          {viewMode==="dashboard"&&(
+            <div className="p-5 space-y-5">
+              {/* KPI Row */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {[
+                  {label:"Total Tasks",val:tasks.length,color:"#6366f1",bg:"#eef2ff"},
+                  {label:"Completed",val:tasks.filter(t=>t.status==="done").length,color:"#16a34a",bg:"#f0fdf4"},
+                  {label:"In Progress",val:tasks.filter(t=>t.status==="inprogress").length,color:"#2563eb",bg:"#eff6ff"},
+                  {label:"Overdue",val:overdueTasks.length,color:"#dc2626",bg:"#fef2f2"},
+                  {label:"Total Hours",val:`${totalHours}h`,color:"#7c3aed",bg:"#f5f3ff"},
+                  {label:"Progress",val:`${activeProject.progress}%`,color:activeProject.color||"#6366f1",bg:"#f9fafb"},
+                ].map(s=>(
+                  <div key={s.label} className="rounded-xl p-4 border" style={{background:s.bg,borderColor:s.color+"20"}}>
+                    <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{color:s.color}}>{s.label}</p>
+                    <p className="text-2xl font-black" style={{color:s.color}}>{s.val}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* Task Status */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                  <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full" style={{background:activeProject.color||"#6366f1"}} />Task Status Overview
+                  </h3>
+                  <div className="space-y-3">
+                    {[
+                      {label:"To Do",count:tasks.filter(t=>t.status==="todo").length,color:"#64748b"},
+                      {label:"In Progress",count:tasks.filter(t=>t.status==="inprogress").length,color:"#2563eb"},
+                      {label:"Review",count:tasks.filter(t=>t.status==="review").length,color:"#7c3aed"},
+                      {label:"Done",count:tasks.filter(t=>t.status==="done").length,color:"#16a34a"},
+                      {label:"Blocked",count:tasks.filter(t=>t.status==="blocked").length,color:"#dc2626"},
+                    ].map(s=>{
+                      const pct=tasks.length?Math.round((s.count/tasks.length)*100):0;
+                      return(
+                        <div key={s.label} className="flex items-center gap-3">
+                          <div className="w-3 h-3 rounded-full shrink-0" style={{background:s.color}} />
+                          <span className="text-xs text-gray-600 w-20 shrink-0">{s.label}</span>
+                          <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-700" style={{width:`${pct}%`,background:s.color}} />
+                          </div>
+                          <span className="text-xs font-bold text-gray-700 w-6 text-right">{s.count}</span>
+                          <span className="text-[10px] text-gray-400 w-8 text-right">{pct}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-gray-50 flex items-center justify-between">
+                    <span className="text-xs text-gray-400">Completion rate</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-20 bg-gray-100 rounded-full h-1.5"><div className="h-1.5 rounded-full" style={{width:`${activeProject.progress}%`,background:activeProject.color||"#6366f1"}} /></div>
+                      <span className="text-xs font-black" style={{color:activeProject.color||"#6366f1"}}>{activeProject.progress}%</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Overdue Items */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                  <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-red-500" />
+                    Overdue Work Items
+                    {overdueTasks.length>0&&<span className="ml-auto text-[10px] font-bold bg-red-50 text-red-600 border border-red-100 px-2 py-0.5 rounded-full">{overdueTasks.length} overdue</span>}
+                  </h3>
+                  {overdueTasks.length===0?(
+                    <div className="flex flex-col items-center justify-center h-32 text-gray-300"><div className="text-3xl mb-2">✅</div><p className="text-xs">No overdue tasks!</p></div>
+                  ):(
+                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                      {overdueTasks.slice(0,8).map(t=>{
+                        const daysLate=Math.floor((new Date().getTime()-new Date(t.dueDate!).getTime())/(1000*60*60*24));
+                        return(
+                          <div key={t.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Avatar name={t.assignedToName||"?"} size="xs" />
+                              <span className="text-xs font-medium text-gray-700 truncate">{t.title}</span>
+                            </div>
+                            <span className="text-[11px] font-semibold text-red-500 shrink-0 ml-2">late by {daysLate}d</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                {/* Team Status */}
+                <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                  <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-500" />Team Status</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-gray-100">
+                          <th className="text-left py-2 px-2 text-gray-400 font-bold uppercase tracking-wider">Member</th>
+                          <th className="text-center py-2 px-2 text-red-400 font-bold">Overdue</th>
+                          <th className="text-center py-2 px-2 text-gray-400 font-bold">Today</th>
+                          <th className="text-center py-2 px-2 text-gray-400 font-bold">Open</th>
+                          <th className="text-center py-2 px-2 text-indigo-400 font-bold">Hours</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {projectMembers.map((u:any)=>{
+                          const todayStr=new Date().toISOString().split("T")[0];
+                          const overdueT=tasks.filter(t=>t.assignedTo===u.uid&&t.dueDate&&new Date(t.dueDate)<new Date()&&t.status!=="done").length;
+                          const todayT=tasks.filter(t=>t.assignedTo===u.uid&&t.dueDate===todayStr).length;
+                          const openT=tasks.filter(t=>t.assignedTo===u.uid&&t.status!=="done").length;
+                          const hrs=workLogs.filter(l=>l.userId===u.uid).reduce((s,l)=>s+l.hoursWorked,0);
+                          return(
+                            <tr key={u.uid} className="border-b border-gray-50 hover:bg-gray-50 transition">
+                              <td className="py-2.5 px-2"><div className="flex items-center gap-2"><Avatar name={u.email} size="xs" /><span className="font-medium text-gray-700 truncate max-w-25">{u.displayName||u.name||u.email?.split("@")[0]||"Unknown"}</span></div></td>
+                              <td className="text-center py-2.5 px-2"><span className={`font-bold ${overdueT>0?"text-red-500":"text-gray-300"}`}>{overdueT}</span></td>
+                              <td className="text-center py-2.5 px-2 text-gray-500">{todayT}</td>
+                              <td className="text-center py-2.5 px-2 text-gray-500">{openT}</td>
+                              <td className="text-center py-2.5 px-2"><span className="font-bold" style={{color:activeProject.color||"#6366f1"}}>{hrs}h</span></td>
+                            </tr>
+                          );
+                        })}
+                        {projectMembers.length===0&&<tr><td colSpan={5} className="py-8 text-center text-gray-300 text-xs">No team members assigned</td></tr>}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Top Contributors */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                  <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-amber-400" />Top Contributors</h3>
+                  <div className="space-y-3">
+                    {projectMembers.slice(0,5).map((u:any,idx:number)=>{
+                      const done=tasks.filter(t=>t.assignedTo===u.uid&&t.status==="done").length;
+                      const total=tasks.filter(t=>t.assignedTo===u.uid).length;
+                      return(
+                        <div key={u.uid} className="flex items-center gap-3">
+                          <span className="text-[10px] font-black text-gray-300 w-4">#{idx+1}</span>
+                          <Avatar name={u.email} size="xs" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-gray-700 truncate">{u.displayName||u.name||u.email?.split("@")[0]||"Unknown"}</p>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <div className="flex-1 bg-gray-100 rounded-full h-1"><div className="h-1 rounded-full" style={{width:total>0?`${(done/total)*100}%`:"0%",background:activeProject.color||"#6366f1"}} /></div>
+                            </div>
+                          </div>
+                          <span className="text-sm font-black text-gray-700">{done}</span>
+                        </div>
+                      );
+                    })}
+                    {projectMembers.length===0&&<div className="text-center py-8 text-gray-300 text-xs">No data yet</div>}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* Timesheet Summary */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                  <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-teal-500" />Timesheet Summary</h3>
+                  <div className="grid grid-cols-3 gap-3 mb-4">
+                    {[
+                      {label:"Total Logged",val:`${totalHours}h`,color:"#7c3aed"},
+                      {label:"Completed",val:`${workLogs.filter(l=>l.workStatus==="Completed").reduce((s,l)=>s+l.hoursWorked,0)}h`,color:"#16a34a"},
+                      {label:"In Progress",val:`${workLogs.filter(l=>l.workStatus==="In Progress").reduce((s,l)=>s+l.hoursWorked,0)}h`,color:"#2563eb"},
+                    ].map(s=>(
+                      <div key={s.label} className="bg-gray-50 rounded-xl p-3 text-center">
+                        <p className="text-[10px] text-gray-400 mb-1">{s.label}</p>
+                        <p className="text-lg font-black" style={{color:s.color}}>{s.val}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="space-y-2 max-h-36 overflow-y-auto">
+                    {workLogs.length===0
+                      ? <div className="text-center py-6 text-gray-300 text-xs">No work logs yet</div>
+                      : workLogs.slice(0,6).map(log=>(
+                        <div key={log.id} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
+                          <div className="flex items-center gap-2"><Avatar name={log.userName} size="xs" /><div><p className="text-xs font-semibold text-gray-700">{log.userName}</p><p className="text-[10px] text-gray-400 truncate max-w-35">{log.description}</p></div></div>
+                          <div className="text-right"><p className="text-sm font-black" style={{color:activeProject.color||"#6366f1"}}>{log.hoursWorked}h</p><span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${log.workStatus==="Completed"?"bg-green-50 text-green-600":log.workStatus==="Blocked"?"bg-red-50 text-red-600":"bg-blue-50 text-blue-600"}`}>{log.workStatus}</span></div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                {/* Priority Breakdown */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                  <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-orange-400" />Priority Breakdown</h3>
+                  <div className="space-y-3 mb-4">
+                    {(["Critical","High","Medium","Low"] as const).map(p=>{
+                      const pc=PRIORITY_CONFIG[p]; const cnt=tasks.filter(t=>t.priority===p).length;
+                      const pct=tasks.length?Math.round((cnt/tasks.length)*100):0;
+                      return(
+                        <div key={p} className="flex items-center gap-3">
+                          <span className="text-sm w-4">{pc.icon}</span>
+                          <span className="text-xs font-semibold w-14" style={{color:pc.color}}>{p}</span>
+                          <div className="flex-1 bg-gray-100 rounded-full h-2"><div className="h-2 rounded-full" style={{width:`${pct}%`,background:pc.color}} /></div>
+                          <span className="text-xs font-bold text-gray-700 w-6 text-right">{cnt}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="border-t border-gray-50 pt-4">
+                    <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-2">Recently Completed</p>
+                    <div className="space-y-1.5 max-h-28 overflow-y-auto">
+                      {tasks.filter(t=>t.status==="done").slice(0,5).map(t=>(
+                        <div key={t.id} className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" /><span className="text-xs text-gray-600 truncate">{t.title}</span><span className="text-[10px] text-green-500 shrink-0 font-semibold">done</span></div>
+                      ))}
+                      {tasks.filter(t=>t.status==="done").length===0&&<p className="text-xs text-gray-300 text-center py-2">No completed tasks yet</p>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── KANBAN ── */}
           {viewMode==="kanban"&&(
             <div className="h-full border border-gray-200 rounded-xl m-4 overflow-hidden bg-white shadow-sm">
               <KanbanBoard tasks={filteredTasks} projectColor={activeProject.color||"#6366f1"} onTaskClick={setActiveTask} onStatusChange={handleTaskStatusChange} />
             </div>
           )}
-
-          {/* LIST */}
           {viewMode==="list"&&(
             <div className="p-6">
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -1128,7 +1487,6 @@ export default function AdminProjectManagement({ user, projects, users }: { user
               </div>
             </div>
           )}
-
           {viewMode==="timeline"&&(
             <div className="p-6"><div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
               <h3 className="font-bold text-gray-800 mb-6">Activity Stream</h3>
@@ -1144,7 +1502,6 @@ export default function AdminProjectManagement({ user, projects, users }: { user
               </div>
             </div></div>
           )}
-
           {viewMode==="workload"&&(
             <div className="p-6 space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -1152,7 +1509,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                   <div key={u.uid} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                     <div className="flex items-center gap-3 mb-4">
                       <Avatar name={u.email} size="md" />
-                      <div><p className="font-bold text-gray-800 text-sm">{u.email?.split("@")[0]}</p><p className="text-xs text-gray-400">{total} tasks</p></div>
+                      <div><p className="font-bold text-gray-800 text-sm">{u.displayName||u.name||u.email?.split("@")[0]||"Unknown"}</p><p className="text-xs text-gray-400">{total} tasks</p></div>
                       <div className="ml-auto"><ProgressRing pct={total>0?Math.round((done/total)*100):0} size={44} stroke={4} color={activeProject.color||"#6366f1"} /></div>
                     </div>
                     <div className="space-y-2">
@@ -1187,7 +1544,6 @@ export default function AdminProjectManagement({ user, projects, users }: { user
               </div>
             </div>
           )}
-
           {viewMode==="reports"&&(
             <div className="p-6 space-y-5">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1222,7 +1578,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                         const hrs=workLogs.filter(l=>l.userId===u.uid).reduce((s,l)=>s+l.hoursWorked,0);
                         return(
                           <tr key={u.uid} className="border-b border-gray-50 hover:bg-gray-50">
-                            <td className="px-4 py-3"><div className="flex items-center gap-2"><Avatar name={u.email} size="xs" /><span className="text-sm font-semibold text-gray-700">{u.email?.split("@")[0]}</span></div></td>
+                            <td className="px-4 py-3"><div className="flex items-center gap-2"><Avatar name={u.email} size="xs" /><span className="text-sm font-semibold text-gray-700">{u.displayName||u.name||u.email?.split("@")[0]||"Unknown"}</span></div></td>
                             <td className="px-4 py-3 text-sm font-bold text-gray-700">{total}</td>
                             <td className="px-4 py-3 text-sm font-bold text-green-600">{done}</td>
                             <td className="px-4 py-3 text-sm font-bold" style={{color:activeProject.color||"#6366f1"}}>{hrs}h</td>
@@ -1235,7 +1591,6 @@ export default function AdminProjectManagement({ user, projects, users }: { user
               </div>
             </div>
           )}
-
           {viewMode==="gantt"&&(
             <div className="p-6"><div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="p-5 border-b border-gray-50"><h3 className="font-bold text-gray-800">Task Timeline (Gantt)</h3></div>
@@ -1266,167 +1621,297 @@ export default function AdminProjectManagement({ user, projects, users }: { user
   const billingP=projects?.filter((p:any)=>p.projectType==="Billing").length||0;
 
   return (
-    <div className="min-h-screen bg-gray-50" style={{fontFamily:"'DM Sans', system-ui, sans-serif"}}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap');`}</style>
+    <div className="min-h-screen" style={{background:"#f5f6fa", fontFamily:"'Inter', 'DM Sans', system-ui, sans-serif"}}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        .proj-card { transition: box-shadow 0.18s ease, transform 0.18s ease; }
+        .proj-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.10) !important; transform: translateY(-2px); }
+        .modal-backdrop { animation: fadeIn 0.18s ease; }
+        .modal-panel { animation: slideUp 0.22s cubic-bezier(0.34,1.56,0.64,1); }
+        @keyframes fadeIn { from{opacity:0}to{opacity:1} }
+        @keyframes slideUp { from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)} }
+        ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:3px}
+      `}</style>
 
-      {/* Page Header */}
-      <div className="bg-white border-b border-gray-200 px-8 py-5 sticky top-0 z-30 shadow-sm">
-        <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-6">
-          <div>
-            <h1 className="text-xl font-black text-gray-900">Project Hub</h1>
-            <p className="text-xs text-gray-400 mt-0.5">Manage &amp; track all company projects</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex bg-gray-100 rounded-xl p-1">
-              <button onClick={()=>setMainTab("projects")} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition ${mainTab==="projects"?"bg-white shadow text-gray-900":"text-gray-500 hover:text-gray-700"}`}>📁 Projects</button>
-              <button onClick={()=>setMainTab("dailysheet")} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition ${mainTab==="dailysheet"?"bg-white shadow text-gray-900":"text-gray-500 hover:text-gray-700"}`}>📋 Daily Sheets</button>
-            </div>
-            {mainTab==="projects"&&<>
-              <div className="flex bg-gray-100 rounded-lg p-0.5">
-                <button onClick={()=>setProjectsView("grid")} className={`px-3 py-1.5 rounded-md text-xs font-semibold transition ${projectsView==="grid"?"bg-white shadow text-gray-800":"text-gray-500"}`}>⊞ Grid</button>
-                <button onClick={()=>setProjectsView("list")} className={`px-3 py-1.5 rounded-md text-xs font-semibold transition ${projectsView==="list"?"bg-white shadow text-gray-800":"text-gray-500"}`}>☰ List</button>
+      {/* ── NEW PROJECT MODAL ── */}
+      {showProjectForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop" style={{background:"rgba(0,0,0,0.45)", backdropFilter:"blur(4px)"}}>
+          <div className="modal-panel bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden" style={{border:"1px solid #e5e7eb"}}>
+            <div className="shrink-0 px-6 py-5 flex items-center justify-between border-b border-gray-100">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">{editingProject ? "Edit Project" : "Create New Project"}</h2>
+                <p className="text-xs text-gray-400 mt-0.5">{editingProject ? "Update project details" : "Fill in the details to set up your project"}</p>
               </div>
-              <button onClick={()=>{setEditingProject(null);setShowProjectForm(!showProjectForm);}} className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white rounded-xl shadow-sm hover:opacity-90 transition" style={{background:"linear-gradient(135deg,#6366f1,#8b5cf6)"}}>+ New Project</button>
+              <button onClick={()=>{setShowProjectForm(false);setEditingProject(null);}} className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition text-sm">✕</button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+              {/* Color picker */}
+              <div>
+                <label className="text-xs font-medium text-gray-500 block mb-2">Project Color</label>
+                <div className="flex gap-2">
+                  {PROJECT_COLORS.map(c=>(
+                    <button key={c} onClick={()=>setPf({...pf,color:c})}
+                      className="w-7 h-7 rounded-full transition-all hover:scale-110 shrink-0"
+                      style={{background:c, outline: pf.color===c ? `2px solid ${c}` : "none", outlineOffset:"2px"}} />
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-gray-500 block mb-1.5">Project Name <span className="text-red-400">*</span></label>
+                  <input value={pf.name} onChange={e=>setPf({...pf,name:e.target.value})} placeholder="e.g. Website Redesign"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 transition" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-500 block mb-1.5">Client Name</label>
+                  <input value={pf.clientName} onChange={e=>setPf({...pf,clientName:e.target.value})} placeholder="e.g. Acme Corp"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 transition" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 block mb-1.5">Description</label>
+                <textarea value={pf.description} onChange={e=>setPf({...pf,description:e.target.value})} placeholder="Brief project overview..."
+                  rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 transition resize-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  {label:"Billing Type", child:<select value={pf.projectType} onChange={e=>setPf({...pf,projectType:e.target.value as any})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 transition"><option value="Billing">Billing</option><option value="Non-Billing">Non-Billing</option></select>},
+                  {label:"Payment Model", child:<select value={pf.billingType} onChange={e=>setPf({...pf,billingType:e.target.value as any})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 transition"><option>Hourly</option><option>Fixed Cost</option><option>Internal</option></select>},
+                  {label:"Priority", child:<select value={pf.priority} onChange={e=>setPf({...pf,priority:e.target.value as any})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 transition">{["Low","Medium","High","Critical"].map(p=><option key={p}>{p}</option>)}</select>},
+                  {label:"Status", child:<select value={pf.status} onChange={e=>setPf({...pf,status:e.target.value as any})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 transition">{["Not Started","Planning","In Progress","On Hold","Completed","Cancelled"].map(s=><option key={s}>{s}</option>)}</select>},
+                  {label:"Budget ($)", child:<input type="number" value={pf.budget} onChange={e=>setPf({...pf,budget:e.target.value})} placeholder="0" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 transition" />},
+                  {label:"Project Manager", child:<select value={pf.projectManager} onChange={e=>setPf({...pf,projectManager:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 transition"><option value="">Select manager</option>{users.map((u:any)=><option key={u.uid} value={u.uid}>{u.displayName||u.name||u.email?.split("@")[0]||"Unknown"}</option>)}</select>},
+                  {label:"Start Date", child:<input type="date" value={pf.startDate} onChange={e=>setPf({...pf,startDate:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 transition" />},
+                  {label:"End Date", child:<input type="date" value={pf.endDate} onChange={e=>setPf({...pf,endDate:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 transition" />},
+                ].map(({label,child})=>(<div key={label}><label className="text-xs font-medium text-gray-500 block mb-1.5">{label}</label>{child}</div>))}
+              </div>
+              <MemberPicker users={users} currentUid={user.uid} selected={pf.selectedMembers} onChange={(sel:string[])=>setPf({...pf,selectedMembers:sel})} />
+            </div>
+            <div className="shrink-0 px-6 py-4 border-t border-gray-100 flex items-center gap-3">
+              <button onClick={()=>{setShowProjectForm(false);setEditingProject(null);}} className="flex-1 py-2 text-sm text-gray-500 rounded-lg border border-gray-200 hover:bg-gray-50 transition">Cancel</button>
+              <button onClick={handleSaveProject} className="flex-1 py-2 text-sm font-semibold text-white rounded-lg hover:opacity-90 transition" style={{background:"#4f46e5"}}>{editingProject ? "Save Changes" : "Create Project"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── TOP HEADER BAR ── */}
+      <div className="bg-white border-b border-gray-200 px-6 py-0 sticky top-0 z-30" style={{boxShadow:"0 1px 0 #e5e7eb"}}>
+        <div className="max-w-screen-2xl mx-auto flex items-center justify-between h-14 gap-6">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:"#4f46e5"}}>PH</div>
+            <div>
+              <h1 className="text-sm font-semibold text-gray-900">Project Hub</h1>
+              <p className="text-[10px] text-gray-400">Manage &amp; track all company projects</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Tabs */}
+            <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+              <button onClick={()=>setMainTab("projects")}
+                className="px-4 py-1.5 text-xs font-medium transition"
+                style={mainTab==="projects"?{background:"white",color:"#4f46e5",boxShadow:"0 1px 3px rgba(0,0,0,0.08)"}:{color:"#6b7280"}}>
+                Projects
+              </button>
+              <button onClick={()=>setMainTab("dailysheet")}
+                className="px-4 py-1.5 text-xs font-medium transition"
+                style={mainTab==="dailysheet"?{background:"white",color:"#4f46e5",boxShadow:"0 1px 3px rgba(0,0,0,0.08)"}:{color:"#6b7280"}}>
+                Daily Sheets
+              </button>
+            </div>
+            {mainTab==="projects" && <>
+              <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                <button onClick={()=>setProjectsView("grid")} className="px-2.5 py-1.5 transition text-sm"
+                  style={projectsView==="grid"?{background:"#4f46e5",color:"white"}:{background:"white",color:"#9ca3af"}}>⊞</button>
+                <button onClick={()=>setProjectsView("list")} className="px-2.5 py-1.5 transition text-sm"
+                  style={projectsView==="list"?{background:"#4f46e5",color:"white"}:{background:"white",color:"#9ca3af"}}>☰</button>
+              </div>
+              <button onClick={()=>{setEditingProject(null);setShowProjectForm(true);}}
+                className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white rounded-lg transition hover:opacity-90"
+                style={{background:"#4f46e5"}}>
+                + New Project
+              </button>
             </>}
           </div>
         </div>
       </div>
 
-      <div className="max-w-screen-2xl mx-auto px-8 py-6 space-y-6">
+      <div className="max-w-screen-2xl mx-auto px-6 py-5 space-y-5">
         {/* DAILY SHEET TAB */}
-        {mainTab==="dailysheet"&&<AdminDailySheet user={user} users={users} projects={projects||[]} />}
+        {mainTab==="dailysheet" && <AdminDailySheet user={user} users={users} projects={projects||[]} />}
 
         {/* PROJECTS TAB */}
-        {mainTab==="projects"&&<>
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {mainTab==="projects" && <>
+
+          {/* ── STAT STRIP ── */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { label: "Total Projects", val: totalP, icon: "📁", bg: "#e8f1ff" },
-              { label: "Completed", val: completedP, icon: "✅", bg: "#e7f8ee" },
-              { label: "In Progress", val: inProgressP, icon: "⚡", bg: "#eef2ff" },
-              { label: "Billing Projects", val: billingP, icon: "💰", bg: "#fff4e5" },
-            ].map((s) => (
-              <div key={s.label} className="rounded-2xl p-5 shadow-sm" style={{ background: s.bg }}>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{s.label}</p>
-                    <p className="text-4xl font-black text-gray-800">{s.val}</p>
-                  </div>
-                  <div className="text-3xl">{s.icon}</div>
+              { label:"Total Projects",  val:totalP,      color:"#4f46e5", bg:"#eef2ff", border:"#c7d2fe" },
+              { label:"Completed",       val:completedP,  color:"#059669", bg:"#ecfdf5", border:"#a7f3d0" },
+              { label:"In Progress",     val:inProgressP, color:"#d97706", bg:"#fffbeb", border:"#fde68a" },
+              { label:"Billing Projects",val:billingP,    color:"#7c3aed", bg:"#f5f3ff", border:"#ddd6fe" },
+            ].map((s)=>(
+              <div key={s.label} className="bg-white rounded-xl p-4 flex items-center gap-4" style={{border:`1px solid ${s.border}`, boxShadow:`0 1px 4px ${s.color}12`}}>
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{background:s.bg}}>
+                  <span className="text-xl font-black" style={{color:s.color}}>{s.val}</span>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 leading-tight">{s.label}</p>
+                  <p className="text-lg font-bold text-gray-800 leading-tight">{s.val}</p>
                 </div>
               </div>
             ))}
           </div>
 
-          {showProjectForm&&(
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-lg overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-50 flex items-center justify-between" style={{background:"linear-gradient(135deg,#6366f1,#8b5cf6)"}}>
-                <h3 className="font-bold text-white">{editingProject?"✏️ Edit Project":"✨ New Project"}</h3>
-                <button onClick={()=>{setShowProjectForm(false);setEditingProject(null);}} className="text-white/70 hover:text-white text-xl">✕</button>
-              </div>
-              <div className="p-6 space-y-5">
-                <div><label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">Project Color</label><div className="flex gap-2">{PROJECT_COLORS.map(c=><button key={c} onClick={()=>setPf({...pf,color:c})} className={`w-7 h-7 rounded-full transition-transform hover:scale-110 ${pf.color===c?"ring-2 ring-offset-2 ring-gray-400":""}`} style={{background:c}} />)}</div></div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <input value={pf.name} onChange={e=>setPf({...pf,name:e.target.value})} placeholder="Project Name *" className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                  <input value={pf.clientName} onChange={e=>setPf({...pf,clientName:e.target.value})} placeholder="Client Name" className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                </div>
-                <textarea value={pf.description} onChange={e=>setPf({...pf,description:e.target.value})} placeholder="Description" rows={2} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none" />
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <select value={pf.projectType} onChange={e=>setPf({...pf,projectType:e.target.value as "Billing"|"Non-Billing"})} className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"><option value="Billing">💰 Billing</option><option value="Non-Billing">📋 Non-Billing</option></select>
-                  <select value={pf.billingType} onChange={e=>setPf({...pf,billingType:e.target.value as "Hourly"|"Fixed Cost"|"Internal"})} className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"><option>Hourly</option><option>Fixed Cost</option><option>Internal</option></select>
-                  <input type="number" value={pf.budget} onChange={e=>setPf({...pf,budget:e.target.value})} placeholder="Budget ($)" className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                  <select value={pf.projectManager} onChange={e=>setPf({...pf,projectManager:e.target.value})} className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"><option value="">Project Manager...</option>{users.map((u:any)=><option key={u.uid} value={u.uid}>{u.email?.split("@")[0]}</option>)}</select>
-                  <select value={pf.priority} onChange={e=>setPf({...pf,priority:e.target.value as "Low"|"Medium"|"High"|"Critical"})} className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">{["Low","Medium","High","Critical"].map(p=><option key={p}>{p}</option>)}</select>
-                  <select value={pf.status} onChange={e=>setPf({...pf,status:e.target.value as Project["status"]})} className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">{["Not Started","Planning","In Progress","On Hold","Completed","Cancelled"].map(s=><option key={s}>{s}</option>)}</select>
-                  <input type="date" value={pf.startDate} onChange={e=>setPf({...pf,startDate:e.target.value})} className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                  <input type="date" value={pf.endDate} onChange={e=>setPf({...pf,endDate:e.target.value})} className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2">Team Members</label>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 max-h-36 overflow-y-auto p-3 bg-gray-50 rounded-xl border border-gray-100">
-                    {users.filter((u:any)=>u.uid!==user.uid).map((u:any)=>(
-                      <label key={u.uid} className="flex items-center gap-2 p-2 hover:bg-white rounded-lg cursor-pointer transition">
-                        <input type="checkbox" checked={pf.selectedMembers.includes(u.uid)} onChange={e=>setPf({...pf,selectedMembers:e.target.checked?[...pf.selectedMembers,u.uid]:pf.selectedMembers.filter((id:string)=>id!==u.uid)})} className="rounded" />
-                        <Avatar name={u.email} size="xs" />
-                        <span className="text-xs font-medium text-gray-700">{u.email?.split("@")[0]}</span>
-                      </label>
-                    ))}
+          {/* ── EMPTY STATE ── */}
+          {projects?.length===0 && (
+            <div className="flex flex-col items-center justify-center py-24 bg-white rounded-xl border border-gray-200">
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl mb-4" style={{background:"#eef2ff"}}>📁</div>
+              <p className="text-sm font-semibold text-gray-700">No projects yet</p>
+              <p className="text-xs text-gray-400 mt-1 mb-5">Create your first project to get started</p>
+              <button onClick={()=>setShowProjectForm(true)} className="px-5 py-2 text-xs font-semibold text-white rounded-lg" style={{background:"#4f46e5"}}>+ New Project</button>
+            </div>
+          )}
+
+          {/* ── GRID VIEW ── */}
+          {projectsView==="grid" && projects?.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {projects?.map((project:any)=>{
+                const sc=STATUS_CONFIG[project.status];
+                const pc=PRIORITY_CONFIG[project.priority];
+                const accentColor = project.color||"#4f46e5";
+                const memberList = project.members?.slice(0,5).map((uid:string)=>users.find((u:any)=>u.uid===uid)).filter(Boolean);
+                return (
+                  <div key={project.id}
+                    className="proj-card bg-white rounded-xl overflow-hidden cursor-pointer group"
+                    style={{border:"1px solid #e5e7eb", boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}}
+                    onClick={()=>{setActiveProject(project);setViewMode("dashboard");}}>
+                    <div className="p-4">
+                      {/* Header */}
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold shrink-0"
+                            style={{background:accentColor}}>
+                            {project.name[0]?.toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="text-sm font-semibold text-gray-900 truncate leading-tight group-hover:text-indigo-700 transition">{project.name}</h3>
+                            {project.clientName && <p className="text-[11px] text-gray-400 truncate mt-0.5">{project.clientName}</p>}
+                          </div>
+                        </div>
+                        <span className="shrink-0 text-[10px] font-medium px-2 py-0.5 rounded" style={{background:sc?.bg,color:sc?.color}}>{project.status}</span>
+                      </div>
+
+                      {/* Description */}
+                      <p className="text-xs text-gray-400 line-clamp-1 mb-3">{project.description||"No description."}</p>
+
+                      {/* Badges */}
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {project.projectType==="Billing" && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-100">Billing</span>}
+                        {project.billingType && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-50 text-gray-500 border border-gray-200">{project.billingType}</span>}
+                        <span className="text-[10px] px-1.5 py-0.5 rounded border" style={{background:pc?.bg,color:pc?.color,borderColor:pc?.color+"30"}}>{project.priority}</span>
+                        {project.endDate && <span className="text-[10px] text-gray-400 ml-auto">Due {project.endDate}</span>}
+                      </div>
+
+                      {/* Progress */}
+                      <div className="mb-3">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-[10px] text-gray-400">Progress</span>
+                          <span className="text-[10px] font-semibold" style={{color:accentColor}}>{project.progress||0}%</span>
+                        </div>
+                        <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-500" style={{width:`${project.progress||0}%`,background:accentColor}} />
+                        </div>
+                      </div>
+
+                      {/* Footer */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex -space-x-1.5">
+                          {memberList?.map((u:any,i:number)=>(
+                            <div key={i} title={u?.email?.split("@")[0]}
+                              className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-white text-[9px] font-semibold"
+                              style={{background:["#6366f1","#7c3aed","#db2777","#d97706","#059669"][i%5]}}>
+                              {u?.email?.[0]?.toUpperCase()}
+                            </div>
+                          ))}
+                          {project.members?.length > 5 && <span className="text-[10px] text-gray-400 pl-2">+{project.members.length-5}</span>}
+                        </div>
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                          <button onClick={e=>{e.stopPropagation();handleEditProject(project);}} className="w-6 h-6 rounded flex items-center justify-center text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 transition text-xs">✏️</button>
+                          <button onClick={e=>{e.stopPropagation();handleDeleteProject(project.id);}} className="w-6 h-6 rounded flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 transition text-xs">🗑️</button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
+                );
+              })}
+              {/* Add card */}
+              <div onClick={()=>setShowProjectForm(true)}
+                className="proj-card rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-2.5 cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/30 transition-all min-h-50 group">
+                <div className="w-10 h-10 rounded-lg border-2 border-dashed border-gray-300 group-hover:border-indigo-400 flex items-center justify-center text-gray-300 group-hover:text-indigo-500 text-xl transition">+</div>
+                <div className="text-center">
+                  <p className="text-xs font-medium text-gray-400 group-hover:text-indigo-600 transition">New Project</p>
+                  <p className="text-[10px] text-gray-300 mt-0.5">Click to create</p>
                 </div>
-                <button onClick={handleSaveProject} className="w-full py-3 text-sm font-bold text-white rounded-xl hover:opacity-90 transition shadow-md" style={{background:"linear-gradient(135deg,#6366f1,#8b5cf6)"}}>{editingProject?"💾 Save Changes":"✨ Create Project"}</button>
               </div>
             </div>
           )}
 
-          {projects?.length===0&&!showProjectForm
-            ? <div className="text-center py-24 text-gray-300"><div className="text-6xl mb-4">📁</div><p className="text-xl font-bold text-gray-400">No projects yet</p></div>
-            : projectsView==="grid"
-            ? <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                {projects?.map((project:any)=>{
-                  const sc=STATUS_CONFIG[project.status]; const pc=PRIORITY_CONFIG[project.priority];
-                  return (
-                    <div key={project.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all group overflow-hidden cursor-pointer" onClick={()=>setActiveProject(project)}>
-                      <div className="h-1.5" style={{background:project.color||"#6366f1"}} />
-                      <div className="p-5">
-                        <div className="flex items-start justify-between gap-3 mb-3">
+          {/* ── LIST VIEW ── */}
+          {projectsView==="list" && projects?.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50/70">
+                    {["Project","Status","Priority","Type","Progress","Members","End Date",""].map(h=>(
+                      <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {projects?.map((project:any)=>{
+                    const sc=STATUS_CONFIG[project.status]; const pc=PRIORITY_CONFIG[project.priority];
+                    return(
+                      <tr key={project.id} onClick={()=>{setActiveProject(project);setViewMode("dashboard");}}
+                        className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition group">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:project.color||"#4f46e5"}}>{project.name[0]?.toUpperCase()}</div>
+                            <div><p className="text-sm font-medium text-gray-800">{project.name}</p>{project.clientName&&<p className="text-[11px] text-gray-400">{project.clientName}</p>}</div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3"><span className="text-[11px] font-medium px-2 py-0.5 rounded" style={{background:sc?.bg,color:sc?.color}}>{project.status}</span></td>
+                        <td className="px-4 py-3"><span className="text-[11px] font-medium px-2 py-0.5 rounded border" style={{background:pc?.bg,color:pc?.color,borderColor:pc?.color+"30"}}>{project.priority}</span></td>
+                        <td className="px-4 py-3"><span className={`text-[11px] font-medium px-2 py-0.5 rounded ${project.projectType==="Billing"?"bg-emerald-50 text-emerald-600":"bg-gray-100 text-gray-500"}`}>{project.projectType}</span></td>
+                        <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-base font-black shrink-0" style={{background:project.color||"#6366f1"}}>{project.name[0]}</div>
-                            <div><h3 className="font-bold text-gray-900 text-sm group-hover:text-indigo-700 transition leading-tight">{project.name}</h3>{project.clientName&&<p className="text-xs text-gray-400">{project.clientName}</p>}</div>
+                            <div className="w-20 bg-gray-100 rounded-full h-1.5"><div className="h-1.5 rounded-full" style={{width:`${project.progress||0}%`,background:project.color||"#4f46e5"}} /></div>
+                            <span className="text-[11px] font-medium" style={{color:project.color||"#4f46e5"}}>{project.progress||0}%</span>
                           </div>
-                          <span className="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{background:sc?.bg,color:sc?.color}}>{project.status}</span>
-                        </div>
-                        <p className="text-xs text-gray-400 line-clamp-2 mb-4 leading-relaxed">{project.description||"No description provided"}</p>
-                        <div className="flex items-center gap-2 mb-4">
+                        </td>
+                        <td className="px-4 py-3">
                           <div className="flex -space-x-1.5">
-                            {project.members?.slice(0,5).map((uid:string,i:number)=>{const member=users.find((u:any)=>u.uid===uid);return <Avatar key={i} name={member?.email} size="xs" />;})}</div>
-                          {project.members?.length>5&&<span className="text-xs text-gray-400">+{project.members.length-5}</span>}
-                          <div className="ml-auto flex items-center gap-1.5">
-                            {project.projectType==="Billing"&&<span className="text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 px-1.5 py-0.5 rounded">💰 Billing</span>}
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{background:pc?.bg,color:pc?.color}}>{pc?.icon} {project.priority}</span>
+                            {project.members?.slice(0,4).map((uid:string,i:number)=>{
+                              const m=users.find((u:any)=>u.uid===uid);
+                              const mName = m?.displayName||m?.name||m?.email?.split("@")[0]||"?";
+                              return(<div key={i} title={mName} className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-white text-[9px] font-semibold" style={{background:["#6366f1","#7c3aed","#db2777","#d97706"][i%4]}}>{mName[0]?.toUpperCase()}</div>);
+                            })}
                           </div>
-                        </div>
-                        <div>
-                          <div className="flex justify-between mb-1.5"><span className="text-xs text-gray-400">Progress</span><span className="text-xs font-bold" style={{color:project.color||"#6366f1"}}>{project.progress||0}%</span></div>
-                          <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden"><div className="h-1.5 rounded-full transition-all duration-700" style={{width:`${project.progress||0}%`,background:project.color||"#6366f1"}} /></div>
-                        </div>
-                        {project.endDate&&<p className="text-[11px] text-gray-400 mt-3">📅 Due {project.endDate}</p>}
-                      </div>
-                      <div className="px-5 py-3 bg-gray-50/80 border-t border-gray-100 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <span className="text-xs text-gray-400">Click to open</span>
-                        <div className="flex gap-1">
-                          <button onClick={e=>{e.stopPropagation();handleEditProject(project);}} className="px-2.5 py-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-50 rounded-lg">✏️ Edit</button>
-                          <button onClick={e=>{e.stopPropagation();handleDeleteProject(project.id);}} className="px-2.5 py-1.5 text-xs font-semibold text-red-500 hover:bg-red-50 rounded-lg">🗑️</button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            : <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-100">
-                    <tr>{["Project","Status","Priority","Type","Progress","Members","End Date",""].map(h=><th key={h} className="px-5 py-3.5 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">{h}</th>)}</tr>
-                  </thead>
-                  <tbody>
-                    {projects?.map((project:any)=>{
-                      const sc=STATUS_CONFIG[project.status]; const pc=PRIORITY_CONFIG[project.priority];
-                      return(
-                        <tr key={project.id} onClick={()=>setActiveProject(project)} className="border-b border-gray-50 hover:bg-indigo-50/30 cursor-pointer transition group">
-                          <td className="px-5 py-4"><div className="flex items-center gap-3"><div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-black shrink-0" style={{background:project.color||"#6366f1"}}>{project.name[0]}</div><div><p className="font-semibold text-sm text-gray-800 group-hover:text-indigo-700">{project.name}</p>{project.clientName&&<p className="text-xs text-gray-400">{project.clientName}</p>}</div></div></td>
-                          <td className="px-5 py-4"><span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{background:sc?.bg,color:sc?.color}}>{project.status}</span></td>
-                          <td className="px-5 py-4"><span className="text-xs font-semibold px-1.5 py-0.5 rounded" style={{background:pc?.bg,color:pc?.color}}>{pc?.icon} {project.priority}</span></td>
-                          <td className="px-5 py-4"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${project.projectType==="Billing"?"bg-emerald-50 text-emerald-700":"bg-gray-100 text-gray-500"}`}>{project.projectType}</span></td>
-                          <td className="px-5 py-4"><div className="flex items-center gap-2"><div className="w-20 bg-gray-100 rounded-full h-1.5"><div className="h-1.5 rounded-full" style={{width:`${project.progress||0}%`,background:project.color||"#6366f1"}} /></div><span className="text-xs font-bold" style={{color:project.color||"#6366f1"}}>{project.progress||0}%</span></div></td>
-                          <td className="px-5 py-4"><div className="flex -space-x-1">{project.members?.slice(0,4).map((uid:string,i:number)=>{const m=users.find((u:any)=>u.uid===uid);return <Avatar key={i} name={m?.email} size="xs" />;})}</div></td>
-                          <td className="px-5 py-4 text-xs text-gray-500">{project.endDate||"—"}</td>
-                          <td className="px-5 py-4"><div className="flex gap-1 opacity-0 group-hover:opacity-100"><button onClick={e=>{e.stopPropagation();handleEditProject(project);}} className="p-1.5 hover:bg-indigo-50 rounded-lg text-indigo-500 text-xs">✏️</button><button onClick={e=>{e.stopPropagation();handleDeleteProject(project.id);}} className="p-1.5 hover:bg-red-50 rounded-lg text-red-400 text-xs">🗑️</button></div></td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-          }
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-500">{project.endDate||"—"}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                            <button onClick={e=>{e.stopPropagation();handleEditProject(project);}} className="w-6 h-6 rounded text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 flex items-center justify-center text-xs">✏️</button>
+                            <button onClick={e=>{e.stopPropagation();handleDeleteProject(project.id);}} className="w-6 h-6 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center text-xs">🗑️</button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </>}
       </div>
     </div>

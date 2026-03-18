@@ -737,6 +737,14 @@ const handleAddUser = async () => {
                   <AdminNotificationBell />
                 </div>
 
+                <button
+  onClick={() => window.open("/admin/greetings", "_blank")}
+  className="p-1 rounded-sm hover:bg-slate-100 transition"
+  title="Greetings Hub"
+>
+  <img src="https://cdn-icons-png.flaticon.com/128/3062/3062634.png" alt="Greetings" className="w-10 h-10 object-contain" />
+</button>
+
                 <button onClick={() => setShowCalendar(true)} className="p-1 rounded-sm hover:bg-slate-100 transition">
                   <img src="https://cdn-icons-png.flaticon.com/512/10691/10691802.png" alt="Calendar" className="w-8 h-8 object-contain" />
                 </button>
@@ -887,8 +895,9 @@ const handleAddUser = async () => {
 
           <MessagesView view={view} messages={messages} newMsg={newMsg} setNewMsg={setNewMsg} sendMessage={sendMessage} loadMessages={loadMessages} db={db} />
 
-          {view === "monthlyReport" && <MonthlyReport users={users} monthlyDate={monthlyDate} setMonthlyDate={setMonthlyDate} monthlyAttendance={monthlyAttendance} setMonthlyAttendance={setMonthlyAttendance} sessionsByDate={sessionsByDate} isHoliday={isHoliday} saveMonthlyAttendance={saveMonthlyAttendance} getAutoStatus={getAutoStatus} isSunday={isSunday} isSecondSaturday={isSecondSaturday} isFourthSaturday={isFourthSaturday} isFifthSaturday={isFifthSaturday} />}
-
+         
+{view === "monthlyReport" && <MonthlyReport db={db} users={users} monthlyDate={monthlyDate} setMonthlyDate={setMonthlyDate} monthlyAttendance={monthlyAttendance} setMonthlyAttendance={setMonthlyAttendance} sessionsByDate={sessionsByDate} isHoliday={isHoliday} saveMonthlyAttendance={saveMonthlyAttendance} getAutoStatus={getAutoStatus} isSunday={isSunday} isSecondSaturday={isSecondSaturday} isFourthSaturday={isFourthSaturday} isFifthSaturday={isFifthSaturday} />}
+  
   <CalendarView
   showCalendar={showCalendar}
   setShowCalendar={setShowCalendar}
@@ -901,16 +910,13 @@ const handleAddUser = async () => {
   isHoliday={isHoliday}
 />
 
-         {view === "leaveReport" && (
-  <LeaveRequests
-    leaveRequests={leaveRequests}
-    users={rows}
-    updateLeaveStatus={updateLeaveStatus}
-  />
+       {view === "leaveReport" && (
+  <LeaveRequests />
 )}
 
 
 {view === "queries" && (
+  // @ts-ignore
   <AdminQueriesView user={user} userData={userData} />
 )}
 

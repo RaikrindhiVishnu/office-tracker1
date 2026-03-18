@@ -1,472 +1,744 @@
+/**
+ * AdminQueriesView.tsx  — fully typed TypeScript version
+ *
+ * SETUP:
+ * 1. npm install firebase lucide-react
+ * 2. Create src/lib/firebase.ts with your Firebase config
+ * 3. Firestore collection: "employeeQueries"
+ */
+
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { FileText, Clock, CheckCircle, Bell } from "lucide-react";
 import {
-  collection, query, orderBy, onSnapshot,
-  updateDoc, doc, serverTimestamp,
+  collection,
+  query,
+  orderBy,
+  onSnapshot,
+  updateDoc,
+  doc,
+  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { User as FirebaseUser } from "firebase/auth";
 
-const ITEMS_PER_PAGE = 8;
-const REPLY_LIMIT = 1000;
-const PREVIEW_LENGTH = 120; // chars before "See More" in expanded panel
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-interface Query {
-  id: string;
-  employeeName?: string;
-  employeeEmail?: string;
-  subject?: string;
-  message?: string;
-  status?: string;
-  adminReply?: string;
-  adminUnread?: boolean;
-  createdAt?: { seconds?: number } | string;
-  repliedAt?: { seconds?: number } | string;
-  [key: string]: unknown;
+interface Reply {
+  author:      string;
+  text:        string;
+  time:        number;
+  assignedTo?: string;
 }
 
-interface AdminQueriesViewProps {
-  user: FirebaseUser | null;
-  userData: any;
+interface EmployeeQuery {
+  id:             string;
+  employeeName:   string;
+  employeeEmail:  string;
+  department:     string;
+  subject:        string;
+  message:        string;
+  status:         string;
+  priority:       string;
+  category:       string;
+  adminUnread:    boolean;
+  employeeUnread: boolean;
+  createdAt:      { seconds: number; nanoseconds: number } | string | number | null;
+  replies?:       Reply[];
+  adminReply?:    string;
+  repliedAt?:     { seconds: number; nanoseconds: number } | null;
+  assignedTo?:    string | null;
 }
 
-const AVATAR_PALETTE: [string, string][] = [
-  ["#1a6ed8", "#e8f0fd"],
-  ["#8b5cf6", "#ede9fe"],
-  ["#059669", "#d1fae5"],
-  ["#d97706", "#fef3c7"],
-  ["#dc2626", "#fee2e2"],
-  ["#0891b2", "#cffafe"],
+interface PriorityConfig {
+  label:  string;
+  bg:     string;
+  color:  string;
+  dot:    string;
+  border: string;
+}
+
+interface CategoryConfig {
+  bg:    string;
+  color: string;
+}
+
+interface AvatarColor {
+  bg:    string;
+  color: string;
+}
+
+interface ChipProps {
+  label:   string;
+  bg:      string;
+  color:   string;
+  border?: string;
+  dot?:    string;
+}
+
+interface AvatarProps {
+  name:   string;
+  size?:  number;
+}
+
+interface StatusChipProps {
+  status: string;
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const PRIORITY_CONFIG: Record<string, PriorityConfig> = {
+  low:    { label: "Low",    bg: "#f0fdf4", color: "#15803d", dot: "#22c55e", border: "#bbf7d0" },
+  medium: { label: "Medium", bg: "#fffbeb", color: "#d97706", dot: "#f59e0b", border: "#fde68a" },
+  high:   { label: "High",   bg: "#fff1f2", color: "#e11d48", dot: "#f43f5e", border: "#fecdd3" },
+  urgent: { label: "Urgent", bg: "#fdf4ff", color: "#9333ea", dot: "#a855f7", border: "#e9d5ff" },
+};
+
+const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
+  "IT Support": { bg: "#eff6ff", color: "#3b82f6" },
+  "Payroll":    { bg: "#f0fdf4", color: "#15803d" },
+  "HR Policy":  { bg: "#fdf4ff", color: "#9333ea" },
+  "Software":   { bg: "#fff7ed", color: "#ea580c" },
+  "Facilities": { bg: "#f0f9ff", color: "#0284c7" },
+  "Finance":    { bg: "#fffbeb", color: "#d97706" },
+};
+
+const AVATAR_COLORS: AvatarColor[] = [
+  { bg: "#eff0ff", color: "#6366f1" },
+  { bg: "#fce7f3", color: "#db2777" },
+  { bg: "#d1fae5", color: "#059669" },
+  { bg: "#fffbeb", color: "#d97706" },
+  { bg: "#ede9fe", color: "#7c3aed" },
+  { bg: "#e0f2fe", color: "#0284c7" },
+  { bg: "#fef9c3", color: "#ca8a04" },
+  { bg: "#fee2e2", color: "#dc2626" },
 ];
 
-function getAvatar(name: string): [string, string] {
-  return AVATAR_PALETTE[(name.charCodeAt(0) || 65) % AVATAR_PALETTE.length] as [string, string];
+const ADMIN_AGENTS: string[] = [
+  "Unassigned",
+  "Admin — madhuri.",
+  "Admin — phani.",
+  "Project manager — pradeep.",
+  "IT — team leads.",
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function getAvatarStyle(name: string): AvatarColor {
+  const idx = ((name ?? "").charCodeAt(0) || 65) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[idx];
 }
 
-function timeAgo(ts: { seconds?: number } | string | undefined): string {
-  if (!ts) return "—";
-  const d = typeof ts === "string" ? new Date(ts) : new Date((ts.seconds ?? 0) * 1000);
+function getInitials(name: string): string {
+  return (name ?? "")
+    .split(" ")
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+function timeAgo(ts: EmployeeQuery["createdAt"] | number): string {
+  if (ts === null || ts === undefined) return "—";
+  let d: Date;
+  if (typeof ts === "object" && "seconds" in ts) {
+    d = new Date(ts.seconds * 1000);
+  } else if (typeof ts === "string") {
+    d = new Date(ts);
+  } else {
+    d = new Date(ts as number);
+  }
   const diff = Math.floor((Date.now() - d.getTime()) / 1000);
-  if (diff < 60) return "Just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 60)     return "Just now";
+  if (diff < 3600)   return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400)  return `${Math.floor(diff / 3600)}h ago`;
   if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
 
-// ── Expandable text with See More / See Less ──
-function ExpandableText({
-  text,
-  previewLength = PREVIEW_LENGTH,
-  style,
-}: {
-  text: string;
-  previewLength?: number;
-  style?: React.CSSProperties;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const isLong = text.length > previewLength;
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
+function Avatar({ name, size = 36 }: AvatarProps) {
+  const { bg, color } = getAvatarStyle(name);
+  const initials = getInitials(name);
   return (
-    <span style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", ...style }}>
-      {isLong && !expanded ? text.slice(0, previewLength) + "…" : text}
-      {isLong && (
-        <button
-          onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
-          style={{
-            marginLeft: 6,
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            color: "#1a6ed8",
-            fontSize: 11,
-            fontWeight: 800,
-            fontFamily: "inherit",
-            textDecoration: "underline",
-            padding: 0,
-          }}
-        >
-          {expanded ? "See Less" : "See More"}
-        </button>
-      )}
+    <div style={{
+      width: size, height: size, borderRadius: "50%",
+      background: bg, color, border: `1.5px solid ${color}30`,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize: size * 0.35, fontWeight: 700, flexShrink: 0,
+      letterSpacing: "-0.3px",
+    }}>
+      {initials || "?"}
+    </div>
+  );
+}
+
+function Chip({ label, bg, color, border, dot }: ChipProps) {
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 4,
+      fontSize: 10, fontWeight: 700, padding: "2px 8px",
+      borderRadius: 20, background: bg, color,
+      border: border ? `1px solid ${border}` : "none",
+      whiteSpace: "nowrap",
+    }}>
+      {dot && <span style={{ width: 5, height: 5, borderRadius: "50%", background: dot }} />}
+      {label}
     </span>
   );
 }
 
-export default function AdminQueriesView({ user, userData }: AdminQueriesViewProps) {
-  const [queries, setQueries] = useState<Query[]>([]);
-  const [replyText, setReplyText] = useState<Record<string, string>>({});
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [filter, setFilter] = useState<"all" | "pending" | "resolved">("all");
-  const [search, setSearch] = useState("");
+function StatusChip({ status }: StatusChipProps) {
+  return status === "resolved"
+    ? <Chip label="✓ Resolved" bg="#f0fdf4" color="#15803d" />
+    : <Chip label="⏳ Pending"  bg="#fffbeb" color="#d97706" />;
+}
 
+function LoadingSpinner() {
+  return (
+    <div style={{
+      flex: 1, display: "flex", alignItems: "center",
+      justifyContent: "center", flexDirection: "column", gap: 12,
+      color: "#94a3b8",
+    }}>
+      <div style={{
+        width: 32, height: 32, border: "3px solid #e2e8f0",
+        borderTopColor: "#6366f1", borderRadius: "50%",
+        animation: "spin 0.8s linear infinite",
+      }} />
+      <span style={{ fontSize: 13, fontWeight: 500 }}>Loading queries…</span>
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export default function AdminQueriesView() {
+  const [queries,   setQueries]   = useState<EmployeeQuery[]>([]);
+  const [loading,   setLoading]   = useState<boolean>(true);
+  const [error,     setError]     = useState<string | null>(null);
+  const [filter,    setFilter]    = useState<string>("all");
+  const [search,    setSearch]    = useState<string>("");
+  const [selected,  setSelected]  = useState<EmployeeQuery | null>(null);
+  const [replyText, setReplyText] = useState<string>("");
+  const [assignTo,  setAssignTo]  = useState<string>("");
+  const [sending,   setSending]   = useState<boolean>(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // ── Firestore real-time listener ────────────────────────────────────────────
   useEffect(() => {
-    const q = query(collection(db, "employeeQueries"), orderBy("createdAt", "desc"));
-    const unsub = onSnapshot(q, (snap) =>
-      setQueries(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Query)))
+    const q = query(
+      collection(db, "employeeQueries"),
+      orderBy("createdAt", "desc"),
     );
+
+    const unsub = onSnapshot(
+      q,
+      (snapshot) => {
+        const data: EmployeeQuery[] = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as Omit<EmployeeQuery, "id">),
+        }));
+        setQueries(data);
+        setLoading(false);
+        setSelected((prev) =>
+          prev ? data.find((item) => item.id === prev.id) ?? prev : null,
+        );
+      },
+      (err) => {
+        console.error("Firestore error:", err);
+        setError("Failed to load queries. Check your Firestore rules.");
+        setLoading(false);
+      },
+    );
+
     return () => unsub();
   }, []);
 
-  const handleReply = async (id: string) => {
-    if (!replyText[id]?.trim()) return;
-    await updateDoc(doc(db, "employeeQueries", id), {
-      adminReply: replyText[id],
-      status: "resolved",
-      employeeUnread: true,
-      adminUnread: false,
-      repliedAt: serverTimestamp(),
-    });
-    setReplyText((p) => ({ ...p, [id]: "" }));
-    setExpandedId(null);
+  // Auto-scroll chat to bottom when replies update
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [selected?.replies?.length]);
+
+  // ── Actions ─────────────────────────────────────────────────────────────────
+
+  const handleSelectQuery = async (item: EmployeeQuery): Promise<void> => {
+    setSelected(item);
+    setReplyText("");
+    if (item.adminUnread) {
+      try {
+        await updateDoc(doc(db, "employeeQueries", item.id), {
+          adminUnread: false,
+        });
+      } catch (e) {
+        console.error("markRead error:", e);
+      }
+    }
   };
 
-  const markAsRead = async (id: string) => {
-    await updateDoc(doc(db, "employeeQueries", id), { adminUnread: false });
+  const handleSendReply = async (): Promise<void> => {
+    if (!replyText.trim() || !selected || sending) return;
+    setSending(true);
+    try {
+      const newReply: Reply = {
+        author:     "Admin",
+        text:       replyText.trim(),
+        time:       Date.now(),
+        assignedTo: assignTo || "Unassigned",
+      };
+      const updatedReplies: Reply[] = [...(selected.replies ?? []), newReply];
+      await updateDoc(doc(db, "employeeQueries", selected.id), {
+        replies:        updatedReplies,
+        adminReply:     replyText.trim(),
+        status:         "resolved",
+        adminUnread:    false,
+        employeeUnread: true,
+        repliedAt:      serverTimestamp(),
+        assignedTo:     assignTo || null,
+      });
+      setReplyText("");
+    } catch (e) {
+      console.error("Reply error:", e);
+      alert("Failed to send reply. Check Firestore permissions.");
+    } finally {
+      setSending(false);
+    }
   };
+
+  const handleChangePriority = async (priority: string): Promise<void> => {
+    if (!selected) return;
+    try {
+      await updateDoc(doc(db, "employeeQueries", selected.id), { priority });
+    } catch (e) {
+      console.error("Priority update error:", e);
+    }
+  };
+
+  const handleReopenQuery = async (): Promise<void> => {
+    if (!selected) return;
+    try {
+      await updateDoc(doc(db, "employeeQueries", selected.id), {
+        status: "pending",
+      });
+    } catch (e) {
+      console.error("Reopen error:", e);
+    }
+  };
+
+  // ── Derived data ─────────────────────────────────────────────────────────────
+
+  const total    = queries.length;
+  const pending  = queries.filter((q) => q.status !== "resolved").length;
+  const resolved = queries.filter((q) => q.status === "resolved").length;
+  const unread   = queries.filter((q) => q.adminUnread).length;
 
   const filtered = queries.filter((q) => {
-    const matchFilter = filter === "all" || q.status === filter;
+    const matchFilter =
+      filter === "all" ||
+      (filter === "pending"  && q.status !== "resolved") ||
+      (filter === "resolved" && q.status === "resolved");
     const s = search.toLowerCase();
     const matchSearch =
       !s ||
-      (q.employeeName || "").toLowerCase().includes(s) ||
-      (q.subject || "").toLowerCase().includes(s) ||
-      (q.message || "").toLowerCase().includes(s);
+      (q.employeeName  || "").toLowerCase().includes(s) ||
+      (q.subject       || "").toLowerCase().includes(s) ||
+      (q.message       || "").toLowerCase().includes(s) ||
+      (q.department    || "").toLowerCase().includes(s);
     return matchFilter && matchSearch;
   });
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
-  const paginated = filtered.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
-
-  const pendingCount  = queries.filter((q) => q.status !== "resolved").length;
-  const resolvedCount = queries.filter((q) => q.status === "resolved").length;
-  const unreadCount   = queries.filter((q) => q.adminUnread).length;
-
-  const S = {
-    wrap:     { fontFamily: "'Nunito',-apple-system,sans-serif", padding: "24px 28px 32px", background: "#f0f4f8", minHeight: "100%" } as React.CSSProperties,
-    card:     { background: "#fff", borderRadius: 16, border: "1px solid #e2eaf3", boxShadow: "0 1px 4px rgba(15,23,42,0.06)", overflow: "hidden" } as React.CSSProperties,
-    thead:    { display: "grid", gridTemplateColumns: "2fr 2.8fr 1fr 160px", background: "#234567" } as React.CSSProperties,
-    th:       { padding: "12px 18px", fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.45)", textTransform: "uppercase" as const, letterSpacing: "0.1em" },
-    row:      { display: "grid", gridTemplateColumns: "2fr 2.8fr 1fr 160px", alignItems: "center", borderBottom: "1px solid #f1f5f9", cursor: "pointer", transition: "background 0.13s" } as React.CSSProperties,
-    td:       { padding: "13px 18px" },
-    chip:     (bg: string, color: string, border: string) => ({ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, padding: "4px 11px", borderRadius: 20, background: bg, color, border: `1.5px solid ${border}`, whiteSpace: "nowrap" as const }),
-    badge:    (bg: string, color: string) => ({ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 10, fontWeight: 800, padding: "3px 9px", borderRadius: 20, background: bg, color, textTransform: "uppercase" as const, letterSpacing: "0.05em", whiteSpace: "nowrap" as const }),
-    dot:      (color: string) => ({ width: 5, height: 5, borderRadius: "50%", background: color, display: "inline-block", flexShrink: 0 }),
-    panel:    { background: "#f7faff", borderTop: "1px solid #e2eaf3", borderBottom: "1px solid #e2eaf3", padding: "20px 22px" } as React.CSSProperties,
-    msgBox:   { background: "#fff", border: "1.5px solid #e2eaf3", borderRadius: 12, padding: "14px 16px", fontSize: 13, color: "#334155", lineHeight: 1.75, fontWeight: 500 } as React.CSSProperties,
-    replyBox: { background: "#f0fdf4", border: "1.5px solid #bbf7d0", borderRadius: 12, padding: "14px 16px", fontSize: 13, color: "#166534", lineHeight: 1.75, fontWeight: 500 } as React.CSSProperties,
-    label:    { fontSize: 10, fontWeight: 800, color: "#94a3b8", textTransform: "uppercase" as const, letterSpacing: "0.09em", marginBottom: 8 },
-    meta:     { fontSize: 11, color: "#94a3b8", fontWeight: 600, marginTop: 7 },
-    charHint: (atLimit: boolean) => ({ fontSize: 11, color: atLimit ? "#ef4444" : "#94a3b8", fontWeight: 600, textAlign: "right" as const, marginTop: 4 }),
-  };
+  // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap');
-        .aq-row-hover:hover { background: #f7faff !important; }
-        .aq-btn {
-          font-family: 'Nunito', sans-serif;
-          font-weight: 700; font-size: 12px;
-          padding: 6px 14px; border-radius: 9px;
-          border: none; cursor: pointer; transition: all 0.16s;
-          white-space: nowrap;
-        }
-        .aq-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .aq-btn-primary  { background: #1a6ed8; color: #fff; }
-        .aq-btn-primary:not(:disabled):hover { background: #1558b0; }
-        .aq-btn-dark     { background: #234567; color: #fff; }
-        .aq-btn-dark:hover { background: #1a3450; }
-        .aq-btn-ghost    { background: #f1f5f9; color: #64748b; border: 1.5px solid #e2eaf3; }
-        .aq-btn-ghost:hover { background: #e8ecf4; }
-        .aq-btn-outline  { background: transparent; color: #1a6ed8; border: 1.5px solid #c4d9f5; }
-        .aq-btn-outline:hover { background: #e8f0fd; }
-        .aq-filter-btn {
-          font-family: 'Nunito', sans-serif;
-          font-size: 12px; font-weight: 700;
-          padding: 6px 15px; border-radius: 7px;
-          border: none; cursor: pointer; transition: all 0.15s;
-        }
-        .aq-filter-btn.active { background: #234567; color: #fff; }
-        .aq-filter-btn:not(.active) { background: transparent; color: #64748b; }
-        .aq-filter-btn:not(.active):hover { background: #f0f4f8; }
-        .aq-textarea {
-          font-family: 'Nunito', sans-serif;
-          width: 100%; padding: 11px 14px;
-          border: 1.5px solid #e2eaf3; border-radius: 11px;
-          font-size: 13px; font-weight: 500; color: #1e293b;
-          background: #fff; resize: none; outline: none;
-          transition: border-color 0.18s; box-sizing: border-box;
-        }
-        .aq-textarea:focus { border-color: #1a6ed8; box-shadow: 0 0 0 3px rgba(26,110,216,0.08); }
-        .aq-textarea::placeholder { color: #c8d3e0; }
-        .aq-search {
-          font-family: 'Nunito', sans-serif;
-          padding: 9px 14px 9px 36px;
-          border: 1.5px solid #e2eaf3; border-radius: 10px;
-          font-size: 13px; color: #1e293b; background: #fff;
-          outline: none; width: 220px; font-weight: 500;
-          transition: border-color 0.18s;
-        }
-        .aq-search:focus { border-color: #1a6ed8; box-shadow: 0 0 0 3px rgba(26,110,216,0.08); }
-        .aq-search::placeholder { color: #c8d3e0; }
-        .aq-page-btn {
-          font-family: 'Nunito', sans-serif;
-          font-size: 12px; font-weight: 700;
-          padding: 6px 13px; border-radius: 8px;
-          border: 1.5px solid #e2eaf3; background: #fff;
-          color: #475569; cursor: pointer; transition: all 0.15s;
-          min-width: 34px; text-align: center;
-        }
-        .aq-page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-        .aq-page-btn.cur { background: #234567; color: #fff; border-color: #234567; }
-        .aq-page-btn:not(.cur):not(:disabled):hover { background: #f0f4f8; }
-        @keyframes aqSlide {
-          from { opacity: 0; transform: translateY(-5px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        .aq-panel-anim { animation: aqSlide 0.18s ease; }
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&display=swap');
+        * { box-sizing: border-box; }
+        .adq-root { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; background: #f4f6fb; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .adq-slide  { animation: slideIn 0.2s ease; }
+        .adq-fadeup { animation: fadeUp  0.18s ease; }
+        .adq-topbar { background: #fff; border-bottom: 1px solid #e8ecf3; padding: 0 24px; height: 54px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+        .adq-logo { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg,#6366f1,#8b5cf6); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 15px; flex-shrink: 0; }
+        .adq-topbar-title { font-size: 15px; font-weight: 800; color: #0f172a; letter-spacing: -0.4px; }
+        .adq-topbar-sep { width: 1px; height: 18px; background: #e2e8f0; }
+        .adq-topbar-sub { font-size: 13px; color: #64748b; font-weight: 500; }
+        .adq-unread-badge { background: #ef4444; color: #fff; font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 20px; margin-left: auto; }
+        .adq-admin-av { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg,#6366f1,#8b5cf6); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; }
+        .adq-stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; padding: 16px 24px 0; flex-shrink: 0; }
+        .adq-stat-card { background: #fff; border: 1px solid #e8ecf3; border-radius: 14px; padding: 18px 20px; display: flex; align-items: center; gap: 14px; min-width: 0; }
+        .adq-stat-icon { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .adq-stat-val { font-size: 28px; font-weight: 700; color: #0f172a; line-height: 1; letter-spacing: -1px; }
+        .adq-stat-lbl { font-size: 12px; color: #64748b; font-weight: 400; margin-top: 4px; }
+        .adq-main { display: flex; gap: 0; flex: 1; min-height: 0; margin: 16px 24px 24px; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #e8ecf3; }
+        .adq-left { width: 380px; flex-shrink: 0; display: flex; flex-direction: column; background: #fff; border-right: 1px solid #f1f5f9; }
+        .adq-left-head { padding: 14px 14px 10px; border-bottom: 1px solid #f1f5f9; flex-shrink: 0; }
+        .adq-search-wrap { position: relative; margin-bottom: 10px; }
+        .adq-search { width: 100%; padding: 8px 12px 8px 34px; border: 1.5px solid #e8ecf3; border-radius: 10px; font-size: 12px; font-family: inherit; font-weight: 500; color: #1e293b; background: #f8fafc; outline: none; transition: border-color 0.15s; }
+        .adq-search:focus { border-color: #6366f1; background: #fff; box-shadow: 0 0 0 3px rgba(99,102,241,0.09); }
+        .adq-search::placeholder { color: #cbd5e1; }
+        .adq-search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 13px; pointer-events: none; }
+        .adq-filters { display: flex; gap: 3px; background: #f1f5f9; padding: 3px; border-radius: 9px; }
+        .adq-filter-btn { flex: 1; font-size: 11px; font-weight: 700; padding: 5px 8px; border-radius: 7px; border: none; cursor: pointer; background: transparent; color: #64748b; font-family: inherit; transition: all 0.13s; white-space: nowrap; }
+        .adq-filter-btn.on { background: #0f172a; color: #fff; }
+        .adq-filter-btn:not(.on):hover { background: #e2e8f0; color: #334155; }
+        .adq-qlist { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+        .adq-qlist::-webkit-scrollbar { width: 4px; }
+        .adq-qlist::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 6px; }
+        .adq-qcard { padding: 12px; border-radius: 10px; border: 1px solid #e8ecf3; cursor: pointer; transition: all 0.13s; position: relative; background: #fff; }
+        .adq-qcard:hover { background: #f8faff; border-color: #dde6f7; }
+        .adq-qcard.active { background: #eff0ff; border-color: #a5b4fc; box-shadow: 0 0 0 1px #a5b4fc; }
+        .adq-unread-bar { position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 55%; background: #6366f1; border-radius: 0 3px 3px 0; }
+        .adq-qcard-row { display: flex; gap: 10px; align-items: flex-start; }
+        .adq-qcard-body { flex: 1; min-width: 0; }
+        .adq-qcard-nameline { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1px; }
+        .adq-qcard-name { font-size: 12px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 5px; }
+        .adq-qcard-time { font-size: 10px; color: #94a3b8; font-weight: 500; flex-shrink: 0; }
+        .adq-qcard-email { font-size: 11px; color: #94a3b8; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .adq-qcard-subj { font-size: 12px; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+        .adq-qcard-msg { font-size: 11px; color: #64748b; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.5; }
+        .adq-qcard-chips { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+        .adq-unread-dot { width: 6px; height: 6px; border-radius: 50%; background: #6366f1; flex-shrink: 0; }
+        .adq-right { flex: 1; display: flex; flex-direction: column; background: #fff; min-width: 0; }
+        .adq-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #94a3b8; }
+        .adq-empty-icon { font-size: 44px; }
+        .adq-det-head { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; flex-shrink: 0; }
+        .adq-det-top { display: flex; align-items: flex-start; gap: 12px; }
+        .adq-det-meta { flex: 1; min-width: 0; }
+        .adq-det-subj { font-size: 15px; font-weight: 800; color: #0f172a; letter-spacing: -0.3px; margin-bottom: 3px; }
+        .adq-det-info { font-size: 12px; color: #64748b; }
+        .adq-det-chips { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
+        .adq-close-btn { font-size: 12px; font-weight: 600; padding: 6px 12px; border: 1.5px solid #e2e8f0; border-radius: 9px; background: transparent; cursor: pointer; color: #64748b; font-family: inherit; flex-shrink: 0; transition: all 0.13s; }
+        .adq-close-btn:hover { background: #f1f5f9; }
+        .adq-chat { flex: 1; overflow-y: auto; padding: 18px 20px; display: flex; flex-direction: column; gap: 16px; }
+        .adq-chat::-webkit-scrollbar { width: 4px; }
+        .adq-chat::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 6px; }
+        .adq-msg-row { display: flex; gap: 10px; align-items: flex-start; }
+        .adq-msg-row.admin-row { flex-direction: row-reverse; }
+        .adq-msg-av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+        .adq-msg-content { max-width: 72%; }
+        .adq-msg-sender { font-size: 11px; color: #94a3b8; font-weight: 600; margin-bottom: 4px; }
+        .adq-msg-row.admin-row .adq-msg-sender { text-align: right; }
+        .adq-bubble { padding: 12px 14px; font-size: 13px; line-height: 1.7; font-weight: 400; word-break: break-word; }
+        .adq-bubble.emp { background: #f8fafc; border: 1.5px solid #e8ecf3; border-radius: 4px 14px 14px 14px; color: #334155; }
+        .adq-bubble.adm { background: #6366f1; border-radius: 14px 4px 14px 14px; color: #fff; }
+        .adq-reply-footer { border-top: 1px solid #f1f5f9; padding: 14px 20px; background: #fafbfc; flex-shrink: 0; }
+        .adq-reply-controls { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+        .adq-mini-label { font-size: 11px; color: #64748b; font-weight: 600; }
+        .adq-mini-select { font-size: 12px; font-weight: 500; padding: 5px 10px; border: 1.5px solid #e2e8f0; border-radius: 8px; background: #fff; color: #475569; cursor: pointer; outline: none; font-family: inherit; }
+        .adq-mini-select:focus { border-color: #6366f1; }
+        .adq-textarea { width: 100%; padding: 11px 14px; font-size: 13px; font-family: inherit; font-weight: 400; border: 1.5px solid #e2e8f0; border-radius: 12px; background: #fff; color: #1e293b; resize: none; outline: none; line-height: 1.6; transition: border-color 0.15s; }
+        .adq-textarea:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.09); }
+        .adq-textarea::placeholder { color: #cbd5e1; }
+        .adq-reply-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+        .adq-send-btn { font-size: 13px; font-weight: 700; padding: 8px 20px; background: #6366f1; color: #fff; border: none; border-radius: 10px; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 6px; transition: background 0.13s; }
+        .adq-send-btn:hover:not(:disabled) { background: #4f46e5; }
+        .adq-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .adq-cancel-btn { font-size: 12px; font-weight: 600; padding: 7px 14px; border: 1.5px solid #e2e8f0; border-radius: 9px; background: transparent; cursor: pointer; color: #64748b; font-family: inherit; transition: all 0.13s; }
+        .adq-cancel-btn:hover { background: #f1f5f9; }
+        .adq-reopen-btn { font-size: 11px; font-weight: 700; padding: 6px 13px; border: 1.5px solid #e2e8f0; border-radius: 8px; background: #f8fafc; cursor: pointer; color: #64748b; font-family: inherit; }
+        .adq-reopen-btn:hover { background: #f1f5f9; }
+        .adq-resolved-bar { padding: 12px 20px; background: #f0fdf4; border-top: 1px solid #bbf7d0; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+        .adq-resolved-text { font-size: 12px; color: #15803d; font-weight: 600; }
+        .adq-error { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; color: #ef4444; padding: 20px; text-align: center; }
       `}</style>
 
-      <div style={S.wrap}>
+      <div className="adq-root">
 
-        {/* ── HEADER ── */}
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 12 }}>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-              <span style={{ fontSize: 20 }}>💬</span>
-              <h2 style={{ fontSize: 22, fontWeight: 900, color: "#1e293b", margin: 0, letterSpacing: "-0.3px" }}>Employee Queries</h2>
-              {unreadCount > 0 && (
-                <span style={S.chip("#e8f0fd", "#1a6ed8", "#c4d9f5")}>
-                  <span style={S.dot("#1a6ed8")} />{unreadCount} new
-                </span>
+        {/* ── TOP BAR ─────────────────────────────────────────────────────── */}
+        <div className="adq-topbar">
+          <div className="adq-logo">💬</div>
+          <span className="adq-topbar-title">HelpDesk</span>
+          <div className="adq-topbar-sep" />
+          <span className="adq-topbar-sub">Admin Console</span>
+          {unread > 0 && (
+            <div className="adq-unread-badge">{unread} unread</div>
+          )}
+          <div className="adq-admin-av" style={{ marginLeft: unread > 0 ? 0 : "auto" }}>A</div>
+        </div>
+
+        {/* ── STAT CARDS ──────────────────────────────────────────────────── */}
+        <div className="adq-stats">
+          {([
+            { icon: <FileText    size={22} color="#534ab7" />, bg: "#eeedfe", label: "Total Queries", value: total    },
+            { icon: <Clock       size={22} color="#854f0b" />, bg: "#faeeda", label: "Pending",        value: pending  },
+            { icon: <CheckCircle size={22} color="#3b6d11" />, bg: "#eaf3de", label: "Resolved",       value: resolved },
+            { icon: <Bell        size={22} color="#854f0b" />, bg: "#faeeda", label: "Unread",         value: unread   },
+          ] as const).map(({ icon, label, value, bg }) => (
+            <div className="adq-stat-card" key={label}>
+              <div className="adq-stat-icon" style={{ background: bg }}>{icon}</div>
+              <div>
+                <div className="adq-stat-val">{value}</div>
+                <div className="adq-stat-lbl">{label}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── MAIN SPLIT PANEL ────────────────────────────────────────────── */}
+        <div className="adq-main">
+
+          {/* ── LEFT: QUERY LIST ──────────────────────────────────────────── */}
+          <div className="adq-left">
+            <div className="adq-left-head">
+              <div className="adq-search-wrap">
+                <span className="adq-search-icon">🔍</span>
+                <input
+                  className="adq-search"
+                  placeholder="Search name, subject, department…"
+                  value={search}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
+                />
+              </div>
+              <div className="adq-filters">
+                {([
+                  ["all",      `All (${total})`],
+                  ["pending",  `Pending (${pending})`],
+                  ["resolved", `Resolved (${resolved})`],
+                ] as [string, string][]).map(([f, label]) => (
+                  <button
+                    key={f}
+                    className={`adq-filter-btn${filter === f ? " on" : ""}`}
+                    onClick={() => setFilter(f)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="adq-qlist">
+              {loading ? (
+                <LoadingSpinner />
+              ) : error ? (
+                <div className="adq-error">
+                  <span style={{ fontSize: 28 }}>⚠️</span>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{error}</div>
+                </div>
+              ) : filtered.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "50px 16px", color: "#94a3b8" }}>
+                  <div style={{ fontSize: 36, marginBottom: 10 }}>📭</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#475569", marginBottom: 4 }}>No queries found</div>
+                  <div style={{ fontSize: 12 }}>
+                    {search ? "Try a different search term" : "Nothing here yet"}
+                  </div>
+                </div>
+              ) : (
+                filtered.map((q) => {
+                  const pc       = PRIORITY_CONFIG[q.priority] ?? PRIORITY_CONFIG["medium"];
+                  const cc       = CATEGORY_CONFIG[q.category] ?? { bg: "#f1f5f9", color: "#64748b" };
+                  const isActive = selected?.id === q.id;
+                  return (
+                    <div
+                      key={q.id}
+                      className={`adq-qcard${isActive ? " active" : ""}`}
+                      style={{ borderLeft: q.adminUnread ? "3px solid #6366f1" : "3px solid transparent" }}
+                      onClick={() => handleSelectQuery(q)}
+                    >
+                      {q.adminUnread && <div className="adq-unread-bar" />}
+                      <div className="adq-qcard-row">
+                        <Avatar name={q.employeeName || ""} size={34} />
+                        <div className="adq-qcard-body">
+                          <div className="adq-qcard-nameline">
+                            <div className="adq-qcard-name">
+                              {q.employeeName || "Unknown"}
+                              {q.adminUnread && <span className="adq-unread-dot" />}
+                            </div>
+                            <span className="adq-qcard-time">{timeAgo(q.createdAt)}</span>
+                          </div>
+                          <div className="adq-qcard-email">
+                            {q.employeeEmail} · {q.department}
+                          </div>
+                          <div className="adq-qcard-subj">{q.subject || "—"}</div>
+                          <div className="adq-qcard-msg">{q.message}</div>
+                          <div className="adq-qcard-chips">
+                            <Chip label={q.category || "General"} bg={cc.bg} color={cc.color} />
+                            <Chip label={pc.label} bg={pc.bg} color={pc.color} dot={pc.dot} border={pc.border} />
+                            <StatusChip status={q.status} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
-            <p style={{ fontSize: 12, color: "#94a3b8", margin: 0, fontWeight: 500 }}>
-              {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-            </p>
           </div>
 
-          {/* Search + Filter */}
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ position: "relative" }}>
-              <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 13, pointerEvents: "none" }}>🔍</span>
-              <input
-                className="aq-search"
-                placeholder="Search name, subject…"
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
-              />
-            </div>
-            <div style={{ display: "flex", gap: 3, background: "#fff", border: "1.5px solid #e2eaf3", borderRadius: 10, padding: 3 }}>
-              {(["all", "pending", "resolved"] as const).map((f) => (
-                <button key={f} className={`aq-filter-btn${filter === f ? " active" : ""}`}
-                  onClick={() => { setFilter(f); setCurrentPage(1); }}>
-                  {f === "all" ? `All (${queries.length})` : f === "pending" ? `Pending (${pendingCount})` : `Resolved (${resolvedCount})`}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+          {/* ── RIGHT: DETAIL / CHAT ──────────────────────────────────────── */}
+          <div className="adq-right">
+            {!selected ? (
+              <div className="adq-empty">
+                <div className="adq-empty-icon">💬</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#475569" }}>
+                  Select a query
+                </div>
+                <div style={{ fontSize: 13 }}>
+                  Click any query on the left to view and reply
+                </div>
+              </div>
+            ) : (
+              <div className="adq-slide" style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
 
-        {/* ── SUMMARY CHIPS ── */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-          <span style={S.chip("#e8f0fd", "#1a6ed8", "#c4d9f5")}><span style={S.dot("#1a6ed8")} />{queries.length} Total</span>
-          <span style={S.chip("#fef3c7", "#92400e", "#fde68a")}><span style={S.dot("#f59e0b")} />{pendingCount} Pending</span>
-          <span style={S.chip("#dcfce7", "#15803d", "#bbf7d0")}><span style={S.dot("#22c55e")} />{resolvedCount} Resolved</span>
-          {unreadCount > 0 && (
-            <span style={S.chip("#fee2e2", "#991b1b", "#fca5a5")}><span style={S.dot("#ef4444")} />{unreadCount} Unread</span>
-          )}
-        </div>
-
-        {/* ── TABLE CARD ── */}
-        <div style={S.card}>
-
-          {/* Head */}
-          <div style={S.thead}>
-            {["Employee", "Subject & Message", "Status", "Actions"].map((h) => (
-              <div key={h} style={S.th}>{h}</div>
-            ))}
-          </div>
-
-          {/* Empty */}
-          {filtered.length === 0 && (
-            <div style={{ textAlign: "center", padding: "60px 0", color: "#94a3b8" }}>
-              <div style={{ fontSize: 44, marginBottom: 10 }}>📭</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#475569", marginBottom: 4 }}>No queries found</div>
-              <div style={{ fontSize: 13 }}>{search ? "Try a different search term" : "Nothing here yet"}</div>
-            </div>
-          )}
-
-          {/* Rows */}
-          {paginated.map((q) => {
-            const [ac, abg] = getAvatar(q.employeeName || "U");
-            const isOpen = expandedId === q.id;
-            const currentReply = replyText[q.id] || "";
-
-            return (
-              <div key={q.id}>
-                <div
-                  className="aq-row-hover"
-                  style={{ ...S.row, borderLeft: q.adminUnread ? `3px solid ${ac}` : "3px solid transparent", background: isOpen ? "#f7faff" : "transparent" }}
-                  onClick={() => { setExpandedId(isOpen ? null : q.id); if (q.adminUnread) markAsRead(q.id); }}
-                >
-                  {/* Employee */}
-                  <div style={{ ...S.td, display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: abg, color: ac, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 900, flexShrink: 0, border: `2px solid ${ac}35` }}>
-                      {(q.employeeName || "U")[0].toUpperCase()}
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: "#1e293b", display: "flex", alignItems: "center", gap: 5 }}>
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.employeeName || "Unknown"}</span>
-                        {q.adminUnread && <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#1a6ed8", display: "inline-block", flexShrink: 0 }} />}
+                {/* Detail header */}
+                <div className="adq-det-head">
+                  <div className="adq-det-top">
+                    <Avatar name={selected.employeeName || ""} size={44} />
+                    <div className="adq-det-meta">
+                      <div className="adq-det-subj">{selected.subject}</div>
+                      <div className="adq-det-info">
+                        <strong style={{ color: "#1e293b" }}>{selected.employeeName}</strong>
+                        {" · "}{selected.employeeEmail}{" · "}{selected.department}
                       </div>
-                      <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.employeeEmail || ""}</div>
+                      <div className="adq-det-chips">
+                        {(() => {
+                          const pc = PRIORITY_CONFIG[selected.priority] ?? PRIORITY_CONFIG["medium"];
+                          const cc = CATEGORY_CONFIG[selected.category] ?? { bg: "#f1f5f9", color: "#64748b" };
+                          return (
+                            <>
+                              <Chip label={selected.category || "General"} bg={cc.bg} color={cc.color} />
+                              <Chip label={pc.label} bg={pc.bg} color={pc.color} dot={pc.dot} border={pc.border} />
+                              <StatusChip status={selected.status} />
+                              <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500 }}>
+                                🕐 {timeAgo(selected.createdAt)}
+                              </span>
+                              {selected.assignedTo && selected.assignedTo !== "Unassigned" && (
+                                <span style={{ fontSize: 11, color: "#6366f1", fontWeight: 600 }}>
+                                  👤 {selected.assignedTo}
+                                </span>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
                     </div>
-                  </div>
-
-                  {/* Subject — always truncated in row, full text in expanded panel */}
-                  <div style={{ ...S.td, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#1e293b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.subject || "—"}</div>
-                    <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.message || ""}</div>
-                    <div style={{ fontSize: 10, color: "#c8d3e0", marginTop: 3, fontWeight: 600 }}>{timeAgo(q.createdAt as { seconds?: number } | string)}</div>
-                  </div>
-
-                  {/* Status */}
-                  <div style={S.td}>
-                    {q.status === "resolved"
-                      ? <span style={S.badge("#dcfce7", "#15803d")}><span style={S.dot("#22c55e")} />Resolved</span>
-                      : <span style={S.badge("#fef3c7", "#92400e")}><span style={S.dot("#f59e0b")} />Pending</span>}
-                  </div>
-
-                  {/* Actions */}
-                  <div style={{ ...S.td, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 5 }}>
-                    <button
-                      className={`aq-btn ${isOpen ? "aq-btn-ghost" : "aq-btn-dark"}`}
-                      onClick={(e) => { e.stopPropagation(); setExpandedId(isOpen ? null : q.id); }}
-                      style={{ width: "100%", textAlign: "center" }}
-                    >
-                      {isOpen ? "Close" : "View"}
+                    <button className="adq-close-btn" onClick={() => setSelected(null)}>
+                      ✕ Close
                     </button>
-                    {q.adminUnread && (
-                      <button
-                        className="aq-btn"
-                        onClick={(e) => { e.stopPropagation(); markAsRead(q.id); }}
-                        style={{ width: "100%", textAlign: "center", fontSize: 11, padding: "4px 10px", background: "#e8f0fd", color: "#1a6ed8", border: "1.5px solid #c4d9f5", borderRadius: 7 }}
-                      >
-                        ✓ Mark Read
-                      </button>
-                    )}
                   </div>
                 </div>
 
-                {/* ── Expanded Panel ── */}
-                {isOpen && (
-                  <div className="aq-panel-anim" style={S.panel}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, maxWidth: 820 }}>
+                {/* Chat thread */}
+                <div className="adq-chat">
+                  {/* Original message */}
+                  <div className="adq-msg-row">
+                    <div
+                      className="adq-msg-av"
+                      style={{
+                        background: getAvatarStyle(selected.employeeName || "").bg,
+                        color:      getAvatarStyle(selected.employeeName || "").color,
+                      }}
+                    >
+                      {getInitials(selected.employeeName || "")}
+                    </div>
+                    <div className="adq-msg-content">
+                      <div className="adq-msg-sender">
+                        {selected.employeeName} · {timeAgo(selected.createdAt)}
+                      </div>
+                      <div className="adq-bubble emp">{selected.message}</div>
+                    </div>
+                  </div>
 
-                      {/* Left — Original Message with See More */}
-                      <div>
-                        <div style={S.label}>📩 Original Message</div>
-                        <div style={S.msgBox}>
-                          {/* Subject full text with See More */}
-                          {q.subject && (
-                            <div style={{ fontWeight: 700, color: "#1e293b", marginBottom: 6, fontSize: 13 }}>
-                              <ExpandableText text={q.subject} previewLength={80} />
-                            </div>
+                  {/* All replies */}
+                  {(selected.replies ?? []).map((r, i) => (
+                    <div
+                      key={i}
+                      className={`adq-msg-row adq-fadeup${r.author === "Admin" ? " admin-row" : ""}`}
+                    >
+                      <div
+                        className="adq-msg-av"
+                        style={{
+                          background: r.author === "Admin" ? "#6366f1" : getAvatarStyle(r.author || "").bg,
+                          color:      r.author === "Admin" ? "#fff"     : getAvatarStyle(r.author || "").color,
+                        }}
+                      >
+                        {r.author === "Admin" ? "A" : getInitials(r.author || "")}
+                      </div>
+                      <div className="adq-msg-content">
+                        <div className="adq-msg-sender">
+                          {r.author === "Admin" ? "You (Admin)" : r.author}
+                          {r.assignedTo && r.assignedTo !== "Unassigned" && (
+                            <span style={{ color: "#6366f1", marginLeft: 6 }}>via {r.assignedTo}</span>
                           )}
-                          <ExpandableText text={q.message || "—"} />
+                          {" · "}{timeAgo(r.time)}
                         </div>
-                        <div style={S.meta}>Submitted {timeAgo(q.createdAt as { seconds?: number } | string)}</div>
+                        <div className={`adq-bubble ${r.author === "Admin" ? "adm" : "emp"}`}>
+                          {r.text}
+                        </div>
                       </div>
+                    </div>
+                  ))}
 
-                      {/* Right — Reply or Reply Form */}
-                      <div>
-                        {q.adminReply ? (
-                          <>
-                            <div style={S.label}>✅ Reply Sent</div>
-                            <div style={S.replyBox}>
-                              <ExpandableText text={q.adminReply} />
-                            </div>
-                            <div style={S.meta}>Replied {timeAgo(q.repliedAt as { seconds?: number } | string)}</div>
-                          </>
-                        ) : (
-                          <>
-                            <div style={S.label}>✍️ Write a Reply</div>
-                            <textarea
-                              className="aq-textarea"
-                              rows={4}
-                              placeholder="Type your reply here…"
-                              maxLength={REPLY_LIMIT}
-                              value={currentReply}
-                              onChange={(e) => {
-                                if (e.target.value.length <= REPLY_LIMIT)
-                                  setReplyText((p) => ({ ...p, [q.id]: e.target.value }));
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            {/* Character counter */}
-                            <div style={S.charHint(currentReply.length >= REPLY_LIMIT)}>
-                              {currentReply.length}/{REPLY_LIMIT}
-                            </div>
-                            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                              <button
-                                className="aq-btn aq-btn-primary"
-                                disabled={!currentReply.trim()}
-                                onClick={(e) => { e.stopPropagation(); handleReply(q.id); }}
-                                style={{ padding: "9px 18px", fontSize: 13 }}
-                              >
-                                Send & Resolve ✓
-                              </button>
-                              <button
-                                className="aq-btn aq-btn-ghost"
-                                onClick={(e) => { e.stopPropagation(); setExpandedId(null); }}
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
+                  <div ref={chatEndRef} />
+                </div>
+
+                {/* Reply footer or resolved bar */}
+                {selected.status === "resolved" && (selected.replies ?? []).length > 0 ? (
+                  <div className="adq-resolved-bar">
+                    <span className="adq-resolved-text">✓ This query is resolved</span>
+                    <button className="adq-reopen-btn" onClick={handleReopenQuery}>
+                      Reopen
+                    </button>
+                  </div>
+                ) : (
+                  <div className="adq-reply-footer">
+                    <div className="adq-reply-controls">
+                      <span className="adq-mini-label">Assign to:</span>
+                      <select
+                        className="adq-mini-select"
+                        value={assignTo}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setAssignTo(e.target.value)}
+                      >
+                        {ADMIN_AGENTS.map((a) => (
+                          <option key={a} value={a}>{a}</option>
+                        ))}
+                      </select>
+                      <span className="adq-mini-label" style={{ marginLeft: 6 }}>Priority:</span>
+                      <select
+                        className="adq-mini-select"
+                        value={selected.priority || "medium"}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChangePriority(e.target.value)}
+                      >
+                        {Object.entries(PRIORITY_CONFIG).map(([k, v]) => (
+                          <option key={k} value={k}>{v.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <textarea
+                      className="adq-textarea"
+                      rows={3}
+                      placeholder="Write a reply… (Enter to send, Shift+Enter for new line)"
+                      value={replyText}
+                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setReplyText(e.target.value)}
+                      onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          void handleSendReply();
+                        }
+                      }}
+                    />
+                    <div className="adq-reply-actions">
+                      <button
+                        className="adq-cancel-btn"
+                        onClick={() => { setSelected(null); setReplyText(""); }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="adq-send-btn"
+                        disabled={!replyText.trim() || sending}
+                        onClick={() => void handleSendReply()}
+                      >
+                        {sending ? "Sending…" : "Send Reply ↗"}
+                      </button>
                     </div>
                   </div>
                 )}
               </div>
-            );
-          })}
-
-          {/* Pagination */}
-          {filtered.length > ITEMS_PER_PAGE && (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 20px", borderTop: "1px solid #f1f5f9", background: "#fafbfc", flexWrap: "wrap", gap: 10 }}>
-              <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>
-                Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)} of {filtered.length}
-              </span>
-              <div style={{ display: "flex", gap: 4 }}>
-                <button className="aq-page-btn" disabled={currentPage === 1} onClick={() => setCurrentPage((p) => p - 1)}>← Prev</button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                  .reduce<(number | "…")[]>((acc, p, i, arr) => {
-                    if (i > 0 && (p as number) - (arr[i - 1] as number) > 1) acc.push("…");
-                    acc.push(p);
-                    return acc;
-                  }, [])
-                  .map((p, i) => (
-                    <button key={i} className={`aq-page-btn${p === currentPage ? " cur" : ""}`}
-                      disabled={p === "…"} style={{ cursor: p === "…" ? "default" : "pointer" }}
-                      onClick={() => typeof p === "number" && setCurrentPage(p)}>
-                      {p}
-                    </button>
-                  ))}
-                <button className="aq-page-btn" disabled={currentPage === totalPages} onClick={() => setCurrentPage((p) => p + 1)}>Next →</button>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </>

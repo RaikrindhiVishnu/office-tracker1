@@ -1,0 +1,67 @@
+// ─── Core Types ───────────────────────────────────────────────────────────────
+
+export interface Employee {
+  id: string;
+  name: string;
+  email: string;
+  birthDate: string;        // YYYY-MM-DD
+  birthMonthDay: string;    // MM-DD
+  department?: string;
+  role?: string;
+  lastWishSentOn?: string;  // YYYY-MM-DD
+  createdAt?: any;
+}
+
+export interface Festival {
+  id: string;
+  title: string;
+  festivalDate: string;     // YYYY-MM-DD
+  sendEmail: boolean;
+  sendInAdvanceDays: number;
+  emailSubject: string;
+  emailMessage: string;
+  bannerEmoji?: string;
+  bannerColor?: string;
+  lastSentOn?: string;
+  createdAt?: any;
+}
+
+export interface CompanyEvent {
+  id: string;
+  title: string;
+  description: string;
+  eventDate: string;        // YYYY-MM-DD
+  location?: string;
+  sendAnnouncementEmail: boolean;
+  reminderDaysBefore: number;
+  rsvpLink?: string;
+  color?: string;
+  announcementSentOn?: string;
+  reminderSentOn?: string;
+  createdAt?: any;
+}
+
+export interface GreetingLog {
+  id: string;
+  type: "birthday" | "festival" | "event";
+  employeeId?: string;
+  recipientEmail: string;
+  recipientName?: string;
+  subject: string;
+  sentAt: any;  // Firestore timestamp
+  sentBy: "system" | "admin";
+  status: "success" | "failed";
+  error?: string;
+  refId?: string; // festivalId or eventId
+}
+
+export interface EmailBatch {
+  recipients: { email: string; name: string; id?: string }[];
+  subject: string;
+  html: (name: string) => string;
+  type: GreetingLog["type"];
+  sentBy: GreetingLog["sentBy"];
+  refId?: string;
+}
+
+export type Tab = "dashboard" | "birthdays" | "festivals" | "events" | "history" | "calendar";
