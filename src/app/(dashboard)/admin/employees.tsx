@@ -466,10 +466,20 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
 <option>Motion Graphics Designer</option>
 <option>Creative Director</option>
 <option>Intern</option>
-
-              </select>
-
-              <select
+<option>Businees analytics</option>
+<option>Operations Manager</option>
+<option>UI/UX Intern</option>
+<option>Backend Intern</option>
+<option>Frontend Intern</option>
+<option>Manger</option>
+<option>Director</option>
+<option>3D Modeler</option>
+<option>3D Generalist</option>
+<option>3D Visualizer</option>
+<option>CG Artist</option>
+<option>Compositing Artist</option>
+</select>
+<select
   value={accountType}
   onChange={(e) =>
     setAccountType(e.target.value as "EMPLOYEE" | "ADMIN")

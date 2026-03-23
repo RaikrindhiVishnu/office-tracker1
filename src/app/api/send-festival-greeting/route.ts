@@ -133,7 +133,6 @@ function buildFestivalHtml(fest: any, recipientName: string): string {
         </p>
 
         <p style="font-size:15px;color:#374151;line-height:1.8;margin-top:12px;">
-          At <strong>Techgy Innovations Pvt. Ltd.</strong> and <strong>9DS</strong>, 
           we sincerely appreciate your dedication and valuable contributions. 
           Festivals are a time to celebrate togetherness, positivity, and the spirit of unity within our organization.
         </p>
