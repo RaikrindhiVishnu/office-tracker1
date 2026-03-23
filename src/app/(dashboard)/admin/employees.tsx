@@ -466,7 +466,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
 <option>Motion Graphics Designer</option>
 <option>Creative Director</option>
 <option>Intern</option>
-<option>Businees analytics</option>
+<option>Businees Analyst</option>
 <option>Operations Manager</option>
 <option>UI/UX Intern</option>
 <option>Backend Intern</option>
