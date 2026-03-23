@@ -478,6 +478,8 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
 <option>3D Visualizer</option>
 <option>CG Artist</option>
 <option>Compositing Artist</option>
+<option>Android Developer</option>
+<option>Mobile App Developer</option>
 </select>
 <select
   value={accountType}
