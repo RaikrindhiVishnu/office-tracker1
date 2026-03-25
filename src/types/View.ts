@@ -13,4 +13,5 @@ export type View =
   | "notifications"
   | "accounts"
   | "queries" 
-  | "analytics";
+  | "analytics"
+  | "breakMonitor";

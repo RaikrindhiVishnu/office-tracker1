@@ -1,7 +1,8 @@
 "use client";
 // GreetingsAdmin.tsx – Auto-synced from users collection (no manual birthdays collection)
+// ✅ NEW: "Send Mail" tab added for composing and sending custom emails to employees
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   collection, onSnapshot, addDoc, deleteDoc, updateDoc,
   doc, serverTimestamp, query, orderBy, limit,
@@ -42,8 +43,13 @@ interface GreetingLog {
   recipientName?: string; subject: string;
   sentAt: string; sentBy: string; status: string; error?: string;
 }
-type Tab = "dashboard"|"birthdays"|"anniversaries"|"achievements"|"welcome"|"festivals"|"events"|"history";
-interface StaffRecord { id: string; email: string; name: string; }
+
+// ✅ NEW: Send Mail types
+type MailRecipientMode = "all" | "select" | "department" | "single";
+interface MailAttachment { name: string; dataUrl: string; type: string; }
+
+type Tab = "dashboard"|"birthdays"|"anniversaries"|"achievements"|"welcome"|"festivals"|"events"|"mail"|"history";
+interface StaffRecord { id: string; email: string; name: string; department?: string; }
 
 const FESTIVAL_EMOJIS = ["🪔","🎉","🎄","🌸","🎊","🥳","🎆","🌺","🎋","🎑","✨","🪅","🎭","🎈","🐣","🌙"];
 const EVENT_COLORS    = ["#193677","#0891b2","#059669","#d97706","#e11d48","#9333ea","#0284c7","#16a34a","#dc2626","#0f766e"];
@@ -99,6 +105,7 @@ const NAV_ITEMS:{id:Tab;label:string;icon:string}[] = [
   {id:"welcome",      label:"New Joiners",      icon:"👋"},
   {id:"festivals",    label:"Festivals",        icon:"🪔"},
   {id:"events",       label:"Events",           icon:"📅"},
+  {id:"mail",         label:"Send Mail",        icon:"✉️"},  // ✅ NEW
   {id:"history",      label:"History",          icon:"📋"},
 ];
 
@@ -134,6 +141,22 @@ export default function GreetingsAdmin() {
   const [festModal,  setFestModal]  = useState<Festival|null|"new">(null);
   const [eventModal, setEventModal] = useState<CompanyEvent|null|"new">(null);
 
+  // ✅ NEW: Send Mail state
+  const [mailSubject,        setMailSubject]        = useState("");
+  const [mailBody,           setMailBody]           = useState("");
+  const [mailRecipientMode,  setMailRecipientMode]  = useState<MailRecipientMode>("all");
+  const [mailSelectedEmps,   setMailSelectedEmps]   = useState<string[]>([]);   // ids
+  const [mailDept,           setMailDept]           = useState("");
+  const [mailSingleEmail,    setMailSingleEmail]    = useState("");
+  const [mailSingleName,     setMailSingleName]     = useState("");
+  const [mailPriority,       setMailPriority]       = useState<"normal"|"high">("normal");
+  const [mailSending,        setMailSending]        = useState(false);
+  const [mailErrors,         setMailErrors]         = useState<Record<string,string>>({});
+  const [mailSearch,         setMailSearch]         = useState("");
+  const [mailSentCount,      setMailSentCount]      = useState<number|null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [mailAttachments,    setMailAttachments]    = useState<MailAttachment[]>([]);
+
   const emptyAch   = {employeeId:"",employeeName:"",employeeEmail:"",title:"",description:"",category:"Employee of the Month",awardDate:todayISO};
   const emptyJoin  = {name:"",email:"",department:"",designation:"",joinDate:todayISO};
   const emptyFest  = {title:"",festivalDate:"",sendEmail:true,sendInAdvanceDays:0,emailSubject:"",emailMessage:"",bannerEmoji:"🎉",bannerColor:"#f59e0b"};
@@ -152,28 +175,15 @@ export default function GreetingsAdmin() {
   }, []);
 
   useEffect(()=>{
-    // ─────────────────────────────────────────────────────────────────────────
-    // ✅ CHANGED: Single source of truth — read ALL employee data from `users`
-    //    collection. No separate `birthdays` collection needed.
-    //    Maps EmployeeDetails fields (dateOfBirth, dateOfJoining) → Employee interface.
-    // ─────────────────────────────────────────────────────────────────────────
     const u1 = onSnapshot(collection(db, "users"), snap => {
       const employeeList: Employee[] = snap.docs
         .map(d => {
           const data = d.data();
-
-          // Support both old field names (birthDate/joinDate) and new ones
-          // (dateOfBirth/dateOfJoining) from EmployeeDetails component
-          const birthDate: string =
-            data.dateOfBirth || data.birthDate || "";
-          const joinDate: string =
-            data.dateOfJoining || data.joinDate || "";
-
-          // Auto-derive birthMonthDay (MM-DD) — no manual entry needed
+          const birthDate: string = data.dateOfBirth || data.birthDate || "";
+          const joinDate: string  = data.dateOfJoining || data.joinDate || "";
           const mm = birthDate?.slice(5, 7);
           const dd = birthDate?.slice(8, 10);
           const birthMonthDay = birthDate ? `${mm}-${dd}` : "";
-
           return {
             id: d.id,
             name: data.name || "",
@@ -186,19 +196,18 @@ export default function GreetingsAdmin() {
             lastAnniversarySentOn: data.lastAnniversarySentOn || "",
           } as Employee;
         })
-        .filter(e => e.email); // only include docs that have an email
+        .filter(e => e.email);
 
       setEmployees(employeeList);
 
-      // Also build allStaff list from the same snapshot
       const staffList: StaffRecord[] = employeeList.map(e => ({
         id: e.id,
         email: e.email,
         name: e.name,
+        department: e.department,
       }));
       setAllStaff(staffList);
 
-      // Populate current admin's profile data
       if (user?.email) {
         const myDoc = snap.docs.find(d => d.data().email === user.email);
         if (myDoc) setUserData({ ...myDoc.data() } as UserData);
@@ -214,19 +223,30 @@ export default function GreetingsAdmin() {
     return ()=>{u1();u2();u3();u4();u5();u6();};
   },[user]);
 
-  const recipientList   = allStaff.length>0 ? allStaff : employees.map(e=>({id:e.id,email:e.email,name:e.name}));
+  const recipientList   = allStaff.length>0 ? allStaff : employees.map(e=>({id:e.id,email:e.email,name:e.name,department:e.department}));
   const recipientCount  = recipientList.length;
   const recipientEmails = recipientList.map(r=>({email:r.email,name:r.name}));
   const showToast=(msg:string,ok=true)=>{setToast({msg,ok});setTimeout(()=>setToast(null),3500);};
 
-  // ── Send ────────────────────────────────────────────────────────────────────
+  // ── All unique departments ────────────────────────────────────────────────
+  const allDepartments = Array.from(new Set(recipientList.map(r=>r.department).filter(Boolean))) as string[];
+
+  // ── Computed mail recipients ──────────────────────────────────────────────
+  const computedMailRecipients = (() => {
+    if (mailRecipientMode === "all") return recipientList.map(r=>({email:r.email,name:r.name}));
+    if (mailRecipientMode === "department") return recipientList.filter(r=>r.department===mailDept).map(r=>({email:r.email,name:r.name}));
+    if (mailRecipientMode === "select") return recipientList.filter(r=>mailSelectedEmps.includes(r.id)).map(r=>({email:r.email,name:r.name}));
+    if (mailRecipientMode === "single") return mailSingleEmail.trim() ? [{email:mailSingleEmail.trim(),name:mailSingleName.trim()||mailSingleEmail.trim()}] : [];
+    return [];
+  })();
+
+  // ── Send functions ───────────────────────────────────────────────────────
   const sendWish=async(emp:Employee)=>{
     setSending(emp.id);
     try{
       const res=await fetch("/api/send-birthday-wish",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({employeeId:emp.id,email:emp.email,name:emp.name,sentBy:"admin"})});
       const data=await res.json();
       if(!res.ok)throw new Error(data.error);
-      // ✅ CHANGED: Update lastWishSentOn on the users doc (single source of truth)
       await updateDoc(doc(db,"users",emp.id),{lastWishSentOn:todayISO});
       showToast(`🎂 Birthday wish sent to ${emp.name}!`);
     }
@@ -241,7 +261,6 @@ export default function GreetingsAdmin() {
       const res=await fetch("/api/send-anniversary-wish",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({employeeId:emp.id,email:emp.email,name:emp.name,years,sentBy:"admin"})});
       const data=await res.json();
       if(!res.ok)throw new Error(data.error);
-      // ✅ CHANGED: Update lastAnniversarySentOn on the users doc
       await updateDoc(doc(db,"users",emp.id),{lastAnniversarySentOn:todayISO});
       showToast(`🎉 Anniversary wish sent to ${emp.name}! (${years} years)`);
     }
@@ -270,7 +289,71 @@ export default function GreetingsAdmin() {
     catch(e:any){showToast(e.message||"Failed",false);}finally{setSending(null);}
   };
 
-  // ── CRUD (achievements, joiners, festivals, events only — employees come from users) ──
+  // ✅ NEW: Send Custom Mail
+  const sendCustomMail = async () => {
+    const err: Record<string,string> = {};
+    if (!mailSubject.trim()) err.subject = "Subject is required";
+    if (!mailBody.trim()) err.body = "Message body is required";
+    if (mailRecipientMode === "single" && !mailSingleEmail.trim()) err.singleEmail = "Recipient email is required";
+    if (mailRecipientMode === "single" && mailSingleEmail.trim() && !/\S+@\S+\.\S+/.test(mailSingleEmail)) err.singleEmail = "Invalid email address";
+    if (mailRecipientMode === "department" && !mailDept) err.dept = "Select a department";
+    if (mailRecipientMode === "select" && mailSelectedEmps.length === 0) err.select = "Select at least one employee";
+    if (computedMailRecipients.length === 0) err.recipients = "No recipients found";
+    if (Object.keys(err).length) { setMailErrors(err); return; }
+    setMailErrors({});
+    setMailSending(true);
+    setMailSentCount(null);
+    try {
+      const res = await fetch("/api/send-custom-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: mailSubject.trim(),
+          body: mailBody.trim(),
+          recipients: computedMailRecipients,
+          priority: mailPriority,
+          sentBy: "admin",
+          attachments: mailAttachments,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send");
+      const count = data.sent ?? computedMailRecipients.length;
+      setMailSentCount(count);
+      showToast(`✉️ Mail sent to ${count} recipient${count!==1?"s":""}!`);
+      // Reset form
+      setMailSubject("");
+      setMailBody("");
+      setMailRecipientMode("all");
+      setMailSelectedEmps([]);
+      setMailDept("");
+      setMailSingleEmail("");
+      setMailSingleName("");
+      setMailPriority("normal");
+      setMailAttachments([]);
+      setMailSearch("");
+    } catch(e:any) {
+      showToast(e.message || "Failed to send mail", false);
+    } finally {
+      setMailSending(false);
+    }
+  };
+
+  // ── File attachment handler ──────────────────────────────────────────────
+  const handleAttachFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    files.forEach(file => {
+      if (file.size > 5 * 1024 * 1024) { showToast(`${file.name} is too large (max 5MB)`, false); return; }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setMailAttachments(prev => [...prev, { name: file.name, dataUrl: ev.target?.result as string, type: file.type }]);
+      };
+      reader.readAsDataURL(file);
+    });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  // ── CRUD ──────────────────────────────────────────────────────────────────
   const saveAch=async()=>{
     const err:Record<string,string>={};
     if(!achForm.employeeName.trim())err.employeeName="Required";
@@ -334,12 +417,10 @@ export default function GreetingsAdmin() {
   const successCount  = logs.filter(l=>l.status==="success").length;
   const failCount     = logs.filter(l=>l.status==="failed").length;
   const filteredLogs  = histFilter==="all"?logs:logs.filter(l=>l.type===histFilter);
-  // ✅ All future festivals sorted by date (no 30-day cap) — used for notifications + card
   const upcomingFests = festivals
     .filter(f => daysUntil(f.festivalDate) >= 0)
     .sort((a, b) => a.festivalDate.localeCompare(b.festivalDate));
 
-  // ── Next Birthday ────────────────────────────────────────────────────────────
   const nextBdayList = employees
     .filter(e => e.birthMonthDay && e.birthMonthDay.length === 5)
     .map(e => ({ ...e, daysLeft: daysUntilMMDD(e.birthMonthDay) }))
@@ -348,16 +429,14 @@ export default function GreetingsAdmin() {
   const nextBday = nextBdayList[0] ?? null;
   const sameDayBdays = nextBday ? nextBdayList.filter(e => e.daysLeft === nextBday.daysLeft) : [];
 
-  // ── All Festivals — upcoming first (nearest), then past (most recent)
-  // This ensures past-dated festivals still show in the card so admin can fix dates
+  // ✅ FIXED: Only show upcoming/today festivals — past ones are excluded from the dashboard card.
+  // Past festivals still appear in the Festivals management tab where admin can update the year.
   const _festsWithDays = festivals.map(f => ({ ...f, daysLeft: daysUntil(f.festivalDate) }));
-  const nextFestList = [
-    ..._festsWithDays.filter(f => f.daysLeft >= 0).sort((a,b) => a.daysLeft - b.daysLeft),
-    ..._festsWithDays.filter(f => f.daysLeft < 0).sort((a,b) => b.daysLeft - a.daysLeft),
-  ];
+  const nextFestList = _festsWithDays
+    .filter(f => f.daysLeft >= 0)           // ← ONLY future + today; drop negatives
+    .sort((a, b) => a.daysLeft - b.daysLeft);
   const nextFest = nextFestList[0] ?? null;
 
-  // ── Notifications ─────────────────────────────────────────────────────────
   const notifications = [
     ...todayBdays.map(e=>({icon:"🎂",msg:`${e.name}'s Birthday today!`,color:"#7c3aed",action:()=>{setTab("birthdays");setShowNotifs(false);}})),
     ...todayAnnivsrs.map(e=>({icon:"🎉",msg:`${e.name} — ${yearsWorked(e.joinDate||"")}yr Anniversary!`,color:"#d97706",action:()=>{setTab("anniversaries");setShowNotifs(false);}})),
@@ -365,6 +444,13 @@ export default function GreetingsAdmin() {
   ];
 
   const recentEmails = logs.slice(0,8);
+
+  // ✅ NEW: Filtered employee list for "select" mode
+  const filteredStaffForSelect = recipientList.filter(r =>
+    r.name.toLowerCase().includes(mailSearch.toLowerCase()) ||
+    r.email.toLowerCase().includes(mailSearch.toLowerCase()) ||
+    (r.department||"").toLowerCase().includes(mailSearch.toLowerCase())
+  );
 
   const CSS = `
     @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800;900&display=swap');
@@ -593,6 +679,54 @@ export default function GreetingsAdmin() {
     /* countdown ring pulse animation */
     @keyframes pulse-ring{0%{opacity:1}50%{opacity:.5}100%{opacity:1}}
     .gr-ring-today{animation:pulse-ring 1.6s ease-in-out infinite;}
+
+    /* ✅ NEW: Mail Composer Styles */
+    .gr-mail-layout{display:grid;grid-template-columns:320px 1fr;gap:16px;align-items:start;}
+    .gr-mail-panel{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}
+    .gr-mail-panel-hd{padding:12px 16px;border-bottom:1px solid #f1f5f9;font-size:11.5px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:6px;}
+    .gr-mail-panel-body{padding:16px;}
+    .gr-mail-compose{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}
+    .gr-mail-compose-hd{padding:16px 20px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;}
+
+    /* Recipient mode tabs */
+    .gr-rmode-tabs{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;margin-bottom:14px;}
+    .gr-rmode-tab{font-family:var(--font);font-size:11px;font-weight:700;padding:7px 6px;border-radius:7px;border:1.5px solid var(--border);background:#f8fafc;color:var(--text2);cursor:pointer;transition:all .13s;text-align:center;line-height:1.3;}
+    .gr-rmode-tab:hover{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8;}
+    .gr-rmode-tab.on{background:var(--blue);color:#fff;border-color:var(--blue);box-shadow:0 2px 8px rgba(25,54,119,.2);}
+
+    /* Employee multi-select list */
+    .gr-emp-list{max-height:240px;overflow-y:auto;border:1.5px solid var(--border);border-radius:8px;background:#f8fafc;}
+    .gr-emp-list::-webkit-scrollbar{width:3px;}
+    .gr-emp-list::-webkit-scrollbar-thumb{background:#e2e8f0;border-radius:3px;}
+    .gr-emp-item{display:flex;align-items:center;gap:9px;padding:8px 11px;border-bottom:1px solid #f1f5f9;cursor:pointer;transition:background .12s;}
+    .gr-emp-item:last-child{border-bottom:none;}
+    .gr-emp-item:hover{background:#eff6ff;}
+    .gr-emp-item.sel{background:#eff6ff;}
+    .gr-emp-cb{width:15px;height:15px;border-radius:4px;border:1.5px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0;transition:all .12s;}
+    .gr-emp-item.sel .gr-emp-cb{background:var(--blue);border-color:var(--blue);color:#fff;}
+
+    /* Priority selector */
+    .gr-priority-row{display:flex;gap:7px;}
+    .gr-priority-opt{flex:1;padding:7px 10px;border-radius:7px;border:1.5px solid var(--border);background:#f8fafc;font-size:11.5px;font-weight:700;color:var(--text2);cursor:pointer;transition:all .13s;text-align:center;}
+    .gr-priority-opt:hover{border-color:var(--border2);}
+    .gr-priority-opt.sel-normal{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8;}
+    .gr-priority-opt.sel-high{background:#fff1f2;border-color:#fecdd3;color:#e11d48;}
+
+    /* Mail body textarea */
+    .gr-mail-body{width:100%;padding:12px 14px;background:#f8fafc;border:1.5px solid var(--border);border-radius:7px;font-size:13px;color:var(--text);font-family:var(--font);outline:none;resize:vertical;min-height:180px;line-height:1.7;transition:border-color .14s;}
+    .gr-mail-body:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(25,54,119,.08);background:#fff;}
+    .gr-mail-body::placeholder{color:var(--text3);}
+
+    /* Recipient preview pill */
+    .gr-recip-preview{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;margin-bottom:14px;}
+
+    /* Attachment chip */
+    .gr-attach-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px 3px 10px;border-radius:20px;background:#f1f5f9;border:1px solid var(--border);font-size:11.5px;font-weight:600;color:var(--text2);}
+    .gr-attach-rm{background:none;border:none;cursor:pointer;font-size:13px;color:var(--text3);line-height:1;padding:0;margin-left:2px;}
+    .gr-attach-rm:hover{color:var(--red);}
+
+    /* Send success banner */
+    .gr-mail-success{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 20px;text-align:center;}
   `;
 
   const StatCard = ({val,lbl,icon,bg,color,badge,badgeBg,barPct}:{val:number;lbl:string;icon:string;bg:string;color:string;badge?:string;badgeBg?:string;barPct?:number}) => (
@@ -647,7 +781,7 @@ export default function GreetingsAdmin() {
           <div className="gr-topbar">
             <div>
               <div className="gr-tb-title">
-                {tab==="dashboard"?"Dashboard":tab==="birthdays"?"🎂 Birthdays":tab==="anniversaries"?"🎉 Work Anniversaries":tab==="achievements"?"🏆 Achievements":tab==="welcome"?"👋 New Joiners":tab==="festivals"?"🪔 Festival Greetings":tab==="events"?"📅 Company Events":"📋 Email History"}
+                {tab==="dashboard"?"Dashboard":tab==="birthdays"?"🎂 Birthdays":tab==="anniversaries"?"🎉 Work Anniversaries":tab==="achievements"?"🏆 Achievements":tab==="welcome"?"👋 New Joiners":tab==="festivals"?"🪔 Festival Greetings":tab==="events"?"📅 Company Events":tab==="mail"?"✉️ Send Mail":"📋 Email History"}
               </div>
               <div className="gr-tb-date">{todayLabel}</div>
             </div>
@@ -695,7 +829,7 @@ export default function GreetingsAdmin() {
                       :recentEmails.map(l=>(
                         <div key={l.id} className="gr-panel-item">
                           <div className="gr-panel-ico" style={{background:l.status==="success"?"#f0fdf4":"#fff1f2"}}>
-                            {l.type==="birthday"?"🎂":l.type==="festival"?"🪔":l.type==="anniversary"?"🎉":l.type==="achievement"?"🏆":l.type==="welcome"?"👋":"📅"}
+                            {l.type==="birthday"?"🎂":l.type==="festival"?"🪔":l.type==="anniversary"?"🎉":l.type==="achievement"?"🏆":l.type==="welcome"?"👋":l.type==="mail"?"✉️":"📅"}
                           </div>
                           <div style={{flex:1,minWidth:0}}>
                             <div className="gr-panel-msg" style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.recipientName||l.recipientEmail}</div>
@@ -714,19 +848,10 @@ export default function GreetingsAdmin() {
 
               {/* Dynamic user profile */}
               <div style={{display:"flex",alignItems:"center",gap:10,paddingLeft:4}}>
-                <div style={{
-                  width:34,height:34,borderRadius:9,overflow:"hidden",
-                  flexShrink:0,boxShadow:"0 2px 8px rgba(25,54,119,.25)",
-                  border:"2px solid #e4e9f2"
-                }}>
+                <div style={{width:34,height:34,borderRadius:9,overflow:"hidden",flexShrink:0,boxShadow:"0 2px 8px rgba(25,54,119,.25)",border:"2px solid #e4e9f2"}}>
                   {userData?.profilePhoto
                     ? <img src={userData.profilePhoto} alt="Admin" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                    : <div style={{
-                        width:"100%",height:"100%",
-                        background:"linear-gradient(135deg,#193677,#2563eb)",
-                        display:"flex",alignItems:"center",justifyContent:"center",
-                        color:"#fff",fontWeight:800,fontSize:12
-                      }}>
+                    : <div style={{width:"100%",height:"100%",background:"linear-gradient(135deg,#193677,#2563eb)",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:12}}>
                         {(userData?.name||user?.email||"A")[0].toUpperCase()}
                       </div>
                   }
@@ -763,7 +888,7 @@ export default function GreetingsAdmin() {
                     {icon:"👋",label:"Welcome Joiner",   sub:"Individual",bg:"#eff6ff",action:()=>setTab("welcome")},
                     {icon:"🪔",label:"Festival Greeting",sub:"Broadcast",bg:"#fef3c7",action:()=>setTab("festivals")},
                     {icon:"📅",label:"Event Invitation", sub:"Broadcast",bg:"#f0fdf4",action:()=>setTab("events")},
-                    {icon:"⏰",label:"Event Reminder",   sub:"Broadcast",bg:"#fff7ed",action:()=>setTab("events")},
+                    {icon:"✉️",label:"Send Mail",        sub:"Any recipients",bg:"#f0f9ff",action:()=>setTab("mail")},
                     {icon:"📋",label:"View History",     sub:"All emails",bg:"#f8fafc",action:()=>setTab("history")},
                   ].map(t=>(
                     <div key={t.label} className="gr-tile" onClick={t.action}>
@@ -840,7 +965,7 @@ export default function GreetingsAdmin() {
                     )}
                   </div>
 
-                  {/* ── ALL UPCOMING FESTIVALS CARD ── */}
+                  {/* Upcoming Festivals Card */}
                   <div className="gr-card">
                     <div className="gr-card-hd">
                       <div className="gr-card-title">🪔 Upcoming Festivals
@@ -849,143 +974,56 @@ export default function GreetingsAdmin() {
                       <button className="gr-btn gr-btn-ghost gr-btn-sm" onClick={()=>setTab("festivals")}>Manage →</button>
                     </div>
                     {nextFestList.length===0 ? (
-                      <div className="gr-empty"><div className="gr-empty-ico">🪔</div>No upcoming festivals. Add them from the Festivals tab.</div>
+                      <div className="gr-empty">
+                        <div className="gr-empty-ico">🪔</div>
+                        <div>No upcoming festivals scheduled.</div>
+                        <div style={{fontSize:11,marginTop:6,color:"#94a3b8"}}>If festivals show as "Date passed", update their year in the <span style={{color:"#2563eb",cursor:"pointer",fontWeight:700}} onClick={()=>setTab("festivals")}>Festivals tab →</span></div>
+                      </div>
                     ) : (
                       <div style={{padding:"16px 18px 18px"}}>
-
-                        {/* ── NEXT / FEATURED FESTIVAL (big hero block) ── */}
-                        <div style={{
-                          borderRadius:14,padding:"16px 16px 14px",
-                          background:"linear-gradient(135deg,"+nextFest!.bannerColor+"18,"+nextFest!.bannerColor+"06)",
-                          border:"1.5px solid "+nextFest!.bannerColor+"33",
-                          marginBottom:14,position:"relative",overflow:"hidden"
-                        }}>
-                          {/* Watermark emoji */}
-                          <div style={{position:"absolute",right:-10,top:-10,fontSize:72,opacity:.07,transform:"rotate(15deg)",lineHeight:1,userSelect:"none",pointerEvents:"none"}}>
-                            {nextFest!.bannerEmoji||"🎊"}
-                          </div>
+                        <div style={{borderRadius:14,padding:"16px 16px 14px",background:"linear-gradient(135deg,"+nextFest!.bannerColor+"18,"+nextFest!.bannerColor+"06)",border:"1.5px solid "+nextFest!.bannerColor+"33",marginBottom:14,position:"relative",overflow:"hidden"}}>
+                          <div style={{position:"absolute",right:-10,top:-10,fontSize:72,opacity:.07,transform:"rotate(15deg)",lineHeight:1,userSelect:"none",pointerEvents:"none"}}>{nextFest!.bannerEmoji||"🎊"}</div>
                           <div style={{display:"flex",alignItems:"center",gap:14,position:"relative"}}>
-                            {/* SVG countdown ring */}
                             <div style={{position:"relative",flexShrink:0}}>
                               <svg width="72" height="72" viewBox="0 0 72 72" className={nextFest!.daysLeft===0?"gr-ring-today":""}>
                                 <circle cx="36" cy="36" r="30" fill="none" stroke={nextFest!.bannerColor+"33"} strokeWidth="6"/>
-                                <circle
-                                  cx="36" cy="36" r="30" fill="none"
-                                  stroke={nextFest!.bannerColor}
-                                  strokeWidth="6" strokeLinecap="round"
-                                  strokeDasharray={""+2*Math.PI*30}
-                                  strokeDashoffset={""+2*Math.PI*30*Math.min(Math.max(nextFest!.daysLeft,0)/365,1)}
-                                  transform="rotate(-90 36 36)"
-                                  style={{transition:"stroke-dashoffset 1.2s ease"}}
-                                />
+                                <circle cx="36" cy="36" r="30" fill="none" stroke={nextFest!.bannerColor} strokeWidth="6" strokeLinecap="round" strokeDasharray={""+2*Math.PI*30} strokeDashoffset={""+2*Math.PI*30*Math.min(Math.max(nextFest!.daysLeft,0)/365,1)} transform="rotate(-90 36 36)" style={{transition:"stroke-dashoffset 1.2s ease"}}/>
                               </svg>
                               <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-                                {nextFest!.daysLeft===0
-                                  ?<span style={{fontSize:22,lineHeight:1}}>🎊</span>
-                                  :<><span style={{fontSize:18,fontWeight:900,color:"#0f172a",lineHeight:1}}>{nextFest!.daysLeft}</span><span style={{fontSize:8,color:"#94a3b8",fontWeight:700,marginTop:1}}>DAYS</span></>
-                                }
+                                {nextFest!.daysLeft===0?<span style={{fontSize:22,lineHeight:1}}>🎊</span>:<><span style={{fontSize:18,fontWeight:900,color:"#0f172a",lineHeight:1}}>{nextFest!.daysLeft}</span><span style={{fontSize:8,color:"#94a3b8",fontWeight:700,marginTop:1}}>DAYS</span></>}
                               </div>
                             </div>
-
                             <div style={{flex:1,minWidth:0}}>
-                              <div style={{fontSize:16,fontWeight:900,color:"#0f172a",letterSpacing:"-.3px",lineHeight:1.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                                {nextFest!.bannerEmoji} {nextFest!.title}
-                              </div>
+                              <div style={{fontSize:16,fontWeight:900,color:"#0f172a",letterSpacing:"-.3px",lineHeight:1.2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{nextFest!.bannerEmoji} {nextFest!.title}</div>
                               <div style={{fontSize:11,color:"#64748b",marginTop:3}}>📅 {fmtDate(nextFest!.festivalDate)}</div>
-                              <div style={{
-                                display:"inline-flex",alignItems:"center",gap:5,
-                                marginTop:8,padding:"3px 10px",borderRadius:20,
-                                background:nextFest!.daysLeft===0?nextFest!.bannerColor:nextFest!.bannerColor+"22",
-                                color:nextFest!.daysLeft===0?"#fff":nextFest!.bannerColor,
-                                fontSize:11,fontWeight:900,
-                                border:"1.5px solid "+nextFest!.bannerColor+"55"
-                              }}>
-                                {nextFest!.daysLeft===0?"🎊 TODAY!"
-                                  :nextFest!.daysLeft===1?"⏰ Tomorrow!"
-                                  :nextFest!.daysLeft>0 && nextFest!.daysLeft<=7?"🔥 "+nextFest!.daysLeft+" days"
-                                  :nextFest!.daysLeft>0?"⏳ "+nextFest!.daysLeft+" days"
-                                  :"⚠️ Date passed"}
+                              <div style={{display:"inline-flex",alignItems:"center",gap:5,marginTop:8,padding:"3px 10px",borderRadius:20,background:nextFest!.daysLeft===0?nextFest!.bannerColor:nextFest!.bannerColor+"22",color:nextFest!.daysLeft===0?"#fff":nextFest!.bannerColor,fontSize:11,fontWeight:900,border:"1.5px solid "+nextFest!.bannerColor+"55"}}>
+                                {nextFest!.daysLeft===0?"🎊 TODAY!":nextFest!.daysLeft===1?"⏰ Tomorrow!":nextFest!.daysLeft>0&&nextFest!.daysLeft<=7?"🔥 "+nextFest!.daysLeft+" days":nextFest!.daysLeft>0?"⏳ "+nextFest!.daysLeft+" days":"⚠️ Date passed"}
                               </div>
                             </div>
                           </div>
-
-                          {/* Send button shown for next festival when ≤ 3 days away */}
-                          {nextFest!.daysLeft<=3&&(
-                            <button
-                              className="gr-btn gr-btn-warn"
-                              style={{width:"100%",justifyContent:"center",fontSize:12.5,padding:"8px 14px",marginTop:12}}
-                              disabled={sending===nextFest!.id}
-                              onClick={()=>sendFestival(nextFest!)}
-                            >
-                              {sending===nextFest!.id?"⏳ Sending…":nextFest!.bannerEmoji+" Send "+nextFest!.title+" Greetings to All"}
-                            </button>
-                          )}
+                          {nextFest!.daysLeft<=3&&<button className="gr-btn gr-btn-warn" style={{width:"100%",justifyContent:"center",fontSize:12.5,padding:"8px 14px",marginTop:12}} disabled={sending===nextFest!.id} onClick={()=>sendFestival(nextFest!)}>{sending===nextFest!.id?"⏳ Sending…":nextFest!.bannerEmoji+" Send "+nextFest!.title+" Greetings to All"}</button>}
                           <div style={{display:"flex",alignItems:"center",gap:6,marginTop:10,flexWrap:"wrap"}}>
                             <span className="gr-rchip">👥 All {recipientCount} employees</span>
                             {nextFest!.lastSentOn&&<span className="gr-b gr-b-teal">💌 {nextFest!.lastSentOn}</span>}
                           </div>
                         </div>
-
-                        {/* ── ALL REMAINING FESTIVALS — scrollable list ── */}
                         {nextFestList.length>1&&(
                           <div>
-                            <div style={{fontSize:10,fontWeight:800,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".6px",marginBottom:8}}>
-                              All Upcoming ({nextFestList.length})
-                            </div>
-                            {/* Scrollable container — shows all, no slice cap */}
+                            <div style={{fontSize:10,fontWeight:800,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".6px",marginBottom:8}}>All Upcoming ({nextFestList.length})</div>
                             <div style={{maxHeight:220,overflowY:"auto",paddingRight:2}}>
                               {nextFestList.map((f,idx)=>{
                                 const isFirst=idx===0;
-                                const urgentBg=f.daysLeft===0?"#fff7ed":f.daysLeft<=3?"#fff1f2":f.daysLeft<=7?"#fffbeb":"#f8fafc";
-                                const urgentBorder=f.daysLeft===0?"#fed7aa":f.daysLeft<=3?"#fecdd3":f.daysLeft<=7?"#fde68a":"#f1f5f9";
                                 const pillBg=f.daysLeft<0?"#94a3b8":f.daysLeft===0?f.bannerColor:f.daysLeft<=3?"#e11d48":f.daysLeft<=7?"#d97706":"#64748b";
-                                return (
-                                  <div key={f.id} style={{
-                                    display:"flex",alignItems:"center",gap:10,
-                                    padding:"9px 12px",borderRadius:10,
-                                    background:isFirst?f.bannerColor+"10":urgentBg,
-                                    border:(isFirst?"1.5px solid "+f.bannerColor+"33":"1px solid "+urgentBorder)+"",
-                                    marginBottom:5,
-                                    transition:"background .13s"
-                                  }}>
-                                    {/* Colour dot */}
-                                    <div style={{
-                                      width:36,height:36,borderRadius:9,flexShrink:0,
-                                      background:f.bannerColor+"22",
-                                      border:"1.5px solid "+f.bannerColor+"44",
-                                      display:"flex",alignItems:"center",justifyContent:"center",
-                                      fontSize:18
-                                    }}>{f.bannerEmoji||"🎊"}</div>
-
+                                return(
+                                  <div key={f.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",borderRadius:10,background:isFirst?f.bannerColor+"10":"#f8fafc",border:(isFirst?"1.5px solid "+f.bannerColor+"33":"1px solid #f1f5f9"),marginBottom:5}}>
+                                    <div style={{width:36,height:36,borderRadius:9,flexShrink:0,background:f.bannerColor+"22",border:"1.5px solid "+f.bannerColor+"44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>{f.bannerEmoji||"🎊"}</div>
                                     <div style={{flex:1,minWidth:0}}>
-                                      <div style={{fontSize:12.5,fontWeight:700,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                                        {f.title}
-                                        {isFirst&&<span style={{fontSize:9,fontWeight:800,background:f.bannerColor,color:"#fff",padding:"1px 5px",borderRadius:4,marginLeft:6}}>NEXT</span>}
-                                      </div>
-                                      <div style={{fontSize:10.5,color:"#94a3b8",marginTop:1}}>
-                                        {fmtDate(f.festivalDate)}
-                                        {f.daysLeft<0&&<span style={{marginLeft:5,fontSize:9,fontWeight:800,color:"#e11d48",background:"#fff1f2",padding:"1px 5px",borderRadius:4}}>⚠️ Update year</span>}
-                                      </div>
+                                      <div style={{fontSize:12.5,fontWeight:700,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f.title}{isFirst&&<span style={{fontSize:9,fontWeight:800,background:f.bannerColor,color:"#fff",padding:"1px 5px",borderRadius:4,marginLeft:6}}>NEXT</span>}</div>
+                                      <div style={{fontSize:10.5,color:"#94a3b8",marginTop:1}}>{fmtDate(f.festivalDate)}{f.daysLeft<0&&<span style={{marginLeft:5,fontSize:9,fontWeight:800,color:"#e11d48",background:"#fff1f2",padding:"1px 5px",borderRadius:4}}>⚠️ Update year</span>}</div>
                                     </div>
-
                                     <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
-                                      {/* Countdown pill */}
-                                      <span style={{
-                                        fontSize:10,fontWeight:900,padding:"2px 8px",borderRadius:20,
-                                        background:pillBg,color:"#fff",
-                                        whiteSpace:"nowrap"
-                                      }}>
-                                        {f.daysLeft===0?"🎊 Today":f.daysLeft===1?"Tomorrow":f.daysLeft>0?f.daysLeft+"d":"⚠️ Past"}
-                                      </span>
-                                      {/* Quick send button */}
-                                      <button
-                                        className="gr-btn gr-btn-warn gr-btn-sm"
-                                        style={{fontSize:9.5,padding:"2px 8px"}}
-                                        disabled={sending===f.id}
-                                        onClick={()=>sendFestival(f)}
-                                      >
-                                        {sending===f.id?"…":"📨"}
-                                      </button>
+                                      <span style={{fontSize:10,fontWeight:900,padding:"2px 8px",borderRadius:20,background:pillBg,color:"#fff",whiteSpace:"nowrap"}}>{f.daysLeft===0?"🎊 Today":f.daysLeft===1?"Tomorrow":f.daysLeft>0?f.daysLeft+"d":"⚠️ Past"}</span>
+                                      <button className="gr-btn gr-btn-warn gr-btn-sm" style={{fontSize:9.5,padding:"2px 8px"}} disabled={sending===f.id} onClick={()=>sendFestival(f)}>{sending===f.id?"…":"📨"}</button>
                                     </div>
                                   </div>
                                 );
@@ -1006,7 +1044,7 @@ export default function GreetingsAdmin() {
                     <div style={{padding:"14px 16px",display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:8}}>
                       {logs.slice(0,6).map(l=>(
                         <div key={l.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:9,background:l.status==="success"?"#f8f9ff":"#fff5f5",border:(l.status==="success"?"1px solid #e0e7ff":"1px solid #fecdd3")}}>
-                          <span style={{fontSize:16,flexShrink:0}}>{l.type==="birthday"?"🎂":l.type==="festival"?"🪔":l.type==="anniversary"?"🎉":l.type==="achievement"?"🏆":l.type==="welcome"?"👋":"📅"}</span>
+                          <span style={{fontSize:16,flexShrink:0}}>{l.type==="birthday"?"🎂":l.type==="festival"?"🪔":l.type==="anniversary"?"🎉":l.type==="achievement"?"🏆":l.type==="welcome"?"👋":l.type==="mail"?"✉️":"📅"}</span>
                           <div style={{flex:1,minWidth:0}}>
                             <div style={{fontSize:12,fontWeight:700,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.recipientName||l.recipientEmail}</div>
                             <div style={{fontSize:10.5,color:"#94a3b8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.subject}</div>
@@ -1029,64 +1067,35 @@ export default function GreetingsAdmin() {
                     <div className="gr-hd-title">🎂 Birthday Management</div>
                     <div className="gr-hd-sub">{employees.filter(e=>e.birthDate).length} employees with DOB · {todayBdays.length} birthday(s) today</div>
                   </div>
-                  {/* ✅ CHANGED: No "+ Add Employee" button here — manage employees from Employee Details */}
                 </div>
-
-                {/* ✅ NEW: Info banner explaining data source */}
                 <div className="gr-info-banner">
                   <span>ℹ️</span>
                   <span>Employee data is automatically synced from <strong>Employee Details</strong>. To add or edit employees, go to the Employee Management section.</span>
                 </div>
-
                 <div className="gr-type-banner individual"><span>🎂</span><span><strong>Individual Email</strong> — Birthday wishes sent to one employee at a time on their birthday.</span></div>
                 <div className="gr-card">
                   <div className="gr-tw">
                     <table className="gr-table">
                       <thead><tr><th>Employee</th><th>Email</th><th>Department</th><th>Birthday</th><th>Next Birthday</th><th>Join Date</th><th>Last Wished</th><th>Actions</th></tr></thead>
                       <tbody>
-                        {employees
-                          .filter(e => e.birthDate) // only show employees who have DOB
-                          .slice()
-                          .sort((a,b)=>daysUntilMMDD(a.birthMonthDay)-daysUntilMMDD(b.birthMonthDay))
-                          .map(e=>{
-                            const[g1,g2]=avatarGrad(e.name);
-                            const dLeft=daysUntilMMDD(e.birthMonthDay);
-                            const isToday=dLeft===0;
-                            const sent=e.lastWishSentOn===todayISO;
-                            return(
-                              <tr key={e.id}>
-                                <td><div style={{display:"flex",alignItems:"center",gap:9}}>
-                                  <div className="gr-av" style={{background:"linear-gradient(135deg,"+g1+","+g2+")"}}>{initials(e.name)}</div>
-                                  <div>
-                                    <div style={{fontWeight:700,color:"var(--text)"}}>{e.name}</div>
-                                    {isToday&&<span className="gr-b gr-b-purple" style={{marginTop:2}}>🎂 Today!</span>}
-                                  </div>
-                                </div></td>
-                                <td style={{color:"var(--text2)"}}>{e.email}</td>
-                                <td style={{color:"var(--text3)"}}>{e.department||"—"}</td>
-                                <td style={{fontWeight:600,color:"var(--text)"}}>{fmtDate(e.birthDate)}</td>
-                                <td>
-                                  <span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:10.5,fontWeight:800,padding:"2px 8px",borderRadius:20,background:dLeft===0?"#f3e8ff":dLeft<=7?"#fff1f2":"#eff6ff",color:dLeft===0?"#7c3aed":dLeft<=7?"#e11d48":"#1d4ed8"}}>
-                                    {dLeft===0?"🎉 Today":dLeft===1?"Tomorrow":dLeft+"d"}
-                                  </span>
-                                </td>
-                                <td style={{color:"var(--text3)"}}>{e.joinDate?fmtDate(e.joinDate):"—"}</td>
-                                <td>{e.lastWishSentOn?<span className="gr-b gr-b-teal">✓ {e.lastWishSentOn}</span>:<span style={{color:"#cbd5e1",fontSize:11}}>Never</span>}</td>
-                                <td>
-                                  {isToday&&<button className={"gr-btn gr-btn-sm "+(sent?"gr-btn-success":"gr-btn-pink")} disabled={sending===e.id||sent} onClick={()=>sendWish(e)}>{sending===e.id?"…":sent?"✓":"🎉 Wish"}</button>}
-                                  {!isToday&&<span style={{color:"var(--text3)",fontSize:11}}>—</span>}
-                                </td>
-                              </tr>
-                            );
-                          })}
+                        {employees.filter(e=>e.birthDate).slice().sort((a,b)=>daysUntilMMDD(a.birthMonthDay)-daysUntilMMDD(b.birthMonthDay)).map(e=>{
+                          const[g1,g2]=avatarGrad(e.name);const dLeft=daysUntilMMDD(e.birthMonthDay);const isToday=dLeft===0;const sent=e.lastWishSentOn===todayISO;
+                          return(
+                            <tr key={e.id}>
+                              <td><div style={{display:"flex",alignItems:"center",gap:9}}><div className="gr-av" style={{background:"linear-gradient(135deg,"+g1+","+g2+")"}}>{initials(e.name)}</div><div><div style={{fontWeight:700,color:"var(--text)"}}>{e.name}</div>{isToday&&<span className="gr-b gr-b-purple" style={{marginTop:2}}>🎂 Today!</span>}</div></div></td>
+                              <td style={{color:"var(--text2)"}}>{e.email}</td>
+                              <td style={{color:"var(--text3)"}}>{e.department||"—"}</td>
+                              <td style={{fontWeight:600,color:"var(--text)"}}>{fmtDate(e.birthDate)}</td>
+                              <td><span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:10.5,fontWeight:800,padding:"2px 8px",borderRadius:20,background:dLeft===0?"#f3e8ff":dLeft<=7?"#fff1f2":"#eff6ff",color:dLeft===0?"#7c3aed":dLeft<=7?"#e11d48":"#1d4ed8"}}>{dLeft===0?"🎉 Today":dLeft===1?"Tomorrow":dLeft+"d"}</span></td>
+                              <td style={{color:"var(--text3)"}}>{e.joinDate?fmtDate(e.joinDate):"—"}</td>
+                              <td>{e.lastWishSentOn?<span className="gr-b gr-b-teal">✓ {e.lastWishSentOn}</span>:<span style={{color:"#cbd5e1",fontSize:11}}>Never</span>}</td>
+                              <td>{isToday&&<button className={"gr-btn gr-btn-sm "+(sent?"gr-btn-success":"gr-btn-pink")} disabled={sending===e.id||sent} onClick={()=>sendWish(e)}>{sending===e.id?"…":sent?"✓":"🎉 Wish"}</button>}{!isToday&&<span style={{color:"var(--text3)",fontSize:11}}>—</span>}</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
-                    {employees.filter(e=>e.birthDate).length===0&&(
-                      <div className="gr-empty">
-                        <div className="gr-empty-ico">👥</div>
-                        No employees have Date of Birth set yet. Add it from Employee Details.
-                      </div>
-                    )}
+                    {employees.filter(e=>e.birthDate).length===0&&<div className="gr-empty"><div className="gr-empty-ico">👥</div>No employees have Date of Birth set yet.</div>}
                   </div>
                 </div>
               </>
@@ -1100,15 +1109,11 @@ export default function GreetingsAdmin() {
                     <div className="gr-hd-title">🎉 Work Anniversary Wishes</div>
                     <div className="gr-hd-sub">{employees.filter(e=>e.joinDate).length} employees with join date · {todayAnnivsrs.length} anniversary(s) today</div>
                   </div>
-                  {/* ✅ CHANGED: No button here — employees managed from Employee Details */}
                 </div>
-
-                {/* ✅ NEW: Info banner explaining data source */}
                 <div className="gr-info-banner">
                   <span>ℹ️</span>
                   <span>Work anniversary data is auto-synced from <strong>Employee Details → Date of Joining</strong>. To update join dates, edit the employee profile.</span>
                 </div>
-
                 <div className="gr-type-banner individual"><span>🎉</span><span><strong>Individual Email</strong> — Anniversary wishes sent to one employee on their work anniversary.</span></div>
                 <div className="gr-card">
                   <div className="gr-tw">
@@ -1132,12 +1137,7 @@ export default function GreetingsAdmin() {
                         })}
                       </tbody>
                     </table>
-                    {employees.filter(e=>e.joinDate).length===0&&(
-                      <div className="gr-empty">
-                        <div className="gr-empty-ico">🎉</div>
-                        No join dates set. Update Date of Joining in Employee Details to track anniversaries.
-                      </div>
-                    )}
+                    {employees.filter(e=>e.joinDate).length===0&&<div className="gr-empty"><div className="gr-empty-ico">🎉</div>No join dates set.</div>}
                   </div>
                 </div>
               </>
@@ -1238,19 +1238,9 @@ export default function GreetingsAdmin() {
                           const days=daysUntil(f.festivalDate);
                           return(
                             <tr key={f.id}>
-                              <td><div style={{display:"flex",alignItems:"center",gap:9}}>
-                                <div style={{width:34,height:34,borderRadius:9,background:f.bannerColor+"22",border:"1.5px solid "+f.bannerColor+"44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>{f.bannerEmoji||"🎉"}</div>
-                                <div>
-                                  <div style={{fontWeight:700,color:"var(--text)"}}>{f.title}</div>
-                                  <div style={{fontSize:10.5,color:"var(--text3)",maxWidth:150,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f.emailSubject}</div>
-                                </div>
-                              </div></td>
+                              <td><div style={{display:"flex",alignItems:"center",gap:9}}><div style={{width:34,height:34,borderRadius:9,background:f.bannerColor+"22",border:"1.5px solid "+f.bannerColor+"44",display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>{f.bannerEmoji||"🎉"}</div><div><div style={{fontWeight:700,color:"var(--text)"}}>{f.title}</div><div style={{fontSize:10.5,color:"var(--text3)",maxWidth:150,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f.emailSubject}</div></div></div></td>
                               <td style={{fontWeight:600,color:"var(--text)"}}>{fmtDate(f.festivalDate)}</td>
-                              <td>
-                                {days>=0&&<span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:10.5,fontWeight:800,padding:"2px 8px",borderRadius:20,background:days===0?f.bannerColor:days<=3?"#fff1f2":days<=7?"#fffbeb":"#f1f5f9",color:days===0?"#fff":days<=3?"#e11d48":days<=7?"#b45309":"#64748b"}}>
-                                  {days===0?"🎊 Today!":days===1?"Tomorrow":days+"d"}
-                                </span>}
-                              </td>
+                              <td>{days>=0&&<span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:10.5,fontWeight:800,padding:"2px 8px",borderRadius:20,background:days===0?f.bannerColor:days<=3?"#fff1f2":days<=7?"#fffbeb":"#f1f5f9",color:days===0?"#fff":days<=3?"#e11d48":days<=7?"#b45309":"#64748b"}}>{days===0?"🎊 Today!":days===1?"Tomorrow":days+"d"}</span>}</td>
                               <td><span className="gr-rchip">👥 All {recipientCount}</span></td>
                               <td style={{color:"var(--text3)"}}>{f.sendInAdvanceDays>0?f.sendInAdvanceDays+"d before":"On the day"}</td>
                               <td>{f.sendEmail?<span className="gr-b gr-b-green">✓ On</span>:<span className="gr-b gr-b-red">Off</span>}</td>
@@ -1308,13 +1298,296 @@ export default function GreetingsAdmin() {
               </>
             )}
 
+            {/* ══ SEND MAIL ══ ✅ NEW TAB */}
+            {tab==="mail"&&(
+              <>
+                <div className="gr-hd">
+                  <div>
+                    <div className="gr-hd-title">✉️ Send Mail</div>
+                    <div className="gr-hd-sub">Compose and send a custom email to any employee or group</div>
+                  </div>
+                  {mailSentCount!==null&&(
+                    <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 14px",borderRadius:9,background:"#f0fdf4",border:"1px solid #bbf7d0"}}>
+                      <span style={{fontSize:15}}>✅</span>
+                      <span style={{fontSize:12.5,fontWeight:700,color:"#15803d"}}>Last sent to {mailSentCount} recipient{mailSentCount!==1?"s":""}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Hidden file input */}
+                <input ref={fileInputRef} type="file" multiple accept="*/*" style={{display:"none"}} onChange={handleAttachFiles}/>
+
+                <div className="gr-mail-layout">
+                  {/* LEFT: Recipients panel */}
+                  <div className="gr-mail-panel">
+                    <div className="gr-mail-panel-hd">
+                      👥 Recipients
+                      <span style={{marginLeft:"auto",fontSize:10,fontWeight:700,color:"var(--text3)"}}>
+                        {computedMailRecipients.length} selected
+                      </span>
+                    </div>
+                    <div className="gr-mail-panel-body">
+
+                      {/* Mode selector */}
+                      <div className="gr-rmode-tabs">
+                        {([
+                          {key:"all",   label:"All",       sub:recipientCount+" emp"},
+                          {key:"dept",  label:"Dept",      sub:"By team"},
+                          {key:"select",label:"Pick",      sub:"Choose"},
+                          {key:"single",label:"One",       sub:"Custom"},
+                        ] as const).map(m=>(
+                          <button
+                            key={m.key}
+                            className={"gr-rmode-tab"+(mailRecipientMode===(m.key==="dept"?"department":m.key==="single"?"single":m.key as MailRecipientMode)?" on":"")}
+                            onClick={()=>setMailRecipientMode(m.key==="dept"?"department":m.key==="single"?"single":m.key as MailRecipientMode)}
+                          >
+                            {m.label}<br/><span style={{fontSize:9,fontWeight:600,opacity:.7}}>{m.sub}</span>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Mode: All */}
+                      {mailRecipientMode==="all"&&(
+                        <div style={{padding:"10px 12px",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:9,fontSize:12.5,fontWeight:700,color:"#15803d"}}>
+                          📢 Will send to all <strong>{recipientCount}</strong> employees
+                        </div>
+                      )}
+
+                      {/* Mode: Department */}
+                      {mailRecipientMode==="department"&&(
+                        <>
+                          <div className="gr-frow">
+                            <label className="gr-lbl">Select Department</label>
+                            <select className={"gr-sel"+(mailErrors.dept?" err":"")} value={mailDept} onChange={e=>setMailDept(e.target.value)}>
+                              <option value="">— Choose department —</option>
+                              {allDepartments.map(d=>(
+                                <option key={d} value={d}>{d} ({recipientList.filter(r=>r.department===d).length})</option>
+                              ))}
+                            </select>
+                            {mailErrors.dept&&<div className="gr-inp-err">⚠️ {mailErrors.dept}</div>}
+                          </div>
+                          {mailDept&&(
+                            <div style={{padding:"9px 12px",background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:9,fontSize:12,fontWeight:700,color:"#1d4ed8"}}>
+                              📧 {recipientList.filter(r=>r.department===mailDept).length} employees in {mailDept}
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* Mode: Select */}
+                      {mailRecipientMode==="select"&&(
+                        <>
+                          <div className="gr-frow" style={{marginBottom:8}}>
+                            <input
+                              type="text"
+                              placeholder="🔍 Search employees..."
+                              className="gr-inp"
+                              style={{fontSize:12}}
+                              value={mailSearch}
+                              onChange={e=>setMailSearch(e.target.value)}
+                            />
+                          </div>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                            <span style={{fontSize:10.5,fontWeight:700,color:"var(--text3)"}}>{mailSelectedEmps.length} selected</span>
+                            <div style={{display:"flex",gap:5}}>
+                              <button className="gr-btn gr-btn-ghost gr-btn-sm" style={{fontSize:10}} onClick={()=>setMailSelectedEmps(filteredStaffForSelect.map(r=>r.id))}>All</button>
+                              <button className="gr-btn gr-btn-ghost gr-btn-sm" style={{fontSize:10}} onClick={()=>setMailSelectedEmps([])}>None</button>
+                            </div>
+                          </div>
+                          <div className="gr-emp-list">
+                            {filteredStaffForSelect.length===0&&<div style={{padding:"16px",textAlign:"center",fontSize:12,color:"var(--text3)"}}>No employees found</div>}
+                            {filteredStaffForSelect.map(r=>{
+                              const sel=mailSelectedEmps.includes(r.id);
+                              const[g1,g2]=avatarGrad(r.name);
+                              return(
+                                <div key={r.id} className={"gr-emp-item"+(sel?" sel":"")} onClick={()=>setMailSelectedEmps(prev=>sel?prev.filter(x=>x!==r.id):[...prev,r.id])}>
+                                  <div className={"gr-emp-cb"}>{sel?"✓":""}</div>
+                                  <div className="gr-av" style={{background:"linear-gradient(135deg,"+g1+","+g2+")",width:24,height:24,borderRadius:6,fontSize:9}}>{initials(r.name)}</div>
+                                  <div style={{flex:1,minWidth:0}}>
+                                    <div style={{fontSize:12,fontWeight:700,color:"var(--text)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name}</div>
+                                    <div style={{fontSize:10,color:"var(--text3)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.department||r.email}</div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {mailErrors.select&&<div className="gr-inp-err" style={{marginTop:6}}>⚠️ {mailErrors.select}</div>}
+                        </>
+                      )}
+
+                      {/* Mode: Single */}
+                      {mailRecipientMode==="single"&&(
+                        <>
+                          <div className="gr-frow">
+                            <label className="gr-lbl">Recipient Name</label>
+                            <input type="text" placeholder="e.g. Priya Sharma" className="gr-inp" value={mailSingleName} onChange={e=>setMailSingleName(e.target.value)}/>
+                          </div>
+                          <div className="gr-frow">
+                            <label className="gr-lbl">Recipient Email *</label>
+                            <input type="email" placeholder="priya@techgyinnovations.com" className={"gr-inp"+(mailErrors.singleEmail?" err":"")} value={mailSingleEmail} onChange={e=>setMailSingleEmail(e.target.value)}/>
+                            {mailErrors.singleEmail&&<div className="gr-inp-err">⚠️ {mailErrors.singleEmail}</div>}
+                          </div>
+                          {/* Quick fill from employee list */}
+                          {recipientList.length>0&&(
+                            <div>
+                              <div className="gr-lbl" style={{marginBottom:6}}>Or pick from employees</div>
+                              <div style={{maxHeight:160,overflowY:"auto",border:"1.5px solid var(--border)",borderRadius:8,background:"#f8fafc"}}>
+                                {recipientList.filter(r=>r.name.toLowerCase().includes(mailSearch.toLowerCase())||r.email.toLowerCase().includes(mailSearch.toLowerCase())).slice(0,20).map(r=>(
+                                  <div key={r.id} className="gr-emp-item" onClick={()=>{setMailSingleEmail(r.email);setMailSingleName(r.name);}}>
+                                    <div className="gr-av" style={{background:"linear-gradient(135deg,"+avatarGrad(r.name)[0]+","+avatarGrad(r.name)[1]+")",width:22,height:22,borderRadius:6,fontSize:9}}>{initials(r.name)}</div>
+                                    <div style={{flex:1,minWidth:0}}>
+                                      <div style={{fontSize:12,fontWeight:700,color:"var(--text)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name}</div>
+                                      <div style={{fontSize:10,color:"var(--text3)"}}>{r.email}</div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              <input type="text" placeholder="🔍 Search..." className="gr-inp" style={{marginTop:6,fontSize:11}} value={mailSearch} onChange={e=>setMailSearch(e.target.value)}/>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* Recipient preview summary */}
+                      {computedMailRecipients.length>0&&(
+                        <div style={{marginTop:12,padding:"9px 12px",background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:9,fontSize:12,fontWeight:700,color:"#15803d",display:"flex",alignItems:"center",gap:6}}>
+                          <span>✅</span>
+                          <span>{computedMailRecipients.length} recipient{computedMailRecipients.length!==1?"s":""} ready</span>
+                        </div>
+                      )}
+                      {mailErrors.recipients&&<div className="gr-inp-err" style={{marginTop:6}}>⚠️ {mailErrors.recipients}</div>}
+
+                      {/* Priority */}
+                      <div style={{marginTop:14}}>
+                        <div className="gr-lbl" style={{marginBottom:6}}>Priority</div>
+                        <div className="gr-priority-row">
+                          <div className={"gr-priority-opt"+(mailPriority==="normal"?" sel-normal":"")} onClick={()=>setMailPriority("normal")}>
+                            📧 Normal
+                          </div>
+                          <div className={"gr-priority-opt"+(mailPriority==="high"?" sel-high":"")} onClick={()=>setMailPriority("high")}>
+                            🔴 High
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* RIGHT: Compose area */}
+                  <div className="gr-mail-compose">
+                    <div className="gr-mail-compose-hd">
+                      <div>
+                        <div style={{fontSize:13.5,fontWeight:800,color:"var(--text)"}}>✉️ Compose Email</div>
+                        <div style={{fontSize:11,color:"var(--text3)",marginTop:2}}>Compose and send to any recipients</div>
+                      </div>
+                      {mailPriority==="high"&&(
+                        <span className="gr-b gr-b-red">🔴 High Priority</span>
+                      )}
+                    </div>
+
+                    <div style={{padding:"18px 20px"}}>
+                      {/* Subject */}
+                      <div className="gr-frow">
+                        <label className="gr-lbl">Subject *</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Team Meeting Rescheduled — Please Read"
+                          className={"gr-inp"+(mailErrors.subject?" err":"")}
+                          value={mailSubject}
+                          onChange={e=>setMailSubject(e.target.value)}
+                        />
+                        {mailErrors.subject&&<div className="gr-inp-err">⚠️ {mailErrors.subject}</div>}
+                      </div>
+
+                      {/* Body */}
+                      <div className="gr-frow">
+                        <label className="gr-lbl">Message *</label>
+                        <textarea
+                          className={"gr-mail-body"+(mailErrors.body?" err":"")}
+                          placeholder={"Dear {name},\n\nWrite your message here...\n\nRegards,\nHR Team"}
+                          value={mailBody}
+                          onChange={e=>setMailBody(e.target.value)}
+                          style={{minHeight:220}}
+                        />
+                        <div style={{display:"flex",justifyContent:"space-between",marginTop:4}}>
+                          {mailErrors.body&&<div className="gr-inp-err">⚠️ {mailErrors.body}</div>}
+                          <div style={{fontSize:10,color:"var(--text3)",marginLeft:"auto"}}>
+                            Tip: Use <code style={{background:"#f1f5f9",padding:"1px 4px",borderRadius:3}}>{"{name}"}</code> to personalize per recipient
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Attachments */}
+                      <div className="gr-frow">
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+                          <label className="gr-lbl" style={{margin:0}}>Attachments</label>
+                          <button className="gr-btn gr-btn-ghost gr-btn-sm" onClick={()=>fileInputRef.current?.click()}>📎 Attach File</button>
+                        </div>
+                        {mailAttachments.length>0?(
+                          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                            {mailAttachments.map((a,i)=>(
+                              <span key={i} className="gr-attach-chip">
+                                📎 {a.name}
+                                <button className="gr-attach-rm" onClick={()=>setMailAttachments(prev=>prev.filter((_,j)=>j!==i))}>×</button>
+                              </span>
+                            ))}
+                          </div>
+                        ):(
+                          <div style={{padding:"10px 14px",background:"#f8fafc",border:"1.5px dashed var(--border)",borderRadius:8,fontSize:12,color:"var(--text3)",textAlign:"center",cursor:"pointer"}} onClick={()=>fileInputRef.current?.click()}>
+                            📎 Click to attach files (max 5MB each)
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Preview summary before send */}
+                      <div style={{padding:"12px 14px",background:"#f8fafc",border:"1px solid var(--border)",borderRadius:10,marginBottom:16}}>
+                        <div style={{fontSize:10,fontWeight:800,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".6px",marginBottom:8}}>Send Summary</div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+                          <span className="gr-b gr-b-blue">
+                            {mailRecipientMode==="all"?"📢 All employees":
+                             mailRecipientMode==="department"?(mailDept?"🏢 "+mailDept:"🏢 No dept"):
+                             mailRecipientMode==="select"?"👥 "+mailSelectedEmps.length+" selected":
+                             "👤 "+(mailSingleName||mailSingleEmail||"No recipient")}
+                          </span>
+                          <span className="gr-b gr-b-green">📧 {computedMailRecipients.length} recipient{computedMailRecipients.length!==1?"s":""}</span>
+                          {mailPriority==="high"&&<span className="gr-b gr-b-red">🔴 High Priority</span>}
+                          {mailAttachments.length>0&&<span className="gr-b gr-b-teal">📎 {mailAttachments.length} file{mailAttachments.length!==1?"s":""}</span>}
+                        </div>
+                      </div>
+
+                      {/* Send button */}
+                      <button
+                        className="gr-btn gr-btn-navy gr-btn-lg"
+                        style={{width:"100%",justifyContent:"center",padding:"11px 20px",fontSize:13.5}}
+                        disabled={mailSending||computedMailRecipients.length===0}
+                        onClick={sendCustomMail}
+                      >
+                        {mailSending
+                          ?"⏳ Sending…"
+                          :computedMailRecipients.length===0
+                            ?"⚠️ Select Recipients First"
+                            :`✉️ Send to ${computedMailRecipients.length} Recipient${computedMailRecipients.length!==1?"s":""}`
+                        }
+                      </button>
+
+                      {/* Clear form */}
+                      <div style={{textAlign:"center",marginTop:10}}>
+                        <button className="gr-btn gr-btn-ghost gr-btn-sm" style={{fontSize:11}} onClick={()=>{setMailSubject("");setMailBody("");setMailSelectedEmps([]);setMailSingleEmail("");setMailSingleName("");setMailAttachments([]);setMailErrors({});setMailSentCount(null);}}>
+                          🗑️ Clear Form
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
             {/* ══ HISTORY ══ */}
             {tab==="history"&&(
               <>
                 <div className="gr-hd">
                   <div><div className="gr-hd-title">📋 Email History</div><div className="gr-hd-sub">{logs.length} emails · {successCount} successful · {failCount} failed</div></div>
                   <div className="gr-ftabs">
-                    {[{k:"all",l:"All"},{k:"birthday",l:"🎂 Birthday"},{k:"anniversary",l:"🎉 Anniversary"},{k:"achievement",l:"🏆 Achievement"},{k:"welcome",l:"👋 Welcome"},{k:"festival",l:"🪔 Festival"},{k:"event",l:"📅 Event"}].map(f=>(
+                    {[{k:"all",l:"All"},{k:"birthday",l:"🎂 Birthday"},{k:"anniversary",l:"🎉 Anniversary"},{k:"achievement",l:"🏆 Achievement"},{k:"welcome",l:"👋 Welcome"},{k:"festival",l:"🪔 Festival"},{k:"event",l:"📅 Event"},{k:"mail",l:"✉️ Mail"}].map(f=>(
                       <button key={f.k} className={"gr-ftab"+(histFilter===f.k?" on":"")} onClick={()=>setHistFilter(f.k)}>{f.l}</button>
                     ))}
                   </div>
@@ -1326,7 +1599,7 @@ export default function GreetingsAdmin() {
                       <tbody>
                         {filteredLogs.map(l=>(
                           <tr key={l.id}>
-                            <td><span className={"gr-b "+(l.type==="birthday"?"gr-b-purple":l.type==="festival"?"gr-b-amber":l.type==="anniversary"?"gr-b-orange":l.type==="achievement"?"gr-b-purple":l.type==="welcome"?"gr-b-teal":"gr-b-blue")}>{l.type==="birthday"?"🎂":l.type==="festival"?"🪔":l.type==="anniversary"?"🎉":l.type==="achievement"?"🏆":l.type==="welcome"?"👋":"📅"} {l.type}</span></td>
+                            <td><span className={"gr-b "+(l.type==="birthday"?"gr-b-purple":l.type==="festival"?"gr-b-amber":l.type==="anniversary"?"gr-b-orange":l.type==="achievement"?"gr-b-purple":l.type==="welcome"?"gr-b-teal":l.type==="mail"?"gr-b-blue":"gr-b-blue")}>{l.type==="birthday"?"🎂":l.type==="festival"?"🪔":l.type==="anniversary"?"🎉":l.type==="achievement"?"🏆":l.type==="welcome"?"👋":l.type==="mail"?"✉️":"📅"} {l.type}</span></td>
                             <td style={{fontWeight:700,color:"var(--text)"}}>{l.recipientName||"—"}</td>
                             <td style={{color:"var(--text2)"}}>{l.recipientEmail}</td>
                             <td style={{maxWidth:140,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:"var(--text3)"}}>{l.subject}</td>

@@ -35,6 +35,7 @@ import CalendarView from "./calendar";
 import MessagesView from "./meassages";
 import MeetChatApp from "@/components/MeetChatAppUpdated";
 import AccountsDashboard from "./Accounts/AccountsDashboard";
+import AdminBreakView from "@/components/AdminBreakView";  // ← NEW
 import { Employee } from "@/types/Employee";
 import type { Session } from "@/types/Employee";
 import { EmployeeRow } from "@/types/EmployeeRow";
@@ -44,11 +45,6 @@ import AdminNotificationBell from "./AdminNotificationBell";
 import Image from "next/image";
 
 /* ================= TYPES ================= */
-// type Session = {
-//   checkIn: any;
-//   checkOut: any;
-// };
-
 type User = {
   uid: string;
   name: string;
@@ -94,10 +90,7 @@ const DECLARED_HOLIDAYS: Record<string, { title: string }> = {
 /* ================= HELPERS ================= */
 const formatTime = (ts: any) =>
   ts
-    ? ts.toDate().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
+    ? ts.toDate().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : "--";
 
 const formatTotal = (m?: number): string => {
@@ -110,28 +103,19 @@ const formatTotal = (m?: number): string => {
 
 const calculateTotalMinutes = (sessions: Session[]) => {
   let total = 0;
-
   for (const s of sessions) {
     if (!s?.checkIn) continue;
-
     const start = s.checkIn?.toDate
       ? s.checkIn.toDate().getTime()
       : new Date(s.checkIn).getTime();
-
     const end = s.checkOut
       ? (s.checkOut?.toDate
           ? s.checkOut.toDate().getTime()
           : new Date(s.checkOut).getTime())
       : Date.now();
-
     const diff = end - start;
-
-    if (diff > 0) {
-      total += Math.floor(diff / 60000);
-    }
-    // if negative → ignore it
+    if (diff > 0) total += Math.floor(diff / 60000);
   }
-
   return total;
 };
 
@@ -170,12 +154,9 @@ const getAutoStatus = ({
 
 /* ================= COMPONENT ================= */
 export default function AdminPage() {
-  // ✅ STATES FIRST
-  const [selectedDashboardRow, setSelectedDashboardRow] =
-  useState<EmployeeRow | null>(null);
+  const [selectedDashboardRow, setSelectedDashboardRow] = useState<EmployeeRow | null>(null);
   const [editedUser, setEditedUser] = useState<Employee | null>(null);
-  const [selectedEmployee, setSelectedEmployee] =
-  useState<Employee | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const { user, loading, userData } = useAuth();
   const router = useRouter();
   const [showMeet, setShowMeet] = useState(false);
@@ -184,7 +165,7 @@ export default function AdminPage() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
-const [holidays, setHolidays] = useState<any[]>([]);
+  const [holidays, setHolidays] = useState<any[]>([]);
 
   // form states
   const [name, setName] = useState("");
@@ -199,7 +180,6 @@ const [holidays, setHolidays] = useState<any[]>([]);
   const [extraData, setExtraData] = useState<Record<string, Record<string, string>>>({});
   const [isEditing, setIsEditing] = useState(false);
 
-  // ✅ SIDEBAR STATE
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -216,21 +196,19 @@ const [holidays, setHolidays] = useState<any[]>([]);
 
   const [queryCount, setQueryCount] = useState(0);
 
-useEffect(() => {
-  const q = query(
-    collection(db, "employeeQueries"),
-    where("adminUnread", "==", true)
-  );
+  useEffect(() => {
+    const q = query(
+      collection(db, "employeeQueries"),
+      where("adminUnread", "==", true)
+    );
+    const unsub = onSnapshot(q, (snapshot) => {
+      setQueryCount(snapshot.size);
+    });
+    return () => unsub();
+  }, []);
 
-  const unsub = onSnapshot(q, (snapshot) => {
-    setQueryCount(snapshot.size);
-  });
-
-  return () => unsub();
-}, []);
   const monthKey = `${monthYear.year}-${String(monthYear.month + 1).padStart(2, "0")}`;
 
-  // excel data
   useEffect(() => {
     const savedCols = localStorage.getItem("extraCols");
     const savedData = localStorage.getItem("extraData");
@@ -244,9 +222,7 @@ useEffect(() => {
   }, [extraCols, extraData]);
 
   useEffect(() => {
-    if (selectedEmployee) {
-      setEditedUser(selectedEmployee);
-    }
+    if (selectedEmployee) setEditedUser(selectedEmployee);
   }, [selectedEmployee]);
 
   useEffect(() => {
@@ -269,8 +245,6 @@ useEffect(() => {
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [newMsg, setNewMsg] = useState("");
   const [busy, setBusy] = useState(true);
-
-  // ✅ ADD PROJECTS STATE
   const [projects, setProjects] = useState<any[]>([]);
 
   const handleSaveEmployee = async () => {
@@ -281,26 +255,20 @@ useEffect(() => {
       updatedBy: user!.uid,
       role: userData?.accountType || "ADMIN",
     });
-   setSelectedEmployee({
-  ...editedUser,
-});
-  setIsEditing(false);
-  alert("Employee details updated successfully!");
-};
+    setSelectedEmployee({ ...editedUser });
+    setIsEditing(false);
+    alert("Employee details updated successfully!");
+  };
 
-  /* ================= LOAD PROJECTS ================= */
   useEffect(() => {
     if (loading || !user) return;
-
     const projectsQuery = query(collection(db, "projects"), orderBy("createdAt", "desc"));
     const unsubProjects = onSnapshot(projectsQuery, (snap) => {
       setProjects(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
-
     return () => unsubProjects();
   }, [loading, user]);
 
-  /* ================= LOAD DASHBOARD ================= */
   const loadDashboard = async (selectedDate?: string) => {
     setBusy(true);
     const targetDate = selectedDate || new Date().toISOString().split("T")[0];
@@ -312,43 +280,37 @@ useEffect(() => {
       const userData = u.data();
       const attendanceSnap = await getDoc(doc(db, "attendance", `${uid}_${targetDate}`));
       const sessions: Session[] = attendanceSnap.exists()
-  ? attendanceSnap.data().sessions || []
-  : [];
+        ? attendanceSnap.data().sessions || []
+        : [];
 
-// ✅ Sort sessions by checkIn ascending (oldest first)
-const sortedSessions = [...sessions].sort((a, b) => {
-  const aTime = a.checkIn?.toDate
-    ? a.checkIn.toDate().getTime()
-    : new Date(a.checkIn).getTime();
+      const sortedSessions = [...sessions].sort((a, b) => {
+        const aTime = a.checkIn?.toDate
+          ? a.checkIn.toDate().getTime()
+          : new Date(a.checkIn).getTime();
+        const bTime = b.checkIn?.toDate
+          ? b.checkIn.toDate().getTime()
+          : new Date(b.checkIn).getTime();
+        return aTime - bTime;
+      });
 
-  const bTime = b.checkIn?.toDate
-    ? b.checkIn.toDate().getTime()
-    : new Date(b.checkIn).getTime();
-
-  return aTime - bTime;
-});
-
-// ✅ Always first check-in of the day
-const morningCheckIn =
-  sortedSessions.length > 0 ? sortedSessions[0].checkIn : null;
+      const morningCheckIn = sortedSessions.length > 0 ? sortedSessions[0].checkIn : null;
       const lastSession = sessions[sessions.length - 1];
       const isOnline = lastSession && !lastSession.checkOut;
       const updateSnap = await getDoc(doc(db, "dailyUpdates", `${uid}_${targetDate}`));
       const id = u.id;
 
       rowsData.push({
-  id,
-  uid: id,
-  name: userData.name,
-  email: userData.email,
-  profilePhoto: userData.profilePhoto || "",
-  sessions: sortedSessions,
-  morningCheckIn,
-  status: isOnline ? "ONLINE" : "OFFLINE",
-  totalMinutes: calculateTotalMinutes(sortedSessions),
-  task: updateSnap.exists() ? updateSnap.data().currentTask : "—",
-});
-
+        id,
+        uid: id,
+        name: userData.name,
+        email: userData.email,
+        profilePhoto: userData.profilePhoto || "",
+        sessions: sortedSessions,
+        morningCheckIn,
+        status: isOnline ? "ONLINE" : "OFFLINE",
+        totalMinutes: calculateTotalMinutes(sortedSessions),
+        task: updateSnap.exists() ? updateSnap.data().currentTask : "—",
+      });
     }
 
     setRows(rowsData);
@@ -358,33 +320,24 @@ const morningCheckIn =
   const loadUsers = async () => {
     const snap = await getDocs(collection(db, "users"));
     setUsers(
-  snap.docs.map((d) => ({
-    id: d.id,
-    uid: d.id,
-    ...(d.data() as Omit<Employee, "id" | "uid">),
-  }))
-);
-
+      snap.docs.map((d) => ({
+        id: d.id,
+        uid: d.id,
+        ...(d.data() as Omit<Employee, "id" | "uid">),
+      }))
+    );
   };
 
   const loadMessages = async () => {
     const snap = await getDocs(collection(db, "messages"));
-    setMessages(
-      snap.docs.map((d) => ({
-        id: d.id,
-        text: d.data().text,
-      }))
-    );
+    setMessages(snap.docs.map((d) => ({ id: d.id, text: d.data().text })));
   };
 
   const loadLeaveRequests = async () => {
-    const snap = await getDocs(query(collection(db, "leaveRequests"), orderBy("createdAt", "desc")));
-    setLeaveRequests(
-      snap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as any),
-      }))
+    const snap = await getDocs(
+      query(collection(db, "leaveRequests"), orderBy("createdAt", "desc"))
     );
+    setLeaveRequests(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
   };
 
   useEffect(() => {
@@ -400,10 +353,7 @@ const morningCheckIn =
   /* ================= ACTIONS ================= */
   const sendMessage = async () => {
     if (!newMsg.trim()) return;
-    await addDoc(collection(db, "messages"), {
-      text: newMsg,
-      createdAt: serverTimestamp(),
-    });
+    await addDoc(collection(db, "messages"), { text: newMsg, createdAt: serverTimestamp() });
     setNewMsg("");
     loadMessages();
   };
@@ -433,7 +383,7 @@ const morningCheckIn =
     return (
       <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-50 to-slate-100">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-[#193677] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-16 h-16 border-4 border-[#193677] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-slate-600 font-medium">Loading dashboard...</p>
         </div>
       </div>
@@ -475,100 +425,69 @@ const morningCheckIn =
       const date = s.checkIn.toDate();
       const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
       const key = `${r.uid}_${dateStr}`;
-      if (!sessionsByDate[key]) {
-        sessionsByDate[key] = [];
-      }
+      if (!sessionsByDate[key]) sessionsByDate[key] = [];
       sessionsByDate[key].push("SESSION");
     });
   });
 
   const saveMonthlyAttendance = async (uid: string, dateStr: string, status: AttendanceType) => {
     const ref = doc(db, "monthlyAttendance", monthKey);
-    await setDoc(
-      ref,
-      {
-        [uid]: {
-          [dateStr]: status,
-        },
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
+    await setDoc(ref, { [uid]: { [dateStr]: status }, updatedAt: serverTimestamp() }, { merge: true });
   };
 
-const filteredRows = rows.filter((r) => {
-  const search = searchQuery.toLowerCase();
-
-  const matchesSearch =
-    (r.name ?? "").toLowerCase().includes(search) ||
-    (r.email ?? "").toLowerCase().includes(search);
-
-  const matchesFilter =
-    filterStatus === "ALL" || r.status === filterStatus;
-
-  return matchesSearch && matchesFilter;
-});
-
+  const filteredRows = rows.filter((r) => {
+    const search = searchQuery.toLowerCase();
+    const matchesSearch =
+      (r.name ?? "").toLowerCase().includes(search) ||
+      (r.email ?? "").toLowerCase().includes(search);
+    const matchesFilter = filterStatus === "ALL" || r.status === filterStatus;
+    return matchesSearch && matchesFilter;
+  });
 
   const totalEmployees = rows.length;
   const onlineEmployees = rows.filter((r) => r.status === "ONLINE").length;
   const offlineEmployees = rows.filter((r) => r.status === "OFFLINE").length;
-  const avgWorkTime = rows.length > 0 ? Math.round(rows.reduce((sum, r) => sum + r.totalMinutes, 0) / rows.length) : 0;
+  const avgWorkTime =
+    rows.length > 0
+      ? Math.round(rows.reduce((sum, r) => sum + r.totalMinutes, 0) / rows.length)
+      : 0;
   const pendingLeaves = leaveRequests.filter((l) => l.status === "Pending").length;
 
-// In your admin page (likely AdminPage.tsx or page.tsx)
-// Find handleAddUser and REPLACE the whole function with this:
-
-const handleAddUser = async () => {
-  if (!name.trim() || !email.trim()) {
-    setMsg("Please enter name and email.");
-    return;
-  }
-
-  try {
-    setCreatingUser(true);
-    setMsg("");
-
-    const res = await fetch("/api/create-employee", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        designation,
-        accountType,
-      }),
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      throw new Error(data.error || "Failed to create employee");
+  const handleAddUser = async () => {
+    if (!name.trim() || !email.trim()) {
+      setMsg("Please enter name and email.");
+      return;
     }
-
-    setMsg("✅ Employee created! Login credentials sent to their email.");
-    setName("");
-    setEmail("");
-    setPassword("");
-    setDesignation("Developer");
-    setAccountType("EMPLOYEE");
-
-    setTimeout(() => {
-      setShowAddUser(false);
+    try {
+      setCreatingUser(true);
       setMsg("");
-    }, 2000);
-
-  } catch (error: any) {
-    console.error("Add user error:", error);
-    setMsg(`❌ ${error.message}`);
-  } finally {
-    setCreatingUser(false);
-  }
-};
+      const res = await fetch("/api/create-employee", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          designation,
+          accountType,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to create employee");
+      setMsg("✅ Employee created! Login credentials sent to their email.");
+      setName(""); setEmail(""); setPassword(""); setDesignation("Developer"); setAccountType("EMPLOYEE");
+      setTimeout(() => { setShowAddUser(false); setMsg(""); }, 2000);
+    } catch (error: any) {
+      console.error("Add user error:", error);
+      setMsg(`❌ ${error.message}`);
+    } finally {
+      setCreatingUser(false);
+    }
+  };
 
   /* ================= UI ================= */
   return (
     <div className="min-h-screen flex bg-linear-to-br from-slate-50 via-slate-100 to-slate-50">
+
       {/* MOBILE MENU BUTTON */}
       <button
         onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -584,20 +503,20 @@ const handleAddUser = async () => {
         </svg>
       </button>
 
-      {/* SIDEBAR OVERLAY (Mobile) */}
-      {sidebarOpen && <div onClick={() => setSidebarOpen(false)} className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-30 transition-opacity" />}
+      {/* SIDEBAR OVERLAY */}
+      {sidebarOpen && (
+        <div onClick={() => setSidebarOpen(false)}
+          className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-30 transition-opacity" />
+      )}
 
-      {/* ✅ SIDEBAR - COLLAPSIBLE */}
+      {/* SIDEBAR */}
       <aside
-        className={`${
-          sidebarCollapsed ? "lg:w-20" : "lg:w-72"
-        } w-72 bg-[#12334f] text-white fixed inset-y-0 z-40 transform transition-all duration-300 ease-out ${
+        className={`${sidebarCollapsed ? "lg:w-20" : "lg:w-72"} w-72 bg-[#12334f] text-white fixed inset-y-0 z-40 transform transition-all duration-300 ease-out ${
           sidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
         } lg:translate-x-0 flex flex-col`}
       >
-        {/* Logo Header with Collapse Toggle */}
+        {/* Logo */}
         <div className="h-16 flex items-center justify-between border-b border-white/10 bg-[#12334f] px-4">
-          {/* Logo */}
           {!sidebarCollapsed ? (
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-[#184199] flex items-center justify-center shadow-lg">
@@ -606,14 +525,8 @@ const handleAddUser = async () => {
                 </svg>
               </div>
               <div className="flex items-center gap-2 ml-4">
-                <Image
-                  src="/logo.svg"
-                  alt="TGY CRM Logo"
-                  width={90}
-                  height={70}
-                  className="object-contain"
-                />
-              </div> 
+                <Image src="/logo.svg" alt="TGY CRM Logo" width={90} height={70} className="object-contain" />
+              </div>
             </div>
           ) : (
             <div className="w-10 h-10 rounded-xl bg-[#184199] flex items-center justify-center shadow-lg mx-auto">
@@ -622,8 +535,6 @@ const handleAddUser = async () => {
               </svg>
             </div>
           )}
-
-          {/* ✅ COLLAPSE TOGGLE (Desktop Only) - Now on the same line */}
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             className="hidden lg:flex items-center justify-center w-8 h-8 hover:bg-white/10 rounded-lg transition-colors"
@@ -631,9 +542,7 @@ const handleAddUser = async () => {
           >
             <svg
               className={`w-5 h-5 transition-transform duration-300 ${sidebarCollapsed ? "rotate-180" : ""}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor"
             >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
             </svg>
@@ -642,73 +551,73 @@ const handleAddUser = async () => {
 
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar">
+
           <NavItem
             icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>}
-            label="Dashboard"
-            active={view === "dashboard"}
-            onClick={() => { setView("dashboard"); setSidebarOpen(false); }}
-            collapsed={sidebarCollapsed}
+            label="Dashboard" active={view === "dashboard"}
+            onClick={() => { setView("dashboard"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
           />
+
           <NavItem
             icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>}
-            label="Employees"
-            active={view === "employees"}
-            onClick={() => { setView("employees"); setSidebarOpen(false); }}
-            collapsed={sidebarCollapsed}
+            label="Employees" active={view === "employees"}
+            onClick={() => { setView("employees"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
           />
+
           <NavItem
             icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>}
-            label="Attendences"
-            active={view === "monthlyReport"}
-            onClick={() => { setView("monthlyReport"); setSidebarOpen(false); }}
-            collapsed={sidebarCollapsed}
+            label="Attendences" active={view === "monthlyReport"}
+            onClick={() => { setView("monthlyReport"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
           />
+
           <NavItem
             icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>}
-            label="Leave Requests"
-            badge={pendingLeaves > 0 ? pendingLeaves : undefined}
+            label="Leave Requests" badge={pendingLeaves > 0 ? pendingLeaves : undefined}
             active={view === "leaveReport"}
-            onClick={() => { setView("leaveReport"); setSidebarOpen(false); }}
-            collapsed={sidebarCollapsed}
+            onClick={() => { setView("leaveReport"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
           />
+
           <NavItem
             icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>}
-            label="Project Management"
-            active={view === "Project Management"}
-            onClick={() => { setView("Project Management"); setSidebarOpen(false); }}
-            collapsed={sidebarCollapsed}
+            label="Project Management" active={view === "Project Management"}
+            onClick={() => { setView("Project Management"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
           />
+
           <NavItem
             icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>}
-            label="Announcements"
-            active={view === "messages"}
-            onClick={() => { setView("messages"); setSidebarOpen(false); }}
-            collapsed={sidebarCollapsed}
+            label="Announcements" active={view === "messages"}
+            onClick={() => { setView("messages"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
           />
+
           <NavItem
-  icon={
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-        d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  }
-  label="Queries"
-  badge={queryCount > 0 ? queryCount : undefined}   // ✅ ADD THIS
-  active={view === "queries"}
-  onClick={() => { setView("queries"); setSidebarOpen(false); }}
-  collapsed={sidebarCollapsed}
-/>
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+            label="Queries" badge={queryCount > 0 ? queryCount : undefined}
+            active={view === "queries"}
+            onClick={() => { setView("queries"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
+          {/* ── NEW: Break Monitor nav item ── */}
+          {/* <NavItem
+            icon={
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            }
+            label="Break Monitor" active={view === "breakMonitor"}
+            onClick={() => { setView("breakMonitor"); setSidebarOpen(false); }}
+            collapsed={sidebarCollapsed}
+          /> */}
 
           <NavItem
             icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-3.866 0-7 1.79-7 4v4h14v-4c0-2.21-3.134-4-7-4zm0-2a3 3 0 110-6 3 3 0 010 6z" /></svg>}
-            label="Accounts"
-            active={view === "accounts"}
-            onClick={() => { setView("accounts"); setSidebarOpen(false); }}
-            collapsed={sidebarCollapsed}
+            label="Accounts" active={view === "accounts"}
+            onClick={() => { setView("accounts"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
           />
+
         </nav>
 
-        {/* Logout Button */}
+        {/* Logout */}
         <button
           onClick={handleLogout}
           className="m-4 bg-gray-500 hover:bg-red-700 py-3 px-5 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 group text-white"
@@ -723,13 +632,25 @@ const handleAddUser = async () => {
 
       {/* MAIN CONTENT */}
       <div className={`${sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"} flex-1 flex flex-col min-h-screen transition-all duration-300`}>
+
         {/* Top Bar */}
         <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-20 shadow-sm">
           <div className="px-4 sm:px-6 lg:px-8 py-0">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="pt-12 lg:pt-0">
-                <h2 className="text-2xl lg:text-3xl font-bold text-slate-900 capitalize">{view === "Project Management" ? "Project Management" : view.replace(/([A-Z])/g, " $1").trim()}</h2>
-                <p className="text-sm text-slate-600 mt-1">{new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
+                <h2 className="text-2xl lg:text-3xl font-bold text-slate-900 capitalize">
+                  {/* ── label for break monitor ── */}
+                  {view === "breakMonitor"
+                    ? "Break Monitor"
+                    : view === "Project Management"
+                    ? "Project Management"
+                    : view.replace(/([A-Z])/g, " $1").trim()}
+                </h2>
+                <p className="text-sm text-slate-600 mt-1">
+                  {new Date().toLocaleDateString("en-IN", {
+                    weekday: "long", day: "numeric", month: "long", year: "numeric",
+                  })}
+                </p>
               </div>
 
               <div className="flex items-center gap-4">
@@ -738,52 +659,38 @@ const handleAddUser = async () => {
                 </div>
 
                 <button
-  onClick={() => window.open("/admin/greetings", "_blank")}
-  className="p-1 rounded-sm hover:bg-slate-100 transition"
-  title="Greetings Hub"
->
-  <img src="https://cdn-icons-png.flaticon.com/128/3062/3062634.png" alt="Greetings" className="w-10 h-10 object-contain" />
-</button>
+                  onClick={() => window.open("/admin/greetings", "_blank")}
+                  className="p-1 rounded-sm hover:bg-slate-100 transition"
+                  title="Greetings Hub"
+                >
+                  <img src="https://cdn-icons-png.flaticon.com/128/3062/3062634.png" alt="Greetings" className="w-10 h-10 object-contain" />
+                </button>
 
                 <button onClick={() => setShowCalendar(true)} className="p-1 rounded-sm hover:bg-slate-100 transition">
                   <img src="https://cdn-icons-png.flaticon.com/512/10691/10691802.png" alt="Calendar" className="w-8 h-8 object-contain" />
                 </button>
 
                 <button
-                  onClick={() => {
-                    window.open("/meet", "_blank");
-                    setSidebarOpen(false);
-                  }}
+                  onClick={() => { window.open("/meet", "_blank"); setSidebarOpen(false); }}
                   className="flex items-center justify-center w-8 h-8 rounded-xl font-semibold text-white bg-[#2380de] shadow-lg hover:shadow-xl transition-all duration-300 active:scale-[0.98]"
                 >
-                  <div className="relative">
-                    <img src="https://cdn-icons-png.flaticon.com/128/8407/8407947.png" alt="Meet" className="w-5 h-5 object-contain" />
-                  </div>
+                  <img src="https://cdn-icons-png.flaticon.com/128/8407/8407947.png" alt="Meet" className="w-5 h-5 object-contain" />
                 </button>
 
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-3">
-  <div className="w-10 h-10 rounded-full overflow-hidden shadow-lg">
-    {userData?.profilePhoto ? (
-      <img
-        src={userData.profilePhoto}
-        alt="Admin"
-        className="w-full h-full object-cover"
-      />
-    ) : (
-      <div className="w-full h-full bg-[#193677] flex items-center justify-center text-white font-bold">
-        {user.email?.[0]?.toUpperCase()}
-      </div>
-    )}
-  </div>
-
-  <div className="hidden sm:block">
-    <p className="text-sm font-semibold text-slate-900">
-      {user.email?.split("@")[0]}
-    </p>
-    <p className="text-xs text-slate-500">Administrator</p>
-  </div>
-</div>
+                  <div className="w-10 h-10 rounded-full overflow-hidden shadow-lg">
+                    {userData?.profilePhoto ? (
+                      <img src={userData.profilePhoto} alt="Admin" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-[#193677] flex items-center justify-center text-white font-bold">
+                        {user.email?.[0]?.toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                  <div className="hidden sm:block">
+                    <p className="text-sm font-semibold text-slate-900">{user.email?.split("@")[0]}</p>
+                    <p className="text-xs text-slate-500">Administrator</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -791,28 +698,29 @@ const handleAddUser = async () => {
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
-          {view === "dashboard" && (
-  <Dashboard
-    totalEmployees={totalEmployees}
-    onlineEmployees={onlineEmployees}
-    offlineEmployees={offlineEmployees}
-    avgWorkTime={avgWorkTime}
-    rows={filteredRows}
-    busy={busy}
-    formatTime={formatTime}
-    formatTotal={formatTotal}
-    setView={setView}
-    setSelectedEmployee={setSelectedDashboardRow}
-  />
-)}
 
-{view === "profile" && selectedDashboardRow && (
-  <EmployeeDetails
-    selectedUser={selectedDashboardRow}
-    setView={setView}
-    setSelectedUser={setSelectedDashboardRow}
-  />
-)}
+          {view === "dashboard" && (
+            <Dashboard
+              totalEmployees={totalEmployees}
+              onlineEmployees={onlineEmployees}
+              offlineEmployees={offlineEmployees}
+              avgWorkTime={avgWorkTime}
+              rows={filteredRows}
+              busy={busy}
+              formatTime={formatTime}
+              formatTotal={formatTotal}
+              setView={setView}
+              setSelectedEmployee={setSelectedDashboardRow}
+            />
+          )}
+
+          {view === "profile" && selectedDashboardRow && (
+            <EmployeeDetails
+              selectedUser={selectedDashboardRow}
+              setView={setView}
+              setSelectedUser={setSelectedDashboardRow}
+            />
+          )}
 
           {view === "analytics" && (
             <div className="space-y-6">
@@ -823,28 +731,25 @@ const handleAddUser = async () => {
                     <div>
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-sm font-medium text-slate-600">Present</span>
-                        <span className="text-sm font-bold text-emerald-600">
-                          {onlineEmployees}/{totalEmployees}
-                        </span>
+                        <span className="text-sm font-bold text-emerald-600">{onlineEmployees}/{totalEmployees}</span>
                       </div>
                       <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-linear-to-r from-emerald-500 to-green-500 rounded-full transition-all duration-500" style={{ width: `${(onlineEmployees / totalEmployees) * 100}%` }}></div>
+                        <div className="h-full bg-linear-to-r from-emerald-500 to-green-500 rounded-full transition-all duration-500"
+                          style={{ width: `${(onlineEmployees / totalEmployees) * 100}%` }} />
                       </div>
                     </div>
                     <div>
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-sm font-medium text-slate-600">Offline</span>
-                        <span className="text-sm font-bold text-slate-600">
-                          {offlineEmployees}/{totalEmployees}
-                        </span>
+                        <span className="text-sm font-bold text-slate-600">{offlineEmployees}/{totalEmployees}</span>
                       </div>
                       <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-linear-to-r from-slate-400 to-slate-500 rounded-full transition-all duration-500" style={{ width: `${(offlineEmployees / totalEmployees) * 100}%` }}></div>
+                        <div className="h-full bg-linear-to-r from-slate-400 to-slate-500 rounded-full transition-all duration-500"
+                          style={{ width: `${(offlineEmployees / totalEmployees) * 100}%` }} />
                       </div>
                     </div>
                   </div>
                 </div>
-
                 <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
                   <h3 className="text-lg font-bold text-slate-900 mb-4">Leave Statistics</h3>
                   <div className="grid grid-cols-3 gap-4">
@@ -863,64 +768,96 @@ const handleAddUser = async () => {
                   </div>
                 </div>
               </div>
-
               <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
                 <h3 className="text-lg font-bold text-slate-900 mb-6">Top Performers Today</h3>
                 <div className="space-y-4">
-                  {rows
-                    .sort((a, b) => b.totalMinutes - a.totalMinutes)
-                    .slice(0, 5)
-                    .map((r, index) => (
-                      <div key={r.id} className="flex items-center gap-4 p-4 bg-linear-to-r from-slate-50 to-transparent rounded-xl hover:from-indigo-50 transition-colors">
-                        <div className="text-2xl font-bold text-slate-300 w-8">{index + 1}</div>
-                        <div className="w-12 h-12 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-lg">{r.name[0]?.toUpperCase()}</div>
-                        <div className="flex-1">
-                          <p className="font-semibold text-slate-900">{r.name}</p>
-                          <p className="text-sm text-slate-500">{r.email}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-bold text-indigo-600">{formatTotal(r.totalMinutes)}</p>
-                          <p className="text-xs text-slate-500">worked today</p>
-                        </div>
+                  {rows.sort((a, b) => b.totalMinutes - a.totalMinutes).slice(0, 5).map((r, index) => (
+                    <div key={r.id} className="flex items-center gap-4 p-4 bg-linear-to-r from-slate-50 to-transparent rounded-xl hover:from-indigo-50 transition-colors">
+                      <div className="text-2xl font-bold text-slate-300 w-8">{index + 1}</div>
+                      <div className="w-12 h-12 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-lg">
+                        {r.name[0]?.toUpperCase()}
                       </div>
-                    ))}
+                      <div className="flex-1">
+                        <p className="font-semibold text-slate-900">{r.name}</p>
+                        <p className="text-sm text-slate-500">{r.email}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-indigo-600">{formatTotal(r.totalMinutes)}</p>
+                        <p className="text-xs text-slate-500">worked today</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
           )}
 
-          <EmployeesView view={view} setView={setView} selectedEmployee={selectedEmployee} users={users} setSelectedUser={setSelectedEmployee} deleteUser={deleteUser} showAddUser={showAddUser} setShowAddUser={setShowAddUser} msg={msg} name={name} setName={setName} email={email} setEmail={setEmail} designation={designation} setDesignation={setDesignation} accountType={accountType} setAccountType={setAccountType} handleAddUser={handleAddUser} creatingUser={creatingUser} formatTime={formatTime} formatTotal={formatTotal} />
+          <EmployeesView
+            view={view} setView={setView} selectedEmployee={selectedEmployee}
+            users={users} setSelectedUser={setSelectedEmployee} deleteUser={deleteUser}
+            showAddUser={showAddUser} setShowAddUser={setShowAddUser} msg={msg}
+            name={name} setName={setName} email={email} setEmail={setEmail}
+            designation={designation} setDesignation={setDesignation}
+            accountType={accountType} setAccountType={setAccountType}
+            handleAddUser={handleAddUser} creatingUser={creatingUser}
+            formatTime={formatTime} formatTotal={formatTotal}
+          />
 
-          {view === "employeeDetails" && selectedEmployee && <EmployeeDetails selectedUser={selectedEmployee} setView={setView} setSelectedUser={setSelectedEmployee} />}
+          {view === "employeeDetails" && selectedEmployee && (
+            <EmployeeDetails selectedUser={selectedEmployee} setView={setView} setSelectedUser={setSelectedEmployee} />
+          )}
 
-          <MessagesView view={view} messages={messages} newMsg={newMsg} setNewMsg={setNewMsg} sendMessage={sendMessage} loadMessages={loadMessages} db={db} />
+          <MessagesView
+            view={view} messages={messages} newMsg={newMsg}
+            setNewMsg={setNewMsg} sendMessage={sendMessage}
+            loadMessages={loadMessages} db={db}
+          />
 
-         
-{view === "monthlyReport" && <MonthlyReport db={db} users={users} monthlyDate={monthlyDate} setMonthlyDate={setMonthlyDate} monthlyAttendance={monthlyAttendance} setMonthlyAttendance={setMonthlyAttendance} sessionsByDate={sessionsByDate} isHoliday={isHoliday} saveMonthlyAttendance={saveMonthlyAttendance} getAutoStatus={getAutoStatus} isSunday={isSunday} isSecondSaturday={isSecondSaturday} isFourthSaturday={isFourthSaturday} isFifthSaturday={isFifthSaturday} />}
-  
-  <CalendarView
-  showCalendar={showCalendar}
-  setShowCalendar={setShowCalendar}
-  calendarDate={calendarDate}
-  setCalendarDate={setCalendarDate}
-  isSunday={isSunday}
-  isSecondSaturday={isSecondSaturday}
-  isFourthSaturday={isFourthSaturday}
-  isFifthSaturday={isFifthSaturday}
-  isHoliday={isHoliday}
-/>
+          {view === "monthlyReport" && (
+            <MonthlyReport
+              db={db} users={users} monthlyDate={monthlyDate} setMonthlyDate={setMonthlyDate}
+              monthlyAttendance={monthlyAttendance} setMonthlyAttendance={setMonthlyAttendance}
+              sessionsByDate={sessionsByDate} isHoliday={isHoliday}
+              saveMonthlyAttendance={saveMonthlyAttendance} getAutoStatus={getAutoStatus}
+              isSunday={isSunday} isSecondSaturday={isSecondSaturday}
+              isFourthSaturday={isFourthSaturday} isFifthSaturday={isFifthSaturday}
+            />
+          )}
 
-       {view === "leaveReport" && (
-  <LeaveRequests />
-)}
+          <CalendarView
+            showCalendar={showCalendar} setShowCalendar={setShowCalendar}
+            calendarDate={calendarDate} setCalendarDate={setCalendarDate}
+            isSunday={isSunday} isSecondSaturday={isSecondSaturday}
+            isFourthSaturday={isFourthSaturday} isFifthSaturday={isFifthSaturday}
+            isHoliday={isHoliday}
+          />
 
+          {view === "leaveReport" && <LeaveRequests />}
 
-{view === "queries" && (
-  // @ts-ignore
-  <AdminQueriesView user={user} userData={userData} />
-)}
+          {view === "queries" && (
+            // @ts-ignore
+            <AdminQueriesView user={user} userData={userData} />
+          )}
 
-          {/* ✅ FIXED: Pass all required props to ProjectManagement */}
+          {/* ── NEW: Break Monitor view ── */}
+          {view === "breakMonitor" && (
+            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6">
+              <div className="mb-6 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-linear-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
+                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">Break Monitor</h2>
+                  <p className="text-sm text-slate-500">Real-time employee break tracking</p>
+                </div>
+              </div>
+              <AdminBreakView />
+            </div>
+          )}
+
           {view === "Project Management" && (
             <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 lg:p-8">
               <ProjectManagement user={user} projects={projects} users={users} />
@@ -933,6 +870,7 @@ const handleAddUser = async () => {
           <MeetChatApp users={users} isOpen={showMeet} onClose={() => setShowMeet(false)} />
 
           {view === "accounts" && <AccountsDashboard />}
+
         </main>
 
         <footer className="bg-white/80 backdrop-blur-md border-t border-slate-200 py-4 px-6">
@@ -950,19 +888,10 @@ const handleAddUser = async () => {
       </div>
 
       <style jsx>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: rgba(255, 255, 255, 0.1);
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.3);
-          border-radius: 3px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: rgba(255, 255, 255, 0.5);
-        }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.5); }
       `}</style>
     </div>
   );
@@ -973,7 +902,7 @@ function NavItem({ icon, label, active = false, onClick, badge, collapsed = fals
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 ${
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 relative ${
         active ? "bg-[#58576358] text-white shadow-md" : "text-slate-300 hover:bg-white/10 hover:text-white"
       } ${collapsed ? "justify-center" : ""}`}
       title={collapsed ? label : ""}
@@ -982,10 +911,14 @@ function NavItem({ icon, label, active = false, onClick, badge, collapsed = fals
       {!collapsed && (
         <>
           <span className="flex-1 text-left">{label}</span>
-          {badge !== undefined && <span className="px-2 py-0.5 bg-rose-500 text-white text-xs font-bold rounded-full">{badge}</span>}
+          {badge !== undefined && (
+            <span className="px-2 py-0.5 bg-rose-500 text-white text-xs font-bold rounded-full">{badge}</span>
+          )}
         </>
       )}
-      {collapsed && badge !== undefined && <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full"></span>}
+      {collapsed && badge !== undefined && (
+        <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full" />
+      )}
     </button>
   );
 }
@@ -994,8 +927,12 @@ function StatCard({ title, value, icon, gradient, trend }: any) {
   return (
     <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 hover:shadow-xl transition-all duration-300 group">
       <div className="flex items-start justify-between mb-4">
-        <div className={`w-14 h-14 rounded-xl bg-linear-to-br ${gradient} flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform`}>{icon}</div>
-        {trend && <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">{trend}</span>}
+        <div className={`w-14 h-14 rounded-xl bg-linear-to-br ${gradient} flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform`}>
+          {icon}
+        </div>
+        {trend && (
+          <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">{trend}</span>
+        )}
       </div>
       <p className="text-slate-600 text-sm font-medium mb-1">{title}</p>
       <p className="text-3xl font-bold text-slate-900">{value}</p>

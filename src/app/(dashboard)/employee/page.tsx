@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import Image from "next/image";
-
+import NavbarBreakStatus from "@/components/NavbarBreakStatus";
 import {
   collection, onSnapshot, query, orderBy, addDoc, serverTimestamp,
   where, updateDoc, doc, setDoc, writeBatch,
@@ -18,6 +18,14 @@ import CallHistory from "@/components/CallHistory";
 import MeetPanel from "@/components/MeetPanel";
 import IncomingCallListener from "@/components/IncomingCallListener";
 import MeetView from "@/components/MeetView";
+
+// ── NEW: Break tracking imports ────────────────────────────
+import BreakPanel from "@/components/BreakPanel";
+import {
+  getActiveBreak,
+  getTodayDateStr,
+  type Break,
+} from "@/lib/breakTracking";
 
 import DashboardView   from "./views/DashboardView";
 import WorkUpdateView  from "./views/WorkUpdateView";
@@ -204,8 +212,6 @@ function NotificationDropdown({
   return (
     <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 z-200 flex flex-col overflow-hidden"
       style={{ maxHeight: "80vh" }}>
-
-      {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50 shrink-0">
         <div className="flex items-center gap-2">
           <span className="text-base">🔔</span>
@@ -229,11 +235,7 @@ function NotificationDropdown({
           </button>
         </div>
       </div>
-
-      {/* Body */}
       <div className="overflow-y-auto flex-1 px-3 py-3 space-y-4">
-
-        {/* Empty state */}
         {hasNone && (
           <div className="flex flex-col items-center justify-center py-10">
             <div className="text-5xl mb-3">🔕</div>
@@ -241,8 +243,6 @@ function NotificationDropdown({
             <p className="text-xs text-gray-400 mt-1">No new notifications</p>
           </div>
         )}
-
-        {/* ── Chat Messages ── */}
         {chatNotifications.length > 0 && (
           <section>
             <div className="flex items-center gap-2 mb-2">
@@ -283,8 +283,6 @@ function NotificationDropdown({
             </div>
           </section>
         )}
-
-        {/* ── Leave Updates ── */}
         {leaveNotifications.length > 0 && (
           <section>
             <div className="flex items-center gap-2 mb-2">
@@ -324,8 +322,6 @@ function NotificationDropdown({
             </div>
           </section>
         )}
-
-        {/* ── Query Replies ── */}
         {queryNotifications.length > 0 && (
           <section>
             <div className="flex items-center gap-2 mb-2">
@@ -400,6 +396,10 @@ export default function ZohoStyleEmployeeDashboard() {
   const [dismissedAnnouncements, setDismissedAnnouncements] = useState<Set<string>>(new Set());
   const [showNotifDropdown,      setShowNotifDropdown]      = useState(false);
   const [chatNotifications,      setChatNotifications]      = useState<ChatNotif[]>([]);
+
+  // ── NEW: Break state ──────────────────────────────────────
+  const [todayBreaks,            setTodayBreaks]            = useState<Break[]>([]);
+
   const notifDropdownRef = useRef<HTMLDivElement>(null);
 
   const year  = calendarDate.getFullYear();
@@ -442,13 +442,33 @@ export default function ZohoStyleEmployeeDashboard() {
 
   useEffect(() => { if (!loading && user) loadAttendance(); }, [loading, user]);
 
+  // ── NEW: Real-time listener for today's breaks ────────────
+  useEffect(() => {
+    if (!user) return;
+    const dateStr = getTodayDateStr();
+    const attRef  = doc(db, "attendance", `${user.uid}_${dateStr}`);
+    return onSnapshot(attRef, (snap) => {
+      if (snap.exists()) {
+        setTodayBreaks(snap.data().breaks || []);
+      } else {
+        setTodayBreaks([]);
+      }
+    });
+  }, [user]);
+
   useEffect(() => {
     if (!attendance?.sessions?.length) return;
     const calc = () => {
       let s = 0;
       attendance.sessions.forEach((sess: any) => {
         const ci = sess.checkIn?.toDate()?.getTime();
-        const co = sess.checkOut ? sess.checkOut.toDate().getTime() : Date.now();
+        const now = new Date();
+const shiftEnd = new Date();
+shiftEnd.setHours(19, 0, 0, 0); // 7:00 PM
+
+const co = sess.checkOut
+  ? sess.checkOut.toDate().getTime()
+  : Math.min(now.getTime(), shiftEnd.getTime());
         if (ci && co > ci) s += Math.floor((co - ci) / 1000);
       });
       setTotalSeconds(s);
@@ -507,6 +527,9 @@ export default function ZohoStyleEmployeeDashboard() {
   const lastSession = sessions.at(-1);
   const isCheckedIn = lastSession && !lastSession.checkOut;
 
+  // ── NEW: Active break derived state ───────────────────────
+  const activeBreak = getActiveBreak(todayBreaks);
+
   const leaveNotifications = leaveRequests.filter(
     l => (l.status === "Approved" || l.status === "Rejected") && !l.notificationRead
   );
@@ -527,18 +550,8 @@ export default function ZohoStyleEmployeeDashboard() {
     if (!task && !notes) { setMsg("Please add task or notes"); return; }
     try {
       setSaving(true); setMsg("");
-      let status   = "In Progress";
-      let priority = "Medium";
-      try {
-        status   = sessionStorage.getItem("workUpdate_status")   || "In Progress";
-        priority = sessionStorage.getItem("workUpdate_priority") || "Medium";
-      } catch {}
       await saveDailyUpdate(user.uid, task, notes);
       setMsg("✅ Update saved"); setTask(""); setNotes("");
-      try {
-        sessionStorage.removeItem("workUpdate_status");
-        sessionStorage.removeItem("workUpdate_priority");
-      } catch {}
     } catch { setMsg("❌ Failed to save"); }
     finally   { setSaving(false); }
   };
@@ -648,7 +661,15 @@ export default function ZohoStyleEmployeeDashboard() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate text-sm">{user.email?.split("@")[0]}</p>
-                <p className="text-xs text-white/60">Employee</p>
+                {/* ── NEW: Show break status under name ── */}
+                {activeBreak ? (
+                  <p className="text-xs text-amber-400 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse inline-block" />
+                    On {activeBreak.type} break
+                  </p>
+                ) : (
+                  <p className="text-xs text-white/60">Employee</p>
+                )}
               </div>
             </div>
           </div>
@@ -733,8 +754,18 @@ export default function ZohoStyleEmployeeDashboard() {
                   <span>⏱</span><span className="tabular-nums">{formatTimer(totalSeconds)}</span>
                 </div>
               </div>
+<NavbarBreakStatus uid={user.uid} isCheckedIn={!!isCheckedIn} />
+              {/* ── NEW: Active break indicator in header ── */}
+              {/* {activeBreak && (
+                <div className="flex items-center gap-2 bg-amber-500/20 px-3 py-1.5 rounded-lg border border-amber-400/30">
+                  <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
+                  <span className="text-xs font-bold text-amber-200">
+                    {activeBreak.type === "MORNING" ? "☕" : activeBreak.type === "LUNCH" ? "🍽️" : "🌇"} On Break
+                  </span>
+                </div>
+              )} */}
 
-              <button disabled={busy || isCheckedIn}  onClick={doCheckIn}  className="px-4 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-lg hover:shadow-xl hover:scale-105 active:scale-95">Check In</button>
+              <button disabled={busy || !!isCheckedIn}  onClick={doCheckIn}  className="px-4 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-lg hover:shadow-xl hover:scale-105 active:scale-95">Check In</button>
               <button disabled={busy || !isCheckedIn} onClick={doCheckOut} className="px-4 py-1.5 bg-red-600   text-white rounded-lg hover:bg-red-700   disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-lg hover:shadow-xl hover:scale-105 active:scale-95">Check Out</button>
 
               {/* Calendar */}
@@ -742,7 +773,7 @@ export default function ZohoStyleEmployeeDashboard() {
                 <img src="https://cdn-icons-png.flaticon.com/128/668/668278.png" alt="Calendar" className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" />
               </button>
 
-              {/* ── NOTIFICATION BELL DROPDOWN ── */}
+              {/* Notification bell */}
               <div className="relative" ref={notifDropdownRef}>
                 <button
                   onClick={() => setShowNotifDropdown(prev => !prev)}
@@ -756,7 +787,6 @@ export default function ZohoStyleEmployeeDashboard() {
                     </span>
                   )}
                 </button>
-
                 {showNotifDropdown && (
                   <NotificationDropdown
                     leaveNotifications={leaveNotifications}
@@ -767,10 +797,7 @@ export default function ZohoStyleEmployeeDashboard() {
                     markChatRead={markChatNotificationAsRead}
                     markAllRead={markAllNotificationsRead}
                     onClose={() => setShowNotifDropdown(false)}
-                    onGoToChat={(_chatId) => {
-                      setActiveView("meet");
-                      setShowNotifDropdown(false);
-                    }}
+                    onGoToChat={(_chatId) => { setActiveView("meet"); setShowNotifDropdown(false); }}
                   />
                 )}
               </div>
@@ -832,8 +859,8 @@ export default function ZohoStyleEmployeeDashboard() {
                 <h1 className="text-sm font-bold capitalize truncate max-w-36">📊 {activeView.replace("-", " ")}</h1>
               </div>
               <div className="flex items-center gap-1">
-                {/* Mobile bell dropdown */}
                 <div className="relative" ref={notifDropdownRef}>
+                  <NavbarBreakStatus uid={user.uid} isCheckedIn={!!isCheckedIn} />
                   <button
                     onClick={() => setShowNotifDropdown(prev => !prev)}
                     className="relative p-1.5 hover:bg-white/10 rounded-lg transition-all"
@@ -888,12 +915,19 @@ export default function ZohoStyleEmployeeDashboard() {
 
             <div className="flex items-center gap-1.5">
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg px-2.5 py-1.5 border border-white/20 flex-1 min-w-0">
-                <span className={`px-1.5 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${isCheckedIn ? "bg-green-500 text-white" : "bg-white/20 text-white/70"}`}>
-                  {isCheckedIn ? "🟢 In" : "⚪ Out"}
-                </span>
+                {/* ── NEW: show break or checkin status on mobile ── */}
+                {/* {activeBreak ? (
+                  <span className="px-1.5 py-0.5 rounded text-xs font-semibold whitespace-nowrap bg-amber-500 text-white animate-pulse">
+                     Break
+                  </span>
+                ) : (
+                  <span className={`px-1.5 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${isCheckedIn ? "bg-green-500 text-white" : "bg-white/20 text-white/70"}`}>
+                    {isCheckedIn ? "🟢 In" : "⚪ Out"}
+                  </span>
+                )} */}
                 <span className="font-mono font-bold text-xs text-amber-300 whitespace-nowrap">⏱ {formatTimer(totalSeconds)}</span>
               </div>
-              <button disabled={busy || isCheckedIn}  onClick={doCheckIn}  className="px-2.5 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-xs whitespace-nowrap">Check In</button>
+              <button disabled={busy || !!isCheckedIn}  onClick={doCheckIn}  className="px-2.5 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-xs whitespace-nowrap">Check In</button>
               <button disabled={busy || !isCheckedIn} onClick={doCheckOut} className="px-2.5 py-1.5 bg-red-600   text-white rounded-lg hover:bg-red-700   disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-xs whitespace-nowrap">Check Out</button>
             </div>
 
@@ -914,42 +948,43 @@ export default function ZohoStyleEmployeeDashboard() {
         <main className="flex-1 overflow-y-auto bg-gray-50">
           <div className="p-3 space-y-3">
 
-            {/* FIX 1: removed extra props that DashboardView doesn't accept */}
             {activeView === "dashboard" && (
-  <DashboardView
-    user={user}                              // ← add this
-    isCheckedIn={!!isCheckedIn}              // ← add this
-    onlineMinutes={Math.floor(totalSeconds / 60)}  // ← add this
-    attendance={attendance}
-    sessions={sessions}
-    formatTotal={formatTotal}
-    formatTime={formatTime}
-    handleSaveUpdate={handleSaveUpdate}
-    saving={saving}
-    msg={msg}
-    leaveType={leaveType}
-    setLeaveType={handleSetLeaveType}
-    fromDate={fromDate}
-    setFromDate={setFromDate}
-    toDate={toDate}
-    setToDate={setToDate}
-    leaveReason={leaveReason}
-    setLeaveReason={setLeaveReason}
-    handleSubmitLeave={handleSubmitLeave}
-    submitting={submitting}
-    leaveMsg={leaveMsg}
-    totalSeconds={totalSeconds}
-    onGoToChat={(_chatId) => setActiveView("meet")}  // ← optional but clean to add
-  />
-)}
+              <DashboardView
+                user={user}
+                isCheckedIn={!!isCheckedIn}
+                onlineMinutes={Math.floor(totalSeconds / 60)}
+                attendance={attendance}
+                sessions={sessions}
+                formatTotal={formatTotal}
+                formatTime={formatTime}
+                handleSaveUpdate={handleSaveUpdate}
+                saving={saving}
+                msg={msg}
+                leaveType={leaveType}
+                setLeaveType={handleSetLeaveType}
+                fromDate={fromDate}
+                setFromDate={setFromDate}
+                toDate={toDate}
+                setToDate={setToDate}
+                leaveReason={leaveReason}
+                setLeaveReason={setLeaveReason}
+                handleSubmitLeave={handleSubmitLeave}
+                submitting={submitting}
+                leaveMsg={leaveMsg}
+                totalSeconds={totalSeconds}
+                onGoToChat={(_chatId) => setActiveView("meet")}
+              />
+            )}
 
-           {activeView === "work-update" && (
-  <WorkUpdateView />
-)}
-            {activeView === "projects"   && <ProjectManagement user={user} projects={projects} users={users} />}
-            {activeView === "attendance" && <AttendanceView sessions={sessions} formatTime={formatTime} />}
+            {/* ── NEW: BreakPanel shown on Dashboard ── */}
+          
 
-            {/* FIX 2: removed dismissedAnnouncements + onDismissAnnouncement — NotificationsView doesn't accept them */}
+            {activeView === "work-update" && <WorkUpdateView />}
+            {activeView === "projects"    && <ProjectManagement user={user} projects={projects} users={users} />}
+
+            {/* AttendanceView already has BreakPanel embedded inside it */}
+            {activeView === "attendance"  && <AttendanceView sessions={sessions} formatTime={formatTime} />}
+
             {activeView === "notifications" && (
               <NotificationsView
                 leaveNotifications={leaveRequests.filter(l => (l.status === "Approved" || l.status === "Rejected") && !l.notificationRead)}
@@ -985,17 +1020,17 @@ export default function ZohoStyleEmployeeDashboard() {
 
       {/* ── CALENDAR MODAL ── */}
       <CalendarModal
-  showCalendar={showCalendar}
-  setShowCalendar={setShowCalendar}
-  calendarDate={calendarDate}
-  setCalendarDate={setCalendarDate}
-  holidays={holidays}
-  isSunday={isSunday}
-  isSecondSaturday={isSecondSaturday}
-  isFourthSaturday={isFourthSaturday}
-  isFifthSaturday={isFifthSaturday}
-  isHoliday={isHoliday}
-/>
+        showCalendar={showCalendar}
+        setShowCalendar={setShowCalendar}
+        calendarDate={calendarDate}
+        setCalendarDate={setCalendarDate}
+        holidays={holidays}
+        isSunday={isSunday}
+        isSecondSaturday={isSecondSaturday}
+        isFourthSaturday={isFourthSaturday}
+        isFifthSaturday={isFifthSaturday}
+        isHoliday={isHoliday}
+      />
 
       {showAttendanceSummary && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowAttendanceSummary(false)}>

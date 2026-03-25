@@ -2,1921 +2,930 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import {
-  collection,
-  addDoc,
-  onSnapshot,
-  orderBy,
-  query,
-  where,
-  serverTimestamp,
-  doc,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  writeBatch,
-  getDoc,
+  collection, addDoc, onSnapshot, orderBy, query,
+  where, serverTimestamp, doc, setDoc, updateDoc,
+  deleteDoc, writeBatch, getDoc,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 
-/* ---------------- TYPES ---------------- */
-
 type User = {
-  uid: string;
-  name?: string | null;
-  email: string | null;
-  profilePhoto?: string;  
-  avatar?: string;
-  online?: boolean;
-  status?: "available" | "busy" | "dnd" | "brb" | "away" | "offline";
+  uid: string; name?: string|null; email: string|null;
+  profilePhoto?: string; avatar?: string;
+  online?: boolean; status?: "available"|"busy"|"dnd"|"brb"|"away"|"offline"|"lunch";
 };
-
 type Message = {
-  id: string;
-  text?: string;
-  imageUrl?: string;
-  fileUrl?: string;
-  fileName?: string;
-  fileType?: string;
-  senderUid: string;
-  senderName?: string;
-  status?: "sent" | "delivered" | "seen";
-  createdAt: any;
-  readBy?: string[];
-  editedAt?: any;
-  isEdited?: boolean;
+  id: string; text?: string; imageUrl?: string; fileUrl?: string;
+  fileName?: string; fileType?: string; senderUid: string; senderName?: string;
+  status?: "sent"|"delivered"|"seen"; createdAt: any; readBy?: string[];
+  editedAt?: any; isEdited?: boolean;
 };
-
 type Chat = {
-  id: string;
-  participants: string[];
-  lastMessage?: string;
-  lastMessageTime?: any;
-  unreadCount?: { [uid: string]: number };
-  isGroup?: boolean;
-  groupName?: string;
-  groupAvatar?: string;
-  createdBy?: string;
-  createdAt?: any;
+  id: string; participants: string[]; lastMessage?: string;
+  lastMessageTime?: any; unreadCount?: {[uid:string]:number};
+  isGroup?: boolean; groupName?: string; groupAvatar?: string;
+  createdBy?: string; createdAt?: any;
 };
-
-type Notification = {
-  id: string;
-  fromUid: string;
-  fromName: string;
-  message: string;
-  chatId: string;
-  timestamp: any;
-  read: boolean;
-};
-
 type Call = {
-  id: string;
-  callerId: string;
-  callerName: string;
-  receiverId: string;
-  type: "video" | "audio";
-  status: "ringing" | "accepted" | "rejected" | "ended";
-  offer?: any;
-  answer?: any;
-  startTime?: any;
-  endTime?: any;
+  id: string; callerId: string; callerName: string; receiverId: string;
+  type: "video"|"audio"; status: "ringing"|"accepted"|"rejected"|"ended";
+  offer?: any; answer?: any; startTime?: any; endTime?: any;
 };
 
-const getUserName = (user?: Partial<User> | null): string =>
-  user?.name ??
-  user?.email ??
-  "User";
+type UserStatus = "available"|"busy"|"dnd"|"brb"|"away"|"offline"|"lunch";
 
+const getUserName = (u?: Partial<User>|null) => u?.name ?? u?.email ?? "User";
 
+const STATUS_CONFIG: Record<UserStatus,{label:string;color:string}> = {
+  available: { label:"Available",       color:"#22c55e" },
+  busy:      { label:"Busy",            color:"#ef4444" },
+  dnd:       { label:"Do not disturb",  color:"#ef4444" },
+  brb:       { label:"Be right back",   color:"#f59e0b" },
+  away:      { label:"Appear away",     color:"#f59e0b" },
+  lunch:     { label:"Out for lunch",   color:"#a855f7" },
+  offline:   { label:"Appear offline",  color:"#9ca3af" },
+};
 
-export default function TeamsStyleChatUpdated({ users }: { users: User[] }) {
+const COLORS = [
+  ["#e8512a","#f5853f"],["#7c3aed","#a78bfa"],["#0891b2","#22d3ee"],
+  ["#059669","#34d399"],["#db2777","#f472b6"],["#1d4ed8","#60a5fa"],
+  ["#d97706","#fbbf24"],["#0f766e","#2dd4bf"],
+];
+const avGrad   = (n:string) => COLORS[(n?.charCodeAt(0)??65)%COLORS.length];
+const initials = (n:string) => (n??"").split(" ").slice(0,2).map(w=>w[0]?.toUpperCase()??"").join("");
+const STUN = { iceServers:[{urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun1.l.google.com:19302"}] };
+
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+.zc{font-family:'DM Sans',sans-serif;display:flex;height:100%;background:#f0f2f5;color:#1a1d23;overflow:hidden;}
+.zc-sb{width:68px;background:#1e2230;display:flex;flex-direction:column;align-items:center;padding:14px 0 10px;gap:2px;flex-shrink:0;}
+.zc-sb-logo{width:38px;height:38px;background:linear-gradient(135deg,#e8512a,#f5853f);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;margin-bottom:12px;letter-spacing:-.3px;}
+.zc-sb-ico{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;color:rgba(255,255,255,.38);position:relative;flex-shrink:0;}
+.zc-sb-ico:hover{background:rgba(255,255,255,.07);color:rgba(255,255,255,.75);}
+.zc-sb-ico.on{background:rgba(232,81,42,.16);color:#e8512a;}
+.zc-sb-ico.on::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:56%;border-radius:0 2px 2px 0;background:#e8512a;}
+.zc-sb-badge{position:absolute;top:5px;right:5px;min-width:16px;height:16px;border-radius:8px;background:#e8512a;border:2px solid #1e2230;font-size:9px;font-weight:800;color:#fff;display:flex;align-items:center;justify-content:center;padding:0 2px;}
+.zc-sb-spacer{flex:1;}
+.zc-sb-av-wrap{position:relative;cursor:pointer;margin-top:8px;}
+.zc-sb-av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px;overflow:hidden;}
+.zc-sb-av img{width:100%;height:100%;object-fit:cover;}
+.zc-sb-status{width:11px;height:11px;border-radius:50%;border:2px solid #1e2230;position:absolute;bottom:-1px;right:-1px;}
+.zc-panel{width:292px;background:#fff;border-right:1px solid #e8eaf0;display:flex;flex-direction:column;flex-shrink:0;}
+.zc-panel-hd{padding:14px 14px 10px;}
+.zc-panel-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.zc-panel-title{font-size:15px;font-weight:700;color:#1a1d23;}
+.zc-icon-btn{width:30px;height:30px;border-radius:7px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#6b7280;transition:all .13s;}
+.zc-icon-btn:hover{background:#f5f6f8;color:#1a1d23;}
+.zc-search-wrap{position:relative;margin-bottom:10px;}
+.zc-search-ico{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#9aa0ad;pointer-events:none;}
+.zc-search{width:100%;padding:7px 10px 7px 30px;background:#f5f6f8;border:1.5px solid transparent;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;color:#1a1d23;transition:all .15s;}
+.zc-search:focus{background:#fff;border-color:#e8512a;}
+.zc-tabs{display:flex;gap:3px;}
+.zc-tab{flex:1;padding:5px 6px;border-radius:7px;font-size:11.5px;font-weight:600;cursor:pointer;border:none;background:transparent;color:#9aa0ad;transition:all .14s;font-family:'DM Sans',sans-serif;}
+.zc-tab:hover{background:#f5f6f8;color:#1a1d23;}
+.zc-tab.on{background:#fff3ef;color:#e8512a;}
+.zc-chat-list{flex:1;overflow-y:auto;}
+.zc-chat-list::-webkit-scrollbar{width:3px;}
+.zc-chat-list::-webkit-scrollbar-thumb{background:#e8eaf0;border-radius:3px;}
+.zc-group-divider{display:flex;align-items:center;gap:7px;padding:8px 14px 4px;cursor:pointer;user-select:none;transition:background .12s;}
+.zc-group-divider:hover{background:#f9fafb;}
+.zc-group-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;flex:1;}
+.zc-group-count{font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;}
+.zc-group-arrow{font-size:8px;color:#9aa0ad;transition:transform .18s;}
+.zc-group-arrow.open{transform:rotate(90deg);}
+.zc-chat-item{display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;transition:background .12s;position:relative;border-left:3px solid transparent;}
+.zc-chat-item:hover{background:#f8f9fb;}
+.zc-chat-item.on{background:#fff3ef;border-left-color:#e8512a;}
+.zc-av{display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;flex-shrink:0;overflow:hidden;position:relative;}
+.zc-av img{width:100%;height:100%;object-fit:cover;}
+.zc-sdot{border-radius:50%;border:2px solid #fff;position:absolute;bottom:-2px;right:-2px;}
+.zc-chat-meta{flex:1;min-width:0;}
+.zc-chat-name{font-size:13px;font-weight:600;color:#1a1d23;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:4px;}
+.zc-chat-preview{font-size:11.5px;color:#9aa0ad;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px;}
+.zc-unread{min-width:18px;height:18px;border-radius:9px;background:#e8512a;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;flex-shrink:0;}
+.zc-main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden;background:#f0f2f5;}
+.zc-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#9aa0ad;gap:12px;}
+.zc-empty-ico{width:72px;height:72px;border-radius:20px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:32px;box-shadow:0 4px 16px rgba(0,0,0,.08);}
+.zc-conv-hd{height:56px;background:#fff;border-bottom:1px solid #e8eaf0;padding:0 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.zc-conv-hd-left{display:flex;align-items:center;gap:9px;}
+.zc-conv-name{font-size:14px;font-weight:700;color:#1a1d23;}
+.zc-conv-sub{font-size:11.5px;color:#9aa0ad;margin-top:1px;}
+.zc-hd-btn{width:32px;height:32px;border-radius:8px;background:transparent;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#6b7280;transition:all .14s;position:relative;}
+.zc-hd-btn:hover{background:#f5f6f8;color:#1a1d23;}
+.zc-msgs{flex:1;overflow-y:auto;padding:14px 20px;display:flex;flex-direction:column;gap:2px;}
+.zc-msgs::-webkit-scrollbar{width:4px;}
+.zc-msgs::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:4px;}
+.zc-sys-msg{text-align:center;margin:10px 0;}
+.zc-sys-pill{display:inline-block;background:#e8eaf0;color:#6b7280;font-size:11px;font-weight:600;padding:3px 12px;border-radius:20px;}
+.zc-msg-row{display:flex;gap:8px;margin-bottom:2px;}
+.zc-msg-row.mine{flex-direction:row-reverse;}
+.zc-msg-av-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;}
+.zc-msg-content{max-width:68%;display:flex;flex-direction:column;}
+.zc-msg-sender{font-size:10.5px;font-weight:600;color:#6b7280;margin-bottom:2px;padding:0 4px;}
+.zc-bubble{padding:9px 13px;border-radius:12px;font-size:13.5px;line-height:1.55;word-break:break-word;position:relative;}
+.zc-bubble.them{background:#fff;color:#1a1d23;border-radius:4px 12px 12px 12px;box-shadow:0 1px 3px rgba(0,0,0,.07);}
+.zc-bubble.mine{background:#e8512a;color:#fff;border-radius:12px 4px 12px 12px;}
+.zc-bfile{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;text-decoration:none;}
+.zc-bfile.them{background:#f5f6f8;color:#1a1d23;}
+.zc-bfile.mine{background:rgba(0,0,0,.15);color:#fff;}
+.zc-msg-meta{display:flex;align-items:center;gap:4px;margin-top:3px;padding:0 4px;}
+.zc-msg-time{font-size:10.5px;color:#9aa0ad;}
+.zc-msg-actions{opacity:0;position:absolute;top:-30px;right:0;display:flex;gap:3px;background:#fff;border:1px solid #e8eaf0;border-radius:7px;padding:3px 5px;box-shadow:0 2px 10px rgba(0,0,0,.12);z-index:10;}
+.zc-bubble:hover .zc-msg-actions{opacity:1;}
+.zc-act-btn{width:22px;height:22px;border-radius:5px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#6b7280;transition:all .13s;}
+.zc-act-btn:hover{background:#f5f6f8;color:#e8512a;}
+.zc-edit-wrap{background:#fff;border:1px solid #e8eaf0;border-radius:10px;padding:10px;box-shadow:0 2px 8px rgba(0,0,0,.07);}
+.zc-edit-ta{width:100%;padding:7px 10px;border:1.5px solid #e8eaf0;border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;resize:none;color:#1a1d23;min-height:60px;transition:border-color .14s;}
+.zc-edit-ta:focus{border-color:#e8512a;}
+.zc-edit-btns{display:flex;gap:6px;margin-top:7px;justify-content:flex-end;}
+.zc-input-area{background:#fff;border-top:1px solid #e8eaf0;padding:10px 14px 12px;}
+.zc-file-prev{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#f5f6f8;border-radius:8px;margin-bottom:8px;font-size:12.5px;color:#1a1d23;}
+.zc-input-row{display:flex;align-items:flex-end;gap:8px;}
+.zc-input-box{flex:1;padding:9px 13px;background:#f5f6f8;border:1.5px solid transparent;border-radius:10px;font-size:13.5px;font-family:'DM Sans',sans-serif;outline:none;resize:none;min-height:40px;max-height:120px;color:#1a1d23;transition:all .15s;}
+.zc-input-box:focus{background:#fff;border-color:#e8512a;}
+.zc-input-box::placeholder{color:#b0b7c3;}
+.zc-inp-btn{width:36px;height:36px;border-radius:9px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;}
+.zc-inp-btn.attach{background:#f5f6f8;color:#6b7280;}
+.zc-inp-btn.attach:hover{background:#e8eaf0;color:#1a1d23;}
+.zc-inp-btn.send{background:#e8512a;color:#fff;}
+.zc-inp-btn.send:hover:not(:disabled){background:#d04420;}
+.zc-inp-btn.send:disabled{background:#e8eaf0;color:#b0b7c3;cursor:not-allowed;}
+.zc-dd{position:fixed;background:#fff;border:1px solid #e8eaf0;border-radius:13px;box-shadow:0 8px 32px rgba(0,0,0,.13);z-index:9000;overflow:hidden;animation:zcpop .16s cubic-bezier(.34,1.4,.64,1);}
+@keyframes zcpop{from{opacity:0;transform:scale(.94) translateY(-4px)}to{opacity:1;transform:none}}
+.zc-prof-hd{padding:14px;border-bottom:1px solid #f0f2f5;display:flex;align-items:center;gap:10px;}
+.zc-prof-name{font-size:13.5px;font-weight:700;color:#1a1d23;}
+.zc-prof-email{font-size:11.5px;color:#6b7280;margin-top:1px;}
+.zc-prof-link{font-size:11.5px;color:#e8512a;font-weight:600;cursor:pointer;margin-top:3px;}
+.zc-ds{padding:5px 0;}
+.zc-ds+.zc-ds{border-top:1px solid #f0f2f5;}
+.zc-di{display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;transition:background .12s;font-size:13px;color:#1a1d23;font-weight:500;}
+.zc-di:hover{background:#f8f9fb;}
+.zc-di.act{background:#fff3ef;}
+.zc-di.red{color:#ef4444;}
+.zc-di.red:hover{background:#fff1f2;}
+.zc-sdot2{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.zc-dtitle{padding:10px 14px 4px;font-size:10.5px;font-weight:700;color:#9aa0ad;text-transform:uppercase;letter-spacing:.5px;}
+.zc-notif-hd{padding:12px 14px;border-bottom:1px solid #f0f2f5;display:flex;align-items:center;justify-content:space-between;}
+.zc-notif-body{max-height:300px;overflow-y:auto;}
+.zc-notif-body::-webkit-scrollbar{width:3px;}
+.zc-notif-body::-webkit-scrollbar-thumb{background:#e8eaf0;border-radius:3px;}
+.zc-ni{display:flex;align-items:flex-start;gap:9px;padding:10px 14px;border-bottom:1px solid #f9fafb;cursor:pointer;transition:background .12s;}
+.zc-ni:hover{background:#f8f9fb;}
+.zc-call-ov{position:fixed;inset:0;background:#0d1117;z-index:9999;display:flex;flex-direction:column;}
+.zc-call-main{flex:1;position:relative;background:#161b22;display:flex;align-items:center;justify-content:center;}
+.zc-call-audio-center{display:flex;flex-direction:column;align-items:center;gap:12px;}
+.zc-call-badge{position:absolute;top:16px;left:16px;background:rgba(0,0,0,.5);backdrop-filter:blur(8px);border-radius:10px;padding:8px 16px;color:#fff;font-size:14px;font-weight:600;}
+.zc-call-bar{background:#1a1d23;padding:20px;display:flex;justify-content:center;gap:14px;flex-shrink:0;}
+.zc-cbtn{width:54px;height:54px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .18s;}
+.zc-cbtn:hover{transform:scale(1.08);}
+.zc-cbtn.neu{background:#2d333b;color:#fff;}
+.zc-cbtn.neu:hover{background:#373e47;}
+.zc-cbtn.end{background:#e8512a;color:#fff;}
+.zc-cbtn.act{background:#dc2626;color:#fff;}
+.zc-incoming{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);}
+.zc-inc-card{background:#fff;border-radius:20px;padding:32px 36px;text-align:center;width:320px;box-shadow:0 24px 64px rgba(0,0,0,.24);}
+.zc-inc-av{width:80px;height:80px;border-radius:20px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:800;color:#fff;overflow:hidden;}
+.zc-inc-av img{width:100%;height:100%;object-fit:cover;}
+.zc-inc-dots{display:flex;gap:5px;justify-content:center;margin:12px 0 24px;}
+.zc-inc-dot{width:7px;height:7px;border-radius:50%;background:#e8512a;animation:zc-bounce .8s infinite;}
+.zc-inc-dot:nth-child(2){animation-delay:.15s;}
+.zc-inc-dot:nth-child(3){animation-delay:.3s;}
+@keyframes zc-bounce{0%,80%,100%{transform:scale(.6)}40%{transform:scale(1)}}
+.zc-inc-btns{display:flex;gap:14px;justify-content:center;}
+.zc-inc-btn{width:58px;height:58px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .16s;}
+.zc-inc-btn:hover{transform:scale(1.1);}
+.zc-inc-btn.rej{background:#fee2e2;}
+.zc-inc-btn.rej:hover{background:#fecaca;}
+.zc-inc-btn.acc{background:#dcfce7;}
+.zc-inc-btn.acc:hover{background:#bbf7d0;}
+.zc-mbk{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:500;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+.zc-modal{background:#fff;border-radius:16px;width:400px;max-width:94vw;max-height:88vh;overflow-y:auto;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.18);}
+.zc-mlbl{font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;margin-top:12px;}
+.zc-mi{width:100%;padding:8px 11px;border:1.5px solid #e8eaf0;border-radius:8px;font-size:13.5px;font-family:'DM Sans',sans-serif;outline:none;color:#1a1d23;transition:border-color .14s;background:#f9fafb;}
+.zc-mi:focus{border-color:#e8512a;background:#fff;}
+.zc-mlist{max-height:200px;overflow-y:auto;border:1.5px solid #e8eaf0;border-radius:8px;}
+.zc-mitm{display:flex;align-items:center;gap:9px;padding:8px 11px;cursor:pointer;transition:background .12s;border-bottom:1px solid #f0f2f5;}
+.zc-mitm:last-child{border-bottom:none;}
+.zc-mitm:hover{background:#f9fafb;}
+.zc-mitm.sel{background:#fff3ef;}
+.zc-chk{width:15px;height:15px;border-radius:4px;border:2px solid #d1d5db;display:flex;align-items:center;justify-content:center;transition:all .12s;flex-shrink:0;}
+.zc-chk.on{background:#e8512a;border-color:#e8512a;}
+.zc-mfooter{display:flex;gap:7px;margin-top:16px;justify-content:flex-end;}
+.zc-btn{padding:7px 18px;border-radius:8px;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;border:none;cursor:pointer;transition:all .14s;}
+.zc-btn.ghost{background:#f5f6f8;color:#6b7280;}
+.zc-btn.ghost:hover{background:#e8eaf0;}
+.zc-btn.primary{background:#e8512a;color:#fff;}
+.zc-btn.primary:hover{background:#d04420;}
+.zc-btn.primary:disabled{background:#e8eaf0;color:#b0b7c3;cursor:not-allowed;}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);}
+`;
+
+export default function TeamsStyleChat({ users }: { users: User[] }) {
   const { user } = useAuth();
+  const [tab,setTab]                   = useState<"chats"|"calls">("chats");
+  const [activeTab,setActiveTab]       = useState<"all"|"direct"|"groups">("all");
+  const [selectedChat,setSelectedChat] = useState<Chat|null>(null);
+  const [messages,setMessages]         = useState<Message[]>([]);
+  const [text,setText]                 = useState("");
+  const [typing,setTyping]             = useState<string[]>([]);
+  const [searchQuery,setSearchQuery]   = useState("");
+  const [chats,setChats]               = useState<Chat[]>([]);
+  const [showCreateGroup,setShowCreateGroup] = useState(false);
+  const [groupName,setGroupName]       = useState("");
+  const [selectedMembers,setSelectedMembers] = useState<string[]>([]);
+  const [notifications,setNotifications]     = useState<any[]>([]);
+  // showNotifs, showProfile, showSettings moved to MeetChatApp — commented out here
+  // const [showNotifs,setShowNotifs]     = useState(false);
+  // const [showProfile,setShowProfile]   = useState(false);
+  // const [showSettings,setShowSettings] = useState(false);
+  const [showDots,setShowDots]         = useState(false);
+  // myStatus / changeStatus also moved — kept only for userStatus heartbeat
+  const [myStatus,setMyStatus]         = useState<UserStatus>("available");
+  const [collapsedGroups,setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [editingMsgId,setEditingMsgId] = useState<string|null>(null);
+  const [editText,setEditText]         = useState("");
+  const [selectedFile,setSelectedFile] = useState<File|null>(null);
+  const [uploading,setUploading]       = useState(false);
+  const [incomingCall,setIncomingCall] = useState<Call|null>(null);
+  const [activeCall,setActiveCall]     = useState<Call|null>(null);
+  const [isMuted,setIsMuted]           = useState(false);
+  const [isVideoOff,setIsVideoOff]     = useState(false);
+  const [callTimer,setCallTimer]       = useState(0);
+  const [userStatuses,setUserStatuses] = useState<Record<string,{status:UserStatus;online:boolean}>>({});
 
-  const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [text, setText] = useState("");
-  const [typing, setTyping] = useState<string[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [chats, setChats] = useState<Chat[]>([]);
-  const [showCreateGroup, setShowCreateGroup] = useState(false);
-  const [groupName, setGroupName] = useState("");
-  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<"all" | "direct" | "groups">("all");
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  const [editText, setEditText] = useState("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  
-  // Call states
-  const [incomingCall, setIncomingCall] = useState<Call | null>(null);
-  const [activeCall, setActiveCall] = useState<Call | null>(null);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOff, setIsVideoOff] = useState(false);
-  const [callTimer, setCallTimer] = useState(0);
+  const msgsEnd   = useRef<HTMLDivElement>(null);
+  const typingRef = useRef<any>(null);
+  const localVid  = useRef<HTMLVideoElement>(null);
+  const remoteVid = useRef<HTMLVideoElement>(null);
+  const peerRef   = useRef<RTCPeerConnection|null>(null);
+  const streamRef = useRef<MediaStream|null>(null);
+  const timerRef  = useRef<any>(null);
+  const fileRef   = useRef<HTMLInputElement>(null);
+  const iceQueue  = useRef<RTCIceCandidateInit[]>([]);
+  const dotsRef   = useRef<HTMLDivElement>(null);
+  // profRef, notifRef, settRef moved to MeetChatApp
+  // const profRef   = useRef<HTMLDivElement>(null);
+  // const notifRef  = useRef<HTMLDivElement>(null);
+  // const settRef   = useRef<HTMLDivElement>(null);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const typingTimeout = useRef<any>(null);
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const localStreamRef = useRef<MediaStream | null>(null);
-  const timerIntervalRef = useRef<any>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const notificationRef = useRef<HTMLDivElement>(null);
-const remoteIceQueue = useRef<RTCIceCandidateInit[]>([]);
+  const chatId = useMemo(()=>selectedChat?.id||null,[selectedChat]);
 
-  const STUN_SERVERS = {
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:stun1.l.google.com:19302" },
-    ],
+  // ── Ringtone helpers ──────────────────────────────────────────────
+  const ringCtxRef  = useRef<AudioContext|null>(null);
+  const ringLoopRef = useRef<ReturnType<typeof setInterval>|null>(null);
+
+  // Create the AudioContext on first user gesture so Chrome allows it
+  useEffect(()=>{
+    const unlock = () => {
+      if(!ringCtxRef.current){
+        ringCtxRef.current = new (window.AudioContext||(window as any).webkitAudioContext)();
+      }
+      if(ringCtxRef.current.state==="suspended"){
+        ringCtxRef.current.resume().catch(()=>{});
+      }
+      // Only need to unlock once
+      document.removeEventListener("click", unlock);
+      document.removeEventListener("keydown", unlock);
+      document.removeEventListener("touchstart", unlock);
+    };
+    document.addEventListener("click", unlock);
+    document.addEventListener("keydown", unlock);
+    document.addEventListener("touchstart", unlock);
+    return()=>{
+      document.removeEventListener("click", unlock);
+      document.removeEventListener("keydown", unlock);
+      document.removeEventListener("touchstart", unlock);
+    };
+  },[]);
+
+  const stopRing = () => {
+    if(ringLoopRef.current){clearInterval(ringLoopRef.current);ringLoopRef.current=null;}
   };
 
-  const chatId = useMemo(() => {
-    return selectedChat?.id || null;
-  }, [selectedChat]);
-
-  /* ---------------- UPDATE USER STATUS ---------------- */
-  useEffect(() => {
-    if (!user) return;
-
-    const updateStatus = async () => {
-      await setDoc(doc(db, "userStatus", user.uid), {
-        online: true,
-        status: "available",
-        lastSeen: serverTimestamp(),
-      }, { merge: true });
-    };
-
-    updateStatus();
-
-    const interval = setInterval(updateStatus, 30000);
-
-    return () => {
-      clearInterval(interval);
-      setDoc(doc(db, "userStatus", user.uid), {
-        online: false,
-        lastSeen: serverTimestamp(),
-      }, { merge: true });
-    };
-  }, [user]);
-
-  /* ---------------- LISTEN FOR USER STATUS UPDATES ---------------- */
-  useEffect(() => {
-    const unsubscribers: (() => void)[] = [];
-
-    users.forEach((u) => {
-      const unsubscribe = onSnapshot(doc(db, "userStatus", u.uid), (snapshot) => {
-        if (snapshot.exists()) {
-          // Status data available for real-time updates
-        }
-      });
-      unsubscribers.push(unsubscribe);
-    });
-
-    return () => {
-      unsubscribers.forEach((unsub) => unsub());
-    };
-  }, [users]);
-
-  /* ---------------- LISTEN FOR NOTIFICATIONS ---------------- */
-  useEffect(() => {
-    if (!user) return;
-
-    const q = query(
-      collection(db, "notifications"),
-      where("toUid", "==", user.uid),
-      where("read", "==", false),
-      orderBy("timestamp", "desc")
-    );
-
-    return onSnapshot(q, (snapshot) => {
-      const notifs: Notification[] = [];
-      snapshot.forEach((doc) => {
-        notifs.push({ id: doc.id, ...doc.data() } as Notification);
-      });
-      setNotifications(notifs);
-    });
-  }, [user]);
-
-  /* ---------------- CLOSE NOTIFICATION DROPDOWN WHEN CLICKING OUTSIDE ---------------- */
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
-        setShowNotifications(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  /* ---------------- CALL TIMER ---------------- */
-  useEffect(() => {
-    if (activeCall?.status === "accepted") {
-      setCallTimer(0);
-      timerIntervalRef.current = setInterval(() => {
-        setCallTimer((prev) => prev + 1);
-      }, 1000);
-    } else {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-      }
-      setCallTimer(0);
-    }
-
-    return () => {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-      }
-    };
-  }, [activeCall?.status]);
-
-  /* ---------------- LISTEN FOR INCOMING CALLS ---------------- */
-  useEffect(() => {
-    if (!user) return;
-
-    const q = query(
-      collection(db, "calls"),
-      where("receiverId", "==", user.uid),
-      where("status", "==", "ringing")
-    );
-
-    return onSnapshot(q, (snapshot) => {
-      snapshot.forEach((doc) => {
-        const call = { id: doc.id, ...doc.data() } as Call;
-        setIncomingCall(call);
+  // Classic PSTN double-ring: 440Hz + 480Hz, two bursts, 3s cadence
+  const playRingCycle = (ctx: AudioContext) => {
+    // Resume in case it got suspended
+    if(ctx.state==="suspended") ctx.resume().catch(()=>{});
+    const now = ctx.currentTime;
+    [[0, 0.4],[0.5, 0.9]].forEach(([start, end])=>{
+      [440, 480].forEach(freq=>{
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, now + start);
+        gain.gain.linearRampToValueAtTime(0.3, now + start + 0.02);
+        gain.gain.setValueAtTime(0.3, now + end - 0.02);
+        gain.gain.linearRampToValueAtTime(0, now + end);
+        osc.start(now + start);
+        osc.stop(now + end);
       });
     });
-  }, [user]);
+  };
 
-  /* ---------------- LISTEN FOR CALL UPDATES ---------------- */
-  useEffect(() => {
-    if (!activeCall) return;
-
-    return onSnapshot(doc(db, "calls", activeCall.id), async (snapshot) => {
-      if (!snapshot.exists()) {
-        endCall();
-        return;
+  const startRing = () => {
+    stopRing();
+    try {
+      // Create context if not yet created (fallback if no gesture happened yet)
+      if(!ringCtxRef.current){
+        ringCtxRef.current = new (window.AudioContext||(window as any).webkitAudioContext)();
       }
+      const ctx = ringCtxRef.current;
+      const doPlay = () => { playRingCycle(ctx); };
+      ctx.resume().then(doPlay).catch(doPlay); // resume then play
+      ringLoopRef.current = setInterval(()=>{
+        if(ringCtxRef.current) playRingCycle(ringCtxRef.current);
+      }, 3000);
+    } catch(e){ /* AudioContext unavailable */ }
+  };
 
-      const call = { id: snapshot.id, ...snapshot.data() } as Call;
+  // Incoming call ringtone
+  useEffect(()=>{
+    if(incomingCall){ startRing(); }
+    else { stopRing(); }
+    return()=>stopRing();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[!!incomingCall]);
+
+  // Outgoing call ringtone (caller side only)
+  useEffect(()=>{
+    if(activeCall?.status==="ringing" && activeCall.callerId===user?.uid){ startRing(); }
+    else { stopRing(); }
+    return()=>stopRing();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[activeCall?.status]);
+  // ──────────────────────────────────────────────────────────────────
+
+  useEffect(()=>{
+    const h=(e:MouseEvent)=>{
+      // profRef, notifRef, settRef handled in MeetChatApp
+      if(dotsRef.current&&!dotsRef.current.contains(e.target as Node))setShowDots(false);
+    };
+    document.addEventListener("mousedown",h);
+    return()=>document.removeEventListener("mousedown",h);
+  },[]);
+
+  useEffect(()=>{
+    if(!user)return;
+    const upd=()=>setDoc(doc(db,"userStatus",user.uid),{online:true,status:myStatus,lastSeen:serverTimestamp()},{merge:true});
+    upd(); const iv=setInterval(upd,30000);
+    return()=>{clearInterval(iv);setDoc(doc(db,"userStatus",user.uid),{online:false,lastSeen:serverTimestamp()},{merge:true});};
+  },[user,myStatus]);
+
+  useEffect(()=>{
+    const subs=users.map(u=>onSnapshot(doc(db,"userStatus",u.uid),snap=>{
+      if(snap.exists())setUserStatuses(p=>({...p,[u.uid]:{status:snap.data().status||"offline",online:snap.data().online||false}}));
+    }));
+    return()=>subs.forEach(s=>s());
+  },[users]);
+
+  useEffect(()=>{
+    if(!user)return;
+    const q=query(collection(db,"notifications"),where("toUid","==",user.uid),where("read","==",false),orderBy("timestamp","desc"));
+    return onSnapshot(q,snap=>setNotifications(snap.docs.map(d=>({id:d.id,...d.data()}))));
+  },[user]);
+
+  useEffect(()=>{
+    if(activeCall?.status==="accepted"){setCallTimer(0);timerRef.current=setInterval(()=>setCallTimer(p=>p+1),1000);}
+    else{clearInterval(timerRef.current);setCallTimer(0);}
+    return()=>clearInterval(timerRef.current);
+  },[activeCall?.status]);
+
+  useEffect(()=>{
+    if(!user)return;
+    const q=query(collection(db,"calls"),where("receiverId","==",user.uid),where("status","==","ringing"));
+    return onSnapshot(q,snap=>snap.forEach(d=>setIncomingCall({id:d.id,...d.data()} as Call)));
+  },[user]);
+
+  useEffect(()=>{
+    if(!activeCall)return;
+    return onSnapshot(doc(db,"calls",activeCall.id),async snap=>{
+      if(!snap.exists()){endCall();return;}
+      const call={id:snap.id,...snap.data()} as Call;
       setActiveCall(call);
-
-      if (call.answer && peerConnectionRef.current && !peerConnectionRef.current.remoteDescription) {
-        await peerConnectionRef.current.setRemoteDescription(
-          new RTCSessionDescription(call.answer)
-        );
+      if(call.answer&&peerRef.current&&!peerRef.current.remoteDescription){
+        await peerRef.current.setRemoteDescription(new RTCSessionDescription(call.answer));
+        iceQueue.current.forEach(c=>peerRef.current?.addIceCandidate(new RTCIceCandidate(c)));
+        iceQueue.current=[];
       }
-remoteIceQueue.current.forEach(async (candidate) => {
-  await peerConnectionRef.current?.addIceCandidate(
-    new RTCIceCandidate(candidate)
-  );
-});
-remoteIceQueue.current = [];
-      if (call.status === "ended" || call.status === "rejected") {
-        endCall();
-      }
+      if(call.status==="ended"||call.status==="rejected")endCall();
     });
-  }, [activeCall?.id]);
+  },[activeCall?.id]);
 
-  /* ---------------- AUTO SCROLL ---------------- */
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  useEffect(()=>{msgsEnd.current?.scrollIntoView({behavior:"smooth"});},[messages]);
 
-  /* ---------------- LISTEN TO ALL CHATS ---------------- */
-  useEffect(() => {
-    if (!user) return;
-
-    const initialChats: Chat[] = users
-      .filter((u) => u.uid !== user.uid)
-      .map((u) => {
-        const tempChatId = [user.uid, u.uid].sort().join("_");
-        return {
-          id: tempChatId,
-          participants: [user.uid, u.uid],
-          unreadCount: { [user.uid]: 0 },
-          isGroup: false,
-        };
-      });
-
-    setChats(initialChats);
-
-    const directUnsubscribers: (() => void)[] = [];
-    users.forEach((u) => {
-      if (u.uid === user.uid) return;
-      
-      const tempChatId = [user.uid, u.uid].sort().join("_");
-      
-      const unsubscribe = onSnapshot(
-        query(
-          collection(db, "chats", tempChatId, "messages"),
-          orderBy("createdAt", "desc")
-        ),
-        (snap) => {
-          const unreadCount = snap.docs.filter(
-            (doc) => {
-              const data = doc.data();
-              return data.senderUid !== user.uid && 
-                     (!data.readBy || !data.readBy.includes(user.uid));
-            }
-          ).length;
-
-          setChats((prev) => {
-            const existing = prev.find((c) => c.id === tempChatId);
-            const lastDoc = snap.docs[0];
-            const lastMessage = lastDoc?.data();
-
-            if (existing) {
-              return prev.map((c) =>
-                c.id === tempChatId
-                  ? {
-                      ...c,
-                      unreadCount: { ...c.unreadCount, [user.uid]: unreadCount },
-                      lastMessage: lastMessage?.text || lastMessage?.fileName || "File",
-                      lastMessageTime: lastMessage?.createdAt,
-                    }
-                  : c
-              );
-            } else {
-              return [
-                ...prev,
-                {
-                  id: tempChatId,
-                  participants: [user.uid, u.uid],
-                  unreadCount: { [user.uid]: unreadCount },
-                  lastMessage: lastMessage?.text || lastMessage?.fileName || "File",
-                  lastMessageTime: lastMessage?.createdAt,
-                  isGroup: false,
-                },
-              ];
-            }
+  useEffect(()=>{
+    if(!user)return;
+    const init=users.filter(u=>u.uid!==user.uid).map(u=>{const id=[user.uid,u.uid].sort().join("_");return{id,participants:[user.uid,u.uid],unreadCount:{[user.uid]:0},isGroup:false} as Chat;});
+    setChats(init);
+    const subs:(()=>void)[]=[];
+    users.forEach(u=>{
+      if(u.uid===user.uid)return;
+      const id=[user.uid,u.uid].sort().join("_");
+      subs.push(onSnapshot(query(collection(db,"chats",id,"messages"),orderBy("createdAt","desc")),snap=>{
+        const unread=snap.docs.filter(d=>{const dd=d.data();return dd.senderUid!==user.uid&&(!dd.readBy||!dd.readBy.includes(user.uid));}).length;
+        const last=snap.docs[0]?.data();
+        setChats(prev=>prev.map(c=>c.id===id?{...c,unreadCount:{...c.unreadCount,[user.uid]:unread},lastMessage:last?.text||last?.fileName||"File",lastMessageTime:last?.createdAt}:c));
+      }));
+    });
+    const gu=onSnapshot(query(collection(db,"groupChats"),where("participants","array-contains",user.uid)),snap=>{
+      snap.forEach(gDoc=>{
+        const gd=gDoc.data();
+        subs.push(onSnapshot(query(collection(db,"groupChats",gDoc.id,"messages"),orderBy("createdAt","desc")),mSnap=>{
+          const unread=mSnap.docs.filter(d=>{const dd=d.data();return dd.senderUid!==user.uid&&(!dd.readBy||!dd.readBy.includes(user.uid));}).length;
+          const last=mSnap.docs[0]?.data();
+          setChats(prev=>{
+            const ex=prev.find(c=>c.id===gDoc.id);
+            if(ex)return prev.map(c=>c.id===gDoc.id?{...c,unreadCount:{...c.unreadCount,[user.uid]:unread},lastMessage:last?.text||last?.fileName||"File",lastMessageTime:last?.createdAt}:c);
+            return[...prev,{id:gDoc.id,participants:gd.participants,unreadCount:{[user.uid]:unread},lastMessage:last?.text||last?.fileName||"File",lastMessageTime:last?.createdAt,isGroup:true,groupName:gd.groupName,groupAvatar:gd.groupAvatar,createdBy:gd.createdBy}];
           });
-        }
-      );
-
-      directUnsubscribers.push(unsubscribe);
-    });
-
-    const groupQuery = query(
-      collection(db, "groupChats"),
-      where("participants", "array-contains", user.uid)
-    );
-
-    const groupUnsubscribe = onSnapshot(groupQuery, (snapshot) => {
-      snapshot.forEach((groupDoc) => {
-        const groupData = groupDoc.data();
-        
-        const messagesUnsubscribe = onSnapshot(
-          query(
-            collection(db, "groupChats", groupDoc.id, "messages"),
-            orderBy("createdAt", "desc")
-          ),
-          (messagesSnap) => {
-            const unreadCount = messagesSnap.docs.filter(
-              (doc) => {
-                const data = doc.data();
-                return data.senderUid !== user.uid && 
-                       (!data.readBy || !data.readBy.includes(user.uid));
-              }
-            ).length;
-
-            const lastDoc = messagesSnap.docs[0];
-            const lastMessage = lastDoc?.data();
-
-            setChats((prev) => {
-              const existing = prev.find((c) => c.id === groupDoc.id);
-              
-              if (existing) {
-                return prev.map((c) =>
-                  c.id === groupDoc.id
-                    ? {
-                        ...c,
-                        unreadCount: { ...c.unreadCount, [user.uid]: unreadCount },
-                        lastMessage: lastMessage?.text || lastMessage?.fileName || "File",
-                        lastMessageTime: lastMessage?.createdAt,
-                      }
-                    : c
-                );
-              } else {
-                return [
-                  ...prev,
-                  {
-                    id: groupDoc.id,
-                    participants: groupData.participants,
-                    unreadCount: { [user.uid]: unreadCount },
-                    lastMessage: lastMessage?.text || lastMessage?.fileName || "File",
-                    lastMessageTime: lastMessage?.createdAt,
-                    isGroup: true,
-                    groupName: groupData.groupName,
-                    groupAvatar: groupData.groupAvatar,
-                    createdBy: groupData.createdBy,
-                    createdAt: groupData.createdAt,
-                  },
-                ];
-              }
-            });
-          }
-        );
-
-        directUnsubscribers.push(messagesUnsubscribe);
-      });
-    });
-
-    return () => {
-      directUnsubscribers.forEach((unsub) => unsub());
-      groupUnsubscribe();
-    };
-  }, [user, users]);
-
-  /* ---------------- LISTEN MESSAGES ---------------- */
-  useEffect(() => {
-    if (!chatId || !selectedChat) return;
-
-    const collectionPath = selectedChat.isGroup 
-      ? `groupChats/${chatId}/messages`
-      : `chats/${chatId}/messages`;
-
-    return onSnapshot(
-      query(
-        collection(db, collectionPath),
-        orderBy("createdAt", "asc")
-      ),
-      (snap) => {
-        const data = snap.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as any),
         }));
-
-        setMessages(data);
-
-        const batch = writeBatch(db);
-        data.forEach((m) => {
-          if (m.senderUid !== user?.uid) {
-            const readBy = m.readBy || [];
-            if (!readBy.includes(user!.uid)) {
-              batch.update(doc(db, collectionPath, m.id), {
-                readBy: [...readBy, user!.uid],
-                status: "seen",
-              });
-            }
-          }
-        });
-        batch.commit();
-      }
-    );
-  }, [chatId, selectedChat, user]);
-
-  /* ---------------- TYPING INDICATOR ---------------- */
-  useEffect(() => {
-    if (!chatId || !selectedChat) return;
-
-    const typingPath = selectedChat.isGroup
-      ? `groupChats/${chatId}/typing`
-      : `chats/${chatId}/typing`;
-
-    const q = query(collection(db, typingPath));
-
-    return onSnapshot(q, (snapshot) => {
-      const typingUsers: string[] = [];
-      snapshot.forEach((doc) => {
-        if (doc.id !== user?.uid && doc.data().typing) {
-          const typingUser = users.find((u) => u.uid === doc.id);
-          if (typingUser) {
-            typingUsers.push(typingUser.name ?? typingUser.email ?? "User");
-          }
-        }
       });
-      setTyping(typingUsers);
     });
-  }, [chatId, selectedChat, user, users]);
+    return()=>{subs.forEach(s=>s());gu();};
+  },[user,users]);
 
-  const handleTyping = async () => {
-    if (!chatId || !user || !selectedChat) return;
-
-    const typingPath = selectedChat.isGroup
-      ? `groupChats/${chatId}/typing`
-      : `chats/${chatId}/typing`;
-
-    await setDoc(doc(db, typingPath, user.uid), {
-      typing: true,
-      timestamp: serverTimestamp(),
+  useEffect(()=>{
+    if(!chatId||!selectedChat)return;
+    const path=selectedChat.isGroup?`groupChats/${chatId}/messages`:`chats/${chatId}/messages`;
+    return onSnapshot(query(collection(db,path),orderBy("createdAt","asc")),snap=>{
+      const data=snap.docs.map(d=>({id:d.id,...d.data()} as Message));
+      setMessages(data);
+      const batch=writeBatch(db);
+      data.forEach(m=>{if(m.senderUid!==user?.uid&&(!m.readBy||!m.readBy.includes(user!.uid)))batch.update(doc(db,path,m.id),{readBy:[...(m.readBy||[]),user!.uid],status:"seen"});});
+      batch.commit();
     });
+  },[chatId,selectedChat,user]);
 
-    clearTimeout(typingTimeout.current);
-    typingTimeout.current = setTimeout(() => {
-      deleteDoc(doc(db, typingPath, user.uid));
-    }, 1500);
+  useEffect(()=>{
+    if(!chatId||!selectedChat)return;
+    const tp=selectedChat.isGroup?`groupChats/${chatId}/typing`:`chats/${chatId}/typing`;
+    return onSnapshot(query(collection(db,tp)),snap=>{
+      const t:string[]=[];
+      snap.forEach(d=>{if(d.id!==user?.uid&&d.data().typing){const u2=users.find(u=>u.uid===d.id);if(u2)t.push(u2.name??u2.email??"User");}});
+      setTyping(t);
+    });
+  },[chatId,selectedChat,user,users]);
+
+  const handleTyping=async()=>{
+    if(!chatId||!user||!selectedChat)return;
+    const tp=selectedChat.isGroup?`groupChats/${chatId}/typing`:`chats/${chatId}/typing`;
+    await setDoc(doc(db,tp,user.uid),{typing:true,timestamp:serverTimestamp()});
+    clearTimeout(typingRef.current);
+    typingRef.current=setTimeout(()=>deleteDoc(doc(db,tp,user.uid)),1500);
   };
 
-  const sendText = async () => {
-    if ((!text.trim() && !selectedFile) || !chatId || !user || !selectedChat) return;
-
+  const sendText=async()=>{
+    if((!text.trim()&&!selectedFile)||!chatId||!user||!selectedChat)return;
     setUploading(true);
-
-    try {
-      let fileUrl = "";
-      let fileName = "";
-      let fileType = "";
-
-      if (selectedFile) {
-        const fileRef = ref(storage, `chat-files/${chatId}/${Date.now()}_${selectedFile.name}`);
-        await uploadBytes(fileRef, selectedFile);
-        fileUrl = await getDownloadURL(fileRef);
-        fileName = selectedFile.name;
-        fileType = selectedFile.type;
-      }
-
-      const collectionPath = selectedChat.isGroup
-        ? `groupChats/${chatId}/messages`
-        : `chats/${chatId}/messages`;
-
-      const messageData: any = {
-        senderUid: user.uid,
-        senderName: getUserName(user),
-        status: "sent",
-        readBy: [user.uid],
-        createdAt: serverTimestamp(),
-      };
-
-      if (text.trim()) {
-        messageData.text = text;
-      }
-
-      if (fileUrl) {
-        messageData.fileUrl = fileUrl;
-        messageData.fileName = fileName;
-        messageData.fileType = fileType;
-      }
-
-      await addDoc(collection(db, collectionPath), messageData);
-
-      const otherParticipants = selectedChat.participants.filter((p) => p !== user.uid);
-      for (const participantId of otherParticipants) {
-        await addDoc(collection(db, "notifications"), {
-          fromUid: user.uid,
-          fromName: getUserName(user),
-          toUid: participantId,
-          message: text || fileName || "Sent a file",
-          chatId: chatId,
-          timestamp: serverTimestamp(),
-          read: false,
-        });
-      }
-
-      const typingPath = selectedChat.isGroup
-        ? `groupChats/${chatId}/typing`
-        : `chats/${chatId}/typing`;
-      
-      await deleteDoc(doc(db, typingPath, user.uid));
-
-      setText("");
-      setSelectedFile(null);
-    } catch (error) {
-      console.error("Error sending message:", error);
-      alert("Failed to send message");
-    } finally {
-      setUploading(false);
-    }
+    try{
+      let fu="",fn="",ft="";
+      if(selectedFile){const r=ref(storage,`chat-files/${chatId}/${Date.now()}_${selectedFile.name}`);await uploadBytes(r,selectedFile);fu=await getDownloadURL(r);fn=selectedFile.name;ft=selectedFile.type;}
+      const path=selectedChat.isGroup?`groupChats/${chatId}/messages`:`chats/${chatId}/messages`;
+      const msg:any={senderUid:user.uid,senderName:getUserName(user),status:"sent",readBy:[user.uid],createdAt:serverTimestamp()};
+      if(text.trim())msg.text=text;if(fu){msg.fileUrl=fu;msg.fileName=fn;msg.fileType=ft;}
+      await addDoc(collection(db,path),msg);
+      const others=selectedChat.participants.filter(p=>p!==user.uid);
+      for(const pid of others)await addDoc(collection(db,"notifications"),{fromUid:user.uid,fromName:getUserName(user),toUid:pid,message:text||fn||"Sent a file",chatId,timestamp:serverTimestamp(),read:false});
+      const tp=selectedChat.isGroup?`groupChats/${chatId}/typing`:`chats/${chatId}/typing`;
+      await deleteDoc(doc(db,tp,user.uid));
+      setText("");setSelectedFile(null);
+    }catch(e){console.error(e);}finally{setUploading(false);}
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
-    }
+  const deleteMsg=async(id:string)=>{if(!selectedChat||!chatId)return;await deleteDoc(doc(db,selectedChat.isGroup?`groupChats/${chatId}/messages`:`chats/${chatId}/messages`,id));};
+  const saveEdit=async()=>{
+    if(!editingMsgId||!editText.trim()||!selectedChat||!chatId)return;
+    await updateDoc(doc(db,selectedChat.isGroup?`groupChats/${chatId}/messages`:`chats/${chatId}/messages`,editingMsgId),{text:editText,isEdited:true,editedAt:serverTimestamp()});
+    setEditingMsgId(null);setEditText("");
   };
 
-  const deleteMessage = async (messageId: string) => {
-    if (!selectedChat || !chatId) return;
+  const changeStatus=async(s:UserStatus)=>{
+  setMyStatus(s);
+  if(user)await updateDoc(doc(db,"userStatus",user.uid),{status:s,online:s!=="offline"});
+};
 
-    const collectionPath = selectedChat.isGroup
-      ? `groupChats/${chatId}/messages`
-      : `chats/${chatId}/messages`;
+  const markAllRead=async()=>{const b=writeBatch(db);notifications.forEach(n=>b.update(doc(db,"notifications",n.id),{read:true}));await b.commit();};
 
-    await deleteDoc(doc(db, collectionPath, messageId));
+  const initiateCall=async(type:"video"|"audio")=>{
+    if(!user||!selectedChat||selectedChat.isGroup)return;
+    const rid=selectedChat.participants.find(p=>p!==user.uid);if(!rid)return;
+    const recv=users.find(u=>u.uid===rid);if(!recv)return;
+    try{
+      const s=await navigator.mediaDevices.getUserMedia({video:type==="video"?{width:1280,height:720}:false,audio:{echoCancellation:true,noiseSuppression:true}});
+      streamRef.current=s;if(localVid.current&&type==="video")localVid.current.srcObject=s;
+      const pc=new RTCPeerConnection(STUN);peerRef.current=pc;
+      s.getTracks().forEach(t=>pc.addTrack(t,s));
+      pc.ontrack=e=>{if(remoteVid.current)remoteVid.current.srcObject=e.streams[0];};
+      const offer=await pc.createOffer();await pc.setLocalDescription(offer);
+      const cd=await addDoc(collection(db,"calls"),{callerId:user.uid,callerName:getUserName(user),receiverId:rid,type,status:"ringing",offer:{type:offer.type,sdp:offer.sdp},startTime:serverTimestamp()});
+      const oc=collection(db,"calls",cd.id,"offerCandidates"),ac=collection(db,"calls",cd.id,"answerCandidates");
+      pc.onicecandidate=async e=>{if(e.candidate)await addDoc(oc,e.candidate.toJSON());};
+      onSnapshot(ac,snap=>snap.docChanges().forEach(ch=>{if(ch.type==="added"){const d=ch.doc.data();if(pc.remoteDescription)pc.addIceCandidate(new RTCIceCandidate(d));else iceQueue.current.push(d);}}));
+      setActiveCall({id:cd.id,callerId:user.uid,callerName:getUserName(user),receiverId:rid,type,status:"ringing"});
+      pc.onconnectionstatechange=()=>{if(pc.connectionState==="failed"||pc.connectionState==="disconnected")endCall();};
+    }catch(e){console.error(e);alert("Camera/mic access failed.");}
   };
 
-  const startEditMessage = (message: Message) => {
-    setEditingMessageId(message.id);
-    setEditText(message.text || "");
+  const acceptCall=async()=>{
+    if(!incomingCall||!user)return;
+    try{
+      const s=await navigator.mediaDevices.getUserMedia({video:incomingCall.type==="video"?{width:1280,height:720}:false,audio:{echoCancellation:true,noiseSuppression:true}});
+      streamRef.current=s;if(localVid.current&&incomingCall.type==="video")localVid.current.srcObject=s;
+      const pc=new RTCPeerConnection(STUN);peerRef.current=pc;
+      s.getTracks().forEach(t=>pc.addTrack(t,s));
+      pc.ontrack=e=>{if(remoteVid.current)remoteVid.current.srcObject=e.streams[0];};
+      await pc.setRemoteDescription(new RTCSessionDescription(incomingCall.offer));
+      const answer=await pc.createAnswer();await pc.setLocalDescription(answer);
+      await updateDoc(doc(db,"calls",incomingCall.id),{status:"accepted",answer:{type:answer.type,sdp:answer.sdp}});
+      const oc=collection(db,"calls",incomingCall.id,"offerCandidates"),ac=collection(db,"calls",incomingCall.id,"answerCandidates");
+      pc.onicecandidate=async e=>{if(e.candidate)await addDoc(ac,e.candidate.toJSON());};
+      onSnapshot(oc,snap=>snap.docChanges().forEach(ch=>{if(ch.type==="added"){const d=ch.doc.data();if(pc.remoteDescription)pc.addIceCandidate(new RTCIceCandidate(d));else iceQueue.current.push(d);}}));
+      setActiveCall(incomingCall);setIncomingCall(null);stopRing();
+    }catch(e){console.error(e);rejectCall();}
   };
 
-  const saveEditMessage = async () => {
-    if (!editingMessageId || !editText.trim() || !selectedChat || !chatId) return;
-
-    const collectionPath = selectedChat.isGroup
-      ? `groupChats/${chatId}/messages`
-      : `chats/${chatId}/messages`;
-
-    await updateDoc(doc(db, collectionPath, editingMessageId), {
-      text: editText,
-      isEdited: true,
-      editedAt: serverTimestamp(),
-    });
-
-    setEditingMessageId(null);
-    setEditText("");
-  };
-
-  const cancelEdit = () => {
-    setEditingMessageId(null);
-    setEditText("");
-  };
-
-  const markNotificationAsRead = async (notificationId: string) => {
-    await updateDoc(doc(db, "notifications", notificationId), {
-      read: true,
-    });
-  };
-
-  const markAllNotificationsAsRead = async () => {
-    const batch = writeBatch(db);
-    notifications.forEach((notif) => {
-      batch.update(doc(db, "notifications", notif.id), { read: true });
-    });
-    await batch.commit();
-  };
-
-  const goToChat = async (notification: Notification) => {
-    const chat = chats.find((c) => c.id === notification.chatId);
-    if (chat) {
-      setSelectedChat(chat);
-      await markNotificationAsRead(notification.id);
-      setShowNotifications(false);
-    }
-  };
-
-  const otherUser = useMemo(() => {
-    if (!activeCall) return null;
-    const otherId =
-      activeCall.callerId === user?.uid
-        ? activeCall.receiverId
-        : activeCall.callerId;
-    return users.find(u => u.uid === otherId) ?? null;
-  }, [users, activeCall, user]);
-
-  const otherUserName = getUserName(otherUser);
-  const otherUserInitial = otherUserName.charAt(0).toUpperCase();
-
-  /* ---------------- CALL FUNCTIONS ---------------- */
-  const initiateCall = async (type: "video" | "audio") => {
-    if (!user || !selectedChat || selectedChat.isGroup) return;
-
-    const receiverId = selectedChat.participants.find((p) => p !== user.uid);
-    if (!receiverId) return;
-
-    const receiverUser = users.find((u) => u.uid === receiverId);
-    if (!receiverUser) return;
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: type === "video" ? { width: 1280, height: 720 } : false,
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-
-      localStreamRef.current = stream;
-      if (localVideoRef.current && type === "video") {
-        localVideoRef.current.srcObject = stream;
-      }
-
-      const peerConnection = new RTCPeerConnection(STUN_SERVERS);
-      peerConnectionRef.current = peerConnection;
-
-      stream.getTracks().forEach((track) => {
-        peerConnection.addTrack(track, stream);
-      });
-
-      peerConnection.ontrack = (event) => {
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = event.streams[0];
-        }
-      };
-
-      const offer = await peerConnection.createOffer();
-      await peerConnection.setLocalDescription(offer);
-
-      // ✅ Create call document WITHOUT iceCandidates array
-      const callDoc = await addDoc(collection(db, "calls"), {
-        callerId: user.uid,
-        callerName: getUserName(user),
-        receiverId: receiverUser.uid,
-        type,
-        status: "ringing",
-        offer: {
-          type: offer.type,
-          sdp: offer.sdp,
-        },
-        startTime: serverTimestamp(),
-      });
-
-      // ✅ Use subcollections for ICE candidates
-      const offerCandidates = collection(db, "calls", callDoc.id, "offerCandidates");
-      const answerCandidates = collection(db, "calls", callDoc.id, "answerCandidates");
-
-      // ✅ Send our ICE candidates to offerCandidates subcollection
-      peerConnection.onicecandidate = async (event) => {
-        if (event.candidate) {
-          await addDoc(offerCandidates, event.candidate.toJSON());
-        }
-      };
-
-      // ✅ Listen for receiver's ICE candidates from answerCandidates subcollection
-      onSnapshot(answerCandidates, (snapshot) => {
-        snapshot.docChanges().forEach((change) => {
-          if (change.type === "added") {
-            const data = change.doc.data();
-            if (peerConnection.remoteDescription) {
-  peerConnection.addIceCandidate(new RTCIceCandidate(data));
-} else {
-  remoteIceQueue.current.push(data);
-}
-          }
-        });
-      });
-
-      setActiveCall({
-        id: callDoc.id,
-        callerId: user.uid,
-        callerName: getUserName(user),
-        receiverId: receiverUser.uid,
-        type,
-        status: "ringing",
-      });
-
-      peerConnection.onconnectionstatechange = () => {
-        if (peerConnection.connectionState === "failed" || 
-            peerConnection.connectionState === "disconnected") {
-          endCall();
-        }
-      };
-
-    } catch (error) {
-      console.error("Error initiating call:", error);
-      alert("Failed to access camera/microphone. Please check permissions.");
-    }
-  };
-
-  const acceptCall = async () => {
-    if (!incomingCall || !user) return;
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: incomingCall.type === "video" ? { width: 1280, height: 720 } : false,
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-
-      localStreamRef.current = stream;
-      if (localVideoRef.current && incomingCall.type === "video") {
-        localVideoRef.current.srcObject = stream;
-      }
-
-      const peerConnection = new RTCPeerConnection(STUN_SERVERS);
-      peerConnectionRef.current = peerConnection;
-
-      stream.getTracks().forEach((track) => {
-        peerConnection.addTrack(track, stream);
-      });
-
-      peerConnection.ontrack = (event) => {
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = event.streams[0];
-        }
-      };
-
-      await peerConnection.setRemoteDescription(
-        new RTCSessionDescription(incomingCall.offer)
-      );
-
-      const answer = await peerConnection.createAnswer();
-      await peerConnection.setLocalDescription(answer);
-
-      await updateDoc(doc(db, "calls", incomingCall.id), {
-        status: "accepted",
-        answer: {
-          type: answer.type,
-          sdp: answer.sdp,
-        },
-      });
-
-      // ✅ Use subcollections for ICE candidates
-      const offerCandidates = collection(db, "calls", incomingCall.id, "offerCandidates");
-      const answerCandidates = collection(db, "calls", incomingCall.id, "answerCandidates");
-
-      // ✅ Send our ICE candidates to answerCandidates subcollection
-      peerConnection.onicecandidate = async (event) => {
-        if (event.candidate) {
-          await addDoc(answerCandidates, event.candidate.toJSON());
-        }
-      };
-
-      // ✅ Listen for caller's ICE candidates from offerCandidates subcollection
-      onSnapshot(offerCandidates, (snapshot) => {
-        snapshot.docChanges().forEach((change) => {
-          if (change.type === "added") {
-            const data = change.doc.data();
-            if (peerConnection.remoteDescription) {
-  peerConnection.addIceCandidate(new RTCIceCandidate(data));
-} else {
-  remoteIceQueue.current.push(data);
-}
-          }
-        });
-      });
-
-      setActiveCall(incomingCall);
-      setIncomingCall(null);
-
-    } catch (error) {
-      console.error("Error accepting call:", error);
-      alert("Failed to access camera/microphone. Please check permissions.");
-      rejectCall();
-    }
-  };
-
-  const rejectCall = async () => {
-    if (!incomingCall) return;
-
-    await updateDoc(doc(db, "calls", incomingCall.id), {
-      status: "rejected",
-      endTime: serverTimestamp(),
-    });
-
-    await addDoc(collection(db, "callHistory"), {
-      callerId: incomingCall.callerId,
-      callerName: incomingCall.callerName,
-      receiverId: incomingCall.receiverId,
-      receiverName: getUserName(user),
-      type: incomingCall.type,
-      status: "rejected",
-      timestamp: serverTimestamp(),
-      participants: [incomingCall.callerId, incomingCall.receiverId],
-    });
-
+  const rejectCall=async()=>{
+    if(!incomingCall)return;
+    stopRing();
+    await updateDoc(doc(db,"calls",incomingCall.id),{status:"rejected",endTime:serverTimestamp()});
+    await addDoc(collection(db,"callHistory"),{callerId:incomingCall.callerId,callerName:incomingCall.callerName,receiverId:incomingCall.receiverId,receiverName:getUserName(user),type:incomingCall.type,status:"rejected",timestamp:serverTimestamp(),participants:[incomingCall.callerId,incomingCall.receiverId]});
     setIncomingCall(null);
   };
 
-  const endCall = async () => {
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => track.stop());
-    }
-
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
-    }
-
-    if (activeCall) {
-      const callRef = doc(db, "calls", activeCall.id);
-      const callSnapshot = await getDoc(callRef);
-      
-      if (callSnapshot.exists()) {
-      await updateDoc(callRef, {
-  status: "ended",
-  endTime: serverTimestamp(),
-});
-
-        const callData = callSnapshot.data();
-        const startTime = callData.startTime?.toMillis();
-        const duration = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
-
-        await addDoc(collection(db, "callHistory"), {
-          callerId: activeCall.callerId,
-          callerName: activeCall.callerName,
-          receiverId: activeCall.receiverId,
-          receiverName: getUserName(users.find(u => u.uid === activeCall.receiverId)),
-          type: activeCall.type,
-          status: activeCall.status === "accepted" ? "completed" : "missed",
-          duration,
-          timestamp: serverTimestamp(),
-          participants: [activeCall.callerId, activeCall.receiverId],
-        });
-
-        
+  const endCall=async()=>{
+    stopRing();
+    streamRef.current?.getTracks().forEach(t=>t.stop());peerRef.current?.close();
+    if(activeCall){
+      const snap=await getDoc(doc(db,"calls",activeCall.id));
+      if(snap.exists()){
+        await updateDoc(doc(db,"calls",activeCall.id),{status:"ended",endTime:serverTimestamp()});
+        const dur=snap.data().startTime?.toMillis()?Math.floor((Date.now()-snap.data().startTime.toMillis())/1000):0;
+        await addDoc(collection(db,"callHistory"),{callerId:activeCall.callerId,callerName:activeCall.callerName,receiverId:activeCall.receiverId,receiverName:getUserName(users.find(u=>u.uid===activeCall.receiverId)),type:activeCall.type,status:activeCall.status==="accepted"?"completed":"missed",duration:dur,timestamp:serverTimestamp(),participants:[activeCall.callerId,activeCall.receiverId]});
       }
     }
-
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-    }
-
-    localStreamRef.current = null;
-    peerConnectionRef.current = null;
-    setActiveCall(null);
-    setIsMuted(false);
-    setIsVideoOff(false);
-    setCallTimer(0);
+    clearInterval(timerRef.current);streamRef.current=null;peerRef.current=null;
+    setActiveCall(null);setIsMuted(false);setIsVideoOff(false);setCallTimer(0);
   };
 
-  const toggleMute = () => {
-    if (localStreamRef.current) {
-      localStreamRef.current.getAudioTracks().forEach((track) => {
-        track.enabled = !track.enabled;
-      });
-      setIsMuted(!isMuted);
-    }
+  const fmtT=(s:number)=>{const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return h>0?`${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`:`${m}:${String(sec).padStart(2,"0")}`;};
+
+  const createGroup=async()=>{
+    if(!groupName.trim()||selectedMembers.length<2||!user)return;
+    const all=[...selectedMembers,user.uid];
+    const gr=await addDoc(collection(db,"groupChats"),{groupName:groupName.trim(),participants:all,createdBy:user.uid,createdAt:serverTimestamp()});
+    await addDoc(collection(db,"groupChats",gr.id,"messages"),{text:`${getUserName(user)} created "${groupName.trim()}"`,senderUid:"system",senderName:"System",createdAt:serverTimestamp(),readBy:all});
+    setGroupName("");setSelectedMembers([]);setShowCreateGroup(false);
+    setSelectedChat({id:gr.id,participants:all,isGroup:true,groupName:groupName.trim(),createdBy:user.uid});
   };
 
-  const toggleVideo = () => {
-    if (localStreamRef.current) {
-      localStreamRef.current.getVideoTracks().forEach((track) => {
-        track.enabled = !track.enabled;
-      });
-      setIsVideoOff(!isVideoOff);
-    }
-  };
+  const getChatName=(c:Chat)=>{if(c.isGroup)return c.groupName||"Group";const ou=users.find(u=>u.uid===c.participants.find(p=>p!==user?.uid));return ou?.name||ou?.email||"Unknown";};
+  const getChatOU=(c:Chat)=>users.find(u=>u.uid===c.participants.find(p=>p!==user?.uid));
+  const getUnread=(id:string)=>(!user?0:chats.find(c=>c.id===id)?.unreadCount?.[user.uid]||0);
+  const getOUSt=(c:Chat):UserStatus=>{if(c.isGroup)return"offline";const ou=getChatOU(c);if(!ou)return"offline";return userStatuses[ou.uid]?.status||"offline";};
 
-  const formatCallDuration = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    if (hrs > 0) {
-      return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-    }
-    return `${mins}:${String(secs).padStart(2, '0')}`;
-  };
-
-  /* ---------------- CREATE GROUP ---------------- */
-  const createGroup = async () => {
-    if (!groupName.trim() || selectedMembers.length < 2 || !user) {
-      alert("Please enter a group name and select at least 2 members");
-      return;
-    }
-
-    const allParticipants = [...selectedMembers, user.uid];
-
-    const groupRef = await addDoc(collection(db, "groupChats"), {
-      groupName: groupName.trim(),
-      participants: allParticipants,
-      createdBy: user.uid,
-      createdAt: serverTimestamp(),
-    });
-
-    await addDoc(collection(db, "groupChats", groupRef.id, "messages"), {
-      text: `${getUserName(user)} created the group "${groupName.trim()}"`,
-      senderUid: "system",
-      senderName: "System",
-      createdAt: serverTimestamp(),
-      readBy: allParticipants,
-    });
-
-    setGroupName("");
-    setSelectedMembers([]);
-    setShowCreateGroup(false);
-
-    const newGroup: Chat = {
-      id: groupRef.id,
-      participants: allParticipants,
-      isGroup: true,
-      groupName: groupName.trim(),
-      createdBy: user.uid,
-    };
-    setSelectedChat(newGroup);
-  };
-
-  const toggleMemberSelection = (userId: string) => {
-    setSelectedMembers((prev) =>
-      prev.includes(userId)
-        ? prev.filter((id) => id !== userId)
-        : [...prev, userId]
-    );
-  };
-
-  /* ---------------- HELPER FUNCTIONS ---------------- */
-  const getUnreadCount = (chatId: string) => {
-    if (!user) return 0;
-    const chat = chats.find((c) => c.id === chatId);
-    return chat?.unreadCount?.[user.uid] || 0;
-  };
-
-  const getChatName = (chat: Chat) => {
-    if (chat.isGroup) {
-      return chat.groupName || "Unnamed Group";
-    } else {
-      const otherUserId = chat.participants.find((p) => p !== user?.uid);
-      const otherUser = users.find((u) => u.uid === otherUserId);
-      return otherUser?.name || otherUser?.email || "Unknown User";
-    }
-  };
-
-  const getChatAvatar = (chat: Chat) => {
-    if (chat.isGroup) {
-      return chat.groupName?.charAt(0).toUpperCase() || "G";
-    } else {
-      const otherUserId = chat.participants.find((p) => p !== user?.uid);
-      const otherUser = users.find((u) => u.uid === otherUserId);
-      return (otherUser?.name || otherUser?.email)?.charAt(0).toUpperCase() || "?";
-    }
-  };
-
-  const isUserOnline = (chat: Chat) => {
-    if (chat.isGroup) return false;
-    const otherUserId = chat.participants.find((p) => p !== user?.uid);
-    const otherUser = users.find((u) => u.uid === otherUserId);
-    return otherUser?.online || false;
-  };
-
-  const getUserStatus = (chat: Chat): string => {
-    if (chat.isGroup) return "";
-    const otherUserId = chat.participants.find((p) => p !== user?.uid);
-    const otherUser = users.find((u) => u.uid === otherUserId);
-    const status = otherUser?.status || "offline";
-    
-    if (!otherUser?.online) return "Offline";
-    
-    switch (status) {
-      case "available": return "Available";
-      case "busy": return "Busy";
-      case "dnd": return "Do not disturb";
-      case "brb": return "Be right back";
-      case "away": return "Away";
-      default: return "Offline";
-    }
-  };
-
-  const getFileIcon = (fileType: string) => {
-    if (fileType.startsWith("image/")) {
-      return (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-      );
-    } else if (fileType.startsWith("video/")) {
-      return (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-        </svg>
-      );
-    } else if (fileType.includes("pdf")) {
-      return (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-        </svg>
-      );
-    } else {
-      return (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-      );
-    }
-  };
-
-  /* ---------------- FILTER CHATS ---------------- */
-  const filteredChats = chats.filter((chat) => {
-    if (activeTab === "direct" && chat.isGroup) return false;
-    if (activeTab === "groups" && !chat.isGroup) return false;
-
-    if (!searchQuery) return true;
-
-    const query = searchQuery.toLowerCase();
-
-    if (chat.isGroup) {
-      return chat.groupName?.toLowerCase().includes(query);
-    } else {
-      const otherUserId = chat.participants.find((p) => p !== user?.uid);
-      const otherUser = users.find((u) => u.uid === otherUserId);
-      return (
-        otherUser?.name?.toLowerCase().includes(query) ||
-        otherUser?.email?.toLowerCase().includes(query)
-      );
-    }
+  const filteredChats=chats.filter(c=>{
+    if(activeTab==="direct"&&c.isGroup)return false;
+    if(activeTab==="groups"&&!c.isGroup)return false;
+    if(!searchQuery)return true;
+    const q=searchQuery.toLowerCase();
+    if(c.isGroup)return c.groupName?.toLowerCase().includes(q);
+    const ou=getChatOU(c);return ou?.name?.toLowerCase().includes(q)||ou?.email?.toLowerCase().includes(q);
+  }).sort((a,b)=>{
+    if(a.lastMessageTime&&b.lastMessageTime)return(b.lastMessageTime?.toMillis()||0)-(a.lastMessageTime?.toMillis()||0);
+    if(a.lastMessageTime)return-1;if(b.lastMessageTime)return 1;
+    return getChatName(a).localeCompare(getChatName(b));
   });
 
-  const sortedChats = [...filteredChats].sort((a, b) => {
-    const hasMessagesA = !!a.lastMessageTime;
-    const hasMessagesB = !!b.lastMessageTime;
+  const availGroups=useMemo(()=>{
+    const G=[
+      {key:"available",label:"Available",      color:"#22c55e",items:[] as Chat[]},
+      {key:"busy",     label:"Busy",            color:"#ef4444",items:[] as Chat[]},
+      {key:"lunch",    label:"Out for Lunch 🍽️",color:"#a855f7",items:[] as Chat[]},
+      {key:"brb",      label:"Be Right Back",   color:"#f59e0b",items:[] as Chat[]},
+      {key:"away",     label:"Away",            color:"#f59e0b",items:[] as Chat[]},
+      {key:"dnd",      label:"Do Not Disturb",  color:"#ef4444",items:[] as Chat[]},
+      {key:"offline",  label:"Offline",         color:"#9ca3af",items:[] as Chat[]},
+      {key:"groups",   label:"Group Chats",     color:"#0891b2",items:[] as Chat[]},
+    ];
+    filteredChats.forEach(c=>{
+      if(c.isGroup){G[7].items.push(c);return;}
+      const st=getOUSt(c);
+      const g=G.find(g=>g.key===st)||G[6];
+      g.items.push(c);
+    });
+    return G.filter(g=>g.items.length>0);
+  },[filteredChats,userStatuses]);
 
-    if (hasMessagesA && hasMessagesB) {
-      const timeA = a.lastMessageTime?.toMillis() || 0;
-      const timeB = b.lastMessageTime?.toMillis() || 0;
-      return timeB - timeA;
-    }
+  const toggleGrp=(key:string)=>setCollapsedGroups(p=>{const n=new Set(p);n.has(key)?n.delete(key):n.add(key);return n;});
+  // myAv / myStCfg used only by removed profile/status UI — moved to MeetChatApp
+  // const myAv=avGrad(getUserName(user));
+  // const myStCfg=STATUS_CONFIG[myStatus];
+  const otherCallUser=useMemo(()=>{if(!activeCall)return null;return users.find(u=>u.uid===(activeCall.callerId===user?.uid?activeCall.receiverId:activeCall.callerId))??null;},[users,activeCall,user]);
 
-    if (hasMessagesA && !hasMessagesB) return -1;
-    if (!hasMessagesA && hasMessagesB) return 1;
-
-    const nameA = getChatName(a).toLowerCase();
-    const nameB = getChatName(b).toLowerCase();
-    return nameA.localeCompare(nameB);
-  });
-
-  return (
+  return(
     <>
-      {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        className="hidden"
-        onChange={handleFileSelect}
-      />
+      <style>{CSS}</style>
+      <input ref={fileRef} type="file" className="sr-only" onChange={e=>e.target.files?.[0]&&setSelectedFile(e.target.files[0])}/>
 
-      {/* INCOMING CALL MODAL */}
-      {incomingCall && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center animate-fade-in">
-          <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 text-center shadow-2xl">
-            {(() => {
-              const caller = users.find(u => u.uid === incomingCall.callerId);
-              return caller?.profilePhoto ? (
-                <img
-                  src={caller.profilePhoto}
-                  className="w-24 h-24 rounded-full object-cover mx-auto mb-4 animate-pulse"
-                  alt="Caller"
-                />
-              ) : (
-                <div className="w-24 h-24 bg-linear-to-br from-purple-400 to-blue-400 rounded-full flex items-center justify-center text-white font-bold text-3xl mx-auto mb-4 animate-pulse">
-                  {incomingCall.callerName.charAt(0).toUpperCase()}
-                </div>
-              );
-            })()}
-
-            <h3 className="text-2xl font-bold text-gray-800 mb-2">
-              {incomingCall.callerName}
-            </h3>
-            <p className="text-gray-600 mb-2">
-              Incoming {incomingCall.type} call...
-            </p>
-            <div className="flex items-center justify-center gap-2 mb-8">
-              <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce"></div>
-              <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-              <div className="w-2 h-2 bg-purple-600 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
-            </div>
-            <div className="flex gap-4 justify-center">
-              <button
-                onClick={rejectCall}
-                className="w-16 h-16 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center transition-all transform hover:scale-110"
-              >
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-              <button
-                onClick={acceptCall}
-                className="w-16 h-16 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center transition-all transform hover:scale-110"
-              >
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                </svg>
-              </button>
+      {/* INCOMING CALL */}
+      {incomingCall&&(
+        <div className="zc-incoming">
+          <div className="zc-inc-card">
+            {(()=>{const c=users.find(u=>u.uid===incomingCall.callerId);const[g1,g2]=avGrad(incomingCall.callerName);
+              return c?.profilePhoto?<div className="zc-inc-av"><img src={c.profilePhoto} alt=""/></div>:<div className="zc-inc-av" style={{background:`linear-gradient(135deg,${g1},${g2})`}}>{initials(incomingCall.callerName)}</div>;})()}
+            <div style={{fontSize:19,fontWeight:700,color:"#1a1d23",marginBottom:3}}>{incomingCall.callerName}</div>
+            <div style={{fontSize:12.5,color:"#6b7280"}}>Incoming {incomingCall.type} call</div>
+            <div className="zc-inc-dots"><div className="zc-inc-dot"/><div className="zc-inc-dot"/><div className="zc-inc-dot"/></div>
+            <div className="zc-inc-btns">
+              <button className="zc-inc-btn rej" onClick={rejectCall}><svg width="26" height="26" fill="none" stroke="#ef4444" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z"/></svg></button>
+              <button className="zc-inc-btn acc" onClick={acceptCall}><svg width="26" height="26" fill="none" stroke="#16a34a" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg></button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ACTIVE CALL INTERFACE */}
-      {activeCall && (
-        <div className="fixed inset-0 bg-gray-900 z-50 flex flex-col">
-          <div className="flex-1 relative bg-gray-800">
-            {activeCall.type === "video" ? (
-              <video
-                ref={remoteVideoRef}
-                autoPlay
-                playsInline
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <div className="text-center">
-                  <div className="w-32 h-32 bg-linear-to-br from-purple-400 to-blue-400 rounded-full flex items-center justify-center text-white font-bold text-5xl mx-auto mb-4">
-                    {otherUserInitial}
-                  </div>
-                  <p className="text-white text-xl font-semibold">
-                    {otherUserName}
-                  </p>
-                </div>
-              </div>
-            )}
-            
-            {activeCall.type === "video" && (
-              <div className="absolute top-4 right-4 w-48 h-36 bg-gray-800 rounded-lg overflow-hidden shadow-2xl border-2 border-gray-700">
-                <video
-                  ref={localVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover"
-                />
-                {isVideoOff && (
-                  <div className="absolute inset-0 bg-gray-900 flex items-center justify-center">
-                    <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2">
-              <p className="text-white font-medium">
-                {activeCall.status === "ringing" ? "Calling..." : formatCallDuration(callTimer)}
-              </p>
-            </div>
+      {/* ACTIVE CALL */}
+      {activeCall&&(
+        <div className="zc-call-ov">
+          <div className="zc-call-main">
+            {activeCall.type==="video"?<video ref={remoteVid} autoPlay playsInline style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+              :<div className="zc-call-audio-center">
+                {otherCallUser?.profilePhoto?<div style={{width:120,height:120,borderRadius:28,overflow:"hidden"}}><img src={otherCallUser.profilePhoto} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/></div>:<div style={{width:120,height:120,borderRadius:28,background:`linear-gradient(135deg,${avGrad(getUserName(otherCallUser))[0]},${avGrad(getUserName(otherCallUser))[1]})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:44,fontWeight:800,color:"#fff"}}>{initials(getUserName(otherCallUser))}</div>}
+                <div style={{color:"#fff",fontSize:22,fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>{getUserName(otherCallUser)}</div>
+                <div style={{color:"rgba(255,255,255,.45)",fontSize:14,fontFamily:"'DM Sans',sans-serif"}}>{activeCall.status==="ringing"?"Calling…":fmtT(callTimer)}</div>
+              </div>}
+            {activeCall.type==="video"&&<div style={{position:"absolute",bottom:16,right:16,width:180,height:135,borderRadius:12,overflow:"hidden",border:"2px solid rgba(255,255,255,.2)"}}><video ref={localVid} autoPlay playsInline muted style={{width:"100%",height:"100%",objectFit:"cover"}}/></div>}
+            {activeCall.type==="audio"&&<><video ref={localVid} autoPlay playsInline muted style={{display:"none"}}/><video ref={remoteVid} autoPlay playsInline style={{display:"none"}}/></>}
+            <div className="zc-call-badge">{activeCall.status==="ringing"?"Calling…":fmtT(callTimer)}</div>
           </div>
-
-          <div className="bg-gray-800 p-6">
-            <div className="flex justify-center gap-4">
-              <button
-                onClick={toggleMute}
-                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all transform hover:scale-110 ${
-                  isMuted ? "bg-red-500 hover:bg-red-600" : "bg-gray-700 hover:bg-gray-600"
-                }`}
-                title={isMuted ? "Unmute" : "Mute"}
-              >
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  {isMuted ? (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" clipRule="evenodd" />
-                  ) : (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                  )}
-                </svg>
-              </button>
-
-              {activeCall.type === "video" && (
-                <button
-                  onClick={toggleVideo}
-                  className={`w-14 h-14 rounded-full flex items-center justify-center transition-all transform hover:scale-110 ${
-                    isVideoOff ? "bg-red-500 hover:bg-red-600" : "bg-gray-700 hover:bg-gray-600"
-                  }`}
-                  title={isVideoOff ? "Turn on camera" : "Turn off camera"}
-                >
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                </button>
-              )}
-
-              <button
-                onClick={endCall}
-                className="w-14 h-14 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center transition-all transform hover:scale-110"
-                title="End call"
-              >
-                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" />
-                </svg>
-              </button>
-            </div>
+          <div className="zc-call-bar">
+            <button className={`zc-cbtn ${isMuted?"act":"neu"}`} onClick={()=>{streamRef.current?.getAudioTracks().forEach(t=>t.enabled=!t.enabled);setIsMuted(p=>!p);}}>
+              <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
+            </button>
+            {activeCall.type==="video"&&<button className={`zc-cbtn ${isVideoOff?"act":"neu"}`} onClick={()=>{streamRef.current?.getVideoTracks().forEach(t=>t.enabled=!t.enabled);setIsVideoOff(p=>!p);}}>
+              <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            </button>}
+            <button className="zc-cbtn end" onClick={endCall}><svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z"/></svg></button>
           </div>
         </div>
       )}
 
       {/* CREATE GROUP MODAL */}
-      {showCreateGroup && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-gray-800">Create Group</h3>
-              <button
-                onClick={() => {
-                  setShowCreateGroup(false);
-                  setGroupName("");
-                  setSelectedMembers([]);
-                }}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+      {showCreateGroup&&(
+        <div className="zc-mbk" onClick={e=>e.target===e.currentTarget&&setShowCreateGroup(false)}>
+          <div className="zc-modal">
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+              <div style={{fontSize:15,fontWeight:700,color:"#1a1d23"}}>Create Group Chat</div>
+              <button style={{background:"none",border:"none",cursor:"pointer",color:"#9aa0ad",fontSize:20}} onClick={()=>setShowCreateGroup(false)}>×</button>
             </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Group Name
-              </label>
-              <input
-                type="text"
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-                placeholder="Enter group name"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-purple-300"
-              />
+            <div className="zc-mlbl">Group Name</div>
+            <input className="zc-mi" placeholder="e.g. Project Alpha" value={groupName} onChange={e=>setGroupName(e.target.value)}/>
+            <div className="zc-mlbl">Members ({selectedMembers.length} selected)</div>
+            <div className="zc-mlist">
+              {users.filter(u=>u.uid!==user?.uid).map(u=>{const sel=selectedMembers.includes(u.uid);const[g1,g2]=avGrad(getUserName(u));
+                return(<div key={u.uid} className={`zc-mitm${sel?" sel":""}`} onClick={()=>setSelectedMembers(p=>sel?p.filter(x=>x!==u.uid):[...p,u.uid])}>
+                  <div className={`zc-chk${sel?" on":""}`}>{sel&&<svg width="9" height="7" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6"/></svg>}</div>
+                  <div className="zc-av" style={{background:`linear-gradient(135deg,${g1},${g2})`,width:28,height:28,borderRadius:8,fontSize:10}}>{initials(getUserName(u))}</div>
+                  <div style={{fontSize:13,fontWeight:600,color:"#1a1d23"}}>{u.name||u.email}</div>
+                </div>);})}
             </div>
-
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select Members ({selectedMembers.length} selected)
-              </label>
-              <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
-                {users
-                  .filter((u) => u.uid !== user?.uid)
-                  .map((u) => (
-                    <button
-                      key={u.uid}
-                      onClick={() => toggleMemberSelection(u.uid)}
-                      className={`w-full flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors ${
-                        selectedMembers.includes(u.uid) ? "bg-purple-50" : ""
-                      }`}
-                    >
-                      <div
-                        className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                          selectedMembers.includes(u.uid)
-                            ? "bg-purple-600 border-purple-600"
-                            : "border-gray-300"
-                        }`}
-                      >
-                        {selectedMembers.includes(u.uid) && (
-                          <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-                      <div className="w-8 h-8 rounded-full bg-linear-to-br from-purple-400 to-blue-400 flex items-center justify-center text-white font-bold text-xs">
-                        {getUserName(u).charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1 text-left">
-                        <p className="font-semibold text-gray-800 text-sm">
-                          {u.name || u.email}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowCreateGroup(false);
-                  setGroupName("");
-                  setSelectedMembers([]);
-                }}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={createGroup}
-                disabled={!groupName.trim() || selectedMembers.length < 2}
-                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-              >
-                Create Group
-              </button>
+            <div className="zc-mfooter">
+              <button className="zc-btn ghost" onClick={()=>{setShowCreateGroup(false);setGroupName("");setSelectedMembers([]);}}>Cancel</button>
+              <button className="zc-btn primary" disabled={!groupName.trim()||selectedMembers.length<2} onClick={createGroup}>Create Group</button>
             </div>
           </div>
         </div>
       )}
 
-      <div className="flex h-full">
-        {/* CONTACTS LIST - Left Side */}
-        <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
-          {/* Header */}
-          <div className="p-4 border-b border-gray-200">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold text-gray-800">Chats</h2>
-              <div className="flex items-center gap-2">
-                {/* Notification Bell */}
-                <div className="relative" ref={notificationRef}>
-                  <button
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className="relative w-9 h-9 rounded hover:bg-gray-100 flex items-center justify-center transition-colors"
-                  >
-                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                    </svg>
-                    {notifications.length > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
-                        {notifications.length > 9 ? "9+" : notifications.length}
-                      </span>
-                    )}
-                  </button>
+      {/* MAIN LAYOUT */}
+      <div className="zc">
 
-                  {showNotifications && (
-                    <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-lg shadow-2xl border border-gray-200 z-50 max-h-96 overflow-hidden flex flex-col">
-                      <div className="p-3 border-b border-gray-200 flex items-center justify-between">
-                        <h3 className="font-semibold text-gray-800">Notifications</h3>
-                        {notifications.length > 0 && (
-                          <button
-                            onClick={markAllNotificationsAsRead}
-                            className="text-xs text-purple-600 hover:text-purple-700 font-medium"
-                          >
-                            Mark all as read
-                          </button>
-                        )}
-                      </div>
-                      <div className="overflow-y-auto flex-1">
-                        {notifications.length === 0 ? (
-                          <div className="p-8 text-center text-gray-500">
-                            <svg className="w-12 h-12 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                            </svg>
-                            <p className="text-sm">No new notifications</p>
-                          </div>
-                        ) : (
-                          notifications.map((notif) => (
-                            <button
-                              key={notif.id}
-                              onClick={() => goToChat(notif)}
-                              className="w-full p-3 hover:bg-gray-50 border-b border-gray-100 text-left transition-colors"
-                            >
-                              <div className="flex items-start gap-3">
-                                <div className="w-10 h-10 rounded-full bg-linear-to-br from-purple-400 to-blue-400 flex items-center justify-center text-white font-bold text-sm shrink-0">
-                                  {notif.fromName.charAt(0).toUpperCase()}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-semibold text-sm text-gray-800 truncate">
-                                    {notif.fromName}
-                                  </p>
-                                  <p className="text-sm text-gray-600 truncate">
-                                    {notif.message}
-                                  </p>
-                                  <p className="text-xs text-gray-400 mt-1">
-                                    {notif.timestamp?.toDate?.()?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                  </p>
-                                </div>
-                              </div>
-                            </button>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Create Group Button */}
-                <button
-                  onClick={() => setShowCreateGroup(true)}
-                  className="w-9 h-9 rounded hover:bg-gray-100 flex items-center justify-center transition-colors"
-                  title="Create group"
-                >
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* Tabs */}
-            <div className="flex gap-2 mb-3">
-              <button
-                onClick={() => setActiveTab("all")}
-                className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  activeTab === "all"
-                    ? "bg-purple-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                All
-              </button>
-              <button
-                onClick={() => setActiveTab("direct")}
-                className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  activeTab === "direct"
-                    ? "bg-purple-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                Direct
-              </button>
-              <button
-                onClick={() => setActiveTab("groups")}
-                className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  activeTab === "groups"
-                    ? "bg-purple-600 text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                Groups
-              </button>
-            </div>
-            
-            {/* Search */}
-            <div className="relative">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search chats"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-300"
-              />
-            </div>
+        {/* SIDEBAR RAIL — notifications, settings, profile/status all live here */}
+        <div className="zc-sb">
+          <div className={`zc-sb-ico${tab==="chats"?" on":""}`} onClick={()=>setTab("chats")} title="Chats">
+            <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
           </div>
 
-          {/* Chats List */}
-          <div className="flex-1 overflow-y-auto">
-            {sortedChats.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                <p className="text-sm">No chats found</p>
-              </div>
-            ) : (
-              sortedChats.map((chat) => {
-                const unreadCount = getUnreadCount(chat.id);
-                const chatName = getChatName(chat);
-                const avatar = getChatAvatar(chat);
-                const online = isUserOnline(chat);
-
-                return (
-                  <button
-                    key={chat.id}
-                    onClick={() => setSelectedChat(chat)}
-                    className={`w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100 ${
-                      selectedChat?.id === chat.id ? "bg-purple-50" : ""
-                    }`}
-                  >
-                    <div className="relative">
-                      <div className="relative w-10 h-10">
-                        {(() => {
-                          if (chat.isGroup) {
-                            return (
-                              <div className="w-10 h-10 rounded-full bg-linear-to-br from-green-400 to-teal-400 flex items-center justify-center text-white font-bold text-sm">
-                                {avatar}
-                              </div>
-                            );
-                          }
-                          const otherUserId = chat.participants.find((p) => p !== user?.uid);
-                          const otherUser = users.find((u) => u.uid === otherUserId);
-                          return otherUser?.profilePhoto ? (
-                            <img
-                              src={otherUser.profilePhoto}
-                              className="w-10 h-10 rounded-full object-cover"
-                              alt="User"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-full bg-linear-to-br from-purple-400 to-blue-400 flex items-center justify-center text-white font-bold text-sm">
-                              {(otherUser?.name || otherUser?.email)?.charAt(0).toUpperCase()}
-                            </div>
-                          );
-                        })()}
-                      </div>
-
-                      {online && !chat.isGroup && (
-                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
-                      )}
-                      {chat.isGroup && (
-                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center">
-                          <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                          </svg>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 text-left min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-semibold text-gray-800 text-sm truncate">
-                          {chatName}
-                        </p>
-                        {unreadCount > 0 && (
-                          <span className="bg-green-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold ml-2">
-                            {unreadCount}
-                          </span>
-                        )}
-                      </div>
-                      {chat.lastMessage && (
-                        <p className="text-xs text-gray-500 truncate">
-                          {chat.lastMessage}
-                        </p>
-                      )}
-                    </div>
-                    {selectedChat?.id === chat.id && (
-                      <div className="w-1 h-10 bg-purple-600 rounded-l absolute right-0"></div>
-                    )}
-                  </button>
-                );
-              })
-            )}
+          <div className={`zc-sb-ico${tab==="calls"?" on":""}`} onClick={()=>setTab("calls")} title="Calls">
+            <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
           </div>
+
         </div>
 
-        {/* CONVERSATION AREA - Right Side */}
-        {!selectedChat ? (
-          <div className="flex-1 flex items-center justify-center bg-gray-50">
-            <div className="text-center">
-              <div className="w-20 h-20 bg-linear-to-br from-purple-400 to-blue-400 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
+        {/* CHATS TAB */}
+        {tab==="chats"&&(
+          <>
+            <div className="zc-panel">
+              <div className="zc-panel-hd">
+                <div className="zc-panel-title-row">
+                  <div className="zc-panel-title">Chats</div>
+                  <button className="zc-icon-btn" onClick={()=>setShowCreateGroup(true)} title="New group">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg>
+                  </button>
+                </div>
+                <div className="zc-search-wrap">
+                  <svg className="zc-search-ico" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                  <input className="zc-search" placeholder="Search chats" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}/>
+                </div>
+                <div className="zc-tabs">
+                  {(["all","direct","groups"] as const).map(t=>(
+                    <button key={t} className={`zc-tab${activeTab===t?" on":""}`} onClick={()=>setActiveTab(t)}>{t.charAt(0).toUpperCase()+t.slice(1)}</button>
+                  ))}
+                </div>
               </div>
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">Select a conversation</h3>
-              <p className="text-gray-500 text-sm">Choose from your chats or create a group to start messaging</p>
-            </div>
-          </div>
-        ) : (
-          <div className="flex-1 flex flex-col bg-gray-50">
-            {/* Conversation Header */}
-            <div className="h-16 bg-white border-b border-gray-200 px-6 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="w-10 h-10 rounded-full overflow-hidden">
-                    {(() => {
-                      if (selectedChat.isGroup) {
-                        return (
-                          <div className="w-10 h-10 bg-linear-to-br from-green-400 to-teal-400 flex items-center justify-center text-white font-bold">
-                            {getChatAvatar(selectedChat)}
+
+              <div className="zc-chat-list">
+                {availGroups.length===0&&<div style={{padding:"28px 14px",textAlign:"center",fontSize:13,color:"#9aa0ad"}}>No chats found</div>}
+                {availGroups.map(group=>{
+                  const collapsed=collapsedGroups.has(group.key);
+                  return(
+                    <div key={group.key}>
+                      <div className="zc-group-divider" onClick={()=>toggleGrp(group.key)}>
+                        <div style={{width:8,height:8,borderRadius:"50%",background:group.color,flexShrink:0}}/>
+                        <div className="zc-group-label" style={{color:group.color}}>{group.label}</div>
+                        <div className="zc-group-count" style={{background:group.color+"20",color:group.color}}>{group.items.length}</div>
+                        <div className={`zc-group-arrow${collapsed?"":" open"}`}>▶</div>
+                      </div>
+                      {!collapsed&&group.items.map(c=>{
+                        const ou=getChatOU(c);const name=getChatName(c);const unread=getUnread(c.id);
+                        const st=getOUSt(c);const stCfg=STATUS_CONFIG[st];const[g1,g2]=avGrad(name);
+                        return(
+                          <div key={c.id} className={`zc-chat-item${selectedChat?.id===c.id?" on":""}`} onClick={()=>setSelectedChat(c)}>
+                            <div style={{position:"relative",flexShrink:0}}>
+                              <div className="zc-av" style={{background:c.isGroup?`linear-gradient(135deg,#0891b2,#22d3ee)`:`linear-gradient(135deg,${g1},${g2})`,width:38,height:38,borderRadius:10,fontSize:13}}>
+                                {ou?.profilePhoto?<img src={ou.profilePhoto} alt=""/>:initials(name)}
+                              </div>
+                              {!c.isGroup&&<div className="zc-sdot" style={{width:10,height:10,background:stCfg.color,border:"2px solid #fff",bottom:-2,right:-2}}/>}
+                            </div>
+                            <div className="zc-chat-meta">
+                              <div className="zc-chat-name">
+                                {name}
+                                {!c.isGroup&&st==="available"&&<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>}
+                              </div>
+                              {c.lastMessage&&<div className="zc-chat-preview">{c.lastMessage}</div>}
+                            </div>
+                            {unread>0&&<div className="zc-unread">{unread>9?"9+":unread}</div>}
                           </div>
                         );
-                      }
-                      const otherUserId = selectedChat.participants.find((p) => p !== user?.uid);
-                      const otherUser = users.find((u) => u.uid === otherUserId);
-                      return otherUser?.profilePhoto ? (
-                        <img
-                          src={otherUser.profilePhoto}
-                          className="w-full h-full object-cover"
-                          alt="User"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-linear-to-br from-purple-400 to-blue-400 flex items-center justify-center text-white font-bold">
-                          {(otherUser?.name || otherUser?.email)?.charAt(0).toUpperCase()}
-                        </div>
-                      );
-                    })()}
-                  </div>
-
-                  {isUserOnline(selectedChat) && !selectedChat.isGroup && (
-                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
-                  )}
-                </div>
-                <div>
-                  <p className="font-semibold text-gray-800">
-                    {getChatName(selectedChat)}
-                  </p>
-                  {typing.length > 0 ? (
-                    <p className="text-xs text-purple-600 animate-pulse font-medium">
-                      {typing.join(", ")} {typing.length === 1 ? "is" : "are"} typing...
-                    </p>
-                  ) : selectedChat.isGroup ? (
-                    <p className="text-xs text-gray-500">
-                      {selectedChat.participants.length} members
-                    </p>
-                  ) : (
-                    <p className="text-xs text-gray-500">
-                      {getUserStatus(selectedChat)}
-                    </p>
-                  )}
-                </div>
+                      })}
+                    </div>
+                  );
+                })}
               </div>
-
-              {!selectedChat.isGroup && (
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={() => initiateCall("video")}
-                    className="w-9 h-9 rounded hover:bg-gray-100 flex items-center justify-center transition-colors" 
-                    title="Video call"
-                  >
-                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                  </button>
-                  <button 
-                    onClick={() => initiateCall("audio")}
-                    className="w-9 h-9 rounded hover:bg-gray-100 flex items-center justify-center transition-colors" 
-                    title="Audio call"
-                  >
-                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                    </svg>
-                  </button>
-                </div>
-              )}
             </div>
 
-            {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-6">
-              {messages.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-gray-500">No messages yet. Start the conversation!</p>
-                </div>
-              ) : (
-                messages.map((m, idx) => {
-                  const mine = m.senderUid === user?.uid;
-                  const isSystem = m.senderUid === "system";
-                  const showAvatar = idx === 0 || messages[idx - 1]?.senderUid !== m.senderUid;
-                  const isRead = m.readBy && m.readBy.length > 1;
-                  const senderUser = users.find((u) => u.uid === m.senderUid);
+            {/* CONVERSATION AREA */}
+            {!selectedChat
+              ?<div className="zc-main">
+                {/* EMPTY STATE — notif/settings/profile live in MeetChatApp's top header */}
+                <div className="zc-empty">
+                <div className="zc-empty-ico">💬</div>
+                <div style={{fontSize:16,fontWeight:700,color:"#374151"}}>Select a conversation</div>
+                <div style={{fontSize:13,color:"#9aa0ad"}}>Choose a chat or create a group</div>
+              </div></div>
+              :<div className="zc-main">
+                {/* CONV HEADER — audio/video call buttons + three-dots only */}
+                <div className="zc-conv-hd">
+                  <div className="zc-conv-hd-left">
+                    {(()=>{
+                      const ou=getChatOU(selectedChat);const name=getChatName(selectedChat);
+                      const st=getOUSt(selectedChat);const stCfg=STATUS_CONFIG[st];const[g1,g2]=avGrad(name);
+                      return(<>
+                        <div style={{position:"relative"}}>
+                          <div className="zc-av" style={{background:selectedChat.isGroup?`linear-gradient(135deg,#0891b2,#22d3ee)`:`linear-gradient(135deg,${g1},${g2})`,width:36,height:36,borderRadius:10,fontSize:12}}>
+                            {ou?.profilePhoto?<img src={ou.profilePhoto} alt=""/>:initials(name)}
+                          </div>
+                          {!selectedChat.isGroup&&<div className="zc-sdot" style={{width:10,height:10,background:stCfg.color,border:"2px solid #fff",bottom:-2,right:-2}}/>}
+                        </div>
+                        <div>
+                          <div className="zc-conv-name">{name}</div>
+                          <div className="zc-conv-sub" style={{color:typing.length>0?"#e8512a":stCfg.color}}>
+                            {typing.length>0?`${typing.join(", ")} ${typing.length===1?"is":"are"} typing…`:selectedChat.isGroup?`${selectedChat.participants.length} members`:stCfg.label}
+                          </div>
+                        </div>
+                      </>);
+                    })()}
+                  </div>
+                  <div style={{display:"flex",gap:2,alignItems:"center"}}>
+                    {!selectedChat.isGroup&&(
+                      <>
+                        <button className="zc-hd-btn" title="Audio call" onClick={()=>initiateCall("audio")}><svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg></button>
+                        <button className="zc-hd-btn" title="Video call" onClick={()=>initiateCall("video")}><svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
+                      </>
+                    )}
+                    {/* THREE DOTS — conversation-specific actions */}
+                    <div ref={dotsRef} style={{position:"relative"}}>
+                      <button className="zc-hd-btn" title="More" onClick={()=>setShowDots(p=>!p)}>
+                        <svg width="17" height="17" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+                      </button>
+                      {showDots&&(
+                        <div className="zc-dd" style={{width:185,top:38,right:0}}>
+                          <div className="zc-ds">
+                            {[{e:"🔍",l:"Search in chat"},{e:"📌",l:"Pin conversation"},{e:"🔕",l:"Mute notifications"},{e:"📁",l:"View files"},{e:"👤",l:"View profile"},
+                              ...(selectedChat.isGroup?[{e:"👥",l:"Members"},{e:"✏️",l:"Edit group"}]:[])].map(item=>(
+                              <div key={item.l} className="zc-di" onClick={()=>setShowDots(false)}><span style={{fontSize:13}}>{item.e}</span>{item.l}</div>
+                            ))}
+                            <div className="zc-di red" onClick={()=>{setShowDots(false);setSelectedChat(null);}}><span style={{fontSize:13}}>🚪</span>Close chat</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
-                  if (isSystem) {
-                    return (
-                      <div key={m.id} className="flex justify-center my-4">
-                        <div className="bg-gray-200 text-gray-600 text-xs px-4 py-2 rounded-full">
-                          {m.text}
+                    {/* NOTIFICATION BELL, SETTINGS, PROFILE — moved to MeetChatApp top header, commented out here to avoid duplication
+                    <div style={{width:1,height:22,background:"#e8eaf0",margin:"0 4px"}}/>
+                    <div ref={notifRef} style={{position:"relative"}}>...</div>
+                    <div ref={settRef} style={{position:"relative"}}>...</div>
+                    <div ref={profRef} style={{position:"relative",cursor:"pointer"}}>...</div>
+                    */}
+                  </div>
+                </div>
+
+                {/* MESSAGES */}
+                <div className="zc-msgs">
+                  {messages.length===0&&<div style={{textAlign:"center",padding:"32px 0",fontSize:13,color:"#9aa0ad"}}>No messages yet — say hello! 👋</div>}
+                  {messages.map((m,i)=>{
+                    const mine=m.senderUid===user?.uid;const isSystem=m.senderUid==="system";
+                    const showAv=i===0||messages[i-1]?.senderUid!==m.senderUid;
+                    const isRead=(m.readBy?.length||0)>1;
+                    const su=users.find(u=>u.uid===m.senderUid);const[sg1,sg2]=avGrad(m.senderName||"?");
+                    if(isSystem)return<div key={m.id} className="zc-sys-msg"><span className="zc-sys-pill">{m.text}</span></div>;
+                    return(
+                      <div key={m.id} className={`zc-msg-row${mine?" mine":""}`} style={{alignItems:"flex-end"}}>
+                        {!mine&&(showAv
+                          ?<div style={{width:30,height:30,borderRadius:8,flexShrink:0,overflow:"hidden"}}><div className="zc-msg-av-ph" style={{background:`linear-gradient(135deg,${sg1},${sg2})`}}>{su?.profilePhoto?<img src={su.profilePhoto} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>:initials(m.senderName||"?")}</div></div>
+                          :<div style={{width:30,flexShrink:0}}/>
+                        )}
+                        <div className="zc-msg-content" style={{alignItems:mine?"flex-end":"flex-start"}}>
+                          {selectedChat.isGroup&&!mine&&showAv&&<div className="zc-msg-sender">{su?.name||m.senderName}</div>}
+                          {editingMsgId===m.id&&mine
+                            ?<div className="zc-edit-wrap">
+                              <textarea className="zc-edit-ta" value={editText} onChange={e=>setEditText(e.target.value)} autoFocus rows={2}/>
+                              <div className="zc-edit-btns">
+                                <button className="zc-btn ghost" style={{padding:"4px 12px",fontSize:12}} onClick={()=>{setEditingMsgId(null);setEditText("");}}>Cancel</button>
+                                <button className="zc-btn primary" style={{padding:"4px 12px",fontSize:12}} onClick={saveEdit}>Save</button>
+                              </div>
+                            </div>
+                            :<div className={`zc-bubble ${mine?"mine":"them"}`}>
+                              {mine&&<div className="zc-msg-actions">
+                                <button className="zc-act-btn" onClick={()=>{setEditingMsgId(m.id);setEditText(m.text||"");}}>✏️</button>
+                                <button className="zc-act-btn" style={{color:"#ef4444"}} onClick={()=>confirm("Delete?")&&deleteMsg(m.id)}>🗑️</button>
+                              </div>}
+                              {m.text&&<p style={{margin:0}}>{m.text}</p>}
+                              {m.imageUrl&&<img src={m.imageUrl} style={{maxHeight:180,borderRadius:8,marginTop:m.text?6:0,cursor:"pointer"}} onClick={()=>window.open(m.imageUrl,"_blank")} alt=""/>}
+                              {m.fileUrl&&!m.imageUrl&&<a href={m.fileUrl} target="_blank" rel="noopener noreferrer" className={`zc-bfile ${mine?"mine":"them"}`}><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg><span style={{fontSize:12.5}}>{m.fileName}</span></a>}
+                              {m.isEdited&&<span style={{fontSize:10,opacity:.6,display:"block",marginTop:2}}>(edited)</span>}
+                            </div>
+                          }
+                          <div className="zc-msg-meta">
+                            <span className="zc-msg-time">{m.createdAt?.toDate?.()?.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})||"Now"}</span>
+                            {mine&&<span style={{fontSize:11,color:isRead?"#22c55e":"#9aa0ad"}}>{isRead?"✓✓":m.status==="delivered"?"✓✓":"✓"}</span>}
+                          </div>
                         </div>
                       </div>
                     );
-                  }
+                  })}
+                  <div ref={msgsEnd}/>
+                </div>
 
-                  return (
-                    <div key={m.id} className={`flex gap-3 mb-4 group ${mine ? "flex-row-reverse" : "flex-row"}`}>
-                      {!mine && showAvatar ? (
-                        <div className="w-8 h-8 rounded-full overflow-hidden shrink-0">
-                          {senderUser?.profilePhoto ? (
-                            <img
-                              src={senderUser.profilePhoto}
-                              className="w-full h-full object-cover"
-                              alt="User"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-linear-to-br from-purple-400 to-blue-400 flex items-center justify-center text-white text-xs font-bold">
-                              {(senderUser?.name || m.senderName || "?").charAt(0).toUpperCase()}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        !mine && <div className="w-8" />
-                      )}
-                      
-                      <div className={`max-w-[70%] ${mine ? "items-end" : "items-start"}`}>
-                        {selectedChat.isGroup && !mine && showAvatar && (
-                          <p className="text-xs text-gray-500 mb-1 px-1">
-                            {senderUser?.name || m.senderName || "Unknown"}
-                          </p>
-                        )}
-                        
-                        {editingMessageId === m.id && mine ? (
-                          <div className="bg-white p-3 rounded-lg shadow-sm">
-                            <textarea
-                              value={editText}
-                              onChange={(e) => setEditText(e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded text-sm outline-none focus:ring-2 focus:ring-purple-300 resize-none"
-                              rows={2}
-                              autoFocus
-                            />
-                            <div className="flex gap-2 mt-2">
-                              <button
-                                onClick={saveEditMessage}
-                                className="px-3 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700"
-                              >
-                                Save
-                              </button>
-                              <button
-                                onClick={cancelEdit}
-                                className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <div
-                              className={`px-4 py-2 rounded-lg relative ${
-                                mine
-                                  ? "bg-purple-600 text-white rounded-br-none"
-                                  : "bg-white text-gray-800 rounded-bl-none shadow-sm"
-                              }`}
-                            >
-                              {m.text && <p className="wrap-break-word text-sm">{m.text}</p>}
-                              {m.imageUrl && (
-                                <img
-                                  src={m.imageUrl}
-                                  className="mt-1 rounded max-h-48 cursor-pointer"
-                                  alt="Shared"
-                                  onClick={() => window.open(m.imageUrl, '_blank')}
-                                />
-                              )}
-                              {m.fileUrl && !m.imageUrl && (
-                                <a
-                                  href={m.fileUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className={`flex items-center gap-2 mt-1 p-2 rounded ${
-                                    mine ? "bg-purple-700" : "bg-gray-100"
-                                  }`}
-                                >
-                                  {getFileIcon(m.fileType || "")}
-                                  <span className="text-sm truncate">{m.fileName}</span>
-                                </a>
-                              )}
-                              {m.isEdited && (
-                                <p className={`text-xs mt-1 ${mine ? "text-purple-200" : "text-gray-400"}`}>
-                                  (edited)
-                                </p>
-                              )}
-                              
-                              {mine && (
-                                <div className="absolute top-0 right-0 -mt-8 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                                  <button
-                                    onClick={() => startEditMessage(m)}
-                                    className="p-1 bg-gray-700 text-white rounded hover:bg-gray-800 text-xs"
-                                    title="Edit"
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                    </svg>
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      if (confirm("Delete this message?")) {
-                                        deleteMessage(m.id);
-                                      }
-                                    }}
-                                    className="p-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs"
-                                    title="Delete"
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                            <div className={`flex items-center gap-1 mt-1 px-1 ${mine ? "justify-end" : "justify-start"}`}>
-                              <p className="text-xs text-gray-400">
-                                {m.createdAt?.toDate?.()?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || "Now"}
-                              </p>
-                              {mine && (
-                                <span className="text-xs">
-                                  {isRead ? (
-                                    <span className="text-green-500 font-bold">✓✓</span>
-                                  ) : m.status === "delivered" ? (
-                                    <span className="text-gray-400">✓✓</span>
-                                  ) : (
-                                    <span className="text-gray-400">✓</span>
-                                  )}
-                                </span>
-                              )}
-                            </div>
-                          </>
-                        )}
-                      </div>
+                {/* INPUT */}
+                <div className="zc-input-area">
+                  {selectedFile&&(
+                    <div className="zc-file-prev">
+                      <svg width="13" height="13" fill="none" stroke="#6b7280" strokeWidth="2" viewBox="0 0 24 24"><path d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                      <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selectedFile.name}</span>
+                      <button style={{background:"none",border:"none",cursor:"pointer",color:"#9aa0ad",fontSize:16,lineHeight:1}} onClick={()=>setSelectedFile(null)}>×</button>
                     </div>
-                  );
-                })
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Message Input */}
-            <div className="bg-white border-t border-gray-200 p-4">
-              {selectedFile && (
-                <div className="mb-2 flex items-center gap-2 bg-gray-100 p-2 rounded">
-                  {getFileIcon(selectedFile.type)}
-                  <span className="text-sm text-gray-700 flex-1 truncate">{selectedFile.name}</span>
-                  <button
-                    onClick={() => setSelectedFile(null)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              )}
-              <div className="flex items-end gap-3">
-                <button 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-9 h-9 rounded hover:bg-gray-100 flex items-center justify-center transition-colors"
-                  title="Attach file"
-                >
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                  </svg>
-                </button>
-
-                <div className="flex-1">
-                  <textarea
-                    value={text}
-                    onChange={(e) => {
-                      setText(e.target.value);
-                      handleTyping();
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        sendText();
-                      }
-                    }}
-                    placeholder="Type a message..."
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-300 resize-none"
-                    rows={1}
-                    style={{ minHeight: "40px", maxHeight: "120px" }}
-                    disabled={uploading}
-                  />
-                </div>
-
-                <button
-                  onClick={sendText}
-                  disabled={(!text.trim() && !selectedFile) || uploading}
-                  className={`w-9 h-9 rounded flex items-center justify-center transition-colors ${
-                    (text.trim() || selectedFile) && !uploading
-                      ? "bg-purple-600 text-white hover:bg-purple-700"
-                      : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                  }`}
-                >
-                  {uploading ? (
-                    <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                    </svg>
                   )}
-                </button>
+                  <div className="zc-input-row">
+                    <button className="zc-inp-btn attach" onClick={()=>fileRef.current?.click()}>
+                      <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                    </button>
+                    <textarea className="zc-input-box" placeholder="Type a message…" value={text} rows={1} disabled={uploading}
+                      onChange={e=>{setText(e.target.value);handleTyping();}}
+                      onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendText();}}}
+                    />
+                    <button className="zc-inp-btn send" disabled={(!text.trim()&&!selectedFile)||uploading} onClick={sendText}>
+                      {uploading?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{animation:"spin 1s linear infinite"}}><style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity=".25"/><path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg>
+                        :<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>}
+                    </button>
+                  </div>
+                </div>
               </div>
+            }
+          </>
+        )}
+
+        {tab==="calls"&&(
+          <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:"#f0f2f5"}}>
+            <div style={{textAlign:"center",color:"#9aa0ad"}}>
+              <div style={{width:72,height:72,borderRadius:20,background:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,margin:"0 auto 16px",boxShadow:"0 4px 16px rgba(0,0,0,.08)"}}>📞</div>
+              <div style={{fontSize:16,fontWeight:700,color:"#374151",marginBottom:6}}>Calls</div>
+              <div style={{fontSize:13}}>Use the Calls module for call history and dialer</div>
             </div>
           </div>
         )}
