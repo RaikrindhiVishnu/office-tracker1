@@ -5,13 +5,14 @@ import { LeaveType } from "@/types/leave";
 
 // ─── LOP REMOVED ─────────────────────────────────────────
 const LEAVE_COLORS: Record<LeaveType, { bg: string; text: string; dot: string }> = {
-  Casual:           { bg: "#EFF6FF", text: "#1D4ED8", dot: "#3B82F6" },
-  Sick:             { bg: "#FFF7ED", text: "#C2410C", dot: "#F97316" },
+  annual: { bg: "#ECFEFF", text: "#0E7490", dot: "#06B6D4" }, // ✅ ADD THIS
+  casual: { bg: "#EFF6FF", text: "#1D4ED8", dot: "#3B82F6" },
+  sick:   { bg: "#FFF7ED", text: "#C2410C", dot: "#F97316" },
   "Work From Home": { bg: "#F0FDF4", text: "#15803D", dot: "#22C55E" },
 };
 
 const LEAVE_ICONS: Record<string, string> = {
-  Casual: "🌴",
+  casual: "🌴",
   Sick: "🤒",
   "Work From Home": "🏠",
 };
@@ -55,16 +56,16 @@ interface BalanceItem {
 
 // ─── DEMO DATA ────────────────────────────────────────────
 const DEMO_BALANCE: BalanceItem[] = [
-  { type: "Casual",          icon: "🌴", remaining: 8,  total: 12 },
+  { type: "casual",          icon: "🌴", remaining: 8,  total: 12 },
   { type: "Sick",            icon: "🤒", remaining: 5,  total: 8  },
   { type: "Work From Home",  icon: "🏠", remaining: 10, total: 15 },
 ];
 
 const DEMO_LEAVES: LeaveRecord[] = [
-  { id: "1", leaveType: "Casual",         fromDate: "2025-06-10", toDate: "2025-06-12", reason: "Family vacation to Goa.",          status: "Approved", adminNote: "Approved. Enjoy!" },
-  { id: "2", leaveType: "Sick",           fromDate: "2025-07-03", toDate: "2025-07-04", reason: "High fever and body ache.",         status: "Pending"  },
+  { id: "1", leaveType: "casual",         fromDate: "2025-06-10", toDate: "2025-06-12", reason: "Family vacation to Goa.",          status: "Approved", adminNote: "Approved. Enjoy!" },
+  { id: "2", leaveType: "sick",           fromDate: "2025-07-03", toDate: "2025-07-04", reason: "High fever and body ache.",         status: "Pending"  },
   { id: "3", leaveType: "Work From Home", fromDate: "2025-07-15", toDate: "2025-07-17", reason: "Home renovation in progress.",      status: "Approved" },
-  { id: "4", leaveType: "Casual",         fromDate: "2025-08-01", toDate: "2025-08-01", reason: "Personal errand at govt. office.",  status: "Rejected", adminNote: "Not available this month." },
+  { id: "4", leaveType: "casual",         fromDate: "2025-08-01", toDate: "2025-08-01", reason: "Personal errand at govt. office.",  status: "Rejected", adminNote: "Not available this month." },
 ];
 
 // Holidays — in real usage pass these from Firestore via props
@@ -310,7 +311,7 @@ const navBtnStyle: React.CSSProperties = {
 
 
 export default function LeaveRequestView({
-  leaveType = "Casual" as LeaveType,
+  leaveType = "casual" as LeaveType,
  setLeaveType = (() => {}) as (v: LeaveType) => void,
   fromDate = "",
   setFromDate = (_: string) => {},
@@ -508,7 +509,7 @@ export default function LeaveRequestView({
           ) : (
             <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
               {filtered.map(leave => {
-                const lc  = LEAVE_COLORS[leave.leaveType] ?? LEAVE_COLORS.Casual;
+                const lc  = LEAVE_COLORS[leave.leaveType] ?? LEAVE_COLORS.casual;
                 const sc  = STATUS_STYLES[leave.status]   ?? STATUS_STYLES.Pending;
                 const exp = expandedId === leave.id;
                 return (

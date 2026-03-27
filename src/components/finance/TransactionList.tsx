@@ -30,7 +30,7 @@ interface TransactionListProps {
   defaultFilters?: UseTransactionsOptions;
 }
 
-export default function TransactionList({ defaultFilters = {} }: TransactionListProps): JSX.Element {
+export default function TransactionList({ defaultFilters = {} }: TransactionListProps) {
   const [showForm,   setShowForm]   = useState(false);
   const [filters,    setFilters]    = useState<UseTransactionsOptions>(defaultFilters);
 
@@ -52,7 +52,7 @@ export default function TransactionList({ defaultFilters = {} }: TransactionList
   ];
 
   // ── Status badge ─────────────────────────────────────────────────────
-  function StatusBadge({ status }: { status: Transaction["status"] }): JSX.Element {
+  function StatusBadge({ status }: { status: Transaction["status"] }) {
     const map = {
       approved : { bg: "#f0fdf4", color: "#15803d", label: "Approved" },
       pending  : { bg: "#fffbeb", color: "#92400e", label: "Pending" },
@@ -71,7 +71,7 @@ export default function TransactionList({ defaultFilters = {} }: TransactionList
   }
 
   // ── Type badge ───────────────────────────────────────────────────────
-  function TypeBadge({ type }: { type: Transaction["type"] }): JSX.Element {
+  function TypeBadge({ type }: { type: Transaction["type"] }) {
     const map = {
       income  : { bg: "#f0fdf4", color: "#15803d" },
       expense : { bg: "#fff1f2", color: "#be123c" },

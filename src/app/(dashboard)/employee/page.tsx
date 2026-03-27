@@ -374,7 +374,7 @@ export default function ZohoStyleEmployeeDashboard() {
   const [msg,                    setMsg]                    = useState("");
   const [messages,               setMessages]               = useState<string[]>([]);
   const [leaveRequests,          setLeaveRequests]          = useState<LeaveRequest[]>([]);
-  const [leaveType,              setLeaveType]              = useState<LeaveType>("Casual");
+  const [leaveType,              setLeaveType]              = useState<LeaveType>("casual");
   const [openGroup,              setOpenGroup]              = useState<string | null>("WORKSPACE");
   const [fromDate,               setFromDate]               = useState("");
   const [toDate,                 setToDate]                 = useState("");
@@ -474,9 +474,9 @@ export default function ZohoStyleEmployeeDashboard() {
           : Math.min(now.getTime(), shiftEnd.getTime());
 
         // 🛑 Freeze work timer at break start if break is active
-        if (activeBreak && !sess.checkOut) {
-          co = activeBreak.startTime.toDate().getTime();
-        }
+       if (activeBreak?.startTime && !sess.checkOut) {
+  co = activeBreak.startTime.toDate().getTime();
+}
 
         if (co > ci) {
           let sessionSeconds = Math.floor((co - ci) / 1000);
@@ -487,9 +487,9 @@ export default function ZohoStyleEmployeeDashboard() {
             const start = b.startTime.toDate().getTime();
             const end = b.endTime
               ? b.endTime.toDate().getTime()
-              : activeBreak
-              ? activeBreak.startTime.toDate().getTime()
-              : start;
+              : activeBreak?.startTime
+  ? activeBreak.startTime.toDate().getTime()
+  : start;
             return acc + Math.max(0, Math.floor((end - start) / 1000));
           }, 0);
 
@@ -594,7 +594,7 @@ export default function ZohoStyleEmployeeDashboard() {
         status: "Pending", notificationRead: false, createdAt: serverTimestamp(),
       });
       setLeaveMsg("✅ Request submitted");
-      setFromDate(""); setToDate(""); setLeaveReason(""); setLeaveType("Casual");
+      setFromDate(""); setToDate(""); setLeaveReason(""); setLeaveType("casual");
       setTimeout(() => setLeaveMsg(""), 2000);
     } catch (error: any) { setLeaveMsg(`❌ ${error.message}`); }
     finally               { setSubmitting(false); }

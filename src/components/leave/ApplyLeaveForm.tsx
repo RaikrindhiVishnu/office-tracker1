@@ -36,7 +36,7 @@ export default function ApplyLeaveForm({
   leaveBalance,
   onSuccess,
   onCancel,
-}: ApplyLeaveFormProps): JSX.Element {
+}: ApplyLeaveFormProps) {
   const { user, userData } = useAuth();
 
   const [leaveType,  setLeaveType]  = useState<LeaveType>("annual");

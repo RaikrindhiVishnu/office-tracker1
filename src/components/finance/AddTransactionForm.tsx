@@ -47,7 +47,7 @@ interface AddTransactionFormProps {
 export default function AddTransactionForm({
   onSuccess,
   onCancel,
-}: AddTransactionFormProps): JSX.Element {
+}: AddTransactionFormProps) {
   const { user, userData } = useAuth();
 
   // ── Form state ──────────────────────────────────────────────────────────

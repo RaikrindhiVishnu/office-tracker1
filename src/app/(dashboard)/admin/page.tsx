@@ -679,13 +679,19 @@ export default function AdminPage() {
 
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full overflow-hidden shadow-lg">
-                    {userData?.profilePhoto ? (
-                      <img src={userData.profilePhoto} alt="Admin" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-[#193677] flex items-center justify-center text-white font-bold">
-                        {user.email?.[0]?.toUpperCase()}
-                      </div>
-                    )}
+                   {typeof userData?.profilePhoto === "string" && userData.profilePhoto ? (
+  <Image
+    src={userData.profilePhoto}
+    alt="Admin"
+    width={40}
+    height={40}
+    className="w-full h-full object-cover"
+  />
+) : (
+  <div className="w-full h-full bg-[#193677] flex items-center justify-center text-white font-bold">
+    {user.email?.[0]?.toUpperCase()}
+  </div>
+)}
                   </div>
                   <div className="hidden sm:block">
                     <p className="text-sm font-semibold text-slate-900">{user.email?.split("@")[0]}</p>

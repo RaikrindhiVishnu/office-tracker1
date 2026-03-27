@@ -16,11 +16,11 @@ export default function HomePage() {
       return;
     }
 
-    if (userData.role === "ADMIN") {
-      router.replace("/admin");
-    } else if (userData.role === "EMPLOYEE") {
-      router.replace("/employee");
-    } else {
+    if (userData.role === "admin") {
+  router.replace("/admin");
+} else if (userData.role === "employee") {
+  router.replace("/employee");
+} else {
       router.replace("/login");
     }
   }, [userData, loading, router]);

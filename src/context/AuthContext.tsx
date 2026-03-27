@@ -71,7 +71,7 @@ const AuthContext = createContext<AuthContextType>({
 
 // ── Provider ──────────────────────────────────────────────────────────────
 
-export function AuthProvider({ children }: { children: ReactNode }): JSX.Element {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user,         setUser]         = useState<User | null>(null);
   const [userData,     setUserData]     = useState<UserProfile | null>(null);
   const [userRole,     setUserRole]     = useState<UserRole | null>(null);

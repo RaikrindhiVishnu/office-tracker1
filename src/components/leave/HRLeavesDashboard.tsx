@@ -506,13 +506,14 @@ export default function AdminLeaveRequests() {
     if (!selected?.uid) { setSelectedBalance(null); return; }
     setLoadingBalance(true);
     // Try employees collection first (has leaveBalance object)
+    const uid = selected.uid as string;
     getDoc(doc(db, "employees", selected.uid))
       .then(snap => {
         if (snap.exists() && snap.data().leaveBalance) {
           setSelectedBalance(snap.data().leaveBalance as LeaveBalance);
         } else {
           // Fallback: try users collection
-          return getDoc(doc(db, "users", selected.uid)).then(usnap => {
+           return getDoc(doc(db, "users", uid)).then(usnap => {
             if (usnap.exists() && usnap.data().leaveBalance) {
               setSelectedBalance(usnap.data().leaveBalance as LeaveBalance);
             } else {

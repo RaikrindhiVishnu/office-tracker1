@@ -23,9 +23,9 @@ export default function ProfileView() {
   useEffect(() => {
     if (userData) {
       setLocalUserData(userData);
-      if (userData.profilePhoto) {
-        setPhotoPreview(userData.profilePhoto);
-      }
+      if (typeof userData.profilePhoto === "string") {
+  setPhotoPreview(userData.profilePhoto);
+}
     }
   }, [userData]);
 

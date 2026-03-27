@@ -505,6 +505,7 @@ export default function AdminLeaveRequests() {
   useEffect(() => {
     if (!selected?.uid) { setSelectedBalance(null); return; }
     setLoadingBalance(true);
+    const uid = selected.uid as string;
     // Try employees collection first (has leaveBalance object)
     getDoc(doc(db, "employees", selected.uid))
       .then(snap => {
@@ -512,7 +513,7 @@ export default function AdminLeaveRequests() {
           setSelectedBalance(snap.data().leaveBalance as LeaveBalance);
         } else {
           // Fallback: try users collection
-          return getDoc(doc(db, "users", selected.uid)).then(usnap => {
+          return getDoc(doc(db, "users", uid)).then(usnap => {
             if (usnap.exists() && usnap.data().leaveBalance) {
               setSelectedBalance(usnap.data().leaveBalance as LeaveBalance);
             } else {

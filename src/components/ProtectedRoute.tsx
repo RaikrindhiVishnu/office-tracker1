@@ -33,7 +33,7 @@ interface ProtectedRouteProps {
 export default function ProtectedRoute({
   children,
   allowedRoles,
-}: ProtectedRouteProps): JSX.Element | null {
+}: ProtectedRouteProps) {
   const { user, userRole, loading } = useAuth();
   const router   = useRouter();
   const pathname = usePathname();
@@ -48,14 +48,20 @@ export default function ProtectedRoute({
     }
 
     // Check authorization
-    const authorized: boolean = allowedRoles
-      ? allowedRoles.includes(userRole as UserRole)
-      : isRoleAuthorized(userRole, pathname);
+   const role = typeof userRole === "string" ? userRole : null;
 
-    if (!authorized) {
-      // Redirect to the user's own home instead of a generic 403
-      router.replace(getRoleRedirect(userRole));
-    }
+if (!role) {
+  router.replace("/login");
+  return;
+}
+
+const authorized = allowedRoles
+  ? allowedRoles.includes(role as UserRole)
+ : isRoleAuthorized(role as UserRole, pathname || "");
+
+if (!authorized) {
+  router.replace(getRoleRedirect(role as UserRole));
+}
   }, [loading, user, userRole, pathname, allowedRoles, router]);
 
   if (loading || !user) {
@@ -67,7 +73,7 @@ export default function ProtectedRoute({
 
 // ── Loading fallback ──────────────────────────────────────────────────────
 
-function LoadingScreen(): JSX.Element {
+function LoadingScreen() {
   return (
     <div style={{
       display        : "flex",

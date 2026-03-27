@@ -425,7 +425,7 @@ function HRDashboard() {
   );
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-50 to-slate-100">
       <div className="text-center">
         <div className="w-16 h-16 border-4 border-teal-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
         <p className="text-slate-600 font-medium">Loading HR Portal...</p>
@@ -439,7 +439,7 @@ function HRDashboard() {
   //  RENDER
   // ═══════════════════════════════════════════════════════════════════════════
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50">
+    <div className="min-h-screen flex bg-linear-to-br from-slate-50 via-slate-100 to-slate-50">
 
       {/* ── MOBILE MENU BUTTON ── */}
       <button
@@ -625,7 +625,7 @@ function HRDashboard() {
                   <span className="font-bold text-teal-600 text-lg">{formatTotal(avgWork)}</span>
                 </div>
                 <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-teal-500 to-teal-700 rounded-full transition-all duration-700" style={{ width: `${Math.min((avgWork / 480) * 100, 100)}%` }} />
+                  <div className="h-full bg-linear-to-r from-teal-500 to-teal-700 rounded-full transition-all duration-700" style={{ width: `${Math.min((avgWork / 480) * 100, 100)}%` }} />
                 </div>
                 <p className="text-xs text-slate-400 mt-1">Based on 8h target</p>
               </div>
@@ -639,15 +639,15 @@ function HRDashboard() {
                   <div className="space-y-3">
                     {rows.sort((a, b) => b.totalMinutes - a.totalMinutes).map((r) => (
                       <div key={r.id} className="flex items-center gap-4 p-3 bg-slate-50 rounded-xl hover:bg-teal-50 transition-colors">
-                        <div className={`w-3 h-3 rounded-full flex-shrink-0 ${r.status === "ONLINE" ? "bg-emerald-500 animate-pulse" : "bg-slate-300"}`} />
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                        <div className={`w-3 h-3 rounded-full shrink-0 ${r.status === "ONLINE" ? "bg-emerald-500 animate-pulse" : "bg-slate-300"}`} />
+                        <div className="w-9 h-9 rounded-full bg-linear-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white font-bold text-sm shrink-0">
                           {r.name?.[0]?.toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-slate-900 text-sm truncate">{r.name}</p>
                           <p className="text-xs text-slate-400 truncate">{r.email}</p>
                         </div>
-                        <div className="text-right flex-shrink-0">
+                        <div className="text-right shrink-0">
                           <p className="font-bold text-teal-600 text-sm">{formatTotal(r.totalMinutes)}</p>
                           <p className="text-xs text-slate-400">
                             {r.morningCheckIn ? `In: ${formatTime(r.morningCheckIn)}` : "Not checked in"}
@@ -834,14 +834,14 @@ function HRDashboard() {
                     return (
                       <div key={emp.id} onClick={() => setSelectedEmployee(emp)}
                         className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex items-center gap-4 hover:border-teal-300 hover:shadow-md cursor-pointer transition-all">
-                        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white font-bold flex-shrink-0">
+                        <div className="w-11 h-11 rounded-full bg-linear-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white font-bold shrink-0">
                           {emp.name?.[0]?.toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-slate-900 truncate">{emp.name}</p>
                           <p className="text-xs text-slate-400 truncate">{emp.email}</p>
                         </div>
-                        <div className="hidden sm:flex items-center gap-4 flex-shrink-0">
+                        <div className="hidden sm:flex items-center gap-4 shrink-0">
                           <span className="text-xs font-medium text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
                             {(emp as any).designation || "—"}
                           </span>
@@ -852,7 +852,7 @@ function HRDashboard() {
                             </span>
                           )}
                         </div>
-                        <svg className="w-5 h-5 text-slate-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-5 h-5 text-slate-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                         </svg>
                       </div>
@@ -1069,7 +1069,7 @@ function HRDashboard() {
           {view === "breakMonitor" && (
             <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6">
               <div className="mb-6 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
+                <div className="w-10 h-10 rounded-xl bg-linear-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
                   <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
@@ -1144,7 +1144,7 @@ function NavItem({ icon, label, active = false, onClick, badge, collapsed = fals
 function StatCard({ title, value, icon, color }: { title: string; value: number; icon: string; color: string }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 hover:shadow-md transition-all">
-      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center text-2xl mb-3 shadow-md`}>
+      <div className={`w-12 h-12 rounded-xl bg-linear-to-br ${color} flex items-center justify-center text-2xl mb-3 shadow-md`}>
         {icon}
       </div>
       <p className="text-slate-500 text-xs font-semibold uppercase tracking-wide">{title}</p>

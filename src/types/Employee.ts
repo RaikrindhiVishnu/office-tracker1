@@ -13,6 +13,7 @@ export interface Employee {
   totalMinutes?: number;
   designation?: string;
   accountType?: "EMPLOYEE" | "ADMIN";
+  department?: string;
   salary?: number;
   lastUpdated?: any;
   sessions?: Session[];

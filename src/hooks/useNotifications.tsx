@@ -88,7 +88,7 @@ export function useNotifications(uid: string | undefined): UseNotificationsRetur
 import { useState as useStateC } from "react";
 import { useAuth } from "@/context/AuthContext";
 
-export function NotificationBell(): JSX.Element {
+export function NotificationBell() {
   const { user } = useAuth();
   const { notifications, unreadCount, markAsRead, markAllRead } =
     useNotifications(user?.uid);
