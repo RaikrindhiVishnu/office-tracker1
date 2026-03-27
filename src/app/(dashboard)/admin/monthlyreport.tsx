@@ -3,7 +3,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { getDoc, doc } from "firebase/firestore";
 import type { AttendanceType } from "@/types/attendance";
-// ── NEW: real break helpers ────────────────────────────────────────────────────
 import {
   calcTotalBreakMinutes,
   BREAK_LIMIT_MINUTES,
@@ -97,13 +96,13 @@ const TODAY_KEY = (() => {
   return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
 })();
 
-// ─ DaySessionNode — now includes real breaks array ───────────────────────────
+// ─ DaySessionNode ─────────────────────────────────────────────────────────────
 type DaySessionNode = {
   checkIn:   string | null;
   checkOut:  string | null;
   totalMins: number;
-  breakMins: number;       // ← real break minutes from Firestore
-  breaks:    Break[];      // ← raw break entries for tooltip
+  breakMins: number;
+  breaks:    Break[];
   hasData:   boolean;
   sessionCount: number;
 };
@@ -115,7 +114,7 @@ function parseSessionTimes(monthlySessionData: Record<string, Record<string, Day
     checkIn:   node.checkIn   || null,
     checkOut:  node.checkOut  || null,
     totalMins: node.totalMins || 0,
-    breakMins: node.breakMins || 0,   // ← real
+    breakMins: node.breakMins || 0,
     breaks:    node.breaks    || [],
   };
 }
@@ -155,14 +154,117 @@ function buildDayStatuses(
   });
 }
 
-// ─ CSV export ────────────────────────────────────────────────────────────────
-function exportCSV(rows: any[], filename: string) {
-  const headers = Object.keys(rows[0]).join(",");
-  const body    = rows.map(r => Object.values(r).map(v => `"${v}"`).join(",")).join("\n");
-  const blob    = new Blob([headers + "\n" + body], { type: "text/csv" });
-  const url     = URL.createObjectURL(blob);
-  const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+// ─ CSV helpers ────────────────────────────────────────────────────────────────
+function csvCell(v: any): string {
+  const s = String(v ?? "");
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+function downloadCSV(content: string, filename: string) {
+  const blob = new Blob(["\uFEFF" + content], { type: "text/csv;charset=utf-8;" });
+  const url  = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
+}
+
+// ─ Enhanced CSV Export ────────────────────────────────────────────────────────
+// Produces two sheets in one CSV:
+//   SECTION 1 — Summary (one row per employee)
+//   SECTION 2 — Day-wise detail (one row per employee per day)
+function exportEnhancedCSV(
+  summaries: any[],
+  monthlySessionData: Record<string, Record<string, DaySessionNode>>,
+  monthlyAttendance: Record<string, Record<string, AttendanceType>>,
+  year: number,
+  month: number,
+  isHoliday: any, isSunday: any, isSecondSaturday: any,
+  isFourthSaturday: any, isFifthSaturday: any,
+  lateThreshold: LateThreshold,
+  monthLabel: string,
+) {
+  const lines: string[] = [];
+
+  // ── SECTION 1: Summary ───────────────────────────────────────────────────
+  lines.push(csvCell(`Monthly Attendance Report — ${monthLabel}`));
+  lines.push("");
+  lines.push("SUMMARY");
+  const summaryHeaders = [
+    "Employee Name","Designation","Department",
+    "Present Days","Absent Days","LOP Days","Leave Days","Working Days",
+    "Late Check-Ins","Attendance %",
+    "Total Work","Avg Work/Day","Total Break","Net Work",
+  ];
+  lines.push(summaryHeaders.map(csvCell).join(","));
+
+  for (const emp of summaries) {
+    lines.push([
+      emp.name,
+      emp.designation || "",
+      emp.department  || "",
+      emp.present,
+      emp.absent,
+      emp.lop,
+      emp.leave,
+      emp.workDays,
+      emp.late,
+      `${emp.pct}%`,
+      fmtMins(emp.totalMins)      === "—" ? "0" : fmtMins(emp.totalMins),
+      fmtMins(emp.avgMins)        === "—" ? "0" : fmtMins(emp.avgMins),
+      fmtMins(emp.totalBreakMins) === "—" ? "0" : fmtMins(emp.totalBreakMins),
+      fmtMins(Math.max(0, emp.totalMins - emp.totalBreakMins)) === "—" ? "0" : fmtMins(Math.max(0, emp.totalMins - emp.totalBreakMins)),
+    ].map(csvCell).join(","));
+  }
+
+  // ── SECTION 2: Day-wise Detail ────────────────────────────────────────────
+  lines.push("");
+  lines.push("");
+  lines.push("DAY-WISE BREAKDOWN");
+  const dayHeaders = [
+    "Employee Name","Designation","Department",
+    "Date","Day","Day Type",
+    "Check In","Check Out","Status","Late?",
+    "Work Hours","Break Time","Net Work",
+  ];
+  lines.push(dayHeaders.map(csvCell).join(","));
+
+  for (const emp of summaries) {
+    const days = buildDayStatuses(
+      emp.uid, year, month, monthlyAttendance, monthlySessionData,
+      isHoliday, isSunday, isSecondSaturday, isFourthSaturday, isFifthSaturday, lateThreshold,
+    );
+    for (const d of days) {
+      if (d.isFuture) continue; // skip future days
+
+      const dayType = d.isPublicHol
+        ? "Public Holiday"
+        : d.isHolidayDay
+          ? (d.dow === 0 ? "Sunday" : "Saturday")
+          : "Working Day";
+
+      const statusLabel = d.status
+        ? (STATUS_CFG[d.status as keyof typeof STATUS_CFG]?.label ?? d.status)
+        : "—";
+
+      lines.push([
+        emp.name,
+        emp.designation || "",
+        emp.department  || "",
+        d.dateStr,
+        DOW_SHORT[d.dow],
+        dayType,
+        d.checkIn  || "",
+        d.checkOut || "",
+        statusLabel,
+        d.isLate && !d.isHolidayDay ? "Yes" : "No",
+        d.totalMins > 0 ? fmtMins(d.totalMins)  : "",
+        d.breakMins > 0 ? fmtMins(d.breakMins)  : "",
+        d.totalMins > 0 ? fmtMins(Math.max(0, d.totalMins - d.breakMins)) : "",
+      ].map(csvCell).join(","));
+    }
+  }
+
+  downloadCSV(lines.join("\n"), `attendance_${monthLabel.replace(" ", "_")}.csv`);
 }
 
 // ─ Break tooltip ─────────────────────────────────────────────────────────────
@@ -218,7 +320,6 @@ function BreakTooltip({ breaks, breakMins }: { breaks: Break[]; breakMins: numbe
           ⚠️ Over limit by {fmtMins(breakMins - BREAK_LIMIT_MINUTES)}
         </div>
       )}
-      {/* Arrow */}
       <div style={{
         position:"absolute", top:"100%", left:"50%", transform:"translateX(-50%)",
         width:0, height:0, borderLeft:"6px solid transparent", borderRight:"6px solid transparent",
@@ -234,7 +335,6 @@ function BreakCell({ breakMins, breaks }: { breakMins: number; breaks: Break[] }
   if (!breakMins || breakMins <= 0) return <span style={{ color:"#cbd5e1" }}>—</span>;
   const isOver = breakMins > BREAK_LIMIT_MINUTES;
   const types  = [...new Set(breaks.map(b => b.type))];
-
   return (
     <div style={{ position:"relative", display:"inline-block" }}
       onMouseEnter={() => setHover(true)}
@@ -335,6 +435,129 @@ function SettingsPanel({ current, onSave, onClose }: { current: LateThreshold; o
   );
 }
 
+// ─ All-Employees PDF Print Panel ─────────────────────────────────────────────
+// This is a hidden <div> that only shows in print mode.
+// It renders a full summary table of all employees.
+function AllEmployeesPrintPanel({
+  summaries, month, year, lateThreshold,
+}: {
+  summaries: any[];
+  month: number;
+  year: number;
+  lateThreshold: LateThreshold;
+}) {
+  const monthLabel = `${MONTHS[month]} ${year}`;
+  const printDate  = new Date().toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" });
+  return (
+    <div className="all-emp-print-panel">
+      <div className="aep-header">
+        <div className="aep-logo-row">
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="18" rx="3" stroke="#4f46e5" strokeWidth="2"/>
+            <path d="M8 2v4M16 2v4M3 10h18" stroke="#4f46e5" strokeWidth="2" strokeLinecap="round"/>
+            <circle cx="8" cy="16" r="1.5" fill="#22c55e"/>
+            <circle cx="12" cy="16" r="1.5" fill="#ef4444"/>
+            <circle cx="16" cy="16" r="1.5" fill="#f97316"/>
+          </svg>
+          <div>
+            <div className="aep-title">Monthly Attendance Report</div>
+            <div className="aep-sub">{monthLabel} · Late threshold: {fmtThreshold(lateThreshold)} · Printed {printDate}</div>
+          </div>
+        </div>
+        <div className="aep-stats-row">
+          <div className="aep-stat"><span className="aep-stat-val">{summaries.length}</span><span className="aep-stat-lbl">Employees</span></div>
+          <div className="aep-stat"><span className="aep-stat-val">{summaries.filter(e => e.pct >= 90).length}</span><span className="aep-stat-lbl">≥90% Attendance</span></div>
+          <div className="aep-stat"><span className="aep-stat-val">{summaries.filter(e => e.late > 0).length}</span><span className="aep-stat-lbl">Had Late Check-ins</span></div>
+          <div className="aep-stat"><span className="aep-stat-val">{Math.round(summaries.reduce((s,e) => s + e.pct, 0) / (summaries.length || 1))}%</span><span className="aep-stat-lbl">Team Avg Attendance</span></div>
+        </div>
+      </div>
+      <table className="aep-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Employee</th>
+            <th>Designation</th>
+            <th>Present</th>
+            <th>Absent</th>
+            <th>LOP</th>
+            <th>Leave</th>
+            <th>Late</th>
+            <th>Att %</th>
+            <th>Total Work</th>
+            <th>Avg/Day</th>
+            <th>Break</th>
+            <th>Net Work</th>
+          </tr>
+        </thead>
+        <tbody>
+          {summaries.map((emp, i) => (
+            <tr key={emp.uid} className={i % 2 === 1 ? "aep-tr-alt" : ""}>
+              <td className="aep-td-num">{i + 1}</td>
+              <td className="aep-td-name">
+                <div className="aep-emp-name">{emp.name}</div>
+                {emp.department && <div className="aep-emp-dept">{emp.department}</div>}
+              </td>
+              <td className="aep-td-role">{emp.designation || "—"}</td>
+              <td className="aep-td-center aep-present">{emp.present}</td>
+              <td className="aep-td-center aep-absent">{emp.absent}</td>
+              <td className="aep-td-center aep-lop">{emp.lop || 0}</td>
+              <td className="aep-td-center aep-leave">{emp.leave || 0}</td>
+              <td className="aep-td-center aep-late">{emp.late}</td>
+              <td className="aep-td-center">
+                <div className="aep-pct-wrap">
+                  <div className="aep-pct-bar">
+                    <div className="aep-pct-fill" style={{
+                      width: `${emp.pct}%`,
+                      background: emp.pct >= 90 ? "#22c55e" : emp.pct >= 75 ? "#f97316" : "#ef4444",
+                    }}/>
+                  </div>
+                  <span className="aep-pct-num" style={{ color: emp.pct>=90?"#16a34a":emp.pct>=75?"#c2410c":"#dc2626" }}>
+                    {emp.pct}%
+                  </span>
+                </div>
+              </td>
+              <td className="aep-td-mono">{fmtMins(emp.totalMins)}</td>
+              <td className="aep-td-mono">{fmtMins(emp.avgMins)}</td>
+              <td className="aep-td-mono aep-break">{emp.totalBreakMins > 0 ? fmtMins(emp.totalBreakMins) : "—"}</td>
+              <td className="aep-td-mono">{fmtMins(Math.max(0, emp.totalMins - emp.totalBreakMins))}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="aep-tfoot-row">
+            <td colSpan={3} style={{ textAlign:"left", paddingLeft:8, fontWeight:700, fontSize:10 }}>TOTALS / AVERAGES</td>
+            <td className="aep-td-center" style={{ fontWeight:800 }}>{summaries.reduce((s,e) => s+e.present,0)}</td>
+            <td className="aep-td-center" style={{ fontWeight:800 }}>{summaries.reduce((s,e) => s+e.absent,0)}</td>
+            <td className="aep-td-center" style={{ fontWeight:800 }}>{summaries.reduce((s,e) => s+(e.lop||0),0)}</td>
+            <td className="aep-td-center" style={{ fontWeight:800 }}>{summaries.reduce((s,e) => s+(e.leave||0),0)}</td>
+            <td className="aep-td-center" style={{ fontWeight:800 }}>{summaries.reduce((s,e) => s+e.late,0)}</td>
+            <td className="aep-td-center" style={{ fontWeight:800, color:"#16a34a" }}>
+              {Math.round(summaries.reduce((s,e) => s+e.pct,0) / (summaries.length||1))}%
+            </td>
+            <td className="aep-td-mono" style={{ fontWeight:800 }}>{fmtMins(summaries.reduce((s,e) => s+e.totalMins,0))}</td>
+            <td className="aep-td-mono" style={{ fontWeight:800 }}>
+              {fmtMins(Math.round(summaries.reduce((s,e) => s+e.avgMins,0) / (summaries.length||1)))}
+            </td>
+            <td className="aep-td-mono aep-break" style={{ fontWeight:800 }}>{fmtMins(summaries.reduce((s,e) => s+e.totalBreakMins,0))}</td>
+            <td className="aep-td-mono" style={{ fontWeight:800 }}>{fmtMins(summaries.reduce((s,e) => s+Math.max(0,e.totalMins-e.totalBreakMins),0))}</td>
+          </tr>
+        </tfoot>
+      </table>
+      <div className="aep-footer">
+        <div className="aep-legend">
+          <span className="aep-legend-item aep-present">■ Present</span>
+          <span className="aep-legend-item aep-absent">■ Absent</span>
+          <span className="aep-legend-item aep-lop">■ LOP</span>
+          <span className="aep-legend-item aep-leave">■ Leave</span>
+          <span className="aep-legend-item aep-late">■ Late</span>
+          <span className="aep-legend-item aep-break">■ Break</span>
+        </div>
+        <div className="aep-footer-note">Generated by Attendance Management System</div>
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -351,14 +574,15 @@ export default function AttendanceDashboard({
   const [sortDir,      setSortDir]      = useState<"asc"|"desc">("asc");
   const [selectedEmp,  setSelectedEmp]  = useState<(User & { idx: number }) | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [highlightOver,setHighlightOver]= useState(false);
+  // NEW: track whether all-emp PDF print is in progress
+  const [printingAllEmp, setPrintingAllEmp] = useState(false);
 
   const [lateThreshold, setLateThreshold] = useState<LateThreshold>(lateThresholdProp ?? DEFAULT_LATE_THRESHOLD);
   useEffect(() => { if (lateThresholdProp) setLateThreshold(lateThresholdProp); }, [lateThresholdProp]);
 
   function handleSaveThreshold(t: LateThreshold) { setLateThreshold(t); onSaveLateThreshold?.(t); }
 
-  // ── Session data (now also fetches breaks) ────────────────────────────────
+  // ── Session data ────────────────────────────────────────────────────────────
   const [monthlySessionData, setMonthlySessionData] = useState<Record<string, Record<string, DaySessionNode>>>({});
   const [loadingData,        setLoadingData]         = useState(false);
 
@@ -377,27 +601,22 @@ export default function AttendanceDashboard({
         for (let day = 1; day <= daysInMonth; day++) {
           const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
           const docId   = `${emp.uid}_${dateStr}`;
-
           promises.push(
             getDoc(doc(db, "attendance", docId)).then((snap) => {
               if (!snap.exists()) return;
               const data     = snap.data();
               const sessions: any[] = data.sessions || [];
-              // ── NEW: read real breaks array ────────────────────────────
               const rawBreaks: Break[] = data.breaks || [];
               const breakMins          = calcTotalBreakMinutes(rawBreaks);
-
               const sorted = [...sessions].sort((a, b) => {
                 const aT = a.checkIn?.toDate ? a.checkIn.toDate().getTime() : new Date(a.checkIn).getTime();
                 const bT = b.checkIn?.toDate ? b.checkIn.toDate().getTime() : new Date(b.checkIn).getTime();
                 return aT - bT;
               });
-
               const first = sorted[0];
               const last  = sorted[sorted.length - 1];
               const checkInTs  = first?.checkIn?.toDate ? first.checkIn.toDate() : first?.checkIn ? new Date(first.checkIn) : null;
               const checkOutTs = last?.checkOut?.toDate ? last.checkOut.toDate() : last?.checkOut ? new Date(last.checkOut) : null;
-
               let totalMins = 0;
               for (const s of sorted) {
                 if (!s.checkIn) continue;
@@ -407,15 +626,14 @@ export default function AttendanceDashboard({
                 if (diff > 0) totalMins += Math.floor(diff / 60000);
               }
               totalMins = Math.min(totalMins, 540);
-
               const fmt = (d: Date) => `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
               if (!newData[emp.uid]) newData[emp.uid] = {};
               newData[emp.uid][dateStr] = {
                 checkIn:      checkInTs  ? fmt(checkInTs)  : null,
                 checkOut:     checkOutTs ? fmt(checkOutTs) : null,
                 totalMins,
-                breakMins,         // ← real break minutes
-                breaks:    rawBreaks,  // ← raw breaks for tooltip
+                breakMins,
+                breaks:    rawBreaks,
                 hasData:   true,
                 sessionCount: sorted.length,
               };
@@ -423,7 +641,6 @@ export default function AttendanceDashboard({
           );
         }
       }
-
       await Promise.all(promises);
       setMonthlySessionData(newData);
       setLoadingData(false);
@@ -435,7 +652,6 @@ export default function AttendanceDashboard({
   const summaries = useMemo(() => users.map((emp, idx) => {
     const days = buildDayStatuses(emp.uid, year, month, monthlyAttendance, monthlySessionData,
       isHoliday, isSunday, isSecondSaturday, isFourthSaturday, isFifthSaturday, lateThreshold);
-
     let present=0, absent=0, lop=0, late=0, leave=0, totalMins=0, totalBreakMins=0;
     days.forEach((d: any) => {
       if (d.isFuture || d.status === null) return;
@@ -444,7 +660,7 @@ export default function AttendanceDashboard({
       if (d.status === "LOP")           lop++;
       if (d.status === "L")             leave++;
       if (d.totalMins)                  totalMins      += d.totalMins;
-      if (d.breakMins)                  totalBreakMins += d.breakMins;  // ← real
+      if (d.breakMins)                  totalBreakMins += d.breakMins;
       if (d.isLate && d.status !== "H") late++;
     });
     const workDays = present + absent + lop + leave;
@@ -470,22 +686,32 @@ export default function AttendanceDashboard({
     else { setSortBy(col); setSortDir("asc"); }
   }
 
+  // ── Enhanced CSV Export ───────────────────────────────────────────────────
   function handleExport() {
-    const rows = filtered.map(e => ({
-      Name: e.name, Designation: e.designation || "", Department: e.department || "",
-      Present: e.present, Absent: e.absent,
-      "Total Work":  fmtMins(e.totalMins),
-      "Avg/Day":     fmtMins(e.avgMins),
-      "Total Break": fmtMins(e.totalBreakMins),
-      "Net Work":    fmtMins(Math.max(0, e.totalMins - e.totalBreakMins)),
-      "Attendance %":`${e.pct}%`,
-    }));
-    exportCSV(rows, `attendance_${MONTHS[month]}_${year}.csv`);
+    exportEnhancedCSV(
+      filtered, monthlySessionData, monthlyAttendance,
+      year, month,
+      isHoliday, isSunday, isSecondSaturday, isFourthSaturday, isFifthSaturday,
+      lateThreshold, `${MONTHS[month]} ${year}`,
+    );
   }
 
-  // ── Team stats for header ──────────────────────────────────────────────────
-  const teamTotalBreak  = summaries.reduce((s, e) => s + e.totalBreakMins, 0);
-  const overLimitCount  = summaries.filter(e => Object.entries(monthlySessionData[e.uid] || {}).some(([, d]) => d.breakMins > BREAK_LIMIT_MINUTES)).length;
+  // ── All-Employees PDF Export ──────────────────────────────────────────────
+  // We flip a flag so the hidden print panel renders, then call print().
+  // After print dialog closes we flip it back.
+  function handlePrintAllEmployees() {
+    setPrintingAllEmp(true);
+    // Give React one tick to render the panel, then print
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.print();
+        // After print dialog closes (synchronous in most browsers)
+        setPrintingAllEmp(false);
+      });
+    });
+  }
+
+  const teamTotalBreak = summaries.reduce((s, e) => s + e.totalBreakMins, 0);
 
   if (selectedEmp) {
     return (
@@ -504,6 +730,16 @@ export default function AttendanceDashboard({
   return (
     <div className="adash-root">
       <style>{STYLES}</style>
+
+      {/* ── Hidden All-Employees print panel (only rendered when printing) ── */}
+      {printingAllEmp && (
+        <AllEmployeesPrintPanel
+          summaries={filtered}
+          month={month}
+          year={year}
+          lateThreshold={lateThreshold}
+        />
+      )}
 
       {showSettings && (
         <SettingsPanel current={lateThreshold} onSave={handleSaveThreshold} onClose={() => setShowSettings(false)} />
@@ -556,6 +792,14 @@ export default function AttendanceDashboard({
           <select className="adash-select" value={year} onChange={e => setMonthlyDate(new Date(+e.target.value, month, 1))}>
             {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
+          {/* NEW: All-Employees PDF button */}
+          <button className="adash-pdf-btn" onClick={handlePrintAllEmployees} title="Save all employees summary as PDF">
+            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path d="M6 2h9l5 5v15a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2z"/>
+              <path d="M14 2v6h6M8 13h8M8 17h5"/>
+            </svg>
+            Save PDF
+          </button>
           <button className="adash-export-btn" onClick={handleExport}>
             <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
@@ -566,13 +810,11 @@ export default function AttendanceDashboard({
       </header>
 
       <div className="adash-body">
-        {/* ── Team break stats bar ─────────────────────────────────────── */}
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(170px, 1fr))", gap:14, marginBottom:20 }}>
           {[
             { label:"Total Employees",  value:String(summaries.length),             icon:"👥", color:"#4f46e5", bg:"#eef2ff" },
             { label:"Team Work Time",   value:fmtMins(summaries.reduce((s,e) => s + e.totalMins, 0)),       icon:"💼", color:"#16a34a", bg:"#f0fdf4" },
             { label:"Team Break Time",  value:fmtMins(teamTotalBreak) || "—",        icon:"☕", color:"#c2410c", bg:"#fff7ed" },
-            // { label:"Over-Limit Days",  value:String(overLimitCount),                icon:"⚠️", color: overLimitCount > 0 ? "#dc2626" : "#64748b", bg: overLimitCount > 0 ? "#fef2f2" : "#f8fafc" },
           ].map((s, i) => (
             <div key={i} style={{ background:"white", border:"1px solid #e2e8f0", borderRadius:14, padding:"14px 18px", boxShadow:"0 1px 3px rgba(0,0,0,0.05)", display:"flex", alignItems:"center", gap:12 }}>
               <div style={{ width:36, height:36, borderRadius:10, background:s.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16, flexShrink:0 }}>{s.icon}</div>
@@ -591,19 +833,6 @@ export default function AttendanceDashboard({
               <span className="adash-count-badge">{filtered.length} employees</span>
             </div>
             <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
-              {/* Over-limit highlight toggle */}
-              {/* <button
-                onClick={() => setHighlightOver(v => !v)}
-                style={{
-                  display:"flex", alignItems:"center", gap:6, padding:"7px 12px",
-                  borderRadius:9, border:"1px solid", cursor:"pointer", fontSize:12, fontWeight:600,
-                  fontFamily:"'Plus Jakarta Sans', sans-serif", transition:"all 0.15s",
-                  background: highlightOver ? "#fef2f2" : "#f8fafc",
-                  borderColor: highlightOver ? "#fecaca" : "#e2e8f0",
-                  color: highlightOver ? "#b91c1c" : "#64748b",
-                }}>
-                ⚠️ {highlightOver ? "Showing Over-Limit" : "Highlight Over-Limit"}
-              </button> */}
               <div className="adash-search-wrap">
                 <svg width="14" height="14" fill="none" stroke="#94a3b8" strokeWidth="2" viewBox="0 0 24 24"
                      style={{ position:"absolute", left:10, top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}>
@@ -633,6 +862,7 @@ export default function AttendanceDashboard({
                     { key:"name",           label:"Employee"      },
                     { key:"present",        label:"Present"       },
                     { key:"absent",         label:"Absent"        },
+                    { key:"late",           label:"Late"          },
                     { key:"pct",            label:"Attendance %"  },
                     { key:"totalMins",      label:"Total Work"    },
                     { key:"avgMins",        label:"Avg/Day"       },
@@ -653,11 +883,8 @@ export default function AttendanceDashboard({
               <tbody>
                 {filtered.map((emp, ri) => {
                   const [g1, g2] = AVATAR_PALETTES[emp.idx % AVATAR_PALETTES.length];
-                  const hasOverLimitDay = Object.entries(monthlySessionData[emp.uid] || {}).some(([, d]) => d.breakMins > BREAK_LIMIT_MINUTES);
-                  const rowBg = highlightOver && hasOverLimitDay ? "#fff5f5" : undefined;
-
                   return (
-                    <tr key={emp.uid} className="adash-tr" style={{ animationDelay:`${ri * 30}ms`, background:rowBg }}>
+                    <tr key={emp.uid} className="adash-tr" style={{ animationDelay:`${ri * 30}ms` }}>
                       <td className="adash-td adash-td-emp">
                         <div className="adash-emp-cell">
                           {emp.profilePhoto ? (
@@ -670,9 +897,6 @@ export default function AttendanceDashboard({
                             <div className="adash-emp-role">{emp.designation || "—"}</div>
                             {emp.department && <div className="adash-emp-dept">{emp.department}</div>}
                           </div>
-                          {highlightOver && hasOverLimitDay && (
-                            <span style={{ marginLeft:6, fontSize:10, background:"#fee2e2", border:"1px solid #fecaca", color:"#b91c1c", padding:"2px 6px", borderRadius:5, fontWeight:700 }}>⚠️ Over</span>
-                          )}
                         </div>
                       </td>
                       <td className="adash-td">
@@ -680,6 +904,11 @@ export default function AttendanceDashboard({
                       </td>
                       <td className="adash-td">
                         <span className="adash-stat-badge" style={{ color:STATUS_CFG.A.text, background:STATUS_CFG.A.bg, borderColor:STATUS_CFG.A.border }}>{emp.absent}</span>
+                      </td>
+                      <td className="adash-td">
+                        {emp.late > 0
+                          ? <span className="adash-stat-badge" style={{ color:"#c2410c", background:"#fff7ed", borderColor:"#fed7aa" }}>⏰ {emp.late}</span>
+                          : <span style={{ color:"#cbd5e1", fontSize:13 }}>—</span>}
                       </td>
                       <td className="adash-td">
                         <div className="adash-pct-row">
@@ -691,8 +920,6 @@ export default function AttendanceDashboard({
                       </td>
                       <td className="adash-td adash-mono">{fmtMins(emp.totalMins)}</td>
                       <td className="adash-td adash-mono">{fmtMins(emp.avgMins)}</td>
-
-                      {/* ── Monthly total break ── */}
                       <td className="adash-td">
                         {emp.totalBreakMins > 0 ? (
                           <span style={{
@@ -705,7 +932,6 @@ export default function AttendanceDashboard({
                           </span>
                         ) : <span style={{ color:"#cbd5e1" }}>—</span>}
                       </td>
-
                       <td className="adash-td">
                         <button className="adash-view-btn" onClick={() => setSelectedEmp({ ...emp })}>
                           View
@@ -733,7 +959,7 @@ export default function AttendanceDashboard({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// DETAIL VIEW  (day-wise with real break column + tooltips)
+// DETAIL VIEW  (unchanged except export button already uses window.print())
 // ═══════════════════════════════════════════════════════════════════════════════
 function DetailView({
   emp, year, month,
@@ -782,26 +1008,13 @@ function DetailView({
     saveMonthlyAttendance(emp.uid, dateStr, ns);
   }
 
-  function handleExportDetail() {
-    const rows = days.map((d: any) => ({
-      Date: d.dateStr, Day: DOW_SHORT[d.dow],
-      "Check In": d.checkIn  || "—",
-      "Check Out": d.checkOut || "—",
-      "Work Time": fmtMins(d.totalMins),
-      "Break Time": fmtMins(d.breakMins),
-      "Net Work":  fmtMins(Math.max(0, d.totalMins - d.breakMins)),
-      Status: STATUS_CFG[d.status as keyof typeof STATUS_CFG]?.label || d.status || "—",
-    }));
-    exportCSV(rows, `${emp.name.replace(/\s+/g,"_")}_${MONTHS[month]}_${year}.csv`);
-  }
-
   return (
     <div className="adash-root">
       <style>{STYLES}</style>
 
       <header className="adash-topbar">
         <div className="adash-topbar-left">
-          <button className="adash-back-btn" onClick={onBack}>
+          <button className="adash-back-btn print-hide" onClick={onBack}>
             <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
             All Employees
           </button>
@@ -821,21 +1034,22 @@ function DetailView({
             Late after {fmtThreshold(lateThreshold)}
           </span>
           <span className="adash-month-label">{MONTHS[month]} {year}</span>
-          <button className="adash-export-btn" onClick={handleExportDetail}>
-            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-            Export CSV
+          <button className="adash-export-btn print-hide" onClick={() => window.print()}>
+            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path d="M6 2h9l5 5v15a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2z"/>
+              <path d="M14 2v6h6M8 13h8M8 17h5"/>
+            </svg>
+            Save as PDF
           </button>
         </div>
       </header>
 
       <div className="adash-body">
-        {/* KPI Cards */}
         <div className="adash-kpi-grid">
           {[
             { label:"Present Days",  value:stats.present,               color:"#16a34a", bg:"#f0fdf4", icon:"✓"  },
             { label:"Absent Days",   value:stats.absent,                color:"#dc2626", bg:"#fef2f2", icon:"✗"  },
             { label:"Total Work",    value:fmtMins(stats.totalMins),    color:"#0369a1", bg:"#f0f9ff", icon:"⏱" },
-            // ── Monthly total break KPI card ──
             { label:"Total Break",   value:fmtMins(stats.totalBreakMins) || "—", color: stats.totalBreakMins > BREAK_LIMIT_MINUTES * 5 ? "#dc2626" : "#c2410c", bg:"#fff7ed", icon:"☕" },
             { label:"Net Work",      value:fmtMins(Math.max(0, stats.totalMins - stats.totalBreakMins)), color:"#4f46e5", bg:"#eef2ff", icon:"💼" },
             {
@@ -863,7 +1077,6 @@ function DetailView({
           ))}
         </div>
 
-        {/* Attendance % bar */}
         <div className="adash-pct-section">
           <div className="adash-pct-header">
             <span className="adash-pct-title">Monthly Attendance Rate</span>
@@ -880,14 +1093,13 @@ function DetailView({
           </div>
         </div>
 
-        {/* Day table */}
         <div className="adash-section">
           <div className="adash-section-header">
             <div className="adash-section-title">
               Day-wise Attendance
               <span className="adash-count-badge">{days.length} days</span>
             </div>
-            <div className="adash-detail-legend">
+            <div className="adash-detail-legend print-hide">
               <span className="adash-dl-item adash-dl-weekend">Weekend</span>
               <span className="adash-dl-item adash-dl-holiday">Public Holiday</span>
               <span className="adash-dl-item adash-dl-late">Late after {fmtThreshold(lateThreshold)}</span>
@@ -898,7 +1110,6 @@ function DetailView({
             <table className="adash-table">
               <thead>
                 <tr>
-                  {/* ── NEW: Break + Net Work columns added ── */}
                   {["Date","Day","Check In","Check Out","Work","Break ☕","Net Work","Status"].map(h => (
                     <th key={h} className="adash-th">{h}</th>
                   ))}
@@ -913,13 +1124,11 @@ function DetailView({
                     : { label:"—", color:"#94a3b8", bg:"#f8fafc", border:"#e2e8f0", text:"#94a3b8", dot:"#cbd5e1" };
                   const netMins  = Math.max(0, totalMins - breakMins);
                   const isOver   = breakMins > BREAK_LIMIT_MINUTES;
-
                   let rowClass = "adash-tr";
                   if (isPublicHol)       rowClass += " adash-tr-pubhol";
                   else if (isHolidayDay) rowClass += " adash-tr-holiday";
                   else if (isFuture)     rowClass += " adash-tr-future";
                   else if (isOver)       rowClass += " adash-tr-break-over";
-
                   const holidayReason = isPublicHol ? "Public Holiday" : isWeekend ? (dow === 0 ? "Sunday" : "Saturday") : null;
 
                   return (
@@ -940,7 +1149,6 @@ function DetailView({
                       <td className="adash-td adash-mono" style={{ color:"#475569" }}>
                         {checkOut || <span className="adash-dash">—</span>}
                       </td>
-                      {/* Work time */}
                       <td className="adash-td adash-mono">
                         {totalMins > 0 ? (
                           <span style={{ color:totalMins>=480?"#16a34a":"#c2410c", fontWeight:600 }}>{fmtMins(totalMins)}</span>
@@ -950,17 +1158,14 @@ function DetailView({
                             : <span className="adash-dash">—</span>
                         )}
                       </td>
-                      {/* ── Break cell with tooltip ── */}
                       <td className="adash-td">
                         <BreakCell breakMins={breakMins} breaks={breaks || []} />
                       </td>
-                      {/* Net work */}
                       <td className="adash-td adash-mono">
                         {netMins > 0 ? (
                           <span style={{ fontWeight:600, color:"#475569" }}>{fmtMins(netMins)}</span>
                         ) : <span className="adash-dash">—</span>}
                       </td>
-                      {/* Status toggle */}
                       <td className="adash-td">
                         {isFuture ? (
                           <span className="adash-status-chip" style={{ color:"#94a3b8", background:"#f8fafc", borderColor:"#e2e8f0", cursor:"default", opacity:0.7, fontStyle:"italic" }}>
@@ -968,7 +1173,7 @@ function DetailView({
                           </span>
                         ) : (
                           <button
-                            className="adash-status-chip"
+                            className="adash-status-chip print-status-static"
                             style={{ color:cfg.text, background:cfg.bg, borderColor:cfg.border, cursor:isHolidayDay?"default":"pointer", opacity:isHolidayDay?0.85:1 }}
                             onClick={() => !isHolidayDay && status && toggleDay(dateStr, status as AttendanceType)}
                             title={isHolidayDay ? cfg.label : `Click to toggle — ${cfg.label}`}
@@ -976,7 +1181,7 @@ function DetailView({
                             <span className="adash-status-dot" style={{ background:cfg.dot }}/>
                             {cfg.label}
                             {!isHolidayDay && (
-                              <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ marginLeft:2, opacity:0.4 }}>
+                              <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ marginLeft:2, opacity:0.4 }} className="print-hide">
                                 <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/>
                               </svg>
                             )}
@@ -987,7 +1192,6 @@ function DetailView({
                   );
                 })}
               </tbody>
-              {/* ── Footer totals row ── */}
               <tfoot>
                 <tr style={{ borderTop:"2px solid #e2e8f0", background:"#f8fafc" }}>
                   <td colSpan={4} style={{ padding:"10px 16px", fontSize:12, fontWeight:700, color:"#64748b" }}>Monthly Totals</td>
@@ -1029,6 +1233,8 @@ const STYLES = `
   .adash-nav-btn:hover { background:white; color:#1e293b; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
   .adash-month-label { font-size:13px; font-weight:700; color:#1e293b; padding:0 8px; min-width:130px; text-align:center; }
   .adash-select { padding:7px 12px; background:white; border:1px solid #e2e8f0; border-radius:9px; color:#1e293b; font-size:13px; font-family:'Plus Jakarta Sans',sans-serif; outline:none; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
+  .adash-pdf-btn { display:flex; align-items:center; gap:6px; padding:7px 14px; background:#0f766e; border:none; border-radius:9px; color:white; font-size:12px; font-weight:600; font-family:'Plus Jakarta Sans',sans-serif; cursor:pointer; transition:all 0.15s; box-shadow:0 1px 3px rgba(0,0,0,0.15); }
+  .adash-pdf-btn:hover { background:#0d9488; transform:translateY(-1px); box-shadow:0 4px 12px rgba(13,148,136,0.3); }
   .adash-export-btn { display:flex; align-items:center; gap:6px; padding:7px 14px; background:#0f172a; border:none; border-radius:9px; color:white; font-size:12px; font-weight:600; font-family:'Plus Jakarta Sans',sans-serif; cursor:pointer; transition:all 0.15s; box-shadow:0 1px 3px rgba(0,0,0,0.15); }
   .adash-export-btn:hover { background:#1e293b; transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.15); }
   .adash-back-btn { display:flex; align-items:center; gap:6px; padding:7px 14px; background:white; border:1px solid #e2e8f0; border-radius:9px; color:#64748b; font-size:13px; font-weight:600; font-family:'Plus Jakarta Sans',sans-serif; cursor:pointer; transition:all 0.15s; }
@@ -1065,7 +1271,6 @@ const STYLES = `
   .adash-tr-holiday { background:#f5f3ff !important; }
   .adash-tr-pubhol  { background:#fff7ed !important; }
   .adash-tr-future  { background:#fafafa !important; opacity:0.55; }
-  /* ── NEW: over-limit row highlight ── */
   .adash-tr-break-over { background:#fff8f8 !important; }
   .adash-td { padding:13px 16px; vertical-align:middle; }
   .adash-td-emp { min-width:220px; }
@@ -1134,6 +1339,12 @@ const STYLES = `
   .settings-save-btn { display:flex; align-items:center; gap:7px; padding:8px 20px; background:#4f46e5; border:none; border-radius:9px; color:white; font-size:13px; font-weight:700; font-family:'Plus Jakarta Sans',sans-serif; cursor:pointer; transition:all 0.15s; box-shadow:0 2px 8px rgba(79,70,229,0.3); }
   .settings-save-btn:hover { background:#4338ca; transform:translateY(-1px); box-shadow:0 4px 14px rgba(79,70,229,0.35); }
 
+  /* ── All-Employees Print Panel (screen: hidden; print: shown) ── */
+  .all-emp-print-panel {
+    display: none;
+  }
+
+  /* ── Animations ── */
   @keyframes adashFadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
   @keyframes adashFadeIn { from { opacity:0; } to { opacity:1; } }
   .adash-table-wrap::-webkit-scrollbar { height:5px; }
@@ -1149,4 +1360,226 @@ const STYLES = `
     .settings-time-row { flex-wrap:wrap; }
   }
   @media (max-width:480px) { .adash-kpi-grid { grid-template-columns:1fr 1fr; } }
+
+  /* ═══════════════════════════════════════════════════
+     PRINT STYLES
+     ═══════════════════════════════════════════════════ */
+  @media print {
+    * { print-color-adjust:exact !important; -webkit-print-color-adjust:exact !important; }
+    @page { size:A4 landscape; margin:10mm 12mm; }
+
+    /* Hide everything on screen by default */
+    .adash-root > *:not(.all-emp-print-panel) { display:none !important; }
+
+    /* But in DetailView there's no print panel — show everything except .print-hide */
+    .adash-root:not(:has(.all-emp-print-panel)) > *:not(.print-hide) { display:revert !important; }
+
+    .print-hide { display:none !important; }
+
+    /* ── All-employees print panel ── */
+    .all-emp-print-panel {
+      display: block !important;
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      color: #0f172a;
+      background: white;
+      padding: 0;
+    }
+
+    .aep-header {
+      padding-bottom: 10px;
+      border-bottom: 2px solid #e2e8f0;
+      margin-bottom: 14px;
+    }
+    .aep-logo-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .aep-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.02em;
+    }
+    .aep-sub {
+      font-size: 10px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+    .aep-stats-row {
+      display: flex;
+      gap: 24px;
+    }
+    .aep-stat {
+      display: flex;
+      flex-direction: column;
+    }
+    .aep-stat-val {
+      font-size: 18px;
+      font-weight: 800;
+      color: #4f46e5;
+      font-family: 'IBM Plex Mono', monospace;
+      line-height: 1;
+    }
+    .aep-stat-lbl {
+      font-size: 9px;
+      font-weight: 700;
+      color: #94a3b8;
+      margin-top: 2px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+    }
+
+    .aep-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10px;
+    }
+    .aep-table thead tr {
+      background: #0f172a;
+      color: white;
+    }
+    .aep-table th {
+      padding: 7px 8px;
+      text-align: left;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      color: #e2e8f0;
+    }
+    .aep-table th:first-child { border-radius: 6px 0 0 6px; }
+    .aep-table th:last-child  { border-radius: 0 6px 6px 0; }
+
+    .aep-table tbody tr {
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .aep-tr-alt { background: #f8fafc !important; }
+
+    .aep-td-num {
+      padding: 6px 8px;
+      color: #94a3b8;
+      font-size: 9px;
+      font-weight: 700;
+      text-align: center;
+    }
+    .aep-td-name {
+      padding: 6px 8px;
+      min-width: 120px;
+    }
+    .aep-emp-name { font-size: 10px; font-weight: 700; color: #0f172a; }
+    .aep-emp-dept { font-size: 8px; color: #94a3b8; margin-top:1px; }
+    .aep-td-role {
+      padding: 6px 8px;
+      font-size: 10px;
+      color: #64748b;
+      min-width: 90px;
+    }
+    .aep-td-center {
+      padding: 6px 8px;
+      text-align: center;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .aep-td-mono {
+      padding: 6px 8px;
+      text-align: center;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 10px;
+      font-weight: 600;
+      color: #475569;
+    }
+
+    .aep-present { color: #16a34a !important; }
+    .aep-absent  { color: #dc2626 !important; }
+    .aep-lop     { color: #7c3aed !important; }
+    .aep-leave   { color: #0369a1 !important; }
+    .aep-late    { color: #c2410c !important; }
+    .aep-break   { color: #9a3412 !important; }
+
+    .aep-pct-wrap {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      justify-content: center;
+    }
+    .aep-pct-bar {
+      width: 40px;
+      height: 5px;
+      background: #f1f5f9;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .aep-pct-fill {
+      height: 100%;
+      border-radius: 3px;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
+    .aep-pct-num {
+      font-size: 10px;
+      font-weight: 800;
+      font-family: 'IBM Plex Mono', monospace;
+      min-width: 32px;
+    }
+
+    .aep-tfoot-row {
+      background: #f1f5f9 !important;
+      border-top: 2px solid #e2e8f0;
+    }
+    .aep-tfoot-row td {
+      padding: 7px 8px;
+      font-size: 10px;
+      color: #0f172a;
+    }
+
+    .aep-footer {
+      margin-top: 12px;
+      padding-top: 8px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .aep-legend {
+      display: flex;
+      gap: 14px;
+    }
+    .aep-legend-item {
+      font-size: 9px;
+      font-weight: 700;
+    }
+    .aep-footer-note {
+      font-size: 9px;
+      color: #94a3b8;
+    }
+
+    /* DetailView print (no all-emp-print-panel present) */
+    .adash-root .adash-topbar { position:static !important; box-shadow:none !important; border-bottom:2px solid #e2e8f0 !important; background:white !important; backdrop-filter:none !important; padding:10px 16px !important; }
+    .adash-root .adash-body { padding:12px 0 0 !important; max-width:100% !important; }
+    .adash-root .adash-kpi-grid { grid-template-columns:repeat(3,1fr) !important; gap:10px !important; margin-bottom:12px !important; }
+    .adash-root .adash-kpi-card { break-inside:avoid !important; box-shadow:none !important; border:1px solid #e2e8f0 !important; animation:none !important; padding:12px 14px 10px !important; }
+    .adash-root .adash-pct-section { break-inside:avoid !important; box-shadow:none !important; border:1px solid #e2e8f0 !important; margin-bottom:12px !important; padding:14px 18px !important; }
+    .adash-root .adash-section { box-shadow:none !important; border:1px solid #e2e8f0 !important; border-radius:10px !important; margin-bottom:0 !important; }
+    .adash-root .adash-section-header { flex-direction:row !important; padding:12px 16px 10px !important; }
+    .adash-root .adash-table-wrap { overflow:visible !important; }
+    .adash-root .adash-table { min-width:unset !important; width:100% !important; font-size:11px !important; }
+    .adash-root .adash-th { padding:8px 10px !important; font-size:9px !important; }
+    .adash-root .adash-td { padding:7px 10px !important; font-size:11px !important; }
+    thead { display:table-header-group !important; }
+    tfoot { display:table-footer-group !important; }
+    tr { break-inside:avoid !important; }
+    .adash-tr-future { opacity:1 !important; }
+    .adash-tr-holiday { background:#f5f3ff !important; }
+    .adash-tr-pubhol  { background:#fff7ed !important; }
+    .adash-tr-break-over { background:#fff8f8 !important; }
+    .print-status-static { cursor:default !important; pointer-events:none !important; }
+    .adash-mono { font-size:11px !important; }
+    .adash-status-chip { font-size:10px !important; padding:2px 7px !important; }
+    .adash-late-flag, .adash-pubhol-badge, .adash-today-badge { font-size:8px !important; padding:1px 4px !important; }
+    .adash-pct-fill-lg { print-color-adjust:exact !important; -webkit-print-color-adjust:exact !important; }
+  }
 `;

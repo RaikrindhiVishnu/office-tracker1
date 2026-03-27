@@ -106,53 +106,45 @@ export async function POST(req: NextRequest) {
 
 function buildFestivalHtml(fest: any, recipientName: string): string {
   const message =
-    fest.emailMessage ||
-    `On this special occasion of ${fest.title}, we extend our heartfelt wishes to you and your loved ones. May this festival bring joy, prosperity, and success.`;
+    fest.emailMessage?.trim() ||
+    `Wishing you a very Happy ${fest.title}.`;
 
   return `
   <div style="font-family:Segoe UI,Arial,sans-serif;background:#f3f4f6;padding:20px;">
     
     <div style="max-width:640px;margin:auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
       
-      <!-- HEADER -->
-      <div style="background:${fest.bannerColor || "#111827"};padding:32px;text-align:center;">
-        <div style="font-size:56px;margin-bottom:10px;">${fest.bannerEmoji || "🎊"}</div>
+      <!-- HEADER (FIXED) -->
+      <div style="background:${fest.bannerColor || "#4f46e5"};padding:32px;text-align:center;">
+        <div style="font-size:56px;margin-bottom:10px;">
+          ${fest.bannerEmoji || "🎉"}
+        </div>
         <h1 style="color:#ffffff;margin:0;font-size:26px;font-weight:700;">
           ${fest.title} Greetings
         </h1>
       </div>
 
-      <!-- BODY -->
+      <!-- BODY (ONLY WHAT YOU TYPE) -->
       <div style="padding:32px;">
-        <p style="font-size:15px;color:#111827;">
+        <p style="font-size:15px;color:#111827;margin:0;">
           Dear <strong>${recipientName || "Team Member"}</strong>,
         </p>
 
-        <p style="font-size:15px;color:#374151;line-height:1.8;margin-top:12px;">
-          ${message}
+        <p style="font-size:15px;color:#374151;line-height:1.8;margin-top:16px;white-space:pre-line;">
+${message}
         </p>
 
-        <p style="font-size:15px;color:#374151;line-height:1.8;margin-top:12px;">
-          we sincerely appreciate your dedication and valuable contributions. 
-          Festivals are a time to celebrate togetherness, positivity, and the spirit of unity within our organization.
-        </p>
-
-        <p style="font-size:15px;color:#374151;line-height:1.8;margin-top:12px;">
-          May this festive occasion bring happiness, success, and new opportunities into your life, 
-          both personally and professionally.
-        </p>
-
-        <!-- SIGNATURE -->
-        <p style="margin-top:24px;font-size:14px;color:#6b7280;">
+        <!-- SIGNATURE (FIXED) -->
+        <p style="margin-top:28px;font-size:14px;color:#6b7280;">
           Warm regards,<br/>
           <strong>HR Team</strong><br/>
-          Techgy Innovations Pvt. Ltd. & 9DS
+          Techgy Innovations Pvt. Ltd.
         </p>
       </div>
 
-      <!-- FOOTER -->
+      <!-- FOOTER (FIXED) -->
       <div style="background:#f9fafb;padding:16px;text-align:center;font-size:12px;color:#9ca3af;">
-        © ${new Date().getFullYear()} Techgy Innovations Pvt. Ltd. & 9DS. All rights reserved.
+        © ${new Date().getFullYear()} Techgy Innovations Pvt. Ltd. All rights reserved.
       </div>
 
     </div>

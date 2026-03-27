@@ -13,33 +13,36 @@ import {
 import { auth, db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { isInsideOffice } from "@/lib/location";
+import { normalizeRole } from "@/context/AuthContext"; // ← reuse the same mapping
+import { getRoleRedirect } from "@/lib/roleRouting";
 
-// ── Extract Firestore index URL from error message ────────
-function extractIndexUrl(msg = "") {
+// ── Extract Firestore index URL from error message ────────────────────────
+function extractIndexUrl(msg = ""): string | null {
   const m = msg.match(/(https:\/\/console\.firebase\.google\.com\/[^\s"'\n]+)/);
   return m ? m[1].trim() : null;
 }
 
-function isIndexError(e: any) {
+function isIndexError(e: unknown): boolean {
+  const err = e as { code?: string; message?: string };
   return (
-    e?.code === "failed-precondition" ||
-    e?.code === "9" ||
-    e?.message?.includes("index") ||
-    e?.message?.includes("FAILED_PRECONDITION") ||
-    e?.message?.includes("console.firebase.google.com")
+    err?.code === "failed-precondition" ||
+    err?.code === "9" ||
+    (err?.message?.includes("index") ?? false) ||
+    (err?.message?.includes("FAILED_PRECONDITION") ?? false) ||
+    (err?.message?.includes("console.firebase.google.com") ?? false)
   );
 }
 
-// ── Today's date string YYYY-MM-DD (local time, midnight) ─
+// ── Today's date string YYYY-MM-DD (local time) ───────────────────────────
 function getTodayString(): string {
   const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
+  const y   = now.getFullYear();
+  const m   = String(now.getMonth() + 1).padStart(2, "0");
+  const d   = String(now.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
 
-// ── Check if employee has an approved WFH leave for today ─
+// ── Check approved WFH leave for today ───────────────────────────────────
 async function checkWFHApproved(uid: string): Promise<{ allowed: boolean; indexUrl?: string }> {
   const today = getTodayString();
   try {
@@ -52,27 +55,25 @@ async function checkWFHApproved(uid: string): Promise<{ allowed: boolean; indexU
     const snap = await getDocs(q);
     let wfhAllowed = false;
     snap.forEach((docSnap) => {
-      const data = docSnap.data();
-      const fromDate: string = data.fromDate ?? "";
-      const toDate:   string = data.toDate   ?? "";
+      const data      = docSnap.data();
+      const fromDate  = (data.fromDate ?? "") as string;
+      const toDate    = (data.toDate   ?? "") as string;
       if (fromDate && toDate && today >= fromDate && today <= toDate) {
         wfhAllowed = true;
       }
     });
     return { allowed: wfhAllowed };
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (isIndexError(e)) {
-      return {
-        allowed: false,
-        indexUrl: extractIndexUrl(e.message) ?? undefined,
-      };
+      const err = e as { message?: string };
+      return { allowed: false, indexUrl: extractIndexUrl(err.message ?? "") ?? undefined };
     }
     console.error("WFH check error:", e);
     return { allowed: false };
   }
 }
 
-// ── Get user's current GPS location ──────────────────────
+// ── Get GPS position ──────────────────────────────────────────────────────
 function getCurrentPosition(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -80,29 +81,29 @@ function getCurrentPosition(): Promise<GeolocationPosition> {
       return;
     }
     navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy: true,
-      timeout: 15000,
-      maximumAge: 0,
+      enableHighAccuracy : true,
+      timeout            : 15000,
+      maximumAge         : 0,
     });
   });
 }
 
-// ─────────────────────────────────────────────────────────
-//  MAIN COMPONENT
-// ─────────────────────────────────────────────────────────
-export default function LoginPage() {
+// ─────────────────────────────────────────────────────────────────────────
+//  COMPONENT
+// ─────────────────────────────────────────────────────────────────────────
+export default function LoginPage(): JSX.Element {
   const router = useRouter();
 
-  const [email,    setEmail]    = useState("");
-  const [password, setPassword] = useState("");
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState("");
-  const [success,  setSuccess]  = useState("");
-  const [indexUrl, setIndexUrl] = useState<string | null>(null);
-  const [step,     setStep]     = useState("");
+  const [email,      setEmail]      = useState<string>("");
+  const [password,   setPassword]   = useState<string>("");
+  const [loading,    setLoading]    = useState<boolean>(false);
+  const [error,      setError]      = useState<string>("");
+  const [success,    setSuccess]    = useState<string>("");
+  const [indexUrl,   setIndexUrl]   = useState<string | null>(null);
+  const [step,       setStep]       = useState<string>("");
 
-  // ── Sign In ───────────────────────────────────────────
-  const handleLogin = async () => {
+  // ── Sign In ─────────────────────────────────────────────────────────────
+  const handleLogin = async (): Promise<void> => {
     if (!email.trim() || !password.trim()) {
       setError("Please enter your email and password.");
       return;
@@ -130,8 +131,8 @@ export default function LoginPage() {
 
       if (!userSnap.exists()) throw new Error("PROFILE_NOT_FOUND");
 
-      const userData = userSnap.data();
-      const role = (userData?.accountType ?? "").toString().trim().toUpperCase();
+      const userData    = userSnap.data();
+      const accountType = (userData?.accountType ?? "").toString().trim().toUpperCase();
 
       // STEP 3: Force password change if flagged
       if (userData?.mustChangePassword === true) {
@@ -139,8 +140,8 @@ export default function LoginPage() {
         return;
       }
 
-      // STEP 4: Location check (EMPLOYEES ONLY)
-      if (role === "EMPLOYEE") {
+      // STEP 4: Location check (employees only, no WFH approval)
+      if (accountType === "EMPLOYEE") {
         setStep("Checking work-from-home status...");
         const wfhResult = await checkWFHApproved(cred.user.uid);
 
@@ -156,10 +157,11 @@ export default function LoginPage() {
           let position: GeolocationPosition;
           try {
             position = await getCurrentPosition();
-          } catch (geoErr: any) {
-            if (geoErr.code === 1 || geoErr.message === "User denied Geolocation") {
+          } catch (geoErr: unknown) {
+            const err = geoErr as { code?: number; message?: string };
+            if (err.code === 1 || err.message === "User denied Geolocation") {
               throw new Error("GEO_DENIED");
-            } else if (geoErr.message === "GEO_NOT_SUPPORTED") {
+            } else if (err.message === "GEO_NOT_SUPPORTED") {
               throw new Error("GEO_NOT_SUPPORTED");
             } else {
               throw new Error("GEO_TIMEOUT");
@@ -167,9 +169,7 @@ export default function LoginPage() {
           }
 
           const { latitude, longitude } = position.coords;
-          const insideOffice = isInsideOffice(latitude, longitude);
-
-          if (!insideOffice) {
+          if (!isInsideOffice(latitude, longitude)) {
             console.warn(
               `[LOGIN BLOCKED] uid=${cred.user.uid} ` +
               `lat=${latitude.toFixed(6)} lng=${longitude.toFixed(6)} ` +
@@ -182,66 +182,40 @@ export default function LoginPage() {
         }
       }
 
-      // STEP 5: Route by role
+      // STEP 5: Route by role using the same normalizeRole mapping as AuthContext
       setStep("Redirecting...");
-      switch (role) {
-        case "SUPERADMIN":      router.replace("/superadmin");      break;
-        case "ADMIN":           router.replace("/admin");           break;
-        case "BUSINESSOWNER":
-        case "BUSINESS_OWNER":  router.replace("/business-owner");  break;
-        case "EMPLOYEE":        router.replace("/employee");        break;
-        default:                throw new Error("INVALID_ROLE");
-      }
+      const role        = normalizeRole(accountType);
+      const destination = getRoleRedirect(role);
 
-    } catch (err: any) {
-      console.error("Login error:", err?.code, err?.message);
+      if (!role) throw new Error("INVALID_ROLE");
+
+      router.replace(destination);
+
+    } catch (err: unknown) {
+      const e = err as { code?: string; message?: string };
+      console.error("Login error:", e?.code, e?.message);
       setStep("");
 
-      switch (true) {
-        case err.message === "INDEX_MISSING":
-          setError("A Firestore index is required. Click the button below to create it, then try logging in again.");
-          break;
-        case err.message === "GEO_DENIED":
-          setError("📍 Location permission denied.\nPlease allow location access in your browser and try again.\nYou must be inside the office to log in.");
-          break;
-        case err.message === "GEO_NOT_SUPPORTED":
-          setError("📍 Geolocation is not supported on this device or browser.");
-          break;
-        case err.message === "GEO_TIMEOUT":
-          setError("📍 Could not get your location (timeout). Please check your GPS signal and try again.");
-          break;
-        case err.message === "OUTSIDE_OFFICE":
-          setError("🚫 Login blocked.\nYou are outside office premises.\nYou must be within 100 meters of the office to log in.\nIf you're working from home, your WFH request must be approved first.");
-          break;
-        case err.message === "PROFILE_NOT_FOUND":
-          setError("User profile not found. Please contact your administrator.");
-          break;
-        case err.message === "INVALID_ROLE":
-          setError("Your account has no valid role assigned. Contact admin.");
-          break;
-        case err.code === "auth/invalid-credential":
-        case err.code === "auth/wrong-password":
-          setError("Invalid email or password. Please try again.");
-          break;
-        case err.code === "auth/user-not-found":
-          setError("No account found with this email address.");
-          break;
-        case err.code === "auth/too-many-requests":
-          setError("Too many failed attempts. Account temporarily locked. Try again later.");
-          break;
-        case err.code === "auth/network-request-failed":
-          setError("Network error. Please check your internet connection.");
-          break;
-        default:
-          setError("Login failed. Please try again.");
-      }
+      if      (e.message === "INDEX_MISSING")     setError("A Firestore index is required. Click the button below to create it, then try logging in again.");
+      else if (e.message === "GEO_DENIED")        setError("📍 Location permission denied.\nPlease allow location access in your browser and try again.\nYou must be inside the office to log in.");
+      else if (e.message === "GEO_NOT_SUPPORTED") setError("📍 Geolocation is not supported on this device or browser.");
+      else if (e.message === "GEO_TIMEOUT")       setError("📍 Could not get your location (timeout). Please check your GPS signal and try again.");
+      else if (e.message === "OUTSIDE_OFFICE")    setError("🚫 Login blocked.\nYou are outside office premises.\nYou must be within 100 meters of the office to log in.\nIf you're working from home, your WFH request must be approved first.");
+      else if (e.message === "PROFILE_NOT_FOUND") setError("User profile not found. Please contact your administrator.");
+      else if (e.message === "INVALID_ROLE")      setError("Your account has no valid role assigned. Contact admin.");
+      else if (e.code === "auth/invalid-credential" || e.code === "auth/wrong-password") setError("Invalid email or password. Please try again.");
+      else if (e.code === "auth/user-not-found")         setError("No account found with this email address.");
+      else if (e.code === "auth/too-many-requests")      setError("Too many failed attempts. Account temporarily locked. Try again later.");
+      else if (e.code === "auth/network-request-failed") setError("Network error. Please check your internet connection.");
+      else                                               setError("Login failed. Please try again.");
+
     } finally {
       setLoading(false);
     }
   };
 
-  // ── Forgot Password — calls branded email API ─────────
-  const handlePasswordReset = async () => {
+  // ── Forgot Password ───────────────────────────────────────────────────
+  const handlePasswordReset = async (): Promise<void> => {
     if (!email.trim()) {
       setError("Please enter your email address first.");
       return;
@@ -252,60 +226,60 @@ export default function LoginPage() {
       setSuccess("");
       setStep("Sending reset email...");
 
-      const res = await fetch("/api/send-password-reset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      const res  = await fetch("/api/send-password-reset", {
+        method  : "POST",
+        headers : { "Content-Type": "application/json" },
+        body    : JSON.stringify({ email: email.trim().toLowerCase() }),
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to send reset email.");
 
       setSuccess("✅ Password reset email sent! Please check your inbox.");
-    } catch (err: any) {
-      setError(err.message || "Failed to send reset email. Try again.");
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      setError(e.message || "Failed to send reset email. Try again.");
     } finally {
       setLoading(false);
       setStep("");
     }
   };
 
-  // ── Enter key support ─────────────────────────────────
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  // ── Enter key support ────────────────────────────────────────────────
+  const handleKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key === "Enter" && !loading) handleLogin();
   };
 
-  // ─────────────────────────────────────────────────────
-  //  RENDER
-  // ─────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────
+  //  RENDER  (UI unchanged from your original)
+  // ─────────────────────────────────────────────────────────────────────
   return (
     <div style={{
-      minHeight: "100vh",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      background: "linear-gradient(135deg, #143d3d 0%, #0f2d2d 100%)",
-      fontFamily: "'Inter', 'Segoe UI', sans-serif",
-      padding: "20px",
+      minHeight      : "100vh",
+      display        : "flex",
+      alignItems     : "center",
+      justifyContent : "center",
+      background     : "linear-gradient(135deg, #143d3d 0%, #0f2d2d 100%)",
+      fontFamily     : "'Inter', 'Segoe UI', sans-serif",
+      padding        : "20px",
     }}>
       <div style={{
-        width: "100%",
-        maxWidth: 420,
-        background: "#fff",
-        borderRadius: 24,
-        boxShadow: "0 24px 64px rgba(0,0,0,0.25)",
-        padding: "40px 36px",
-        boxSizing: "border-box",
+        width        : "100%",
+        maxWidth     : 420,
+        background   : "#fff",
+        borderRadius : 24,
+        boxShadow    : "0 24px 64px rgba(0,0,0,0.25)",
+        padding      : "40px 36px",
+        boxSizing    : "border-box",
       }}>
 
         {/* Logo / Brand */}
         <div style={{ textAlign: "center", marginBottom: 28 }}>
           <div style={{
             width: 56, height: 56,
-            background: "linear-gradient(135deg, #143d3d, #1a5c5c)",
-            borderRadius: 16, display: "flex", alignItems: "center",
-            justifyContent: "center", margin: "0 auto 14px", fontSize: 26,
-            boxShadow: "0 4px 16px rgba(20,61,61,0.35)",
+            background     : "linear-gradient(135deg, #143d3d, #1a5c5c)",
+            borderRadius   : 16, display: "flex", alignItems: "center",
+            justifyContent : "center", margin: "0 auto 14px", fontSize: 26,
+            boxShadow      : "0 4px 16px rgba(20,61,61,0.35)",
           }}>🏢</div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: "#0f172a", letterSpacing: "-0.5px" }}>
             Office Tracker
@@ -317,8 +291,8 @@ export default function LoginPage() {
 
         {/* Location policy notice */}
         <div style={{
-          background: "#f0fdf4", border: "1px solid #bbf7d0",
-          borderRadius: 12, padding: "10px 14px", marginBottom: 20,
+          background   : "#f0fdf4", border: "1px solid #bbf7d0",
+          borderRadius : 12, padding: "10px 14px", marginBottom: 20,
           display: "flex", alignItems: "flex-start", gap: 10,
         }}>
           <span style={{ fontSize: 16, flexShrink: 0 }}>📍</span>
@@ -331,8 +305,8 @@ export default function LoginPage() {
         {/* Step indicator */}
         {loading && step && (
           <div style={{
-            background: "#eff6ff", border: "1px solid #bfdbfe",
-            borderRadius: 10, padding: "8px 14px", marginBottom: 16,
+            background   : "#eff6ff", border: "1px solid #bfdbfe",
+            borderRadius : 10, padding: "8px 14px", marginBottom: 16,
             fontSize: 13, color: "#1d4ed8", fontWeight: 600,
             display: "flex", alignItems: "center", gap: 8,
           }}>
@@ -344,8 +318,8 @@ export default function LoginPage() {
         {/* Success */}
         {success && (
           <div style={{
-            background: "#f0fdf4", border: "1px solid #bbf7d0",
-            borderRadius: 10, padding: "10px 14px", marginBottom: 16,
+            background   : "#f0fdf4", border: "1px solid #bbf7d0",
+            borderRadius : 10, padding: "10px 14px", marginBottom: 16,
             fontSize: 13, color: "#15803d", fontWeight: 500,
           }}>{success}</div>
         )}
@@ -353,18 +327,18 @@ export default function LoginPage() {
         {/* Error */}
         {error && (
           <div style={{
-            background: "#fff1f2", border: "1px solid #fecdd3",
-            borderRadius: 10, padding: "10px 14px", marginBottom: 16,
+            background   : "#fff1f2", border: "1px solid #fecdd3",
+            borderRadius : 10, padding: "10px 14px", marginBottom: 16,
             fontSize: 13, color: "#be123c", fontWeight: 500,
-            whiteSpace: "pre-line", lineHeight: 1.6,
+            whiteSpace   : "pre-line", lineHeight: 1.6,
           }}>{error}</div>
         )}
 
         {/* Firestore Index Error Banner */}
         {indexUrl && (
           <div style={{
-            background: "#fffbeb", border: "1px solid #fbbf24",
-            borderRadius: 12, padding: "14px 16px", marginBottom: 16,
+            background   : "#fffbeb", border: "1px solid #fbbf24",
+            borderRadius : 12, padding: "14px 16px", marginBottom: 16,
           }}>
             <p style={{ margin: "0 0 8px", fontSize: 13, fontWeight: 800, color: "#78350f" }}>
               ⚠️ Missing Firestore Index — leaveRequests
@@ -381,11 +355,11 @@ export default function LoginPage() {
               target="_blank"
               rel="noopener noreferrer"
               style={{
-                display: "inline-flex", alignItems: "center", gap: 7,
-                padding: "9px 18px", background: "#f59e0b", color: "#fff",
-                borderRadius: 10, fontSize: 13, fontWeight: 800,
-                textDecoration: "none",
-                boxShadow: "0 3px 12px rgba(245,158,11,0.45)",
+                display        : "inline-flex", alignItems: "center", gap: 7,
+                padding        : "9px 18px", background: "#f59e0b", color: "#fff",
+                borderRadius   : 10, fontSize: 13, fontWeight: 800,
+                textDecoration : "none",
+                boxShadow      : "0 3px 12px rgba(245,158,11,0.45)",
               }}
             >
               🔗 Create Index in Firebase →
@@ -402,10 +376,10 @@ export default function LoginPage() {
             onChange={(e) => setEmail(e.target.value)}
             disabled={loading}
             style={{
-              padding: "12px 16px", border: "1.5px solid #e2e8f0",
-              borderRadius: 12, fontSize: 14, outline: "none",
-              color: "#0f172a", background: loading ? "#f8fafc" : "#fff",
-              boxSizing: "border-box", width: "100%",
+              padding      : "12px 16px", border: "1.5px solid #e2e8f0",
+              borderRadius : 12, fontSize: 14, outline: "none",
+              color        : "#0f172a", background: loading ? "#f8fafc" : "#fff",
+              boxSizing    : "border-box", width: "100%",
             }}
           />
 
@@ -416,10 +390,10 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             disabled={loading}
             style={{
-              padding: "12px 16px", border: "1.5px solid #e2e8f0",
-              borderRadius: 12, fontSize: 14, outline: "none",
-              color: "#0f172a", background: loading ? "#f8fafc" : "#fff",
-              boxSizing: "border-box", width: "100%",
+              padding      : "12px 16px", border: "1.5px solid #e2e8f0",
+              borderRadius : 12, fontSize: 14, outline: "none",
+              color        : "#0f172a", background: loading ? "#f8fafc" : "#fff",
+              boxSizing    : "border-box", width: "100%",
             }}
           />
 
@@ -427,13 +401,13 @@ export default function LoginPage() {
             onClick={handleLogin}
             disabled={loading}
             style={{
-              padding: "13px",
-              background: loading ? "#94a3b8" : "#143d3d",
-              color: "#fff", border: "none", borderRadius: 12,
-              fontSize: 15, fontWeight: 700,
-              cursor: loading ? "not-allowed" : "pointer",
-              transition: "background 0.2s",
-              boxShadow: loading ? "none" : "0 4px 16px rgba(20,61,61,0.35)",
+              padding      : "13px",
+              background   : loading ? "#94a3b8" : "#143d3d",
+              color        : "#fff", border: "none", borderRadius: 12,
+              fontSize     : 15, fontWeight: 700,
+              cursor       : loading ? "not-allowed" : "pointer",
+              transition   : "background 0.2s",
+              boxShadow    : loading ? "none" : "0 4px 16px rgba(20,61,61,0.35)",
             }}
           >
             {loading ? "Please wait..." : "Sign In"}
@@ -446,9 +420,9 @@ export default function LoginPage() {
             onClick={handlePasswordReset}
             disabled={loading}
             style={{
-              background: "none", border: "none", cursor: "pointer",
-              color: "#ea580c", fontSize: 13, fontWeight: 600,
-              textDecoration: "underline", opacity: loading ? 0.5 : 1,
+              background     : "none", border: "none", cursor: "pointer",
+              color          : "#ea580c", fontSize: 13, fontWeight: 600,
+              textDecoration : "underline", opacity: loading ? 0.5 : 1,
             }}
           >
             Forgot Password?

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
-import { getDoc, doc } from "firebase/firestore";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
+import { getDoc, doc, collection, query, orderBy, onSnapshot, limit } from "firebase/firestore";
 import type { View } from "@/types/View";
 import type { EmployeeRow } from "@/types/EmployeeRow";
 import {
@@ -14,11 +15,27 @@ import {
 import { db } from "@/lib/firebase";
 import { Timestamp } from "firebase/firestore";
 
+// ── CHANGE 1: Import EmployeeTodayPanel ────────────────────────────────────
+import EmployeeTodayPanel from "@/components/EmployeeTodayPanel";
+
 // Types
 interface Break {
   type: "MORNING" | "LUNCH" | "EVENING";
   startTime: Timestamp;
   endTime?: Timestamp;
+}
+
+// ── WorkUpdate type ────────────────────────────────────────────────────────
+interface WorkUpdate {
+  id: string;
+  uid: string;
+  userEmail: string;
+  userName: string;
+  task: string;
+  notes: string;
+  status: string;
+  priority: string;
+  createdAt: Timestamp;
 }
 
 //Helpers
@@ -32,7 +49,7 @@ function calcTotalBreakSeconds(breaks: Break[]): number {
   return breaks.reduce((acc, b) => {
     if (!b.startTime) return acc;
     const start = b.startTime.toDate().getTime();
-    const end   = b.endTime ? b.endTime.toDate().getTime() : start; // closed only
+    const end   = b.endTime ? b.endTime.toDate().getTime() : start;
     return acc + Math.max(0, Math.floor((end - start) / 1000));
   }, 0);
 }
@@ -52,6 +69,119 @@ function getActiveBreakType(breaks: Break[]): string | null {
   const active = breaks.find((b) => b.startTime && !b.endTime);
   if (!active) return null;
   return active.type === "MORNING" ? "☕ Morning" : active.type === "LUNCH" ? "🍱 Lunch" : "🌆 Evening";
+}
+
+// ── WorkUpdate status / priority config ───────────────────────────────────
+const WU_STATUS_CFG: Record<string, { icon: string; bg: string; color: string; border: string }> = {
+  "In Progress": { icon: "🔄", bg: "bg-blue-50",   color: "text-blue-700",   border: "border-blue-200"   },
+  "Completed":   { icon: "✅", bg: "bg-green-50",  color: "text-green-700",  border: "border-green-200"  },
+  "Blocked":     { icon: "🚫", bg: "bg-red-50",    color: "text-red-700",    border: "border-red-200"    },
+  "Review":      { icon: "👀", bg: "bg-purple-50", color: "text-purple-700", border: "border-purple-200" },
+};
+
+const WU_PRIORITY_CFG: Record<string, { dot: string; color: string; badge: string }> = {
+  "Low":    { dot: "bg-gray-400",   color: "text-gray-600",   badge: "bg-gray-100 text-gray-600"     },
+  "Medium": { dot: "bg-yellow-400", color: "text-yellow-700", badge: "bg-yellow-100 text-yellow-700" },
+  "High":   { dot: "bg-orange-500", color: "text-orange-700", badge: "bg-orange-100 text-orange-700" },
+  "Urgent": { dot: "bg-red-500",    color: "text-red-700",    badge: "bg-red-100 text-red-700"       },
+};
+
+// ── Work Update Tooltip (Portal-based) ────────────────────────────────────
+function WorkUpdateTooltip({ update }: { update: WorkUpdate | null }) {
+  const [visible, setVisible] = useState(false);
+  const [pos, setPos]         = useState({ top: 0, left: 0, above: false });
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const TOOLTIP_W  = 280;
+  const TOOLTIP_H  = 180;
+
+  const computePos = useCallback(() => {
+    if (!triggerRef.current) return;
+    const r          = triggerRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - r.bottom;
+    const spaceAbove = r.top;
+    const above      = spaceBelow < TOOLTIP_H + 16 && spaceAbove > TOOLTIP_H + 16;
+    let left = r.left;
+    if (left + TOOLTIP_W > window.innerWidth - 8) left = window.innerWidth - TOOLTIP_W - 8;
+    if (left < 8) left = 8;
+    const top = above ? r.top - TOOLTIP_H - 8 : r.bottom + 8;
+    setPos({ top, left, above });
+  }, []);
+
+  const handleEnter = () => { computePos(); setVisible(true); };
+  const handleLeave = () => setVisible(false);
+
+  // If no update, render a plain dash matching the original cell style
+  if (!update) return <span className="text-slate-700">—</span>;
+
+  const scfg = WU_STATUS_CFG[update.status]    ?? WU_STATUS_CFG["In Progress"];
+  const pcfg = WU_PRIORITY_CFG[update.priority] ?? WU_PRIORITY_CFG["Medium"];
+  const fmtTime = (ts: Timestamp | undefined | null) => {
+    if (!ts) return "—";
+    return ts.toDate().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const tooltip = visible ? createPortal(
+    <div
+      ref={tooltipRef}
+      onMouseEnter={() => setVisible(true)}
+      onMouseLeave={handleLeave}
+      style={{ position: "fixed", top: pos.top, left: pos.left, width: TOOLTIP_W, zIndex: 99999, pointerEvents: "auto" }}
+      className="bg-[#1e1f3b] text-white rounded-xl shadow-2xl p-3.5 text-xs"
+    >
+      {/* Arrow */}
+      <div style={{
+        position: "absolute", left: 18,
+        ...(pos.above
+          ? { bottom: -6, borderTop: "6px solid #1e1f3b", borderLeft: "6px solid transparent", borderRight: "6px solid transparent" }
+          : { top: -6, borderBottom: "6px solid #1e1f3b", borderLeft: "6px solid transparent", borderRight: "6px solid transparent" }
+        ),
+        width: 0, height: 0,
+      }}/>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-2.5">
+        <span className="text-[10px] font-bold tracking-widest uppercase text-slate-300">Task Details</span>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${pcfg.badge}`}>{update.priority}</span>
+      </div>
+      {/* Task */}
+      <p className="font-semibold text-white text-sm leading-snug mb-2">{update.task}</p>
+      {/* Status */}
+      <div className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border mb-2 ${scfg.bg} ${scfg.color} ${scfg.border}`}>
+        {scfg.icon} {update.status}
+      </div>
+      {/* Notes */}
+      {update.notes && (
+        <p className="text-slate-300 italic text-[11px] leading-relaxed mb-2 border-t border-slate-600 pt-2">
+          "{update.notes}"
+        </p>
+      )}
+      {/* Time */}
+      <div className="flex items-center gap-1 text-slate-400 text-[10px] mt-1 border-t border-slate-600 pt-2">
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        Submitted at {fmtTime(update.createdAt)}
+      </div>
+    </div>,
+    document.body
+  ) : null;
+
+  return (
+    <>
+      <div
+        ref={triggerRef}
+        onMouseEnter={handleEnter}
+        onMouseLeave={handleLeave}
+        className="cursor-pointer max-w-xs truncate"
+      >
+        {/* Styled exactly like the original plain-text task cell */}
+        <span className="text-slate-700 text-sm truncate block hover:text-indigo-600 transition-colors">
+          {update.task || "—"}
+        </span>
+      </div>
+      {tooltip}
+    </>
+  );
 }
 
 // ── Mini Calendar─────────
@@ -163,16 +293,10 @@ function StatCard({ title, value, icon, gradient }: StatCardProps) {
 // ── Break badge
 function BreakBadge({ seconds, activeType }: { seconds: number; activeType: string | null }) {
   const formatted = fmtBreak(seconds);
-
   if (!seconds || seconds <= 0) {
     return <span className="text-slate-400 font-medium">—</span>;
   }
-
-  return (
-    <span className="text-slate-900 font-bold">
-      {formatted}
-    </span>
-  );
+  return <span className="text-slate-900 font-bold">{formatted}</span>;
 }
 
 // ── Props──────
@@ -213,9 +337,39 @@ export default function Dashboard({
   const saveAttempted = useRef(false);
   const itemsPerPage = 10;
 
+  // ── CHANGE 2: State for Today Panel ───────────────────────────────────────
+  const [todayPanelEmployee, setTodayPanelEmployee] = useState<EmployeeRow | null>(null);
+
   // ── Break data per employee (fetched today)
   const [breakData, setBreakData] = useState<Record<string, Break[]>>({});
   const [loadingBreaks, setLoadingBreaks] = useState(false);
+
+  // ── Live workUpdates map (uid → latest today) ─────────────────────────────
+  const [workUpdatesMap, setWorkUpdatesMap] = useState<Record<string, WorkUpdate>>({});
+
+  useEffect(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const q = query(
+      collection(db, "workUpdates"),
+      orderBy("createdAt", "desc"),
+      limit(200)
+    );
+    const unsub = onSnapshot(q, snap => {
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as WorkUpdate));
+      const todayUpdates = all.filter(u => {
+        if (!u.createdAt) return false;
+        const d = new Date(u.createdAt.toDate());
+        d.setHours(0, 0, 0, 0);
+        return d.getTime() === todayStart.getTime();
+      });
+      // Keep only latest per uid
+      const map: Record<string, WorkUpdate> = {};
+      todayUpdates.forEach(u => { if (!map[u.uid]) map[u.uid] = u; });
+      setWorkUpdatesMap(map);
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     if (busy || rows.length === 0) return;
@@ -380,6 +534,8 @@ export default function Dashboard({
             const breaks     = breakData[r.uid] ?? [];
             const breakSecs  = calcTotalBreakSeconds(breaks);
             const activeType = getActiveBreakType(breaks);
+            const wu         = workUpdatesMap[r.uid] ?? null;
+            const scfg       = wu ? (WU_STATUS_CFG[wu.status] ?? WU_STATUS_CFG["In Progress"]) : null;
             return (
               <div key={r.uid} className="bg-gradient-to-br from-white to-slate-50 rounded-xl shadow-md border border-slate-200 p-4 hover:shadow-xl transition-all duration-300">
                 <div className="flex items-start justify-between mb-3">
@@ -405,20 +561,33 @@ export default function Dashboard({
                     <p className="text-xs text-purple-600 font-medium mb-1">Worked</p>
                     <p className="font-bold text-purple-900 text-sm">{formatTotal(r.totalMinutes)}</p>
                   </div>
-                  {/* ── NEW: Break cell ── */}
                   <div className="bg-amber-50 p-2.5 rounded-lg border border-amber-100">
                     <p className="text-xs text-amber-600 font-medium mb-1">Break</p>
                     <p className="font-bold text-amber-800 text-sm">{fmtBreak(breakSecs)}</p>
                     {activeType && <p className="text-[9px] text-amber-500 animate-pulse">{activeType}</p>}
                   </div>
                 </div>
+                {/* Mobile current task: show wu data if available, else r.task — same card UI as before */}
                 <div className="mb-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
                   <p className="text-xs text-slate-600 font-medium mb-1">Current Task</p>
-                  <p className="text-sm font-medium text-slate-800 line-clamp-2">{r.task}</p>
+                  {wu ? (
+                    <div>
+                      <p className="text-sm font-medium text-slate-800 line-clamp-2">{wu.task}</p>
+                      {scfg && (
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border mt-1 ${scfg.bg} ${scfg.color} ${scfg.border}`}>
+                          {scfg.icon} {wu.status}
+                        </span>
+                      )}
+                      {wu.notes && <p className="text-slate-400 italic mt-0.5 text-[10px]">"{wu.notes}"</p>}
+                    </div>
+                  ) : (
+                    <p className="text-sm font-medium text-slate-800 line-clamp-2">{r.task}</p>
+                  )}
                 </div>
-                <button onClick={() => { setSelectedEmployee(r); setView("profile"); }}
+                {/* ── CHANGE 3a: Mobile button opens Today Panel ── */}
+                <button onClick={() => setTodayPanelEmployee(r)}
                   className="w-full px-4 py-2.5 bg-[#5e8076] text-white rounded-xl font-semibold hover:bg-[#152b5c] transition-all shadow-md">
-                  View Profile
+                  View Today Activity
                 </button>
               </div>
             );
@@ -430,7 +599,6 @@ export default function Dashboard({
           <table className="w-full">
             <thead className="bg-gradient-to-r from-slate-50 to-slate-100">
               <tr>
-                {/* ── NEW: "Total Break" column added ── */}
                 {["Employee","Status","Check-in","Total Work","Total Break","Current Task","Actions"].map((h) => (
                   <th key={h} className="px-5 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
@@ -441,6 +609,7 @@ export default function Dashboard({
                 const breaks     = breakData[r.uid] ?? [];
                 const breakSecs  = calcTotalBreakSeconds(breaks);
                 const activeType = getActiveBreakType(breaks);
+                const wu         = workUpdatesMap[r.uid] ?? null;
                 return (
                   <tr key={r.uid} className="hover:bg-slate-50 transition-colors">
                     {/* Employee */}
@@ -468,18 +637,26 @@ export default function Dashboard({
                     <td className="px-5 py-4 text-slate-700 font-medium">{formatTime(r.morningCheckIn)}</td>
                     {/* Total Work */}
                     <td className="px-5 py-4 text-slate-900 font-bold">{formatTotal(r.totalMinutes)}</td>
-                    {/* ── NEW: Total Break ── */}
+                    {/* Total Break */}
                     <td className="px-5 py-4">
                       <BreakBadge seconds={breakSecs} activeType={activeType}/>
                     </td>
-                    {/* Task */}
-                    <td className="px-5 py-4 text-slate-700 max-w-xs truncate">{r.task}</td>
-                    {/* Actions */}
+                    {/* Current Task — only functionality changed: now shows WorkUpdateTooltip on hover */}
+                    <td className="px-5 py-4 text-slate-700 max-w-xs truncate">
+                      <WorkUpdateTooltip update={wu} />
+                    </td>
+                    {/* ── CHANGE 3b: Eye button opens Today Panel ── */}
                     <td className="px-5 py-4">
-                      <button onClick={() => { setSelectedEmployee(r); setView("profile"); }}
+                      <button
+                        onClick={() => setTodayPanelEmployee(r)}
+                        title="View Today Activity"
                         className="p-1 rounded-md hover:bg-slate-200 transition group">
-                        <img src="https://cdn-icons-png.flaticon.com/128/2767/2767146.png" alt="View"
-                          draggable="false" className="w-5 h-5 opacity-70 group-hover:opacity-100 group-hover:scale-110 transition"/>
+                        <img
+                          src="https://cdn-icons-png.flaticon.com/128/2767/2767146.png"
+                          alt="View Today Activity"
+                          draggable="false"
+                          className="w-5 h-5 opacity-70 group-hover:opacity-100 group-hover:scale-110 transition"
+                        />
                       </button>
                     </td>
                   </tr>
@@ -672,6 +849,15 @@ export default function Dashboard({
           </div>
         )}
       </div>
+
+      {/* ── CHANGE 4: Render Today Panel ── */}
+      {todayPanelEmployee && (
+        <EmployeeTodayPanel
+          employee={todayPanelEmployee}
+          adminUid="admin"
+          onClose={() => setTodayPanelEmployee(null)}
+        />
+      )}
     </>
   );
 }

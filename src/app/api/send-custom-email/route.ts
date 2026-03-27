@@ -98,22 +98,48 @@ export async function POST(req: NextRequest) {
 
 function buildMailHtml(body: string, recipientName: string, priority: string): string {
   const isHigh = priority === "high";
+
+  const cleanBody = body.trim();
+
   return `
     <div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.1);">
+      
+      <!-- HEADER (FIXED) -->
       <div style="background:${isHigh ? "#e11d48" : "#193677"};padding:32px;text-align:center;">
-        <div style="font-size:44px;margin-bottom:10px;">${isHigh ? "🔴" : "✉️"}</div>
+        <div style="font-size:44px;margin-bottom:10px;">
+          ${isHigh ? "🔴" : "✉️"}
+        </div>
+
         <h1 style="color:#fff;margin:0;font-size:22px;font-weight:900;">
           ${isHigh ? "Important Message" : "Message from HR"}
         </h1>
-        ${isHigh ? `<p style="color:rgba(255,255,255,.85);margin:8px 0 0;font-size:13px;">This is a high priority message — please read carefully.</p>` : ""}
+
+        ${
+          isHigh
+            ? `<p style="color:rgba(255,255,255,.85);margin:8px 0 0;font-size:13px;">
+                This is a high priority message — please read carefully.
+               </p>`
+            : ""
+        }
       </div>
+
+      <!-- BODY (CONTROLLED) -->
       <div style="padding:32px;">
-        <p style="font-size:16px;color:#1e293b;">Dear <strong>${recipientName || "Team Member"}</strong>,</p>
-        <div style="font-size:15px;color:#334155;line-height:1.75;">
-          ${body.replace(/\n/g, "<br/>")}
+
+        <!-- Greeting (AUTO) -->
+        <p style="font-size:16px;color:#1e293b;margin:0;">
+          Dear <strong>${recipientName || "Team Member"}</strong>,
+        </p>
+
+        <!-- USER CONTENT -->
+        <div style="font-size:15px;color:#334155;line-height:1.75;margin-top:16px;white-space:pre-line;">
+${cleanBody}
         </div>
-        <p style="font-size:14px;color:#64748b;margin-top:24px;">
-          Regards,<br/><strong>Techgy Innovations HR Team</strong>
+
+        <!-- SIGNATURE (FIXED) -->
+        <p style="font-size:14px;color:#64748b;margin-top:28px;">
+          Warm regards,<br/>
+          <strong>Techgy Innovations HR Team</strong>
         </p>
       </div>
     </div>

@@ -18,6 +18,7 @@ import CallHistory from "@/components/CallHistory";
 import MeetPanel from "@/components/MeetPanel";
 import IncomingCallListener from "@/components/IncomingCallListener";
 import MeetView from "@/components/MeetView";
+import ApplyLeaveForm from "@/components/leave/ApplyLeaveForm";
 
 // ── NEW: Break tracking imports ────────────────────────────
 import BreakPanel from "@/components/BreakPanel";
@@ -456,20 +457,45 @@ export default function ZohoStyleEmployeeDashboard() {
     });
   }, [user]);
 
-  useEffect(() => {
+ useEffect(() => {
     if (!attendance?.sessions?.length) return;
     const calc = () => {
       let s = 0;
       attendance.sessions.forEach((sess: any) => {
         const ci = sess.checkIn?.toDate()?.getTime();
-        const now = new Date();
-const shiftEnd = new Date();
-shiftEnd.setHours(19, 0, 0, 0); // 7:00 PM
+        if (!ci) return;
 
-const co = sess.checkOut
-  ? sess.checkOut.toDate().getTime()
-  : Math.min(now.getTime(), shiftEnd.getTime());
-        if (ci && co > ci) s += Math.floor((co - ci) / 1000);
+        const now = new Date();
+        const shiftEnd = new Date();
+        shiftEnd.setHours(19, 0, 0, 0);
+
+        let co = sess.checkOut
+          ? sess.checkOut.toDate().getTime()
+          : Math.min(now.getTime(), shiftEnd.getTime());
+
+        // 🛑 Freeze work timer at break start if break is active
+        if (activeBreak && !sess.checkOut) {
+          co = activeBreak.startTime.toDate().getTime();
+        }
+
+        if (co > ci) {
+          let sessionSeconds = Math.floor((co - ci) / 1000);
+
+          // ➖ Subtract all break durations from this session
+          const totalBreakSeconds = todayBreaks.reduce((acc: number, b: Break) => {
+            if (!b.startTime) return acc;
+            const start = b.startTime.toDate().getTime();
+            const end = b.endTime
+              ? b.endTime.toDate().getTime()
+              : activeBreak
+              ? activeBreak.startTime.toDate().getTime()
+              : start;
+            return acc + Math.max(0, Math.floor((end - start) / 1000));
+          }, 0);
+
+          sessionSeconds -= totalBreakSeconds;
+          s += Math.max(0, sessionSeconds);
+        }
       });
       setTotalSeconds(s);
     };
@@ -479,8 +505,7 @@ const co = sess.checkOut
       const iv = setInterval(calc, 1000);
       return () => clearInterval(iv);
     }
-  }, [attendance]);
-
+  }, [attendance, todayBreaks]);
   useEffect(() => {
     return onSnapshot(query(collection(db, "messages"), orderBy("createdAt", "desc")),
       snap => setMessages(snap.docs.map(d => (d.data() as any).text)));
@@ -521,14 +546,14 @@ const co = sess.checkOut
       ));
   }, [user]);
 
+ // ── Active break derived state (must be before useEffect) ─
+  const activeBreak = getActiveBreak(todayBreaks);
+
   if (loading || !user) return null;
 
   const sessions    = attendance?.sessions || [];
   const lastSession = sessions.at(-1);
   const isCheckedIn = lastSession && !lastSession.checkOut;
-
-  // ── NEW: Active break derived state ───────────────────────
-  const activeBreak = getActiveBreak(todayBreaks);
 
   const leaveNotifications = leaveRequests.filter(
     l => (l.status === "Approved" || l.status === "Rejected") && !l.notificationRead
@@ -1006,7 +1031,7 @@ const co = sess.checkOut
                 handleSubmitLeave={handleSubmitLeave} submitting={submitting} leaveMsg={leaveMsg}
               />
             )}
-
+{/* <ApplyLeaveForm /> */}
             {activeView === "profile"  && <ProfileView />}
             {activeView === "help"     && <HelpView />}
             {activeView === "meet"     && <MeetView users={users.filter((u: any) => u.uid !== user.uid)} />}
