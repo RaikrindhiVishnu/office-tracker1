@@ -1,13 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import SalaryStructure from "./SalaryStructure";
 import PayrollGenerator from "./PayrollGenerator";
-import PayslipHistory from "./PayslipHistory";
-
-/* ---------------- TYPES ---------------- */
-
-type Tab = "salary" | "payroll" | "history";
+import SalaryStructure from "./SalaryStructure";
 
 interface User {
   uid?: string;
@@ -19,61 +14,56 @@ interface AccountsDashboardProps {
   selectedUser?: User | null;
 }
 
-/* ---------------- COMPONENT ---------------- */
+type Tab = "payroll" | "accounts";
 
 export default function AccountsDashboard({
   selectedUser,
 }: AccountsDashboardProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("salary");
-
-  const TabButton = ({
-    id,
-    label,
-  }: {
-    id: Tab;
-    label: string;
-  }) => (
-    <button
-      onClick={() => setActiveTab(id)}
-      className={`px-6 py-3 rounded-xl font-semibold transition ${
-        activeTab === id
-          ? "bg-indigo-600 text-white shadow"
-          : "bg-gray-100 hover:bg-gray-200"
-      }`}
-    >
-      {label}
-    </button>
-  );
+  const [activeTab, setActiveTab] = useState<Tab>("payroll");
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">
-          Accounts & Payroll
-        </h1>
 
-        <p className="text-gray-600">
-          Manage salaries, generate payroll, and download payslips.
-        </p>
-      </div>
+      {/* Header */}
+      
 
       {/* Tabs */}
-      <div className="flex gap-3">
-        <TabButton id="salary" label="Salary Structure" />
-        <TabButton id="payroll" label="Payroll Generator" />
-        <TabButton id="history" label="Payslip History" />
+      <div className="flex gap-2">
+          <button
+          onClick={() => setActiveTab("accounts")}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
+            activeTab === "accounts"
+              ? "bg-indigo-600 text-white"
+              : "bg-white border border-gray-200 hover:bg-gray-50"
+          }`}
+        >
+          Accounts
+        </button>
+        <button
+          onClick={() => setActiveTab("payroll")}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
+            activeTab === "payroll"
+              ? "bg-indigo-600 text-white"
+              : "bg-white border border-gray-200 hover:bg-gray-50"
+          }`}
+        >
+          Payroll
+        </button>
+
+      
       </div>
 
       {/* Content */}
-      <div>
-        {activeTab === "salary" && (
-        <SalaryStructure />
+      <div className="bg-white rounded-2xl border border-gray-100 p-4">
+
+        {activeTab === "payroll" && (
+          <PayrollGenerator />
         )}
 
-        {activeTab === "payroll" && <PayrollGenerator />}
+        {activeTab === "accounts" && (
+          <SalaryStructure />
+        )}
 
-        {activeTab === "history" && <PayslipHistory />}
       </div>
     </div>
   );

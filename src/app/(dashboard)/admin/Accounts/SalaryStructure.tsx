@@ -50,12 +50,10 @@ export default function SalaryStructure() {
   const [selectedEmployee, setSelectedEmployee] =
     useState<Employee | null>(null);
 
-  const [salary, setSalary] =
-    useState<Salary>(emptySalary);
-
+  const [salary, setSalary] = useState<Salary>(emptySalary);
   const [loading, setLoading] = useState(false);
 
-/* ================= LOAD EMPLOYEES ================= */
+  /* ================= LOAD EMPLOYEES ================= */
 
   useEffect(() => {
     const loadEmployees = async () => {
@@ -80,19 +78,14 @@ export default function SalaryStructure() {
     loadEmployees();
   }, []);
 
-/* ================= LOAD SALARY ================= */
+  /* ================= LOAD SALARY ================= */
 
   useEffect(() => {
     if (!selectedEmployee) return;
 
     const loadSalary = async () => {
       try {
-        const ref = doc(
-          db,
-          "salaryStructures",
-          selectedEmployee.uid
-        );
-
+        const ref = doc(db, "salaryStructures", selectedEmployee.uid);
         const snap = await getDoc(ref);
 
         if (snap.exists()) {
@@ -108,28 +101,25 @@ export default function SalaryStructure() {
     loadSalary();
   }, [selectedEmployee]);
 
-/* ================= CALCULATIONS ================= */
+  /* ================= CALCULATIONS ================= */
 
   const gross =
     Number(salary.basic || 0) +
     Number(salary.hra || 0) +
     Number(salary.specialAllowance || 0);
 
-  const handleChange = (
-    field: keyof Salary,
-    value: string
-  ) => {
+  const handleChange = (field: keyof Salary, value: string) => {
     setSalary((prev) => ({
       ...prev,
       [field]: value,
     }));
   };
 
-/* ================= SAVE ================= */
+  /* ================= SAVE ================= */
 
   const saveSalary = async () => {
     if (!selectedEmployee) {
-      alert("Select employee first");
+      alert("⚠️ Please select an employee before saving");
       return;
     }
 
@@ -155,17 +145,22 @@ export default function SalaryStructure() {
     setLoading(false);
   };
 
-/* ================= UI ================= */
+  /* ================= UI ================= */
 
   return (
-    <div className="bg-white p-8 rounded-2xl shadow-lg max-w-3xl">
-      <h2 className="text-2xl font-bold mb-6">
-        Salary Structure
-      </h2>
+    <div className="bg-white rounded-2xl border border-gray-100 p-6 max-w-3xl">
+
+      {/* Header */}
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold">Salary Structure</h2>
+        <p className="text-sm text-gray-500">
+          Define salary components for employees
+        </p>
+      </div>
 
       {/* Employee Dropdown */}
       <select
-        className="border p-3 rounded-lg mb-6 w-full"
+        className="border border-gray-200 p-3 rounded-xl mb-6 w-full bg-white focus:outline-none"
         onChange={(e) => {
           const emp = employees.find(
             (u) => u.uid === e.target.value
@@ -174,9 +169,7 @@ export default function SalaryStructure() {
         }}
         value={selectedEmployee?.uid || ""}
       >
-        <option value="" disabled>
-          Select Employee
-        </option>
+        <option value="">Select Employee</option>
 
         {employees.map((emp) => (
           <option key={emp.uid} value={emp.uid}>
@@ -185,38 +178,32 @@ export default function SalaryStructure() {
         ))}
       </select>
 
-      {/* Show form ONLY after selecting */}
-      {selectedEmployee && (
-        <>
-          <div className="grid grid-cols-2 gap-4">
-            {(Object.keys(emptySalary) as (keyof Salary)[])
-              .map((field) => (
-                <input
-                  key={field}
-                  placeholder={field}
-                  value={salary[field]}
-                  onChange={(e) =>
-                    handleChange(field, e.target.value)
-                  }
-                  className="border p-3 rounded-lg"
-                />
-              ))}
-          </div>
+      {/* Salary Form (ALWAYS VISIBLE) */}
+      <div className="grid grid-cols-2 gap-4">
+        {(Object.keys(emptySalary) as (keyof Salary)[]).map((field) => (
+          <input
+            key={field}
+            placeholder={field}
+            value={salary[field]}
+            onChange={(e) => handleChange(field, e.target.value)}
+            className="border border-gray-200 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
+          />
+        ))}
+      </div>
 
-          {/* Gross */}
-          <div className="mt-6 text-lg font-semibold">
-            Gross Salary: ₹{gross.toLocaleString()}
-          </div>
+      {/* Gross Salary */}
+      <div className="mt-6 text-lg font-semibold text-gray-800">
+        Gross Salary: ₹{gross.toLocaleString()}
+      </div>
 
-          <button
-            onClick={saveSalary}
-            disabled={loading}
-            className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl"
-          >
-            {loading ? "Saving..." : "Save Salary"}
-          </button>
-        </>
-      )}
+      {/* Save Button */}
+      <button
+        onClick={saveSalary}
+        disabled={loading}
+        className="mt-6 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white px-6 py-3 rounded-xl font-medium transition"
+      >
+        {loading ? "Saving..." : "Save Salary"}
+      </button>
     </div>
   );
 }

@@ -3,435 +3,498 @@
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import {
-  collection,
-  getDocs,
-  doc,
-  getDoc,
-  setDoc,
-  serverTimestamp,
+  collection, getDocs, doc, getDoc, setDoc, serverTimestamp,
 } from "firebase/firestore";
+import SalaryStructure from "./SalaryStructure";
+import PayslipHistory  from "./PayslipHistory";
 
 type Employee = {
-  uid: string;
-  name: string;
-  email: string;
-  generated?: boolean;
+  uid: string; name: string; email: string; generated?: boolean;
 };
 
+type View = "payroll" | "salary" | "history";
+
+const monthNames = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December",
+];
+
+function daysInMonth(month: number, year: number): number {
+  return new Date(year, month, 0).getDate();
+}
+
 export default function PayrollGenerator() {
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loadingAll, setLoadingAll] = useState(false);
-  const [generatingUid, setGeneratingUid] = useState<string | null>(null);
-  const [downloadingUid, setDownloadingUid] = useState<string | null>(null);
-  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
-
   const today = new Date();
-  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
 
-  const monthKey = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
+  const [currentView, setCurrentView]       = useState<View>("payroll");
+  const [employees, setEmployees]           = useState<Employee[]>([]);
+  const [selectedYear, setSelectedYear]     = useState(today.getFullYear());
+  const [selectedMonth, setSelectedMonth]   = useState(today.getMonth() + 1);
+  const [selectedEmp, setSelectedEmp]       = useState<string>("all");
+  const [search, setSearch]                 = useState("");
+  const [generatingUid, setGeneratingUid]   = useState<string | null>(null);
+  const [downloadingUid, setDownloadingUid] = useState<string | null>(null);
+  const [bulkProgress, setBulkProgress]     = useState<{ done: number; total: number } | null>(null);
+  const [loadingAll, setLoadingAll]         = useState(false);
 
+  const monthKey    = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
   const yearOptions = [today.getFullYear(), today.getFullYear() - 1, today.getFullYear() - 2];
-
-  const monthNames = [
-    "January","February","March","April","May","June",
-    "July","August","September","October","November","December",
-  ];
 
   useEffect(() => { loadEmployees(); }, [monthKey]);
 
-  /* ================= LOAD ================= */
   const loadEmployees = async () => {
     const snap = await getDocs(collection(db, "users"));
     const list: Employee[] = [];
     for (const docSnap of snap.docs) {
-      const uid = docSnap.id;
+      const uid  = docSnap.id;
       const data = docSnap.data();
+      if (data.accountType !== "EMPLOYEE") continue;
       const payslipSnap = await getDoc(doc(db, "payslips", `${uid}_${monthKey}`));
       list.push({ uid, name: data.name, email: data.email, generated: payslipSnap.exists() });
     }
     setEmployees(list);
   };
 
-  /* ================= SHARED PDF BUILDER (same logic as employee page) ================= */
-  const buildAndDownloadPdf = async (uid: string, monthKey: string) => {
-    const { default: jsPDF } = await import("jspdf");
+  const filteredEmployees = employees.filter((e) => {
+    const matchEmp    = selectedEmp === "all" || e.uid === selectedEmp;
+    const q           = search.toLowerCase();
+    const matchSearch = !q || e.name?.toLowerCase().includes(q) || e.email?.toLowerCase().includes(q);
+    return matchEmp && matchSearch;
+  });
 
-    const logoDataUrl = await new Promise<string>((resolve) => {
-      const img = new window.Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        canvas.width = img.naturalWidth || 300;
-        canvas.height = img.naturalHeight || 150;
-        const ctx = canvas.getContext("2d");
-        if (ctx) { ctx.drawImage(img, 0, 0); resolve(canvas.toDataURL("image/png")); }
-        else resolve("");
-      };
-      img.onerror = () => resolve("");
-      img.src = "/logo (2).png";
-    });
+  const pendingCount = filteredEmployees.filter((e) => !e.generated).length;
 
-    const userDoc    = await getDoc(doc(db, "users", uid));
-    const salarySnap = await getDoc(doc(db, "salaryStructures", uid));
+  /* ── generatePayslip ─────────────────────────────────────────────────────*/
+  const generatePayslip = async (uid: string, silent = false): Promise<boolean> => {
+    try {
+      const userSnap = await getDoc(doc(db, "users", uid));
+      if (!userSnap.exists()) { if (!silent) alert("Employee not found."); return false; }
+      const u = userSnap.data();
 
-    if (!salarySnap.exists()) { alert("Salary structure not found for this employee."); return false; }
+      const salarySnap = await getDoc(doc(db, "salaryStructures", uid));
+      if (!salarySnap.exists()) {
+        if (!silent) alert(`No salary structure found for ${u.name}. Please set it up first.`);
+        return false;
+      }
+      const s = salarySnap.data();
 
-    const user   = userDoc.data();
-    const salary = salarySnap.data();
+      const basic            = Number(s.basic            ?? s.Basic            ?? 0);
+      const hra              = Number(s.hra              ?? s.HRA              ?? 0);
+      const specialAllowance = Number(s.specialAllowance ?? s.SpecialAllowance ?? 0);
+      const pf               = Number(s.pf               ?? s.PF               ?? 0);
+      const pt               = Number(s.pt               ?? s.PT               ?? 0);
+      const tds              = Number(s.tds              ?? s.TDS              ?? 0);
+      const totalEarnings    = basic + hra + specialAllowance;
+      const totalDeductions  = pf + pt + tds;
+      const netSalary        = totalEarnings - totalDeductions;
+      const totalDays        = daysInMonth(selectedMonth, selectedYear);
 
-    const basic   = Number(salary.basic || 0);
-    const hra     = Number(salary.hra || 0);
-    const special = Number(salary.specialAllowance || 0);
-    const tds     = Number(salary.tds || 0);
-    const pt      = Number(salary.pt || 0);
-    const other   = Number(salary.other || 0);
-
-    const totalEarnings   = basic + hra + special;
-    const totalDeductions = tds + pt + other;
-    const netSalary       = totalEarnings - totalDeductions;
-
-    const totalDays   = salary.totalDays || 30;
-    const lop         = salary.lop || 0;
-    const paidDays    = totalDays - lop;
-    const bankAccount = salary.bankAccount || "N/A";
-    const designation = user?.designation || user?.role || "Employee";
-    const empId       = salary.empId || uid.substring(0, 6).toUpperCase();
-    const doj         = user?.dateOfJoining || "N/A";
-
-    const [year, month] = monthKey.split("-");
-    const monthName    = new Date(Number(year), Number(month) - 1).toLocaleString("default", { month: "long" });
-    const monthDisplay = `${monthName}, ${year}`;
-
-    const pdf = new jsPDF({ unit: "pt", format: "a4" });
-    const W   = 595;
-
-    if (logoDataUrl) pdf.addImage(logoDataUrl, "PNG", 18, 10, 145, 100);
-
-    pdf.setFont("helvetica", "bold"); pdf.setFontSize(19); pdf.setTextColor(0, 0, 0);
-    pdf.text("TECHGY INNOVATIONS", 222, 38);
-    pdf.text("PRIVATE LIMITED", 222, 60);
-
-    pdf.setFont("helvetica", "normal"); pdf.setFontSize(8.5);
-    pdf.text("Shop No. 09, Sri Venkateswara Swamy Residency, Land Mark -", 222, 77);
-    pdf.text("Rajahmundry Ruchulu, 13th Phase Rd, Kukatpally Housing Board", 222, 88);
-    pdf.text("Colony, Hyderabad, Telangana 500085", 222, 99);
-    pdf.text("CIN: U93090TG2019PTC13277", 222, 110);
-
-    pdf.setDrawColor(0, 0, 0); pdf.setLineWidth(0.8);
-    pdf.line(28, 122, W - 28, 122);
-
-    pdf.setFont("helvetica", "bold"); pdf.setFontSize(13); pdf.setTextColor(0, 0, 0);
-    pdf.text(`Payslip For: ${monthDisplay}`, W / 2, 148, { align: "center" });
-
-    const TOP_Y = 178, LINE_H = 19;
-
-    const lbl = (t: string, x: number, y: number) => {
-      pdf.setFont("helvetica", "bold"); pdf.setFontSize(10); pdf.setTextColor(0, 0, 0); pdf.text(t, x, y);
-    };
-    const val = (t: string, x: number, y: number) => {
-      pdf.setFont("helvetica", "normal"); pdf.setFontSize(10); pdf.setTextColor(0, 0, 0); pdf.text(String(t), x, y);
-    };
-
-    lbl("Employee Name:",   28,  TOP_Y);           val(user?.name || "-", 145, TOP_Y);
-    lbl("Emp ID:",          28,  TOP_Y + LINE_H);  val(empId,             145, TOP_Y + LINE_H);
-    lbl("Designation:",     28,  TOP_Y + LINE_H*2);val(designation,       145, TOP_Y + LINE_H*2);
-    lbl("Date of Joining:", 28,  TOP_Y + LINE_H*3);val(doj,               145, TOP_Y + LINE_H*3);
-
-    lbl("Total Days In Month:", 318, TOP_Y);            val(String(totalDays), 470, TOP_Y);
-    lbl("LOP",                  318, TOP_Y + LINE_H);   val(String(lop),       470, TOP_Y + LINE_H);
-    lbl("Actual Paid Days",     318, TOP_Y + LINE_H*2); val(String(paidDays),  470, TOP_Y + LINE_H*2);
-    lbl("Bank Account No.",     318, TOP_Y + LINE_H*3); val(bankAccount,       470, TOP_Y + LINE_H*3);
-
-    const TABLE_TOP = TOP_Y + LINE_H * 3 + 28;
-    const ROW_H = 21, TX = 28;
-    const CW = [145, 115, 165, 114];
-    const CX = [TX, TX+CW[0], TX+CW[0]+CW[1], TX+CW[0]+CW[1]+CW[2]];
-
-    const tableRows: [string,string,string,string,boolean,boolean][] = [
-      ["Earnings",           "Amount",             "Deduction",        "Amount",                 true,  false],
-      ["Basic Salary",       String(basic),        "TDS",              String(tds),              false, false],
-      ["HRA",                String(hra),           "PT",               String(pt),               false, false],
-      ["Special Allowances", String(special),      "Other",            other ? String(other):"", false, false],
-      ["Total Earnings",     String(totalEarnings),"Total Deductions", String(totalDeductions),  false, true ],
-    ];
-
-    tableRows.forEach(([el,ev,dl,dv,isH,isT], i) => {
-      const ry = TABLE_TOP + i * ROW_H;
-      [el, ev, dl, dv].forEach((text, ci) => {
-        const x = CX[ci], w = CW[ci];
-        if (isH || isT) { pdf.setFillColor(224,224,224); pdf.rect(x, ry, w, ROW_H, "F"); }
-        pdf.setDrawColor(0,0,0); pdf.setLineWidth(0.5); pdf.rect(x, ry, w, ROW_H, "S");
-        const ty = ry + ROW_H - 6;
-        pdf.setFont("helvetica", isH||isT ? "bold" : "normal");
-        pdf.setFontSize(10); pdf.setTextColor(0,0,0);
-        if (isH) pdf.text(text, x + w/2, ty, { align: "center" });
-        else if ((ci===1||ci===3) && text) pdf.text(text, x + w - 6, ty, { align: "right" });
-        else pdf.text(text, x + 6, ty);
+      await setDoc(doc(db, "payslips", `${uid}_${monthKey}`), {
+        uid,
+        name:           u.name          || "",
+        email:          u.email         || "",
+        designation:    u.designation   || "N/A",
+        empId:          u.empId         || u.employeeId || "N/A",
+        dateOfJoining:  u.dateOfJoining || u.joiningDate || "N/A",
+        bankAccount:    s.bankAccount   ?? s.BankAccount ?? "N/A",
+        pan:            s.pan           ?? s.Pan         ?? "N/A",
+        month:          selectedMonth,
+        year:           selectedYear,
+        monthKey,
+        totalDays,
+        lop:            0,
+        paidDays:       totalDays,
+        basic, hra, specialAllowance,
+        totalEarnings,
+        pf, pt, tds,
+        totalDeductions,
+        netSalary,
+        generatedAt: serverTimestamp(),
       });
-    });
-
-    const NET_Y = TABLE_TOP + tableRows.length * ROW_H + 26;
-    pdf.setFont("helvetica", "bold"); pdf.setFontSize(13); pdf.setTextColor(0,0,0);
-    pdf.text("Net Salary",      165, NET_Y);
-    pdf.text(String(netSalary), 315, NET_Y);
-
-    pdf.setFont("helvetica", "italic"); pdf.setFontSize(9); pdf.setTextColor(80,80,80);
-    pdf.text("This is system Generated document. doesn't need a signature", W/2, NET_Y+55, { align:"center" });
-    pdf.text("For Verification reach hr@techgyinnovations.com",             W/2, NET_Y+69, { align:"center" });
-
-    // ✅ Direct download — identical to employee page, no Storage needed
-    pdf.save(`Payslip_${user?.name || uid}_${monthKey}.pdf`);
-    return true;
-  };
-
-  /* ================= GENERATE: saves only metadata to Firestore ================= */
-  const generatePayslip = async (uid: string, silent = false) => {
-    const userDoc    = await getDoc(doc(db, "users", uid));
-    const salarySnap = await getDoc(doc(db, "salaryStructures", uid));
-
-    if (!salarySnap.exists()) {
-      if (!silent) alert("❌ Salary structure not found for this employee.");
+      return true;
+    } catch (err) {
+      console.error("generatePayslip error:", err);
+      if (!silent) alert("Failed to generate payslip. Check console for details.");
       return false;
     }
-
-    const user   = userDoc.data();
-    const salary = salarySnap.data();
-
-    const gross      = Number(salary.basic||0) + Number(salary.hra||0) + Number(salary.specialAllowance||0);
-    const deductions = Number(salary.tds||0)   + Number(salary.pt||0)  + Number(salary.other||0);
-    const netSalary  = gross - deductions;
-
-    // Save only metadata — PDF is regenerated on demand (same as employee page)
-    await setDoc(doc(db, "payslips", `${uid}_${monthKey}`), {
-      uid,
-      employeeId: uid,
-      name:      user?.name,
-      email:     user?.email,
-      month:     monthKey,
-      gross,
-      deductions,
-      netSalary,
-      generatedAt: serverTimestamp(),
-    });
-
-    return true;
   };
 
+  /* ── buildAndDownloadPdf — exact TechGy payslip design ──────────────────*/
+  const buildAndDownloadPdf = async (uid: string, key: string) => {
+    try {
+      const snap = await getDoc(doc(db, "payslips", `${uid}_${key}`));
+      if (!snap.exists()) { alert("Payslip not found. Please generate it first."); return; }
+      const p = snap.data();
+
+      const { jsPDF } = await import("jspdf");
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+      const pageW  = 210;
+      const margin = 14;
+
+      // ── Load logo from /public/logo (2).png ──────────────────────────────
+      let logoDataUrl: string | null = null;
+      try {
+        const res  = await fetch("/logo (2).png");
+        const blob = await res.blob();
+        logoDataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload  = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } catch { /* continue without logo */ }
+
+      const fmt = (n: number | undefined) =>
+        Number(n || 0).toLocaleString("en-IN");
+
+      let y = margin;
+
+      // ── Logo + Company header ─────────────────────────────────────────────
+      if (logoDataUrl) {
+        pdf.addImage(logoDataUrl, "PNG", margin, y, 26, 20);
+      }
+
+      const cx = margin + 30; // text starts after logo
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(13);
+      pdf.setTextColor(20, 20, 20);
+      pdf.text("TECHGY INNOVATIONS", cx, y + 5);
+      pdf.text("PRIVATE LIMITED",    cx, y + 11);
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(7);
+      pdf.setTextColor(70, 70, 70);
+      [
+        "Shop No. 09, Sri Venkateswara Swamy Residency, Land Mark -",
+        "Rajahmundry Ruchulu, 13th Phase Rd, Kukatpally Housing Board",
+        "Colony, Hyderabad, Telangana 500085",
+        "CIN: U93090TG2019PTC13277",
+      ].forEach((line, i) => pdf.text(line, cx, y + 17 + i * 3.8));
+
+      y += 36;
+
+      // ── Divider ───────────────────────────────────────────────────────────
+      pdf.setDrawColor(160, 160, 160);
+      pdf.setLineWidth(0.5);
+      pdf.line(margin, y, pageW - margin, y);
+      y += 7;
+
+      // ── "Payslip For" title ───────────────────────────────────────────────
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(11);
+      pdf.setTextColor(20, 20, 20);
+      pdf.text(
+        `Payslip For: ${monthNames[p.month - 1]}, ${p.year}`,
+        pageW / 2, y, { align: "center" }
+      );
+      y += 9;
+
+      // ── Employee info (2-column label/value) ──────────────────────────────
+      const L  = margin;
+      const R  = pageW / 2 + 4;
+      const LV = L  + 35; // left  value x
+      const RV = R  + 35; // right value x
+
+      const infoLine = (
+        lb1: string, v1: string,
+        lb2: string, v2: string
+      ) => {
+        pdf.setFont("helvetica", "bold");   pdf.setFontSize(8.5); pdf.setTextColor(20,20,20);
+        pdf.text(lb1, L, y);
+        pdf.setFont("helvetica", "normal"); pdf.text(v1, LV, y);
+        pdf.setFont("helvetica", "bold");   pdf.text(lb2, R, y);
+        pdf.setFont("helvetica", "normal"); pdf.text(v2, RV, y);
+        y += 6;
+      };
+
+      infoLine("Employee Name:", p.name           || "N/A", "Total Days In Month:", String(p.totalDays || 30));
+      infoLine("Emp ID:",        p.empId           || "N/A", "LOP",                  String(p.lop       || 0));
+      infoLine("Designation:",   p.designation     || "N/A", "Actual Paid Days",     String(p.paidDays  || 30));
+      infoLine("Date of Joining:",p.dateOfJoining  || "N/A", "Bank Account No.",     p.bankAccount      || "N/A");
+
+      y += 2;
+
+      // ── Earnings / Deductions table ───────────────────────────────────────
+      const tL   = margin;
+      const tR   = pageW - margin;
+      const tW   = tR - tL;
+      const half = tW / 2;
+      const midX = tL + half;
+      // Sub-column split (label | amount) within each half
+      const splitRatio = 0.62;
+      const LS = tL   + half * splitRatio; // left  amount col x
+      const RS = midX + half * splitRatio; // right amount col x
+      const rH = 7;   // row height
+
+      // Draw a rect border + inner lines for a given row
+      const drawRowBorders = (rowY: number, filled: boolean) => {
+        if (filled) {
+          pdf.setFillColor(242, 242, 242);
+          pdf.rect(tL, rowY, tW, rH, "F");
+        }
+        pdf.setDrawColor(190, 190, 190);
+        pdf.setLineWidth(0.25);
+        pdf.rect(tL, rowY, tW, rH, "S");
+        pdf.line(midX, rowY, midX, rowY + rH);
+        pdf.line(LS,   rowY, LS,   rowY + rH);
+        pdf.line(RS,   rowY, RS,   rowY + rH);
+      };
+
+      // Header row
+      drawRowBorders(y, true);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(20, 20, 20);
+      pdf.text("Earnings",  tL   + 3, y + 5);
+      pdf.text("Amount",    LS   + 3, y + 5);
+      pdf.text("Deduction", midX + 3, y + 5);
+      pdf.text("Amount",    RS   + 3, y + 5);
+      y += rH;
+
+      // Data rows
+      const earningRows  = [
+        ["Basic Salary",       fmt(p.basic)],
+        ["HRA",                fmt(p.hra)],
+        ["Special Allowances", fmt(p.specialAllowance)],
+      ];
+      const deductionRows = [
+        ["TDS",   fmt(p.tds)],
+        ["PT",    fmt(p.pt)],
+        ["Other", ""],
+      ];
+
+      earningRows.forEach((er, i) => {
+        const dr = deductionRows[i] || ["", ""];
+        drawRowBorders(y, false);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(8.5);
+        pdf.setTextColor(20, 20, 20);
+        pdf.text(er[0],  tL   + 3, y + 5);
+        pdf.text(er[1],  LS   + 3, y + 5);
+        pdf.text(dr[0],  midX + 3, y + 5);
+        if (dr[1]) pdf.text(dr[1], RS + 3, y + 5);
+        y += rH;
+      });
+
+      // Totals row (bold, shaded)
+      pdf.setFillColor(225, 225, 225);
+      pdf.rect(tL, y, tW, rH, "F");
+      pdf.setDrawColor(170, 170, 170);
+      pdf.rect(tL, y, tW, rH, "S");
+      pdf.line(midX, y, midX, y + rH);
+      pdf.line(LS,   y, LS,   y + rH);
+      pdf.line(RS,   y, RS,   y + rH);
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(20, 20, 20);
+      pdf.text("Total Earnings",    tL   + 3, y + 5);
+      pdf.text(fmt(p.totalEarnings),LS   + 3, y + 5);
+      pdf.text("Total Deductions",  midX + 3, y + 5);
+      pdf.text(fmt(p.totalDeductions), RS + 3, y + 5);
+      y += rH + 8;
+
+      // ── Net Salary ────────────────────────────────────────────────────────
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(12);
+      pdf.setTextColor(20, 20, 20);
+      const netLabel = "Net Salary";
+      const netValue = fmt(p.netSalary);
+      // Centre both together
+      const centre = pageW / 2;
+      pdf.text(netLabel, centre - 18, y);
+      pdf.text(netValue, centre + 18, y);
+      y += 18;
+
+      // ── Footer ────────────────────────────────────────────────────────────
+      pdf.setFont("helvetica", "italic");
+      pdf.setFontSize(8);
+      pdf.setTextColor(110, 110, 110);
+      pdf.text("This is system Generated document. doesn't need a signature", pageW / 2, y, { align: "center" });
+      pdf.text("For Verification reach hr@techgyinnovations.com",             pageW / 2, y + 5, { align: "center" });
+
+      pdf.save(`Payslip_${(p.name || "Employee").replace(/\s+/g, "_")}_${key}.pdf`);
+    } catch (err) {
+      console.error("buildAndDownloadPdf error:", err);
+      alert("Failed to generate PDF. Make sure jsPDF is installed:\nnpm install jspdf");
+    }
+  };
+
+  /* ─── Handlers ──────────────────────────────────────────────────────────── */
   const handleGenerateSingle = async (uid: string) => {
     setGeneratingUid(uid);
     const ok = await generatePayslip(uid, false);
-    if (ok) alert("✅ Payslip Generated");
-    await loadEmployees();
+    if (ok) await loadEmployees();
     setGeneratingUid(null);
   };
 
-  /* ================= DOWNLOAD: regenerate from salary data (same as employee page) ================= */
   const handleDownload = async (uid: string) => {
     setDownloadingUid(uid);
     await buildAndDownloadPdf(uid, monthKey);
     setDownloadingUid(null);
   };
 
-  /* ================= GENERATE ALL ================= */
   const handleGenerateAll = async () => {
-    const pending = employees.filter((e) => !e.generated);
-    if (pending.length === 0) { alert("✅ All payslips already generated for this month."); return; }
-
-    const confirmed = confirm(
-      `Generate payslips for ${pending.length} pending employee(s) for ${monthNames[selectedMonth-1]} ${selectedYear}?`
-    );
-    if (!confirmed) return;
-
+    const pending = filteredEmployees.filter((e) => !e.generated);
+    if (!pending.length) { alert("All payslips already generated."); return; }
     setLoadingAll(true);
     setBulkProgress({ done: 0, total: pending.length });
-
-    let successCount = 0;
-    const failNames: string[] = [];
-
+    let success = 0; const fail: string[] = [];
     for (let i = 0; i < pending.length; i++) {
-      const emp = pending[i];
-      const ok  = await generatePayslip(emp.uid, true);
-      if (ok) successCount++; else failNames.push(emp.name || emp.uid);
+      const ok = await generatePayslip(pending[i].uid, true);
+      if (ok) success++; else fail.push(pending[i].name);
       setBulkProgress({ done: i + 1, total: pending.length });
     }
-
     await loadEmployees();
-    setLoadingAll(false);
-    setBulkProgress(null);
-
-    if (failNames.length === 0) {
-      alert(`✅ All ${successCount} payslips generated successfully!`);
-    } else {
-      alert(`✅ ${successCount} payslips generated.\n❌ Failed (no salary structure):\n${failNames.join(", ")}`);
-    }
+    setLoadingAll(false); setBulkProgress(null);
+    if (!fail.length) alert(`✅ ${success} payslips generated!`);
+    else alert(`✅ ${success} generated.\n❌ Failed: ${fail.join(", ")}`);
   };
 
-  const totalCount     = employees.length;
-  const generatedCount = employees.filter((e) => e.generated).length;
-  const pendingCount   = totalCount - generatedCount;
+  /* ─── Sub-views ─────────────────────────────────────────────────────────── */
+  if (currentView === "salary") return (
+    <div className="space-y-4">
+      <BackBar label="Salary Structure" onBack={() => setCurrentView("payroll")} />
+      <SalaryStructure />
+    </div>
+  );
+  if (currentView === "history") return (
+    <div className="space-y-4">
+      <BackBar label="Payslip History" onBack={() => setCurrentView("payroll")} />
+      <PayslipHistory />
+    </div>
+  );
 
+  /* ─── Main view ─────────────────────────────────────────────────────────── */
   return (
-    <div className="bg-white p-8 rounded-2xl shadow-lg space-y-6">
-
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold">Payroll Generator</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            {generatedCount} of {totalCount} generated &nbsp;·&nbsp;
-            <span className="text-amber-600 font-medium">{pendingCount} pending</span>
-          </p>
-        </div>
-
-        {/* MONTH PICKER */}
-        <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2">
-          <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          <select value={selectedMonth} onChange={(e) => setSelectedMonth(Number(e.target.value))}
-            className="bg-transparent text-sm font-medium focus:outline-none cursor-pointer">
-            {monthNames.map((name, idx) => (
-              <option key={idx+1} value={idx+1}>{name}</option>
-            ))}
-          </select>
-          <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="bg-transparent text-sm font-medium focus:outline-none cursor-pointer">
-            {yearOptions.map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
-        </div>
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-semibold">Payroll Management</h1>
+        <p className="text-sm text-gray-500 mt-1">Manage salaries, generate payroll, and download payslips.</p>
       </div>
 
-      {/* BULK GENERATE */}
-      <div className="flex items-center gap-4">
+      {/* Filter Bar */}
+      <div className="flex flex-wrap items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-xl">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500 font-medium">Year</span>
+          <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))}
+            className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
+            {yearOptions.map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500 font-medium">Month</span>
+          <select value={selectedMonth} onChange={(e) => setSelectedMonth(Number(e.target.value))}
+            className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
+            {monthNames.map((name, idx) => <option key={idx} value={idx + 1}>{name}</option>)}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500 font-medium">Employee</span>
+          <select value={selectedEmp} onChange={(e) => setSelectedEmp(e.target.value)}
+            className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
+            <option value="all">All</option>
+            {employees.map((e) => <option key={e.uid} value={e.uid}>{e.name}</option>)}
+          </select>
+        </div>
         <button onClick={handleGenerateAll} disabled={loadingAll || pendingCount === 0}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold transition-all shadow-sm ${
-            pendingCount === 0
-              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-              : "bg-indigo-600 hover:bg-indigo-700 text-white"
-          }`}>
-          {loadingAll ? (
-            <>
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-              </svg>
-              {bulkProgress ? `Generating ${bulkProgress.done}/${bulkProgress.total}…` : "Generating…"}
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-              </svg>
-              Generate All ({pendingCount} pending)
-            </>
-          )}
+          className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white text-sm font-medium rounded-lg transition">
+          {loadingAll ? "Generating…" : "Generate"}
         </button>
+      </div>
+
+      {/* Search */}
+      <div className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-lg bg-white w-fit">
+        <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <circle cx="11" cy="11" r="8"/><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35"/>
+        </svg>
+        <input value={search} onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search employees…" className="text-sm focus:outline-none w-48 bg-transparent" />
+      </div>
+
+      {/* Table */}
+      <div className="border border-gray-200 rounded-xl bg-white overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+          <span className="text-sm font-medium">Payroll Output Area</span>
+          <span className="text-xs text-gray-500">{monthNames[selectedMonth - 1]} {selectedYear}</span>
+        </div>
 
         {bulkProgress && (
-          <div className="flex-1 max-w-xs">
-            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100">
+            <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+              <span>Generating {bulkProgress.done} / {bulkProgress.total}…</span>
+              <span>{Math.round((bulkProgress.done / bulkProgress.total) * 100)}%</span>
+            </div>
+            <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
               <div className="h-full bg-indigo-500 rounded-full transition-all duration-300"
                 style={{ width: `${(bulkProgress.done / bulkProgress.total) * 100}%` }} />
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              {Math.round((bulkProgress.done / bulkProgress.total) * 100)}% complete
-            </p>
           </div>
         )}
-      </div>
 
-      {/* TABLE */}
-      <div className="overflow-x-auto rounded-xl border border-gray-200">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="p-3 text-left text-sm font-semibold text-gray-600">Employee</th>
-              <th className="p-3 text-center text-sm font-semibold text-gray-600">Status</th>
-              <th className="p-3 text-center text-sm font-semibold text-gray-600">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {employees.length === 0 ? (
-              <tr><td colSpan={3} className="p-8 text-center text-gray-400">Loading employees…</td></tr>
-            ) : (
-              employees.map((emp) => (
+        {filteredEmployees.length === 0 ? (
+          <div className="py-16 text-center">
+            <p className="text-sm font-medium text-gray-700">No employees found</p>
+            <p className="text-xs text-gray-400 mt-1">Select filters and click Generate to get started.</p>
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">Employee</th>
+                <th className="text-center px-4 py-2.5 text-xs font-medium text-gray-500">Status</th>
+                <th className="text-center px-4 py-2.5 text-xs font-medium text-gray-500">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredEmployees.map((emp) => (
                 <tr key={emp.uid} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
-                  <td className="p-3">
-                    <p className="font-medium text-gray-900">{emp.name}</p>
+                  <td className="px-4 py-3">
+                    <p className="text-sm font-medium text-gray-900">{emp.name}</p>
                     <p className="text-xs text-gray-500">{emp.email}</p>
                   </td>
-                  <td className="p-3 text-center">
-                    {emp.generated ? (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                        ✅ Generated
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-                        ⏳ Pending
-                      </span>
-                    )}
+                  <td className="px-4 py-3 text-center">
+                    {emp.generated
+                      ? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">✅ Generated</span>
+                      : <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">⏳ Pending</span>
+                    }
                   </td>
-                  <td className="p-3 text-center">
+                  <td className="px-4 py-3 text-center">
                     {emp.generated ? (
-                      <button
-                        onClick={() => handleDownload(emp.uid)}
-                        disabled={downloadingUid === emp.uid}
-                        className="inline-flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 font-semibold text-sm transition-colors disabled:opacity-50"
-                      >
-                        {downloadingUid === emp.uid ? (
-                          <>
-                            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                            </svg>
-                            Preparing…
-                          </>
-                        ) : (
-                          <>
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
-                            Download
-                          </>
-                        )}
+                      <button onClick={() => handleDownload(emp.uid)} disabled={downloadingUid === emp.uid}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-indigo-500 text-indigo-600 rounded-lg text-xs font-medium hover:bg-indigo-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                        {downloadingUid === emp.uid ? "Preparing…" : "⬇ Download"}
                       </button>
                     ) : (
-                      <button
-                        onClick={() => handleGenerateSingle(emp.uid)}
-                        disabled={generatingUid === emp.uid}
-                        className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors"
-                      >
-                        {generatingUid === emp.uid ? (
-                          <>
-                            <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                            </svg>
-                            Generating…
-                          </>
-                        ) : (
-                          <>
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                            </svg>
-                            Generate
-                          </>
-                        )}
+                      <button disabled
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-400 rounded-lg text-xs font-medium cursor-not-allowed bg-gray-50">
+                        ⬇ Download
                       </button>
                     )}
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
+    </div>
+  );
+}
+
+function BackBar({ label, onBack }: { label: string; onBack: () => void }) {
+  return (
+    <div className="flex items-center gap-3">
+      <button onClick={onBack}
+        className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-indigo-600 transition-colors">
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+        Back to Payroll
+      </button>
+      <span className="text-gray-300">/</span>
+      <span className="text-sm font-medium text-gray-800">{label}</span>
     </div>
   );
 }

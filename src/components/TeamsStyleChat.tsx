@@ -54,7 +54,23 @@ const COLORS = [
 ];
 const avGrad   = (n:string) => COLORS[(n?.charCodeAt(0)??65)%COLORS.length];
 const initials = (n:string) => (n??"").split(" ").slice(0,2).map(w=>w[0]?.toUpperCase()??"").join("");
-const STUN = { iceServers:[{urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun1.l.google.com:19302"}] };
+
+// ── ICE / TURN config ─────────────────────────────────────────────────────────
+const ICE_SERVERS: RTCConfiguration = {
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+    {
+      urls: "turn:global.relay.metered.ca:80",
+      username: "12806757bb1fc0f96b5f0f13",
+      credential: "MZ14/Tt0GfozoWP4",
+    },
+    {
+      urls: "turn:global.relay.metered.ca:443",
+      username: "12806757bb1fc0f96b5f0f13",
+      credential: "MZ14/Tt0GfozoWP4",
+    },
+  ],
+};
 
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
@@ -173,6 +189,8 @@ const CSS = `
 .zc-notif-body::-webkit-scrollbar-thumb{background:#e8eaf0;border-radius:3px;}
 .zc-ni{display:flex;align-items:flex-start;gap:9px;padding:10px 14px;border-bottom:1px solid #f9fafb;cursor:pointer;transition:background .12s;}
 .zc-ni:hover{background:#f8f9fb;}
+
+/* ── Active call overlay ── */
 .zc-call-ov{position:fixed;inset:0;background:#0d1117;z-index:9999;display:flex;flex-direction:column;}
 .zc-call-main{flex:1;position:relative;background:#161b22;display:flex;align-items:center;justify-content:center;}
 .zc-call-audio-center{display:flex;flex-direction:column;align-items:center;gap:12px;}
@@ -184,6 +202,8 @@ const CSS = `
 .zc-cbtn.neu:hover{background:#373e47;}
 .zc-cbtn.end{background:#e8512a;color:#fff;}
 .zc-cbtn.act{background:#dc2626;color:#fff;}
+
+/* ── Incoming call ── */
 .zc-incoming{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);}
 .zc-inc-card{background:#fff;border-radius:20px;padding:32px 36px;text-align:center;width:320px;box-shadow:0 24px 64px rgba(0,0,0,.24);}
 .zc-inc-av{width:80px;height:80px;border-radius:20px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:800;color:#fff;overflow:hidden;}
@@ -236,12 +256,7 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
   const [groupName,setGroupName]       = useState("");
   const [selectedMembers,setSelectedMembers] = useState<string[]>([]);
   const [notifications,setNotifications]     = useState<any[]>([]);
-  // showNotifs, showProfile, showSettings moved to MeetChatApp — commented out here
-  // const [showNotifs,setShowNotifs]     = useState(false);
-  // const [showProfile,setShowProfile]   = useState(false);
-  // const [showSettings,setShowSettings] = useState(false);
   const [showDots,setShowDots]         = useState(false);
-  // myStatus / changeStatus also moved — kept only for userStatus heartbeat
   const [myStatus,setMyStatus]         = useState<UserStatus>("available");
   const [collapsedGroups,setCollapsedGroups] = useState<Set<string>>(new Set());
   const [editingMsgId,setEditingMsgId] = useState<string|null>(null);
@@ -257,35 +272,34 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
 
   const msgsEnd   = useRef<HTMLDivElement>(null);
   const typingRef = useRef<any>(null);
-  const localVid  = useRef<HTMLVideoElement>(null);
-  const remoteVid = useRef<HTMLVideoElement>(null);
   const peerRef   = useRef<RTCPeerConnection|null>(null);
   const streamRef = useRef<MediaStream|null>(null);
   const timerRef  = useRef<any>(null);
   const fileRef   = useRef<HTMLInputElement>(null);
   const iceQueue  = useRef<RTCIceCandidateInit[]>([]);
   const dotsRef   = useRef<HTMLDivElement>(null);
-  // profRef, notifRef, settRef moved to MeetChatApp
-  // const profRef   = useRef<HTMLDivElement>(null);
-  // const notifRef  = useRef<HTMLDivElement>(null);
-  // const settRef   = useRef<HTMLDivElement>(null);
+
+  // ── SEPARATE REFS FOR VIDEO AND AUDIO (prevents stream routing bugs) ───────
+  const localVideoRef  = useRef<HTMLVideoElement>(null);  // local camera PiP
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);  // remote video stream
+  const localAudioRef  = useRef<HTMLAudioElement>(null);  // local mic element (muted)
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);  // remote audio output
+
+  // Track call type in a ref so async ontrack closures always see current value
+  const callTypeRef = useRef<"video"|"audio">("audio");
 
   const chatId = useMemo(()=>selectedChat?.id||null,[selectedChat]);
 
-  // ── Ringtone helpers ──────────────────────────────────────────────
+  // ── Ringtone helpers ──────────────────────────────────────────────────────
   const ringCtxRef  = useRef<AudioContext|null>(null);
   const ringLoopRef = useRef<ReturnType<typeof setInterval>|null>(null);
 
-  // Create the AudioContext on first user gesture so Chrome allows it
   useEffect(()=>{
     const unlock = () => {
       if(!ringCtxRef.current){
         ringCtxRef.current = new (window.AudioContext||(window as any).webkitAudioContext)();
       }
-      if(ringCtxRef.current.state==="suspended"){
-        ringCtxRef.current.resume().catch(()=>{});
-      }
-      // Only need to unlock once
+      if(ringCtxRef.current.state==="suspended") ringCtxRef.current.resume().catch(()=>{});
       document.removeEventListener("click", unlock);
       document.removeEventListener("keydown", unlock);
       document.removeEventListener("touchstart", unlock);
@@ -304,25 +318,20 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
     if(ringLoopRef.current){clearInterval(ringLoopRef.current);ringLoopRef.current=null;}
   };
 
-  // Classic PSTN double-ring: 440Hz + 480Hz, two bursts, 3s cadence
   const playRingCycle = (ctx: AudioContext) => {
-    // Resume in case it got suspended
     if(ctx.state==="suspended") ctx.resume().catch(()=>{});
     const now = ctx.currentTime;
     [[0, 0.4],[0.5, 0.9]].forEach(([start, end])=>{
       [440, 480].forEach(freq=>{
         const osc  = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.type = "sine";
-        osc.frequency.value = freq;
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = "sine"; osc.frequency.value = freq;
         gain.gain.setValueAtTime(0, now + start);
         gain.gain.linearRampToValueAtTime(0.3, now + start + 0.02);
         gain.gain.setValueAtTime(0.3, now + end - 0.02);
         gain.gain.linearRampToValueAtTime(0, now + end);
-        osc.start(now + start);
-        osc.stop(now + end);
+        osc.start(now + start); osc.stop(now + end);
       });
     });
   };
@@ -330,40 +339,34 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
   const startRing = () => {
     stopRing();
     try {
-      // Create context if not yet created (fallback if no gesture happened yet)
-      if(!ringCtxRef.current){
+      if(!ringCtxRef.current)
         ringCtxRef.current = new (window.AudioContext||(window as any).webkitAudioContext)();
-      }
       const ctx = ringCtxRef.current;
-      const doPlay = () => { playRingCycle(ctx); };
-      ctx.resume().then(doPlay).catch(doPlay); // resume then play
+      const doPlay = () => playRingCycle(ctx);
+      ctx.resume().then(doPlay).catch(doPlay);
       ringLoopRef.current = setInterval(()=>{
         if(ringCtxRef.current) playRingCycle(ringCtxRef.current);
       }, 3000);
     } catch(e){ /* AudioContext unavailable */ }
   };
 
-  // Incoming call ringtone
   useEffect(()=>{
-    if(incomingCall){ startRing(); }
-    else { stopRing(); }
+    if(incomingCall){ startRing(); } else { stopRing(); }
     return()=>stopRing();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[!!incomingCall]);
 
-  // Outgoing call ringtone (caller side only)
   useEffect(()=>{
-    if(activeCall?.status==="ringing" && activeCall.callerId===user?.uid){ startRing(); }
+    if(activeCall?.status==="ringing"&&activeCall.callerId===user?.uid){ startRing(); }
     else { stopRing(); }
     return()=>stopRing();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[activeCall?.status]);
-  // ──────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(()=>{
     const h=(e:MouseEvent)=>{
-      // profRef, notifRef, settRef handled in MeetChatApp
-      if(dotsRef.current&&!dotsRef.current.contains(e.target as Node))setShowDots(false);
+      if(dotsRef.current&&!dotsRef.current.contains(e.target as Node)) setShowDots(false);
     };
     document.addEventListener("mousedown",h);
     return()=>document.removeEventListener("mousedown",h);
@@ -378,7 +381,7 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
 
   useEffect(()=>{
     const subs=users.map(u=>onSnapshot(doc(db,"userStatus",u.uid),snap=>{
-      if(snap.exists())setUserStatuses(p=>({...p,[u.uid]:{status:snap.data().status||"offline",online:snap.data().online||false}}));
+      if(snap.exists()) setUserStatuses(p=>({...p,[u.uid]:{status:snap.data().status||"offline",online:snap.data().online||false}}));
     }));
     return()=>subs.forEach(s=>s());
   },[users]);
@@ -390,8 +393,9 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
   },[user]);
 
   useEffect(()=>{
-    if(activeCall?.status==="accepted"){setCallTimer(0);timerRef.current=setInterval(()=>setCallTimer(p=>p+1),1000);}
-    else{clearInterval(timerRef.current);setCallTimer(0);}
+    if(activeCall?.status==="accepted"){
+      setCallTimer(0); timerRef.current=setInterval(()=>setCallTimer(p=>p+1),1000);
+    } else { clearInterval(timerRef.current); setCallTimer(0); }
     return()=>clearInterval(timerRef.current);
   },[activeCall?.status]);
 
@@ -402,25 +406,35 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
   },[user]);
 
   useEffect(()=>{
-    if(!activeCall)return;
+    if(!activeCall?.id)return;
     return onSnapshot(doc(db,"calls",activeCall.id),async snap=>{
       if(!snap.exists()){endCall();return;}
       const call={id:snap.id,...snap.data()} as Call;
-      setActiveCall(call);
+      // Apply answer SDP exactly once (caller side)
       if(call.answer&&peerRef.current&&!peerRef.current.remoteDescription){
         await peerRef.current.setRemoteDescription(new RTCSessionDescription(call.answer));
-        iceQueue.current.forEach(c=>peerRef.current?.addIceCandidate(new RTCIceCandidate(c)));
+        for(const c of iceQueue.current)
+          await peerRef.current.addIceCandidate(new RTCIceCandidate(c)).catch(console.error);
         iceQueue.current=[];
       }
-      if(call.status==="ended"||call.status==="rejected")endCall();
+      if(call.status==="ended"||call.status==="rejected"){ endCall(); return; }
+      setActiveCall(prev=>{
+        if(!prev) return call;
+        if(prev.status!==call.status||prev.answer!==call.answer) return call;
+        return prev;
+      });
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[activeCall?.id]);
 
   useEffect(()=>{msgsEnd.current?.scrollIntoView({behavior:"smooth"});},[messages]);
 
   useEffect(()=>{
     if(!user)return;
-    const init=users.filter(u=>u.uid!==user.uid).map(u=>{const id=[user.uid,u.uid].sort().join("_");return{id,participants:[user.uid,u.uid],unreadCount:{[user.uid]:0},isGroup:false} as Chat;});
+    const init=users.filter(u=>u.uid!==user.uid).map(u=>{
+      const id=[user.uid,u.uid].sort().join("_");
+      return{id,participants:[user.uid,u.uid],unreadCount:{[user.uid]:0},isGroup:false} as Chat;
+    });
     setChats(init);
     const subs:(()=>void)[]=[];
     users.forEach(u=>{
@@ -440,7 +454,7 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
           const last=mSnap.docs[0]?.data();
           setChats(prev=>{
             const ex=prev.find(c=>c.id===gDoc.id);
-            if(ex)return prev.map(c=>c.id===gDoc.id?{...c,unreadCount:{...c.unreadCount,[user.uid]:unread},lastMessage:last?.text||last?.fileName||"File",lastMessageTime:last?.createdAt}:c);
+            if(ex) return prev.map(c=>c.id===gDoc.id?{...c,unreadCount:{...c.unreadCount,[user.uid]:unread},lastMessage:last?.text||last?.fileName||"File",lastMessageTime:last?.createdAt}:c);
             return[...prev,{id:gDoc.id,participants:gd.participants,unreadCount:{[user.uid]:unread},lastMessage:last?.text||last?.fileName||"File",lastMessageTime:last?.createdAt,isGroup:true,groupName:gd.groupName,groupAvatar:gd.groupAvatar,createdBy:gd.createdBy}];
           });
         }));
@@ -456,7 +470,7 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
       const data=snap.docs.map(d=>({id:d.id,...d.data()} as Message));
       setMessages(data);
       const batch=writeBatch(db);
-      data.forEach(m=>{if(m.senderUid!==user?.uid&&(!m.readBy||!m.readBy.includes(user!.uid)))batch.update(doc(db,path,m.id),{readBy:[...(m.readBy||[]),user!.uid],status:"seen"});});
+      data.forEach(m=>{if(m.senderUid!==user?.uid&&(!m.readBy||!m.readBy.includes(user!.uid))) batch.update(doc(db,path,m.id),{readBy:[...(m.readBy||[]),user!.uid],status:"seen"});});
       batch.commit();
     });
   },[chatId,selectedChat,user]);
@@ -490,14 +504,17 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
       if(text.trim())msg.text=text;if(fu){msg.fileUrl=fu;msg.fileName=fn;msg.fileType=ft;}
       await addDoc(collection(db,path),msg);
       const others=selectedChat.participants.filter(p=>p!==user.uid);
-      for(const pid of others)await addDoc(collection(db,"notifications"),{fromUid:user.uid,fromName:getUserName(user),toUid:pid,message:text||fn||"Sent a file",chatId,timestamp:serverTimestamp(),read:false});
+      for(const pid of others) await addDoc(collection(db,"notifications"),{fromUid:user.uid,fromName:getUserName(user),toUid:pid,message:text||fn||"Sent a file",chatId,timestamp:serverTimestamp(),read:false});
       const tp=selectedChat.isGroup?`groupChats/${chatId}/typing`:`chats/${chatId}/typing`;
       await deleteDoc(doc(db,tp,user.uid));
       setText("");setSelectedFile(null);
     }catch(e){console.error(e);}finally{setUploading(false);}
   };
 
-  const deleteMsg=async(id:string)=>{if(!selectedChat||!chatId)return;await deleteDoc(doc(db,selectedChat.isGroup?`groupChats/${chatId}/messages`:`chats/${chatId}/messages`,id));};
+  const deleteMsg=async(id:string)=>{
+    if(!selectedChat||!chatId)return;
+    await deleteDoc(doc(db,selectedChat.isGroup?`groupChats/${chatId}/messages`:`chats/${chatId}/messages`,id));
+  };
   const saveEdit=async()=>{
     if(!editingMsgId||!editText.trim()||!selectedChat||!chatId)return;
     await updateDoc(doc(db,selectedChat.isGroup?`groupChats/${chatId}/messages`:`chats/${chatId}/messages`,editingMsgId),{text:editText,isEdited:true,editedAt:serverTimestamp()});
@@ -505,50 +522,111 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
   };
 
   const changeStatus=async(s:UserStatus)=>{
-  setMyStatus(s);
-  if(user)await updateDoc(doc(db,"userStatus",user.uid),{status:s,online:s!=="offline"});
-};
+    setMyStatus(s);
+    if(user) await updateDoc(doc(db,"userStatus",user.uid),{status:s,online:s!=="offline"});
+  };
 
-  const markAllRead=async()=>{const b=writeBatch(db);notifications.forEach(n=>b.update(doc(db,"notifications",n.id),{read:true}));await b.commit();};
+  const markAllRead=async()=>{
+    const b=writeBatch(db);
+    notifications.forEach(n=>b.update(doc(db,"notifications",n.id),{read:true}));
+    await b.commit();
+  };
 
+  // ── Build ontrack handler — routes stream to the correct ref ─────────────
+  const buildOnTrack = (pc: RTCPeerConnection) => {
+    pc.ontrack = (e) => {
+      const remoteStream = e.streams[0];
+      console.log("ontrack — type:", callTypeRef.current, "tracks:", remoteStream.getTracks().map(t=>t.kind));
+      if(callTypeRef.current === "video"){
+        if(remoteVideoRef.current){
+          remoteVideoRef.current.srcObject = remoteStream;
+          remoteVideoRef.current.muted = false;
+          remoteVideoRef.current.play().catch(err=>console.warn("remote video autoplay:", err));
+        }
+      } else {
+        if(remoteAudioRef.current){
+          remoteAudioRef.current.srcObject = remoteStream;
+          remoteAudioRef.current.muted = false;
+          remoteAudioRef.current.play().catch(err=>console.warn("remote audio autoplay:", err));
+        }
+      }
+    };
+  };
+
+  // ── Attach local stream to the right element ─────────────────────────────
+  const attachLocalStream = (stream: MediaStream, type: "video"|"audio") => {
+    if(type === "video" && localVideoRef.current) localVideoRef.current.srcObject = stream;
+    if(type === "audio" && localAudioRef.current) localAudioRef.current.srcObject = stream;
+  };
+
+  // ── INITIATE CALL ─────────────────────────────────────────────────────────
   const initiateCall=async(type:"video"|"audio")=>{
     if(!user||!selectedChat||selectedChat.isGroup)return;
     const rid=selectedChat.participants.find(p=>p!==user.uid);if(!rid)return;
     const recv=users.find(u=>u.uid===rid);if(!recv)return;
+    callTypeRef.current = type;
     try{
-      const s=await navigator.mediaDevices.getUserMedia({video:type==="video"?{width:1280,height:720}:false,audio:{echoCancellation:true,noiseSuppression:true}});
-      streamRef.current=s;if(localVid.current&&type==="video")localVid.current.srcObject=s;
-      const pc=new RTCPeerConnection(STUN);peerRef.current=pc;
-      s.getTracks().forEach(t=>pc.addTrack(t,s));
-      pc.ontrack=e=>{if(remoteVid.current)remoteVid.current.srcObject=e.streams[0];};
-      const offer=await pc.createOffer();await pc.setLocalDescription(offer);
+      const stream=await navigator.mediaDevices.getUserMedia({
+        video:type==="video"?{width:1280,height:720,facingMode:"user"}:false,
+        audio:{echoCancellation:true,noiseSuppression:true,sampleRate:48000},
+      });
+      streamRef.current=stream;
+      attachLocalStream(stream,type);
+      const pc=new RTCPeerConnection(ICE_SERVERS);
+      peerRef.current=pc;
+      stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+      buildOnTrack(pc);
+      const offer=await pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:type==="video"});
+      await pc.setLocalDescription(offer);
       const cd=await addDoc(collection(db,"calls"),{callerId:user.uid,callerName:getUserName(user),receiverId:rid,type,status:"ringing",offer:{type:offer.type,sdp:offer.sdp},startTime:serverTimestamp()});
-      const oc=collection(db,"calls",cd.id,"offerCandidates"),ac=collection(db,"calls",cd.id,"answerCandidates");
+      const oc=collection(db,"calls",cd.id,"offerCandidates");
+      const ac=collection(db,"calls",cd.id,"answerCandidates");
       pc.onicecandidate=async e=>{if(e.candidate)await addDoc(oc,e.candidate.toJSON());};
-      onSnapshot(ac,snap=>snap.docChanges().forEach(ch=>{if(ch.type==="added"){const d=ch.doc.data();if(pc.remoteDescription)pc.addIceCandidate(new RTCIceCandidate(d));else iceQueue.current.push(d);}}));
-      setActiveCall({id:cd.id,callerId:user.uid,callerName:getUserName(user),receiverId:rid,type,status:"ringing"});
+      onSnapshot(ac,snap=>snap.docChanges().forEach(ch=>{
+        if(ch.type==="added"){const d=ch.doc.data();if(pc.remoteDescription)pc.addIceCandidate(new RTCIceCandidate(d)).catch(console.error);else iceQueue.current.push(d);}
+      }));
       pc.onconnectionstatechange=()=>{if(pc.connectionState==="failed"||pc.connectionState==="disconnected")endCall();};
+      setActiveCall({id:cd.id,callerId:user.uid,callerName:getUserName(user),receiverId:rid,type,status:"ringing"});
     }catch(e){console.error(e);alert("Camera/mic access failed.");}
   };
 
+  // ── ACCEPT CALL ───────────────────────────────────────────────────────────
   const acceptCall=async()=>{
     if(!incomingCall||!user)return;
+    callTypeRef.current = incomingCall.type;   // ← set BEFORE creating RTCPeerConnection
     try{
-      const s=await navigator.mediaDevices.getUserMedia({video:incomingCall.type==="video"?{width:1280,height:720}:false,audio:{echoCancellation:true,noiseSuppression:true}});
-      streamRef.current=s;if(localVid.current&&incomingCall.type==="video")localVid.current.srcObject=s;
-      const pc=new RTCPeerConnection(STUN);peerRef.current=pc;
-      s.getTracks().forEach(t=>pc.addTrack(t,s));
-      pc.ontrack=e=>{if(remoteVid.current)remoteVid.current.srcObject=e.streams[0];};
+      const stream=await navigator.mediaDevices.getUserMedia({
+        video:incomingCall.type==="video"?{width:1280,height:720,facingMode:"user"}:false,
+        audio:{echoCancellation:true,noiseSuppression:true,sampleRate:48000},
+      });
+      streamRef.current=stream;
+      attachLocalStream(stream,incomingCall.type);
+      const pc=new RTCPeerConnection(ICE_SERVERS);   // ← was "STUN" — FIXED
+      peerRef.current=pc;
+      stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+      buildOnTrack(pc);
+      // Flush any ICE candidates that arrived before accept
+      for(const c of iceQueue.current)
+        await pc.addIceCandidate(new RTCIceCandidate(c)).catch(console.error);
+      iceQueue.current=[];
       await pc.setRemoteDescription(new RTCSessionDescription(incomingCall.offer));
-      const answer=await pc.createAnswer();await pc.setLocalDescription(answer);
+      const answer=await pc.createAnswer();
+      await pc.setLocalDescription(answer);
       await updateDoc(doc(db,"calls",incomingCall.id),{status:"accepted",answer:{type:answer.type,sdp:answer.sdp}});
-      const oc=collection(db,"calls",incomingCall.id,"offerCandidates"),ac=collection(db,"calls",incomingCall.id,"answerCandidates");
+      const oc=collection(db,"calls",incomingCall.id,"offerCandidates");
+      const ac=collection(db,"calls",incomingCall.id,"answerCandidates");
       pc.onicecandidate=async e=>{if(e.candidate)await addDoc(ac,e.candidate.toJSON());};
-      onSnapshot(oc,snap=>snap.docChanges().forEach(ch=>{if(ch.type==="added"){const d=ch.doc.data();if(pc.remoteDescription)pc.addIceCandidate(new RTCIceCandidate(d));else iceQueue.current.push(d);}}));
-      setActiveCall(incomingCall);setIncomingCall(null);stopRing();
+      onSnapshot(oc,snap=>snap.docChanges().forEach(ch=>{
+        if(ch.type==="added"){const d=ch.doc.data();if(pc.remoteDescription)pc.addIceCandidate(new RTCIceCandidate(d)).catch(console.error);else iceQueue.current.push(d);}
+      }));
+      pc.onconnectionstatechange=()=>{if(pc.connectionState==="failed"||pc.connectionState==="disconnected")endCall();};
+      setActiveCall({...incomingCall,status:"accepted"});
+      setIncomingCall(null);
+      stopRing();
     }catch(e){console.error(e);rejectCall();}
   };
 
+  // ── REJECT CALL ───────────────────────────────────────────────────────────
   const rejectCall=async()=>{
     if(!incomingCall)return;
     stopRing();
@@ -557,19 +635,31 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
     setIncomingCall(null);
   };
 
+  // ── END CALL ──────────────────────────────────────────────────────────────
   const endCall=async()=>{
     stopRing();
-    streamRef.current?.getTracks().forEach(t=>t.stop());peerRef.current?.close();
+    streamRef.current?.getTracks().forEach(t=>t.stop());
+    peerRef.current?.close();
+    // Clear all media elements
+    if(localVideoRef.current)  localVideoRef.current.srcObject  = null;
+    if(remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+    if(localAudioRef.current)  localAudioRef.current.srcObject  = null;
+    if(remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
     if(activeCall){
-      const snap=await getDoc(doc(db,"calls",activeCall.id));
-      if(snap.exists()){
-        await updateDoc(doc(db,"calls",activeCall.id),{status:"ended",endTime:serverTimestamp()});
-        const dur=snap.data().startTime?.toMillis()?Math.floor((Date.now()-snap.data().startTime.toMillis())/1000):0;
-        await addDoc(collection(db,"callHistory"),{callerId:activeCall.callerId,callerName:activeCall.callerName,receiverId:activeCall.receiverId,receiverName:getUserName(users.find(u=>u.uid===activeCall.receiverId)),type:activeCall.type,status:activeCall.status==="accepted"?"completed":"missed",duration:dur,timestamp:serverTimestamp(),participants:[activeCall.callerId,activeCall.receiverId]});
-      }
+      try{
+        const snap=await getDoc(doc(db,"calls",activeCall.id));
+        if(snap.exists()){
+          const data=snap.data();
+          if(data.status!=="ended"&&data.status!=="rejected")
+            await updateDoc(doc(db,"calls",activeCall.id),{status:"ended",endTime:serverTimestamp()});
+          const dur=data.startTime?.toMillis()?Math.floor((Date.now()-data.startTime.toMillis())/1000):0;
+          await addDoc(collection(db,"callHistory"),{callerId:activeCall.callerId,callerName:activeCall.callerName,receiverId:activeCall.receiverId,receiverName:getUserName(users.find(u=>u.uid===activeCall.receiverId)),type:activeCall.type,status:activeCall.status==="accepted"?"completed":"missed",duration:dur,timestamp:serverTimestamp(),participants:[activeCall.callerId,activeCall.receiverId]});
+        }
+      }catch(e){console.error(e);}
     }
-    clearInterval(timerRef.current);streamRef.current=null;peerRef.current=null;
-    setActiveCall(null);setIsMuted(false);setIsVideoOff(false);setCallTimer(0);
+    clearInterval(timerRef.current);
+    streamRef.current=null; peerRef.current=null;
+    setActiveCall(null); setIsMuted(false); setIsVideoOff(false); setCallTimer(0);
   };
 
   const fmtT=(s:number)=>{const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return h>0?`${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`:`${m}:${String(sec).padStart(2,"0")}`;};
@@ -596,7 +686,7 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
     if(c.isGroup)return c.groupName?.toLowerCase().includes(q);
     const ou=getChatOU(c);return ou?.name?.toLowerCase().includes(q)||ou?.email?.toLowerCase().includes(q);
   }).sort((a,b)=>{
-    if(a.lastMessageTime&&b.lastMessageTime)return(b.lastMessageTime?.toMillis()||0)-(a.lastMessageTime?.toMillis()||0);
+    if(a.lastMessageTime&&b.lastMessageTime) return(b.lastMessageTime?.toMillis()||0)-(a.lastMessageTime?.toMillis()||0);
     if(a.lastMessageTime)return-1;if(b.lastMessageTime)return 1;
     return getChatName(a).localeCompare(getChatName(b));
   });
@@ -619,20 +709,26 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
       g.items.push(c);
     });
     return G.filter(g=>g.items.length>0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[filteredChats,userStatuses]);
 
   const toggleGrp=(key:string)=>setCollapsedGroups(p=>{const n=new Set(p);n.has(key)?n.delete(key):n.add(key);return n;});
-  // myAv / myStCfg used only by removed profile/status UI — moved to MeetChatApp
-  // const myAv=avGrad(getUserName(user));
-  // const myStCfg=STATUS_CONFIG[myStatus];
-  const otherCallUser=useMemo(()=>{if(!activeCall)return null;return users.find(u=>u.uid===(activeCall.callerId===user?.uid?activeCall.receiverId:activeCall.callerId))??null;},[users,activeCall,user]);
+  const otherCallUser=useMemo(()=>{
+    if(!activeCall)return null;
+    return users.find(u=>u.uid===(activeCall.callerId===user?.uid?activeCall.receiverId:activeCall.callerId))??null;
+  },[users,activeCall,user]);
 
+  // ── JSX ───────────────────────────────────────────────────────────────────
   return(
     <>
       <style>{CSS}</style>
       <input ref={fileRef} type="file" className="sr-only" onChange={e=>e.target.files?.[0]&&setSelectedFile(e.target.files[0])}/>
 
-      {/* INCOMING CALL */}
+      {/* ── HIDDEN AUDIO ELEMENTS — always in DOM so refs are always attached ── */}
+      <audio ref={localAudioRef}  autoPlay muted style={{display:"none"}}/>
+      <audio ref={remoteAudioRef} autoPlay       style={{display:"none"}}/>
+
+      {/* ── INCOMING CALL ── */}
       {incomingCall&&(
         <div className="zc-incoming">
           <div className="zc-inc-card">
@@ -649,33 +745,51 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
         </div>
       )}
 
-      {/* ACTIVE CALL */}
+      {/* ── ACTIVE CALL ── */}
       {activeCall&&(
         <div className="zc-call-ov">
           <div className="zc-call-main">
-            {activeCall.type==="video"?<video ref={remoteVid} autoPlay playsInline style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-              :<div className="zc-call-audio-center">
-                {otherCallUser?.profilePhoto?<div style={{width:120,height:120,borderRadius:28,overflow:"hidden"}}><img src={otherCallUser.profilePhoto} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/></div>:<div style={{width:120,height:120,borderRadius:28,background:`linear-gradient(135deg,${avGrad(getUserName(otherCallUser))[0]},${avGrad(getUserName(otherCallUser))[1]})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:44,fontWeight:800,color:"#fff"}}>{initials(getUserName(otherCallUser))}</div>}
-                <div style={{color:"#fff",fontSize:22,fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>{getUserName(otherCallUser)}</div>
-                <div style={{color:"rgba(255,255,255,.45)",fontSize:14,fontFamily:"'DM Sans',sans-serif"}}>{activeCall.status==="ringing"?"Calling…":fmtT(callTimer)}</div>
-              </div>}
-            {activeCall.type==="video"&&<div style={{position:"absolute",bottom:16,right:16,width:180,height:135,borderRadius:12,overflow:"hidden",border:"2px solid rgba(255,255,255,.2)"}}><video ref={localVid} autoPlay playsInline muted style={{width:"100%",height:"100%",objectFit:"cover"}}/></div>}
-            {activeCall.type==="audio"&&<><video ref={localVid} autoPlay playsInline muted style={{display:"none"}}/><video ref={remoteVid} autoPlay playsInline style={{display:"none"}}/></>}
+            {activeCall.type==="video"
+              ? <video ref={remoteVideoRef} autoPlay playsInline style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+              : <div className="zc-call-audio-center">
+                  {otherCallUser?.profilePhoto
+                    ?<div style={{width:120,height:120,borderRadius:28,overflow:"hidden"}}><img src={otherCallUser.profilePhoto} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/></div>
+                    :<div style={{width:120,height:120,borderRadius:28,background:`linear-gradient(135deg,${avGrad(getUserName(otherCallUser))[0]},${avGrad(getUserName(otherCallUser))[1]})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:44,fontWeight:800,color:"#fff"}}>{initials(getUserName(otherCallUser))}</div>
+                  }
+                  <div style={{color:"#fff",fontSize:22,fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>{getUserName(otherCallUser)}</div>
+                  <div style={{color:"rgba(255,255,255,.45)",fontSize:14,fontFamily:"'DM Sans',sans-serif"}}>{activeCall.status==="ringing"?"Calling…":fmtT(callTimer)}</div>
+                </div>
+            }
+            {/* Local video PiP (video calls only) */}
+            {activeCall.type==="video"&&(
+              <div style={{position:"absolute",bottom:16,right:16,width:180,height:135,borderRadius:12,overflow:"hidden",border:"2px solid rgba(255,255,255,.2)"}}>
+                <video ref={localVideoRef} autoPlay playsInline muted style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                {isVideoOff&&<div style={{position:"absolute",inset:0,background:"#161b22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"rgba(255,255,255,.4)",fontFamily:"'DM Sans',sans-serif"}}>Camera off</div>}
+              </div>
+            )}
             <div className="zc-call-badge">{activeCall.status==="ringing"?"Calling…":fmtT(callTimer)}</div>
           </div>
           <div className="zc-call-bar">
             <button className={`zc-cbtn ${isMuted?"act":"neu"}`} onClick={()=>{streamRef.current?.getAudioTracks().forEach(t=>t.enabled=!t.enabled);setIsMuted(p=>!p);}}>
-              <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
+              {isMuted
+                ?<svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 005.12 2.12M15 9.34V4a3 3 0 00-5.94-.6"/><path d="M17 16.95A7 7 0 015 12v-2m14 0v2a7 7 0 01-.11 1.23M12 19v3M8 23h8"/></svg>
+                :<svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
+              }
             </button>
-            {activeCall.type==="video"&&<button className={`zc-cbtn ${isVideoOff?"act":"neu"}`} onClick={()=>{streamRef.current?.getVideoTracks().forEach(t=>t.enabled=!t.enabled);setIsVideoOff(p=>!p);}}>
-              <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-            </button>}
+            {activeCall.type==="video"&&(
+              <button className={`zc-cbtn ${isVideoOff?"act":"neu"}`} onClick={()=>{streamRef.current?.getVideoTracks().forEach(t=>t.enabled=!t.enabled);setIsVideoOff(p=>!p);}}>
+                {isVideoOff
+                  ?<svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M16 16l4.553 2.276A1 1 0 0022 17.382v-6.764a1 1 0 00-1.447-.894L16 12"/><rect x="2" y="6" width="14" height="12" rx="2"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  :<svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                }
+              </button>
+            )}
             <button className="zc-cbtn end" onClick={endCall}><svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z"/></svg></button>
           </div>
         </div>
       )}
 
-      {/* CREATE GROUP MODAL */}
+      {/* ── CREATE GROUP MODAL ── */}
       {showCreateGroup&&(
         <div className="zc-mbk" onClick={e=>e.target===e.currentTarget&&setShowCreateGroup(false)}>
           <div className="zc-modal">
@@ -702,22 +816,18 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
         </div>
       )}
 
-      {/* MAIN LAYOUT */}
+      {/* ── MAIN LAYOUT ── */}
       <div className="zc">
-
-        {/* SIDEBAR RAIL — notifications, settings, profile/status all live here */}
         <div className="zc-sb">
           <div className={`zc-sb-ico${tab==="chats"?" on":""}`} onClick={()=>setTab("chats")} title="Chats">
             <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
           </div>
-
           <div className={`zc-sb-ico${tab==="calls"?" on":""}`} onClick={()=>setTab("calls")} title="Calls">
             <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
           </div>
-
         </div>
 
-        {/* CHATS TAB */}
+        {/* ── CHATS TAB ── */}
         {tab==="chats"&&(
           <>
             <div className="zc-panel">
@@ -738,7 +848,6 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
                   ))}
                 </div>
               </div>
-
               <div className="zc-chat-list">
                 {availGroups.length===0&&<div style={{padding:"28px 14px",textAlign:"center",fontSize:13,color:"#9aa0ad"}}>No chats found</div>}
                 {availGroups.map(group=>{
@@ -779,17 +888,16 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
               </div>
             </div>
 
-            {/* CONVERSATION AREA */}
+            {/* ── CONVERSATION AREA ── */}
             {!selectedChat
               ?<div className="zc-main">
-                {/* EMPTY STATE — notif/settings/profile live in MeetChatApp's top header */}
                 <div className="zc-empty">
-                <div className="zc-empty-ico">💬</div>
-                <div style={{fontSize:16,fontWeight:700,color:"#374151"}}>Select a conversation</div>
-                <div style={{fontSize:13,color:"#9aa0ad"}}>Choose a chat or create a group</div>
-              </div></div>
+                  <div className="zc-empty-ico">💬</div>
+                  <div style={{fontSize:16,fontWeight:700,color:"#374151"}}>Select a conversation</div>
+                  <div style={{fontSize:13,color:"#9aa0ad"}}>Choose a chat or create a group</div>
+                </div>
+              </div>
               :<div className="zc-main">
-                {/* CONV HEADER — audio/video call buttons + three-dots only */}
                 <div className="zc-conv-hd">
                   <div className="zc-conv-hd-left">
                     {(()=>{
@@ -818,7 +926,6 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
                         <button className="zc-hd-btn" title="Video call" onClick={()=>initiateCall("video")}><svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
                       </>
                     )}
-                    {/* THREE DOTS — conversation-specific actions */}
                     <div ref={dotsRef} style={{position:"relative"}}>
                       <button className="zc-hd-btn" title="More" onClick={()=>setShowDots(p=>!p)}>
                         <svg width="17" height="17" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
@@ -835,17 +942,10 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
                         </div>
                       )}
                     </div>
-
-                    {/* NOTIFICATION BELL, SETTINGS, PROFILE — moved to MeetChatApp top header, commented out here to avoid duplication
-                    <div style={{width:1,height:22,background:"#e8eaf0",margin:"0 4px"}}/>
-                    <div ref={notifRef} style={{position:"relative"}}>...</div>
-                    <div ref={settRef} style={{position:"relative"}}>...</div>
-                    <div ref={profRef} style={{position:"relative",cursor:"pointer"}}>...</div>
-                    */}
                   </div>
                 </div>
 
-                {/* MESSAGES */}
+                {/* ── MESSAGES ── */}
                 <div className="zc-msgs">
                   {messages.length===0&&<div style={{textAlign:"center",padding:"32px 0",fontSize:13,color:"#9aa0ad"}}>No messages yet — say hello! 👋</div>}
                   {messages.map((m,i)=>{
@@ -892,7 +992,7 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
                   <div ref={msgsEnd}/>
                 </div>
 
-                {/* INPUT */}
+                {/* ── INPUT ── */}
                 <div className="zc-input-area">
                   {selectedFile&&(
                     <div className="zc-file-prev">
@@ -910,8 +1010,10 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
                       onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendText();}}}
                     />
                     <button className="zc-inp-btn send" disabled={(!text.trim()&&!selectedFile)||uploading} onClick={sendText}>
-                      {uploading?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{animation:"spin 1s linear infinite"}}><style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity=".25"/><path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg>
-                        :<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>}
+                      {uploading
+                        ?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{animation:"spin 1s linear infinite"}}><style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity=".25"/><path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg>
+                        :<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                      }
                     </button>
                   </div>
                 </div>
@@ -920,6 +1022,7 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
           </>
         )}
 
+        {/* ── CALLS TAB ── */}
         {tab==="calls"&&(
           <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:"#f0f2f5"}}>
             <div style={{textAlign:"center",color:"#9aa0ad"}}>
