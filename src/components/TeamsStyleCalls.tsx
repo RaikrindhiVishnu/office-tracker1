@@ -82,6 +82,115 @@ const ICE_SERVERS: RTCConfiguration = {
   ],
 };
 
+// ══════════════════════════════════════════════════════════════════════════════
+//  🔔  SOUND MANAGER
+//  All sounds live in /public/sounds/
+//
+//  Required files — add these to your repo:
+//    /public/sounds/ringtone.mp3   ← incoming call ring  (looping)
+//    /public/sounds/outgoing.mp3   ← outgoing call ring  (looping)
+//    /public/sounds/connected.mp3  ← call connected chime (once)
+//    /public/sounds/ended.mp3      ← hang-up beep         (once)
+//
+//  Free sources:
+//    https://mixkit.co/free-sound-effects/phone/
+//    https://freesound.org
+// ══════════════════════════════════════════════════════════════════════════════
+class SoundManager {
+  private static cache: Record<string, HTMLAudioElement> = {};
+
+  /** Get (or lazily create) an Audio node for a given key + src */
+  private static node(key: string, src: string, loop: boolean): HTMLAudioElement {
+    if (!this.cache[key]) {
+      const a   = new Audio(src);
+      a.preload = "auto";
+      a.loop    = loop;
+      this.cache[key] = a;
+    }
+    return this.cache[key];
+  }
+
+  /** Play a sound. Resets to start so it always plays from beginning. */
+  static play(key: string, src: string, volume: number, loop = false) {
+    try {
+      const a      = this.node(key, src, loop);
+      a.loop       = loop;
+      a.volume     = Math.max(0, Math.min(1, volume));
+      a.currentTime = 0;
+      a.play().catch(() => {
+        // Autoplay policy blocked — will play after next user gesture
+      });
+    } catch (_) {}
+  }
+
+  /** Stop and reset a specific sound */
+  static stop(key: string) {
+    const a = this.cache[key];
+    if (a) {
+      a.pause();
+      a.currentTime = 0;
+    }
+  }
+
+  /** Stop every cached sound */
+  static stopAll() {
+    Object.keys(this.cache).forEach((k) => this.stop(k));
+  }
+}
+
+// Sound key constants — prevents typos across the file
+const S = {
+  INCOMING  : "incoming",   // 📲 incoming ring  (loops, vol 0.25)
+  OUTGOING  : "outgoing",   // 📞 outgoing ring  (loops, vol 0.20)
+  CONNECTED : "connected",  // 🔔 call connected (once,  vol 0.30)
+  ENDED     : "ended",      // 🔇 call ended     (once,  vol 0.30)
+} as const;
+
+// ─── Vibration helpers ────────────────────────────────────────────────────────
+/** Triple-pulse vibration pattern for incoming calls */
+const vibrateOnce  = () => navigator.vibrate?.([300, 150, 300, 150, 300]);
+const vibrateStop  = () => navigator.vibrate?.(0);
+
+// ─── Audio Processing Pipeline ────────────────────────────────────────────────
+async function applyNoiseSuppression(rawStream: MediaStream): Promise<{
+  processedStream: MediaStream;
+  audioContext: AudioContext;
+}> {
+  const audioContext = new AudioContext();
+  const source       = audioContext.createMediaStreamSource(rawStream);
+
+  const highpass           = audioContext.createBiquadFilter();
+  highpass.type            = "highpass";
+  highpass.frequency.value = 200;
+  highpass.Q.value         = 0.7;
+
+  const lowpass            = audioContext.createBiquadFilter();
+  lowpass.type             = "lowpass";
+  lowpass.frequency.value  = 3000;
+  lowpass.Q.value          = 0.7;
+
+  const compressor               = audioContext.createDynamicsCompressor();
+  compressor.threshold.value     = -50;
+  compressor.knee.value          = 40;
+  compressor.ratio.value         = 12;
+  compressor.attack.value        = 0;
+  compressor.release.value       = 0.25;
+
+  source.connect(highpass);
+  highpass.connect(lowpass);
+  lowpass.connect(compressor);
+
+  const destination = audioContext.createMediaStreamDestination();
+  compressor.connect(destination);
+
+  const processedStream = new MediaStream([
+    ...destination.stream.getAudioTracks(),
+    ...rawStream.getVideoTracks(),
+  ]);
+
+  return { processedStream, audioContext };
+}
+
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
@@ -145,9 +254,9 @@ const CSS = `
 .zcc-cb.red:hover{background:#d04420;}
 .zcc-cb.active{background:#dc2626;color:#fff;}
 
-/* Incoming call */
+/* ── INCOMING CALL ── */
 .zcc-inc-ov{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);}
-.zcc-inc-card{background:#fff;border-radius:22px;padding:40px;text-align:center;width:340px;box-shadow:0 32px 80px rgba(0,0,0,.28);}
+.zcc-inc-card{background:#fff;border-radius:22px;padding:40px;text-align:center;width:340px;box-shadow:0 32px 80px rgba(0,0,0,.28);animation:zcc-ring-scale 1s ease-in-out infinite;}
 .zcc-inc-av{width:90px;height:90px;border-radius:22px;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:800;color:#fff;overflow:hidden;}
 .zcc-inc-av img{width:100%;height:100%;object-fit:cover;}
 .zcc-inc-name{font-size:20px;font-weight:700;color:#1a1d23;margin-bottom:4px;}
@@ -156,7 +265,6 @@ const CSS = `
 .zcc-pulse-dot{width:8px;height:8px;border-radius:50%;background:#e8512a;animation:zcc-pulse .9s infinite;}
 .zcc-pulse-dot:nth-child(2){animation-delay:.18s;}
 .zcc-pulse-dot:nth-child(3){animation-delay:.36s;}
-@keyframes zcc-pulse{0%,100%{opacity:.3;transform:scale(.7)}50%{opacity:1;transform:scale(1)}}
 .zcc-inc-actions{display:flex;gap:20px;justify-content:center;}
 .zcc-inc-action{display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;}
 .zcc-inc-btn{width:62px;height:62px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .16s;}
@@ -166,44 +274,98 @@ const CSS = `
 .zcc-inc-btn.accept{background:#dcfce7;}
 .zcc-inc-btn.accept:hover{background:#bbf7d0;}
 .zcc-inc-lbl{font-size:12px;font-weight:600;color:#6b7280;}
+
+/* Animations */
+@keyframes zcc-pulse{0%,100%{opacity:.3;transform:scale(.7)}50%{opacity:1;transform:scale(1)}}
+@keyframes zcc-ring-scale{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
 `;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function TeamsStyleCalls({ users }: { users: User[] }) {
   const { user } = useAuth();
 
-  const [view, setView] = useState<"dial" | "history">("dial");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [view, setView]                 = useState<"dial" | "history">("dial");
+  const [searchQuery, setSearchQuery]   = useState("");
   const [incomingCall, setIncomingCall] = useState<Call | null>(null);
-  const [activeCall, setActiveCall] = useState<Call | null>(null);
-  const [callHistory, setCallHistory] = useState<CallHistory[]>([]);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOff, setIsVideoOff] = useState(false);
-  const [callTimer, setCallTimer] = useState(0);
+  const [activeCall, setActiveCall]     = useState<Call | null>(null);
+  const [callHistory, setCallHistory]   = useState<CallHistory[]>([]);
+  const [isMuted, setIsMuted]           = useState(false);
+  const [isVideoOff, setIsVideoOff]     = useState(false);
+  const [callTimer, setCallTimer]       = useState(0);
 
-  // ── SEPARATE REFS FOR VIDEO AND AUDIO (KEY FIX) ──────────────────────────
-  const localVideoRef = useRef<HTMLVideoElement>(null);   // local camera PiP
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);  // remote video stream
+  const localVideoRef  = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const localAudioRef  = useRef<HTMLAudioElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
 
-  const localAudioRef = useRef<HTMLAudioElement>(null);   // local mic (muted, keeps stream alive)
-  const remoteAudioRef = useRef<HTMLAudioElement>(null);  // remote audio output
+  const peerRef      = useRef<RTCPeerConnection | null>(null);
+  const streamRef    = useRef<MediaStream | null>(null);
+  const processedRef = useRef<MediaStream | null>(null);
+  const audioCtxRef  = useRef<AudioContext | null>(null);
+  const timerRef     = useRef<ReturnType<typeof setInterval> | null>(null);
+  const vibTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const iceQueue     = useRef<RTCIceCandidateInit[]>([]);
+  const callTypeRef  = useRef<"video" | "audio">("audio");
 
-  const peerRef = useRef<RTCPeerConnection | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const iceQueue = useRef<RTCIceCandidateInit[]>([]);
-  // Store call type in ref so ontrack closure always has the current value
-  const callTypeRef = useRef<"video" | "audio">("audio");
+  // ── Stop all sounds + vibration ───────────────────────────────────────────
+  const stopAllSounds = () => {
+    SoundManager.stopAll();
+    vibrateStop();
+    if (vibTimerRef.current) {
+      clearInterval(vibTimerRef.current);
+      vibTimerRef.current = null;
+    }
+  };
 
-  // ── Derived: the other person in the call ────────────────────────────────
+  // ── Derived ───────────────────────────────────────────────────────────────
   const otherCallUser = useMemo(() => {
     if (!activeCall) return null;
     const otherId =
-      activeCall.callerId === user?.uid
-        ? activeCall.receiverId
-        : activeCall.callerId;
+      activeCall.callerId === user?.uid ? activeCall.receiverId : activeCall.callerId;
     return users.find((u) => u.uid === otherId) ?? null;
   }, [users, activeCall, user]);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  🔔 SOUND EFFECTS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // 📲 INCOMING RINGTONE — starts when incomingCall appears, stops when it clears
+  useEffect(() => {
+    if (incomingCall) {
+      SoundManager.stop(S.OUTGOING); // safety
+      // Play incoming ring at low volume, looping
+      SoundManager.play(S.INCOMING, "/sounds/ringtone.mp3", 0.25, true);
+      // Vibrate once immediately, then every 1.8 s
+      vibrateOnce();
+      vibTimerRef.current = setInterval(vibrateOnce, 1800);
+      return () => {
+        SoundManager.stop(S.INCOMING);
+        vibrateStop();
+        if (vibTimerRef.current) {
+          clearInterval(vibTimerRef.current);
+          vibTimerRef.current = null;
+        }
+      };
+    }
+  }, [incomingCall]);
+
+  // 📞 OUTGOING RING — plays while activeCall.status === "ringing" (caller side)
+  useEffect(() => {
+    if (activeCall?.status === "ringing") {
+      SoundManager.play(S.OUTGOING, "/sounds/outgoing.mp3", 0.20, true);
+    } else {
+      SoundManager.stop(S.OUTGOING);
+    }
+  }, [activeCall?.status]);
+
+  // 🔔 CONNECTED CHIME — plays once when status flips to "accepted"
+  useEffect(() => {
+    if (activeCall?.status === "accepted") {
+      SoundManager.stop(S.OUTGOING);
+      SoundManager.stop(S.INCOMING);
+      SoundManager.play(S.CONNECTED, "/sounds/connected.mp3", 0.30, false);
+    }
+  }, [activeCall?.status]);
 
   // ── Call timer ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -214,12 +376,10 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
       if (timerRef.current) clearInterval(timerRef.current);
       setCallTimer(0);
     }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [activeCall?.status]);
 
-  // ── Listen for incoming calls ─────────────────────────────────────────────
+  // ── Firestore: incoming calls ─────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
     const q = query(
@@ -232,7 +392,7 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
     });
   }, [user]);
 
-  // ── Listen for call history ───────────────────────────────────────────────
+  // ── Firestore: call history ───────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
     const q = query(
@@ -241,148 +401,125 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
     );
     return onSnapshot(q, (snap) => {
       const h = snap.docs.map((d) => ({ id: d.id, ...d.data() } as CallHistory));
-      setCallHistory(
-        h.sort((a, b) => b.timestamp?.toMillis() - a.timestamp?.toMillis())
-      );
+      setCallHistory(h.sort((a, b) => b.timestamp?.toMillis() - a.timestamp?.toMillis()));
     });
   }, [user]);
 
-  // ── Listen for active call state changes (answer / ended) ─────────────────
+  // ── Firestore: active call state changes ──────────────────────────────────
   useEffect(() => {
     if (!activeCall?.id) return;
-
     return onSnapshot(doc(db, "calls", activeCall.id), async (snap) => {
-      if (!snap.exists()) {
-        endCall();
-        return;
-      }
-
+      if (!snap.exists()) { endCall(); return; }
       const call = { id: snap.id, ...snap.data() } as Call;
 
-      // Apply answer SDP once (caller side)
-      if (
-        call.answer &&
-        peerRef.current &&
-        !peerRef.current.remoteDescription
-      ) {
-        await peerRef.current.setRemoteDescription(
-          new RTCSessionDescription(call.answer)
-        );
-        // Flush queued ICE candidates
+      if (call.answer && peerRef.current && !peerRef.current.remoteDescription) {
+        await peerRef.current.setRemoteDescription(new RTCSessionDescription(call.answer));
         for (const c of iceQueue.current) {
           await peerRef.current.addIceCandidate(new RTCIceCandidate(c));
         }
         iceQueue.current = [];
       }
 
-      if (call.status === "ended" || call.status === "rejected") {
-        endCall();
-        return;
-      }
+      if (call.status === "ended" || call.status === "rejected") { endCall(); return; }
 
-      // Only update state when something meaningful changed
       setActiveCall((prev) => {
         if (!prev) return call;
-        if (prev.status !== call.status || prev.answer !== call.answer)
-          return call;
+        if (prev.status !== call.status || prev.answer !== call.answer) return call;
         return prev;
       });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCall?.id]);
 
-  // ── Build ontrack handler that routes to the correct ref ─────────────────
+  // ── WebRTC helpers ────────────────────────────────────────────────────────
   const buildOnTrack = (pc: RTCPeerConnection) => {
     pc.ontrack = (e) => {
       const remoteStream = e.streams[0];
-      console.log(
-        "ontrack — type:",
-        callTypeRef.current,
-        "tracks:",
-        remoteStream.getTracks().map((t) => t.kind)
-      );
-
       if (callTypeRef.current === "video") {
-        // Video call — attach to <video> element
         if (remoteVideoRef.current) {
           remoteVideoRef.current.srcObject = remoteStream;
           remoteVideoRef.current.muted = false;
-          remoteVideoRef.current
-            .play()
-            .catch((err) => console.warn("Remote video autoplay:", err));
+          remoteVideoRef.current.play().catch(console.warn);
         }
       } else {
-        // Audio-only call — attach to <audio> element
         if (remoteAudioRef.current) {
           remoteAudioRef.current.srcObject = remoteStream;
           remoteAudioRef.current.muted = false;
-          remoteAudioRef.current
-            .play()
-            .catch((err) => console.warn("Remote audio autoplay:", err));
+          remoteAudioRef.current.play().catch(console.warn);
         }
       }
     };
   };
 
-  // ── Attach local stream to the right element ─────────────────────────────
-  const attachLocalStream = (stream: MediaStream, type: "video" | "audio") => {
-    if (type === "video" && localVideoRef.current) {
-      localVideoRef.current.srcObject = stream;
-    }
-    if (type === "audio" && localAudioRef.current) {
-      localAudioRef.current.srcObject = stream;
-    }
+  const attachLocalPreview = (stream: MediaStream, type: "video" | "audio") => {
+    if (type === "video" && localVideoRef.current) localVideoRef.current.srcObject = stream;
+    if (type === "audio" && localAudioRef.current) localAudioRef.current.srcObject = stream;
+  };
+
+  const getProcessedStream = async (type: "video" | "audio") => {
+    const rawStream = await navigator.mediaDevices.getUserMedia({
+      video: type === "video" ? { width: 1280, height: 720, facingMode: "user" } : false,
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl:  true,
+        // @ts-ignore
+        googEchoCancellation: true,
+        // @ts-ignore
+        googAutoGainControl: true,
+        // @ts-ignore
+        googNoiseSuppression: true,
+        // @ts-ignore
+        googHighpassFilter: true,
+        // @ts-ignore
+        googTypingNoiseDetection: true,
+        channelCount: 1,
+        sampleRate:   48000,
+      },
+    });
+    const { processedStream, audioContext } = await applyNoiseSuppression(rawStream);
+    audioCtxRef.current = audioContext;
+    return { rawStream, processedStream };
   };
 
   // ── INITIATE CALL ─────────────────────────────────────────────────────────
   const initiateCall = async (receiver: User, type: "video" | "audio") => {
     if (!user) return;
-
-    callTypeRef.current = type; // set ref BEFORE creating RTCPeerConnection
-
+    callTypeRef.current = type;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video:
-          type === "video" ? { width: 1280, height: 720, facingMode: "user" } : false,
-        audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 48000 },
-      });
-      streamRef.current = stream;
-      attachLocalStream(stream, type);
+      const { rawStream, processedStream } = await getProcessedStream(type);
+      streamRef.current    = rawStream;
+      processedRef.current = processedStream;
+      attachLocalPreview(rawStream, type);
 
       const pc = new RTCPeerConnection(ICE_SERVERS);
       peerRef.current = pc;
-      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+      processedStream.getTracks().forEach((t) => pc.addTrack(t, processedStream));
       buildOnTrack(pc);
 
-      // Create offer
       const offer = await pc.createOffer({
         offerToReceiveAudio: true,
         offerToReceiveVideo: type === "video",
       });
       await pc.setLocalDescription(offer);
 
-      // Save call document
       const callDoc = await addDoc(collection(db, "calls"), {
-        callerId: user.uid,
+        callerId:   user.uid,
         callerName: getUserName(user),
         receiverId: receiver.uid,
         type,
         status: "ringing",
-        offer: { type: offer.type, sdp: offer.sdp },
+        offer:  { type: offer.type, sdp: offer.sdp },
         startTime: serverTimestamp(),
       });
 
-      const offerCandidatesCol = collection(db, "calls", callDoc.id, "offerCandidates");
+      const offerCandidatesCol  = collection(db, "calls", callDoc.id, "offerCandidates");
       const answerCandidatesCol = collection(db, "calls", callDoc.id, "answerCandidates");
 
-      // Send our ICE candidates to Firestore
       pc.onicecandidate = async (e) => {
-        if (e.candidate) {
-          await addDoc(offerCandidatesCol, e.candidate.toJSON());
-        }
+        if (e.candidate) await addDoc(offerCandidatesCol, e.candidate.toJSON());
       };
 
-      // Receive the callee's ICE candidates
       onSnapshot(answerCandidatesCol, (snap) => {
         snap.docChanges().forEach((change) => {
           if (change.type === "added") {
@@ -397,18 +534,13 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
       });
 
       pc.onconnectionstatechange = () => {
-        console.log("Connection state:", pc.connectionState);
-        if (
-          pc.connectionState === "failed" ||
-          pc.connectionState === "disconnected"
-        ) {
-          endCall();
-        }
+        if (pc.connectionState === "failed" || pc.connectionState === "disconnected") endCall();
       };
 
+      // 📞 Outgoing tone fires via useEffect watching activeCall.status === "ringing"
       setActiveCall({
-        id: callDoc.id,
-        callerId: user.uid,
+        id:         callDoc.id,
+        callerId:   user.uid,
         callerName: getUserName(user),
         receiverId: receiver.uid,
         type,
@@ -423,37 +555,28 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
   // ── ACCEPT CALL ───────────────────────────────────────────────────────────
   const acceptCall = async () => {
     if (!incomingCall || !user) return;
+    callTypeRef.current = incomingCall.type;
 
-    callTypeRef.current = incomingCall.type; // set ref BEFORE creating RTCPeerConnection
+    // 🔇 Stop ringtone + vibration the instant user taps Accept
+    stopAllSounds();
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video:
-          incomingCall.type === "video"
-            ? { width: 1280, height: 720, facingMode: "user" }
-            : false,
-        audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 48000 },
-      });
-      streamRef.current = stream;
-      attachLocalStream(stream, incomingCall.type);
+      const { rawStream, processedStream } = await getProcessedStream(incomingCall.type);
+      streamRef.current    = rawStream;
+      processedRef.current = processedStream;
+      attachLocalPreview(rawStream, incomingCall.type);
 
       const pc = new RTCPeerConnection(ICE_SERVERS);
       peerRef.current = pc;
-      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+      processedStream.getTracks().forEach((t) => pc.addTrack(t, processedStream));
       buildOnTrack(pc);
 
-      // Set remote offer SDP
-      await pc.setRemoteDescription(
-        new RTCSessionDescription(incomingCall.offer!)
-      );
-
-      // Flush any queued ICE candidates from the caller
+      await pc.setRemoteDescription(new RTCSessionDescription(incomingCall.offer!));
       for (const c of iceQueue.current) {
         await pc.addIceCandidate(new RTCIceCandidate(c)).catch(console.error);
       }
       iceQueue.current = [];
 
-      // Create answer
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
@@ -462,17 +585,13 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
         answer: { type: answer.type, sdp: answer.sdp },
       });
 
-      const offerCandidatesCol = collection(db, "calls", incomingCall.id, "offerCandidates");
+      const offerCandidatesCol  = collection(db, "calls", incomingCall.id, "offerCandidates");
       const answerCandidatesCol = collection(db, "calls", incomingCall.id, "answerCandidates");
 
-      // Send our ICE candidates
       pc.onicecandidate = async (e) => {
-        if (e.candidate) {
-          await addDoc(answerCandidatesCol, e.candidate.toJSON());
-        }
+        if (e.candidate) await addDoc(answerCandidatesCol, e.candidate.toJSON());
       };
 
-      // Receive the caller's ICE candidates
       onSnapshot(offerCandidatesCol, (snap) => {
         snap.docChanges().forEach((change) => {
           if (change.type === "added") {
@@ -487,15 +606,10 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
       });
 
       pc.onconnectionstatechange = () => {
-        console.log("Connection state:", pc.connectionState);
-        if (
-          pc.connectionState === "failed" ||
-          pc.connectionState === "disconnected"
-        ) {
-          endCall();
-        }
+        if (pc.connectionState === "failed" || pc.connectionState === "disconnected") endCall();
       };
 
+      // 🔔 Connected chime fires via useEffect watching activeCall.status === "accepted"
       setActiveCall({ ...incomingCall, status: "accepted" });
       setIncomingCall(null);
     } catch (err) {
@@ -508,18 +622,21 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
   // ── REJECT CALL ───────────────────────────────────────────────────────────
   const rejectCall = async () => {
     if (!incomingCall) return;
+    // 🔇 Stop ringtone + vibration immediately on Decline tap
+    stopAllSounds();
+
     await updateDoc(doc(db, "calls", incomingCall.id), {
       status: "rejected",
       endTime: serverTimestamp(),
     });
     await addDoc(collection(db, "callHistory"), {
-      callerId: incomingCall.callerId,
-      callerName: incomingCall.callerName,
-      receiverId: incomingCall.receiverId,
+      callerId:     incomingCall.callerId,
+      callerName:   incomingCall.callerName,
+      receiverId:   incomingCall.receiverId,
       receiverName: getUserName(user),
-      type: incomingCall.type,
-      status: "rejected",
-      timestamp: serverTimestamp(),
+      type:         incomingCall.type,
+      status:       "rejected",
+      timestamp:    serverTimestamp(),
       participants: [incomingCall.callerId, incomingCall.receiverId],
     });
     setIncomingCall(null);
@@ -527,14 +644,18 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
 
   // ── END CALL ──────────────────────────────────────────────────────────────
   const endCall = async () => {
-    // Stop all media tracks
+    // 🔇 Stop all tones, then play hang-up beep
+    stopAllSounds();
+    SoundManager.play(S.ENDED, "/sounds/ended.mp3", 0.30, false);
+
     streamRef.current?.getTracks().forEach((t) => t.stop());
+    processedRef.current?.getTracks().forEach((t) => t.stop());
+    audioCtxRef.current?.close();
     peerRef.current?.close();
 
-    // Clear video/audio element sources
-    if (localVideoRef.current) localVideoRef.current.srcObject = null;
+    if (localVideoRef.current)  localVideoRef.current.srcObject  = null;
     if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-    if (localAudioRef.current) localAudioRef.current.srcObject = null;
+    if (localAudioRef.current)  localAudioRef.current.srcObject  = null;
     if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
 
     if (activeCall) {
@@ -542,25 +663,24 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
         const snap = await getDoc(doc(db, "calls", activeCall.id));
         if (snap.exists()) {
           const data = snap.data();
-          // Only update if not already ended
           if (data.status !== "ended" && data.status !== "rejected") {
             await updateDoc(doc(db, "calls", activeCall.id), {
               status: "ended",
               endTime: serverTimestamp(),
             });
           }
-          const startMs = data.startTime?.toMillis?.();
+          const startMs  = data.startTime?.toMillis?.();
           const duration = startMs ? Math.floor((Date.now() - startMs) / 1000) : 0;
           const receiverUser = users.find((u) => u.uid === activeCall.receiverId);
           await addDoc(collection(db, "callHistory"), {
-            callerId: activeCall.callerId,
-            callerName: activeCall.callerName,
-            receiverId: activeCall.receiverId,
+            callerId:     activeCall.callerId,
+            callerName:   activeCall.callerName,
+            receiverId:   activeCall.receiverId,
             receiverName: getUserName(receiverUser),
-            type: activeCall.type,
-            status: activeCall.status === "accepted" ? "completed" : "missed",
+            type:         activeCall.type,
+            status:       activeCall.status === "accepted" ? "completed" : "missed",
             duration,
-            timestamp: serverTimestamp(),
+            timestamp:    serverTimestamp(),
             participants: [activeCall.callerId, activeCall.receiverId],
           });
         }
@@ -570,8 +690,10 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
     }
 
     if (timerRef.current) clearInterval(timerRef.current);
-    streamRef.current = null;
-    peerRef.current = null;
+    streamRef.current    = null;
+    processedRef.current = null;
+    audioCtxRef.current  = null;
+    peerRef.current      = null;
     setActiveCall(null);
     setIsMuted(false);
     setIsVideoOff(false);
@@ -580,8 +702,8 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
 
   // ── Format helpers ────────────────────────────────────────────────────────
   const fmtTime = (s: number) => {
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
+    const h   = Math.floor(s / 3600);
+    const m   = Math.floor((s % 3600) / 60);
     const sec = s % 60;
     return h > 0
       ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
@@ -602,10 +724,9 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
     <>
       <style>{CSS}</style>
 
-      {/* ── HIDDEN AUDIO ELEMENTS — always in DOM so refs are always attached ── */}
-      {/* These are intentionally outside the call overlay so refs persist     */}
-      <audio ref={localAudioRef} autoPlay muted style={{ display: "none" }} />
-      <audio ref={remoteAudioRef} autoPlay style={{ display: "none" }} />
+      {/* Hidden audio for WebRTC streams */}
+      <audio ref={localAudioRef}  autoPlay muted style={{ display: "none" }} />
+      <audio ref={remoteAudioRef} autoPlay       style={{ display: "none" }} />
 
       {/* ── INCOMING CALL OVERLAY ── */}
       {incomingCall && (
@@ -615,14 +736,9 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
               const caller = users.find((u) => u.uid === incomingCall.callerId);
               const [g1, g2] = avGrad(incomingCall.callerName);
               return caller?.profilePhoto ? (
-                <div className="zcc-inc-av">
-                  <img src={caller.profilePhoto} alt="" />
-                </div>
+                <div className="zcc-inc-av"><img src={caller.profilePhoto} alt="" /></div>
               ) : (
-                <div
-                  className="zcc-inc-av"
-                  style={{ background: `linear-gradient(135deg,${g1},${g2})` }}
-                >
+                <div className="zcc-inc-av" style={{ background: `linear-gradient(135deg,${g1},${g2})` }}>
                   {initials(incomingCall.callerName)}
                 </div>
               );
@@ -663,26 +779,15 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
         <div className="zcc-call-ov">
           <div className="zcc-call-main">
             {activeCall.type === "video" ? (
-              /* Remote video fills the screen */
-              <video
-                ref={remoteVideoRef}
-                autoPlay
-                playsInline
-                className="zcc-remote-vid"
-              />
+              <video ref={remoteVideoRef} autoPlay playsInline className="zcc-remote-vid" />
             ) : (
-              /* Audio call — show avatar */
               <div className="zcc-audio-center">
                 {otherCallUser?.profilePhoto ? (
-                  <div className="zcc-audio-av">
-                    <img src={otherCallUser.profilePhoto} alt="" />
-                  </div>
+                  <div className="zcc-audio-av"><img src={otherCallUser.profilePhoto} alt="" /></div>
                 ) : (
                   <div
                     className="zcc-audio-av"
-                    style={{
-                      background: `linear-gradient(135deg,${avGrad(getUserName(otherCallUser))[0]},${avGrad(getUserName(otherCallUser))[1]})`,
-                    }}
+                    style={{ background: `linear-gradient(135deg,${avGrad(getUserName(otherCallUser))[0]},${avGrad(getUserName(otherCallUser))[1]})` }}
                   >
                     {initials(getUserName(otherCallUser))}
                   </div>
@@ -694,52 +799,29 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
               </div>
             )}
 
-            {/* Local camera PiP (video calls only) */}
             {activeCall.type === "video" && (
               <div className="zcc-local-pip">
-                <video
-                  ref={localVideoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
+                <video ref={localVideoRef} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 {isVideoOff && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      background: "#161b22",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 13,
-                      color: "rgba(255,255,255,.4)",
-                      fontFamily: "'DM Sans',sans-serif",
-                    }}
-                  >
+                  <div style={{ position: "absolute", inset: 0, background: "#161b22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "rgba(255,255,255,.4)", fontFamily: "'DM Sans',sans-serif" }}>
                     Camera off
                   </div>
                 )}
               </div>
             )}
 
-            {/* Timer badge */}
             <div className="zcc-call-timer">
               {activeCall.status === "ringing" ? "Calling…" : fmtTime(callTimer)}
             </div>
           </div>
 
-          {/* Call controls */}
           <div className="zcc-call-bar">
-            {/* Mute toggle */}
+            {/* Mute */}
             <button
               className={`zcc-cb ${isMuted ? "active" : "neutral"}`}
               title={isMuted ? "Unmute" : "Mute"}
               onClick={() => {
-                streamRef.current
-                  ?.getAudioTracks()
-                  .forEach((t) => (t.enabled = !t.enabled));
+                streamRef.current?.getAudioTracks().forEach((t) => (t.enabled = !t.enabled));
                 setIsMuted((p) => !p);
               }}
             >
@@ -757,15 +839,13 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
               )}
             </button>
 
-            {/* Camera toggle (video calls only) */}
+            {/* Camera toggle */}
             {activeCall.type === "video" && (
               <button
                 className={`zcc-cb ${isVideoOff ? "active" : "neutral"}`}
                 title={isVideoOff ? "Enable camera" : "Disable camera"}
                 onClick={() => {
-                  streamRef.current
-                    ?.getVideoTracks()
-                    .forEach((t) => (t.enabled = !t.enabled));
+                  streamRef.current?.getVideoTracks().forEach((t) => (t.enabled = !t.enabled));
                   setIsVideoOff((p) => !p);
                 }}
               >
@@ -795,29 +875,21 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
 
       {/* ── MAIN UI ── */}
       <div className="zcc">
-        {/* Left panel */}
         <div className="zcc-panel">
           <div className="zcc-panel-hd">
             <div className="zcc-title">Calls</div>
             <div className="zcc-tabs">
-              <button
-                className={`zcc-tab${view === "dial" ? " on" : ""}`}
-                onClick={() => setView("dial")}
-              >
+              <button className={`zcc-tab${view === "dial" ? " on" : ""}`} onClick={() => setView("dial")}>
                 Make a Call
               </button>
-              <button
-                className={`zcc-tab${view === "history" ? " on" : ""}`}
-                onClick={() => setView("history")}
-              >
+              <button className={`zcc-tab${view === "history" ? " on" : ""}`} onClick={() => setView("history")}>
                 History {callHistory.length > 0 && `(${callHistory.length})`}
               </button>
             </div>
             {view === "dial" && (
               <div className="zcc-search-wrap">
                 <svg className="zcc-search-ico" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <circle cx="11" cy="11" r="8" />
-                  <path d="M21 21l-4.35-4.35" />
+                  <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
                 </svg>
                 <input
                   className="zcc-search"
@@ -830,12 +902,9 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
           </div>
 
           <div className="zcc-list">
-            {/* ── DIAL TAB ── */}
             {view === "dial" &&
               (filteredUsers.length === 0 ? (
-                <div style={{ padding: "32px 12px", textAlign: "center", fontSize: 13, color: "#9aa0ad" }}>
-                  No contacts found
-                </div>
+                <div style={{ padding: "32px 12px", textAlign: "center", fontSize: 13, color: "#9aa0ad" }}>No contacts found</div>
               ) : (
                 filteredUsers.map((u) => {
                   const [g1, g2] = avGrad(getUserName(u));
@@ -843,35 +912,21 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
                     <div key={u.uid} className="zcc-contact">
                       <div style={{ position: "relative", flexShrink: 0 }}>
                         <div className="zcc-av" style={{ background: `linear-gradient(135deg,${g1},${g2})` }}>
-                          {u.profilePhoto ? (
-                            <img src={u.profilePhoto} alt="" />
-                          ) : (
-                            initials(getUserName(u))
-                          )}
+                          {u.profilePhoto ? <img src={u.profilePhoto} alt="" /> : initials(getUserName(u))}
                         </div>
                         {u.online && <div className="zcc-online-dot" />}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div className="zcc-contact-name">{u.name || u.email}</div>
-                        <div className="zcc-contact-sub">
-                          {u.online ? "● Online" : "○ Offline"}
-                        </div>
+                        <div className="zcc-contact-sub">{u.online ? "● Online" : "○ Offline"}</div>
                       </div>
                       <div className="zcc-call-btns">
-                        <button
-                          className="zcc-cta video"
-                          title="Video call"
-                          onClick={() => initiateCall(u, "video")}
-                        >
+                        <button className="zcc-cta video" title="Video call" onClick={() => initiateCall(u, "video")}>
                           <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                           </svg>
                         </button>
-                        <button
-                          className="zcc-cta audio"
-                          title="Audio call"
-                          onClick={() => initiateCall(u, "audio")}
-                        >
+                        <button className="zcc-cta audio" title="Audio call" onClick={() => initiateCall(u, "audio")}>
                           <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             <path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                           </svg>
@@ -882,63 +937,38 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
                 })
               ))}
 
-            {/* ── HISTORY TAB ── */}
             {view === "history" &&
               (callHistory.length === 0 ? (
-                <div style={{ padding: "32px 12px", textAlign: "center", fontSize: 13, color: "#9aa0ad" }}>
-                  No call history yet
-                </div>
+                <div style={{ padding: "32px 12px", textAlign: "center", fontSize: 13, color: "#9aa0ad" }}>No call history yet</div>
               ) : (
                 callHistory.map((c) => {
-                  const isOut = c.callerId === user?.uid;
+                  const isOut     = c.callerId === user?.uid;
                   const otherName = isOut ? c.receiverName : c.callerName;
-                  const hu = users.find(
-                    (u) => u.name === otherName || u.email === otherName
-                  );
-                  const [g1, g2] = avGrad(otherName);
+                  const hu        = users.find((u) => u.name === otherName || u.email === otherName);
+                  const [g1, g2]  = avGrad(otherName);
                   const statusColor =
-                    c.status === "completed"
-                      ? "#22c55e"
-                      : c.status === "missed"
-                      ? "#ef4444"
-                      : "#f59e0b";
+                    c.status === "completed" ? "#22c55e"
+                    : c.status === "missed"  ? "#ef4444"
+                    : "#f59e0b";
                   return (
                     <div key={c.id} className="zcc-hist-item">
                       <div className="zcc-av" style={{ background: `linear-gradient(135deg,${g1},${g2})` }}>
-                        {hu?.profilePhoto ? (
-                          <img src={hu.profilePhoto} alt="" />
-                        ) : (
-                          initials(otherName)
-                        )}
+                        {hu?.profilePhoto ? <img src={hu.profilePhoto} alt="" /> : initials(otherName)}
                       </div>
                       <div className="zcc-hist-info">
                         <div className="zcc-hist-name">{otherName}</div>
                         <div className="zcc-hist-sub">
                           <div className="zcc-hist-status-dot" style={{ background: statusColor }} />
                           <span style={{ color: c.status === "missed" ? "#ef4444" : "inherit" }}>
-                            {c.status === "completed"
-                              ? fmtDur(c.duration)
-                              : c.status === "missed"
-                              ? "Missed"
-                              : "Declined"}
+                            {c.status === "completed" ? fmtDur(c.duration) : c.status === "missed" ? "Missed" : "Declined"}
                           </span>
-                          <span>·</span>
-                          <span>{c.type === "video" ? "📹" : "📞"}</span>
-                          <span>·</span>
-                          <span>{isOut ? "Outgoing" : "Incoming"}</span>
+                          <span>·</span><span>{c.type === "video" ? "📹" : "📞"}</span>
+                          <span>·</span><span>{isOut ? "Outgoing" : "Incoming"}</span>
                         </div>
                       </div>
                       <div className="zcc-hist-time">
-                        <div>
-                          {c.timestamp
-                            ?.toDate?.()
-                            ?.toLocaleDateString([], { month: "short", day: "numeric" })}
-                        </div>
-                        <div>
-                          {c.timestamp
-                            ?.toDate?.()
-                            ?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </div>
+                        <div>{c.timestamp?.toDate?.()?.toLocaleDateString([], { month: "short", day: "numeric" })}</div>
+                        <div>{c.timestamp?.toDate?.()?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
                       </div>
                     </div>
                   );
@@ -947,7 +977,6 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
           </div>
         </div>
 
-        {/* Right panel — idle state */}
         <div className="zcc-right">
           <div className="zcc-right-card">
             <div className="zcc-right-ico">{view === "dial" ? "📞" : "🕐"}</div>
@@ -964,12 +993,10 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
                 {[
                   { dot: "#22c55e", label: "Free via WebRTC" },
                   { label: "🔒 Peer-to-peer" },
-                  { label: "📹 Video + Audio" },
+                  { label: "🎙️ Noise suppressed" },
+                  { label: "🔔 Smart ringtones" },
                 ].map(({ dot, label }) => (
-                  <div
-                    key={label}
-                    style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#6b7280", background: "#fff", padding: "6px 12px", borderRadius: 20, boxShadow: "0 1px 4px rgba(0,0,0,.06)" }}
-                  >
+                  <div key={label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#6b7280", background: "#fff", padding: "6px 12px", borderRadius: 20, boxShadow: "0 1px 4px rgba(0,0,0,.06)" }}>
                     {dot && <div style={{ width: 8, height: 8, borderRadius: "50%", background: dot }} />}
                     {label}
                   </div>
