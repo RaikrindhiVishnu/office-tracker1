@@ -1,20 +1,26 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import {
+  collection, query, where, onSnapshot,
+  orderBy, getDocs,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { LeaveType } from "@/types/leave";
 
-// ─── LOP REMOVED ─────────────────────────────────────────
-const LEAVE_COLORS: Record<LeaveType, { bg: string; text: string; dot: string }> = {
-  annual: { bg: "#ECFEFF", text: "#0E7490", dot: "#06B6D4" }, // ✅ ADD THIS
-  casual: { bg: "#EFF6FF", text: "#1D4ED8", dot: "#3B82F6" },
-  sick:   { bg: "#FFF7ED", text: "#C2410C", dot: "#F97316" },
-  "Work From Home": { bg: "#F0FDF4", text: "#15803D", dot: "#22C55E" },
+// ─── COLORS & ICONS ───────────────────────────────────────
+const LEAVE_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
+  annual:          { bg: "#ECFEFF", text: "#0E7490", dot: "#06B6D4" },
+  casual:          { bg: "#EFF6FF", text: "#1D4ED8", dot: "#3B82F6" },
+  sick:            { bg: "#FFF7ED", text: "#C2410C", dot: "#F97316" },
+  "Work From Home":{ bg: "#F0FDF4", text: "#15803D", dot: "#22C55E" },
 };
 
 const LEAVE_ICONS: Record<string, string> = {
-  casual: "🌴",
-  Sick: "🤒",
-  "Work From Home": "🏠",
+  casual:          "🌴",
+  sick:            "🤒",
+  "Work From Home":"🏠",
+  annual:          "📅",
 };
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; ring: string; icon: string }> = {
@@ -27,24 +33,25 @@ const MONTH_NAMES = [
   "January","February","March","April","May","June",
   "July","August","September","October","November","December",
 ];
-
 const SHORT_DAYS = ["Su","Mo","Tu","We","Th","Fr","Sa"];
 
 // ─── TYPES ────────────────────────────────────────────────
 interface Holiday {
-  date: string;       // "YYYY-MM-DD"
+  date: string;
   name: string;
   type: "national" | "optional";
 }
 
 interface LeaveRecord {
   id: string;
-  leaveType: LeaveType;   // ✅ correct
+  leaveType: LeaveType;
   fromDate: string;
   toDate: string;
   reason: string;
   status: string;
   adminNote?: string;
+  days?: number;
+  createdAt?: any;
 }
 
 interface BalanceItem {
@@ -54,43 +61,6 @@ interface BalanceItem {
   total: number;
 }
 
-// ─── DEMO DATA ────────────────────────────────────────────
-const DEMO_BALANCE: BalanceItem[] = [
-  { type: "casual",          icon: "🌴", remaining: 8,  total: 12 },
-  { type: "Sick",            icon: "🤒", remaining: 5,  total: 8  },
-  { type: "Work From Home",  icon: "🏠", remaining: 10, total: 15 },
-];
-
-const DEMO_LEAVES: LeaveRecord[] = [
-  { id: "1", leaveType: "casual",         fromDate: "2025-06-10", toDate: "2025-06-12", reason: "Family vacation to Goa.",          status: "Approved", adminNote: "Approved. Enjoy!" },
-  { id: "2", leaveType: "sick",           fromDate: "2025-07-03", toDate: "2025-07-04", reason: "High fever and body ache.",         status: "Pending"  },
-  { id: "3", leaveType: "Work From Home", fromDate: "2025-07-15", toDate: "2025-07-17", reason: "Home renovation in progress.",      status: "Approved" },
-  { id: "4", leaveType: "casual",         fromDate: "2025-08-01", toDate: "2025-08-01", reason: "Personal errand at govt. office.",  status: "Rejected", adminNote: "Not available this month." },
-];
-
-// Holidays — in real usage pass these from Firestore via props
-const DEMO_HOLIDAYS: Holiday[] = [
-  { date: "2025-01-14", name: "Makar Sankranti",     type: "national"  },
-  { date: "2025-01-26", name: "Republic Day",         type: "national"  },
-  { date: "2025-03-17", name: "Holi",                 type: "national"  },
-  { date: "2025-04-14", name: "Dr. Ambedkar Jayanti", type: "optional"  },
-  { date: "2025-04-18", name: "Good Friday",          type: "national"  },
-  { date: "2025-05-12", name: "Buddha Purnima",       type: "optional"  },
-  { date: "2025-06-07", name: "Eid ul-Adha",          type: "national"  },
-  { date: "2025-07-06", name: "Bonalu",                type: "optional"  },
-  { date: "2025-08-15", name: "Independence Day",     type: "national"  },
-  { date: "2025-08-16", name: "Raksha Bandhan",       type: "optional"  },
-  { date: "2025-08-27", name: "Janmashtami",          type: "national"  },
-  { date: "2025-09-05", name: "Ganesh Chaturthi",     type: "national"  },
-  { date: "2025-10-02", name: "Gandhi Jayanti",       type: "national"  },
-  { date: "2025-10-02", name: "Dussehra",             type: "national"  },
-  { date: "2025-10-20", name: "Diwali",               type: "national"  },
-  { date: "2025-10-21", name: "Diwali (Laxmi Puja)", type: "national"  },
-  { date: "2025-11-05", name: "Bhai Dooj",            type: "optional"  },
-  { date: "2025-11-15", name: "Guru Nanak Jayanti",   type: "national"  },
-  { date: "2025-12-25", name: "Christmas",            type: "national"  },
-];
-
 // ─── HELPERS ──────────────────────────────────────────────
 function todayStr() {
   const d = new Date();
@@ -98,15 +68,14 @@ function todayStr() {
 }
 
 // ══════════════════════════════════════════════════════════
-//  HOLIDAY CALENDAR (monthly view)
+//  HOLIDAY CALENDAR
 // ══════════════════════════════════════════════════════════
 function HolidayCalendar({ holidays }: { holidays: Holiday[] }) {
-  const now   = new Date();
-  const [month, setMonth] = useState(now.getMonth());   // 0-indexed
+  const now  = new Date();
+  const [month, setMonth] = useState(now.getMonth());
   const [year,  setYear]  = useState(now.getFullYear());
-  const today  = todayStr();
+  const today = todayStr();
 
-  // Group holidays by "YYYY-MM"
   const byMonth = useMemo(() => {
     const map: Record<string, Holiday[]> = {};
     holidays.forEach(h => {
@@ -120,8 +89,7 @@ function HolidayCalendar({ holidays }: { holidays: Holiday[] }) {
   const monthKey    = `${year}-${String(month + 1).padStart(2, "0")}`;
   const monthHols   = byMonth[monthKey] ?? [];
   const holSet      = new Set(monthHols.map(h => h.date));
-
-  const firstDayDow = new Date(year, month, 1).getDay();   // 0=Sun
+  const firstDayDow = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
 
   const prev = () => { if (month === 0) { setMonth(11); setYear(y => y-1); } else setMonth(m => m-1); };
@@ -132,7 +100,6 @@ function HolidayCalendar({ holidays }: { holidays: Holiday[] }) {
 
   return (
     <div>
-      {/* Year pills */}
       <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:16, flexWrap:"wrap" }}>
         <div style={{ background:"#1E3A5F", color:"#fff", borderRadius:10, padding:"5px 14px", fontSize:13, fontWeight:700 }}>
           📅 {year}
@@ -145,26 +112,20 @@ function HolidayCalendar({ holidays }: { holidays: Holiday[] }) {
         </span>
       </div>
 
-      {/* Month navigator */}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
         <button onClick={prev} style={navBtnStyle}>‹</button>
-        <span style={{ fontSize:16, fontWeight:800, color:"#0f172a" }}>
-          {MONTH_NAMES[month]} {year}
-        </span>
+        <span style={{ fontSize:16, fontWeight:800, color:"#0f172a" }}>{MONTH_NAMES[month]} {year}</span>
         <button onClick={next} style={navBtnStyle}>›</button>
       </div>
 
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
-
-        {/* ── Mini Calendar ── */}
+        {/* Mini Calendar */}
         <div style={{ background:"#f8fafc", borderRadius:14, padding:14, border:"1px solid #e2e8f0" }}>
-          {/* Day headers */}
           <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", marginBottom:6 }}>
             {SHORT_DAYS.map(d => (
               <div key={d} style={{ textAlign:"center", fontSize:10, fontWeight:700, color:"#94a3b8", padding:"3px 0" }}>{d}</div>
             ))}
           </div>
-          {/* Cells */}
           <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:2 }}>
             {Array.from({ length: firstDayDow }).map((_, i) => <div key={`e${i}`} />)}
             {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
@@ -174,13 +135,15 @@ function HolidayCalendar({ holidays }: { holidays: Holiday[] }) {
               const dow   = new Date(year, month, day).getDay();
               const isWkd = dow === 0 || dow === 6;
               return (
-                <div key={day} title={isHol ? monthHols.filter(h=>h.date===ds).map(h=>h.name).join(", ") : ""} style={{
-                  textAlign:"center", padding:"5px 2px", borderRadius:7, fontSize:12, fontWeight: isHol||isTdy ? 800 : 400,
-                  background: isTdy ? "#1E3A5F" : isHol ? "#fef9c3" : "transparent",
-                  color: isTdy ? "#fff" : isHol ? "#92400e" : isWkd ? "#ef4444" : "#334155",
-                  cursor: isHol ? "default" : "default",
-                  position:"relative",
-                }}>
+                <div key={day}
+                  title={isHol ? monthHols.filter(h=>h.date===ds).map(h=>h.name).join(", ") : ""}
+                  style={{
+                    textAlign:"center", padding:"5px 2px", borderRadius:7,
+                    fontSize:12, fontWeight: isHol||isTdy ? 800 : 400,
+                    background: isTdy ? "#1E3A5F" : isHol ? "#fef9c3" : "transparent",
+                    color: isTdy ? "#fff" : isHol ? "#92400e" : isWkd ? "#ef4444" : "#334155",
+                    position:"relative", cursor:"default",
+                  }}>
                   {day}
                   {isHol && !isTdy && (
                     <div style={{ position:"absolute", bottom:1, left:"50%", transform:"translateX(-50%)", width:4, height:4, borderRadius:"50%", background:"#f59e0b" }} />
@@ -189,7 +152,6 @@ function HolidayCalendar({ holidays }: { holidays: Holiday[] }) {
               );
             })}
           </div>
-          {/* Legend */}
           <div style={{ display:"flex", gap:10, marginTop:12, flexWrap:"wrap" }}>
             {[
               { label:"Today",   box:"#1E3A5F", fg:"#fff" },
@@ -197,14 +159,14 @@ function HolidayCalendar({ holidays }: { holidays: Holiday[] }) {
               { label:"Weekend", box:"transparent", fg:"#ef4444", border:"1px solid #fca5a5" },
             ].map(l => (
               <div key={l.label} style={{ display:"flex", alignItems:"center", gap:5, fontSize:10 }}>
-                <div style={{ width:12, height:12, borderRadius:3, background:l.box, border:l.border||"none" }} />
+                <div style={{ width:12, height:12, borderRadius:3, background:l.box, border:(l as any).border||"none" }} />
                 <span style={{ color:"#64748b", fontWeight:600 }}>{l.label}</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* ── Holiday list for month ── */}
+        {/* Holiday list */}
         <div>
           <div style={{ fontSize:13, fontWeight:800, color:"#0f172a", marginBottom:10, display:"flex", alignItems:"center", gap:8 }}>
             {MONTH_NAMES[month]} Holidays
@@ -214,7 +176,6 @@ function HolidayCalendar({ holidays }: { holidays: Holiday[] }) {
               </span>
             )}
           </div>
-
           {monthHols.length === 0 ? (
             <div style={{ textAlign:"center", padding:"28px 0", color:"#94a3b8", fontSize:13, background:"#f8fafc", borderRadius:12, border:"1px dashed #e2e8f0" }}>
               <div style={{ fontSize:28, marginBottom:6 }}>🎉</div>
@@ -235,7 +196,6 @@ function HolidayCalendar({ holidays }: { holidays: Holiday[] }) {
                     border:`1px solid ${past ? "#e2e8f0" : "#fcd34d"}`,
                     opacity: past ? 0.6 : 1,
                   }}>
-                    {/* Date box */}
                     <div style={{
                       width:42, height:42, borderRadius:10, flexShrink:0,
                       background: past ? "#e2e8f0" : "#1E3A5F",
@@ -244,9 +204,8 @@ function HolidayCalendar({ holidays }: { holidays: Holiday[] }) {
                       alignItems:"center", justifyContent:"center", lineHeight:1.2,
                     }}>
                       <span style={{ fontSize:15, fontWeight:900 }}>{dayN}</span>
-                      <span style={{ fontSize:9,  fontWeight:600, opacity:0.8 }}>{dow}</span>
+                      <span style={{ fontSize:9, fontWeight:600, opacity:0.8 }}>{dow}</span>
                     </div>
-                    {/* Name */}
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ fontSize:13, fontWeight:700, color:"#0f172a", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                         {h.name}
@@ -255,11 +214,10 @@ function HolidayCalendar({ holidays }: { holidays: Holiday[] }) {
                         {MONTH_NAMES[month]} {dayN}, {year}
                       </div>
                     </div>
-                    {/* Type */}
                     <span style={{
                       fontSize:10, fontWeight:700, padding:"3px 8px", borderRadius:20, flexShrink:0,
                       background: h.type==="national" ? "#dcfce7" : "#eff6ff",
-                      color:      h.type==="national" ? "#166534"  : "#1d4ed8",
+                      color:      h.type==="national" ? "#166534" : "#1d4ed8",
                     }}>
                       {h.type === "national" ? "National" : "Optional"}
                     </span>
@@ -271,7 +229,7 @@ function HolidayCalendar({ holidays }: { holidays: Holiday[] }) {
         </div>
       </div>
 
-      {/* ── Month quick-jump row ── */}
+      {/* Month quick-jump */}
       <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:16 }}>
         {MONTH_NAMES.map((name, i) => {
           const k     = `${year}-${String(i+1).padStart(2,"0")}`;
@@ -309,26 +267,113 @@ const navBtnStyle: React.CSSProperties = {
   color:"#334155", display:"flex", alignItems:"center", justifyContent:"center",
 };
 
-
+// ══════════════════════════════════════════════════════════
+//  MAIN COMPONENT — all data from Firestore
+// ══════════════════════════════════════════════════════════
 export default function LeaveRequestView({
-  leaveType = "casual" as LeaveType,
- setLeaveType = (() => {}) as (v: LeaveType) => void,
-  fromDate = "",
-  setFromDate = (_: string) => {},
-  toDate = "",
-  setToDate = (_: string) => {},
-  leaveReason = "",
-  setLeaveReason = (_: string) => {},
-  handleSubmitLeave = () => {},
-  submitting = false,
-  leaveMsg = "",
-  myLeaves = DEMO_LEAVES as LeaveRecord[],
-  leaveBalance = DEMO_BALANCE as BalanceItem[],
-  holidays = DEMO_HOLIDAYS as Holiday[],
+  user,                         // ← pass user from parent always
+  leaveType,
+  setLeaveType,
+  fromDate,
+  setFromDate,
+  toDate,
+  setToDate,
+  leaveReason,
+  setLeaveReason,
+  handleSubmitLeave,
+  submitting,
+  leaveMsg,
+}: {
+  user: any;
+  leaveType: LeaveType;
+  setLeaveType: (v: LeaveType) => void;
+  fromDate: string;
+  setFromDate: (v: string) => void;
+  toDate: string;
+  setToDate: (v: string) => void;
+  leaveReason: string;
+  setLeaveReason: (v: string) => void;
+  handleSubmitLeave: () => void;
+  submitting: boolean;
+  leaveMsg: string;
 }) {
   const [tab,           setTab]           = useState<"apply"|"history"|"holidays">("apply");
   const [historyFilter, setHistoryFilter] = useState("All");
   const [expandedId,    setExpandedId]    = useState<string|null>(null);
+
+  // ── Real Firestore data ──
+  const [myLeaves,     setMyLeaves]     = useState<LeaveRecord[]>([]);
+  const [leaveBalance, setLeaveBalance] = useState<BalanceItem[]>([]);
+  const [holidays,     setHolidays]     = useState<Holiday[]>([]);
+  const [dataLoading,  setDataLoading]  = useState(true);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    // 1. Live leave history
+    const unsubLeaves = onSnapshot(
+      query(
+        collection(db, "leaveRequests"),
+        where("uid", "==", user.uid),
+        orderBy("createdAt", "desc")
+      ),
+      (snap) => {
+        setMyLeaves(
+          snap.docs.map(d => ({ id: d.id, ...d.data() } as LeaveRecord))
+        );
+      }
+    );
+
+    // 2. Live leave balance → map to BalanceItem[]
+    const unsubBalance = onSnapshot(
+      query(collection(db, "leaveBalances"), where("uid", "==", user.uid)),
+      (snap) => {
+        if (!snap.empty) {
+          const data = snap.docs[0].data();
+          const rows: BalanceItem[] = [
+            {
+              type:      "sick",
+              icon:      "🤒",
+              remaining: (data?.sick?.quota  ?? 12) - (data?.sick?.used  ?? 0),
+              total:     data?.sick?.quota  ?? 12,
+            },
+            {
+              type:      "casual",
+              icon:      "🌴",
+              remaining: (data?.casual?.quota ?? 12) - (data?.casual?.used ?? 0),
+              total:     data?.casual?.quota ?? 12,
+            },
+            {
+              type:      "Work From Home",
+              icon:      "🏠",
+              remaining: (data?.wfh?.quota ?? 24) - (data?.wfh?.used ?? 0),
+              total:     data?.wfh?.quota ?? 24,
+            },
+          ];
+          setLeaveBalance(rows);
+        }
+      }
+    );
+
+    // 3. Holidays — one-time fetch
+    getDocs(query(collection(db, "holidays"), orderBy("date", "asc")))
+      .then(snap => {
+        setHolidays(
+          snap.docs.map(d => {
+            const data = d.data();
+            return {
+              date: data.date,
+              name: data.title ?? data.name ?? "Holiday",
+              type: data.type === "Optional" ? "optional" : "national",
+            } as Holiday;
+          })
+        );
+      })
+      .catch(() => setHolidays([]))
+      .finally(() => setDataLoading(false));
+
+    return () => { unsubLeaves(); unsubBalance(); };
+  }, [user]);
 
   const days = useMemo(() => {
     if (!fromDate || !toDate) return 0;
@@ -341,45 +386,38 @@ export default function LeaveRequestView({
     [myLeaves, historyFilter]
   );
 
-  // Next upcoming holiday (for hero)
-  const today   = todayStr();
+  const today  = todayStr();
   const nextHol = holidays.filter(h => h.date >= today)[0];
+
+  // Remaining balance for selected leave type (to warn user)
+  const selectedBalance = leaveBalance.find(b => b.type === leaveType);
+  const isExhausted = selectedBalance ? selectedBalance.remaining <= 0 : false;
+
+  if (dataLoading) {
+    return (
+      <div style={{ padding: 40, textAlign: "center", color: "#64748b", fontSize: 14 }}>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
+        Loading your leave data...
+      </div>
+    );
+  }
 
   return (
     <div style={S.root}>
-<div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:24 }}>
-  {/* <div>
-    <div style={{ fontSize:24, fontWeight:800, color:"#0f172a", letterSpacing:-0.5 }}>Leave Portal</div>
-    <div style={{ fontSize:13, color:"#64748b", marginTop:2 }}>Manage & track your leave requests</div>
-  </div> */}
-  {nextHol && (
-    <div style={{ background:"#fff", borderRadius:12, padding:"10px 16px", border:"1px solid #e2e8f0", boxShadow:"0 2px 8px #0000000D", textAlign:"right" }}>
-      <div style={{ fontSize:10, color:"#94a3b8", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em" }}>Next Holiday</div>
-      <div style={{ fontSize:14, color:"#0f172a", fontWeight:800, marginTop:2 }}>{nextHol.name}</div>
-      <div style={{ fontSize:11, color:"#64748b", marginTop:1 }}>{nextHol.date}</div>
-    </div>
-  )}
-</div>
 
-      {/* ── BALANCE CARDS ────────────────────────────────── */}
-      {/* <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:14, marginBottom:24 }}>
-        {leaveBalance.map(b => (
-          <div key={b.type} style={{ ...S.balCard, borderTopColor: LEAVE_COLORS[b.type]?.dot ?? "#6366F1" }}>
-            <div style={{ fontSize:26, marginBottom:6 }}>{b.icon}</div>
-            <div style={{ fontSize:32, fontWeight:800, color:"#111827", lineHeight:1 }}>{b.remaining}</div>
-            <div style={{ fontSize:12, fontWeight:600, color:"#6B7280", marginTop:4, marginBottom:10 }}>
-              {b.type === "Work From Home" ? "WFH" : b.type}
-            </div>
-            <div style={S.bar}>
-              <div style={{ ...S.fill, width:`${Math.min((b.remaining/b.total)*100,100)}%`, background: LEAVE_COLORS[b.type]?.dot ?? "#6366F1" }} />
-            </div>
-            <div style={{ fontSize:11, color:"#9CA3AF" }}>{b.remaining}/{b.total} days</div>
+      {/* Next holiday banner */}
+      {nextHol && (
+        <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:20 }}>
+          <div style={{ background:"#fff", borderRadius:12, padding:"10px 16px", border:"1px solid #e2e8f0", boxShadow:"0 2px 8px #0000000D", textAlign:"right" }}>
+            <div style={{ fontSize:10, color:"#94a3b8", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.08em" }}>Next Holiday</div>
+            <div style={{ fontSize:14, color:"#0f172a", fontWeight:800, marginTop:2 }}>{nextHol.name}</div>
+            <div style={{ fontSize:11, color:"#64748b", marginTop:1 }}>{nextHol.date}</div>
           </div>
-        ))}
-      </div> */}
+        </div>
+      )}
 
-      {/* ── TABS ─────────────────────────────────────────── */}
-      <div style={{ display:"flex", gap:8, marginBottom:20 }}>
+      {/* Tabs */}
+      <div style={{ display:"flex", gap:8, marginBottom:20, flexWrap:"wrap" }}>
         {([
           ["apply",    "✏️ Apply for Leave"],
           ["history",  "📋 My Leave History"],
@@ -391,37 +429,110 @@ export default function LeaveRequestView({
         ))}
       </div>
 
-      {/* ── APPLY TAB ────────────────────────────────────── */}
+      {/* ── APPLY TAB ── */}
       {tab === "apply" && (
         <div style={S.card}>
-          {/* <div style={S.cardTitle}>📝 New Leave Application</div> */}
+
+          {/* Balance summary strip */}
+          {leaveBalance.length > 0 && (
+            <div style={{ display:"flex", gap:10, marginBottom:20, flexWrap:"wrap" }}>
+              {leaveBalance.map(b => {
+                const exhausted = b.remaining <= 0;
+                return (
+                  <div key={b.type} style={{
+                    flex:1, minWidth:100,
+                    background: exhausted ? "#fef2f2" : "#f8fafc",
+                    border:`1.5px solid ${exhausted ? "#fecaca" : "#e2e8f0"}`,
+                    borderRadius:12, padding:"10px 14px",
+                    textAlign:"center",
+                  }}>
+                    <div style={{ fontSize:20, marginBottom:4 }}>{b.icon}</div>
+                    <div style={{ fontSize:22, fontWeight:900, color: exhausted ? "#ef4444" : "#111827", lineHeight:1 }}>
+                      {b.remaining}
+                    </div>
+                    <div style={{ fontSize:10, color:"#6b7280", fontWeight:600, marginTop:3 }}>
+                      {b.type === "Work From Home" ? "WFH" : b.type}
+                    </div>
+                    <div style={{ fontSize:10, color:"#9ca3af", marginTop:2 }}>
+                      of {b.total}
+                    </div>
+                    {exhausted && (
+                      <div style={{ fontSize:9, fontWeight:800, color:"#ef4444", marginTop:4 }}>EXHAUSTED</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           <label style={S.label}>Leave Type</label>
-          {/* 3 columns — LOP removed */}
           <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10 }}>
             {(Object.keys(LEAVE_COLORS) as LeaveType[]).map(type => {
               const c   = LEAVE_COLORS[type];
               const sel = leaveType === type;
+              const bal = leaveBalance.find(b => b.type === type);
+              const exhausted = bal ? bal.remaining <= 0 : false;
               return (
-                <button key={type} onClick={() => setLeaveType(type as LeaveType)} style={{
-                  padding:"14px 8px", borderRadius:12, cursor:"pointer",
-                  fontSize:13, fontWeight:600,
-                  display:"flex", flexDirection:"column", alignItems:"center", gap:5,
-                  transition:"all 0.2s",
-                  background: sel ? c.dot    : "#F9FAFB",
-                  color:      sel ? "#fff"   : "#374151",
-                  border:     `2px solid ${sel ? c.dot : "#E5E7EB"}`,
-                  transform:  sel ? "translateY(-2px)" : "none",
-                  boxShadow:  sel ? `0 6px 20px ${c.dot}55` : "none",
-                }}>
-                  <span style={{ fontSize:22 }}>{LEAVE_ICONS[type]}</span>
+                <button
+                  key={type}
+                  onClick={() => !exhausted && setLeaveType(type)}
+                  disabled={exhausted}
+                  title={exhausted ? `No ${type} leaves remaining` : ""}
+                  style={{
+                    padding:"14px 8px", borderRadius:12, cursor: exhausted ? "not-allowed" : "pointer",
+                    fontSize:13, fontWeight:600,
+                    display:"flex", flexDirection:"column", alignItems:"center", gap:5,
+                    transition:"all 0.2s",
+                    background: exhausted ? "#f9fafb" : sel ? c.dot : "#F9FAFB",
+                    color:      exhausted ? "#d1d5db" : sel ? "#fff" : "#374151",
+                    border:     `2px solid ${exhausted ? "#e5e7eb" : sel ? c.dot : "#E5E7EB"}`,
+                    transform:  sel && !exhausted ? "translateY(-2px)" : "none",
+                    boxShadow:  sel && !exhausted ? `0 6px 20px ${c.dot}55` : "none",
+                    opacity:    exhausted ? 0.5 : 1,
+                    position:   "relative",
+                  }}
+                >
+                  <span style={{ fontSize:22, filter: exhausted ? "grayscale(1)" : "none" }}>
+                    {LEAVE_ICONS[type] ?? "📋"}
+                  </span>
                   <span>{type === "Work From Home" ? "WFH" : type}</span>
+                  {bal && (
+                    <span style={{
+                      fontSize:10, fontWeight:700,
+                      color: exhausted ? "#ef4444" : sel ? "rgba(255,255,255,0.85)" : "#6b7280",
+                    }}>
+                      {exhausted ? "0 left" : `${bal.remaining} left`}
+                    </span>
+                  )}
+                  {exhausted && (
+                    <span style={{
+                      position:"absolute", top:-6, right:-6,
+                      background:"#ef4444", color:"#fff",
+                      fontSize:8, fontWeight:900,
+                      padding:"2px 5px", borderRadius:99,
+                    }}>
+                      DONE
+                    </span>
+                  )}
                 </button>
               );
             })}
           </div>
 
-          {leaveType === "Work From Home" && (
+          {/* Exhausted warning */}
+          {isExhausted && (
+            <div style={{ background:"#fef2f2", border:"1.5px solid #fecaca", borderRadius:12, padding:"14px 16px", display:"flex", gap:12, color:"#dc2626", fontSize:13, marginTop:12 }}>
+              <span style={{ fontSize:20 }}>🚫</span>
+              <div>
+                <strong>No {leaveType} leaves remaining</strong>
+                <div style={{ fontSize:12, marginTop:3, color:"#ef4444" }}>
+                  You have exhausted all your {leaveType} leave quota for this year. Please contact HR for further assistance.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {leaveType === "Work From Home" && !isExhausted && (
             <div style={{ background:"#F0FDF4", border:"1.5px solid #BBF7D0", borderRadius:12, padding:"14px 16px", display:"flex", gap:12, color:"#15803D", fontSize:13, marginTop:12 }}>
               <span style={{ fontSize:20 }}>🏠</span>
               <div>
@@ -437,40 +548,61 @@ export default function LeaveRequestView({
           <div style={{ display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:12, alignItems:"end", marginTop:4 }}>
             <div>
               <label style={S.label}>📅 From Date</label>
-              <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} style={S.input} />
+              <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
+                style={S.input} min={today} disabled={isExhausted} />
             </div>
             <div style={{ fontSize:20, color:"#9CA3AF", paddingBottom:8, textAlign:"center" }}>→</div>
             <div>
               <label style={S.label}>📅 To Date</label>
-              <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} style={S.input} />
+              <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
+                style={S.input} min={fromDate || today} disabled={isExhausted} />
             </div>
           </div>
 
-          {days > 0 && (
+          {days > 0 && selectedBalance && days > selectedBalance.remaining && (
+            <div style={{ background:"#fef2f2", border:"1.5px solid #fecaca", borderRadius:10, padding:"8px 14px", fontSize:12, color:"#dc2626", marginTop:8, fontWeight:600 }}>
+              ⚠️ You selected {days} days but only have {selectedBalance.remaining} {leaveType} leave(s) remaining.
+            </div>
+          )}
+
+          {days > 0 && !(days > (selectedBalance?.remaining ?? 99)) && (
             <div style={{ display:"inline-flex", alignItems:"center", gap:6, background:"#EFF6FF", color:"#1D4ED8", border:"1.5px solid #BFDBFE", borderRadius:20, padding:"6px 16px", fontSize:13, marginTop:12 }}>
               🗓️ <strong>{days} {days===1?"day":"days"}</strong> of {leaveType} leave
             </div>
           )}
 
-          {/* Reason */}
           <label style={S.label}>📝 Reason for Leave</label>
           <div style={{ position:"relative" }}>
-            <textarea value={leaveReason} onChange={e => setLeaveReason(e.target.value)}
-              rows={5} placeholder="Describe your reason in detail..."
-              style={{ ...S.input, resize:"vertical", fontFamily:"inherit", lineHeight:1.6 }} />
-            <div style={{ position:"absolute", bottom:10, right:12, fontSize:11, color:"#9CA3AF" }}>{leaveReason.length} chars</div>
+            <textarea
+              value={leaveReason}
+              onChange={e => setLeaveReason(e.target.value)}
+              rows={5}
+              placeholder="Describe your reason in detail..."
+              disabled={isExhausted}
+              style={{ ...S.input, resize:"vertical", fontFamily:"inherit", lineHeight:1.6 }}
+            />
+            <div style={{ position:"absolute", bottom:10, right:12, fontSize:11, color:"#9CA3AF" }}>
+              {leaveReason.length} chars
+            </div>
           </div>
 
-          <button onClick={handleSubmitLeave} disabled={submitting} style={{
-            width:"100%", marginTop:20,
-            background:"linear-gradient(135deg,#1E3A5F,#2D6A9F)",
-            color:"#fff", border:"none", borderRadius:14,
-            padding:"15px 24px", fontSize:15, fontWeight:700,
-            cursor: submitting?"not-allowed":"pointer",
-            opacity: submitting ? 0.6 : 1,
-            boxShadow:"0 6px 20px #1E3A5F44",
-          }}>
-            {submitting ? "⏳ Submitting..." : "🚀 Submit Leave Request"}
+          <button
+            onClick={handleSubmitLeave}
+            disabled={submitting || isExhausted}
+            style={{
+              width:"100%", marginTop:20,
+              background: isExhausted
+                ? "#e5e7eb"
+                : "linear-gradient(135deg,#1E3A5F,#2D6A9F)",
+              color: isExhausted ? "#9ca3af" : "#fff",
+              border:"none", borderRadius:14,
+              padding:"15px 24px", fontSize:15, fontWeight:700,
+              cursor: submitting || isExhausted ? "not-allowed" : "pointer",
+              opacity: submitting ? 0.6 : 1,
+              boxShadow: isExhausted ? "none" : "0 6px 20px #1E3A5F44",
+            }}
+          >
+            {isExhausted ? "🚫 Leave Quota Exhausted" : submitting ? "⏳ Submitting..." : "🚀 Submit Leave Request"}
           </button>
 
           {leaveMsg && (
@@ -485,12 +617,12 @@ export default function LeaveRequestView({
         </div>
       )}
 
-      {/* ── HISTORY TAB ──────────────────────────────────── */}
+      {/* ── HISTORY TAB ── */}
       {tab === "history" && (
         <div style={S.card}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20, flexWrap:"wrap", gap:10 }}>
             <div style={S.cardTitle}>📋 Leave History</div>
-            <div style={{ display:"flex", gap:6 }}>
+            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
               {["All","Pending","Approved","Rejected"].map(s => (
                 <button key={s} onClick={() => setHistoryFilter(s)} style={{
                   border:"none", borderRadius:8, padding:"6px 14px", fontSize:12, fontWeight:600, cursor:"pointer",
@@ -505,6 +637,9 @@ export default function LeaveRequestView({
             <div style={{ textAlign:"center", padding:"60px 0" }}>
               <div style={{ fontSize:48 }}>📭</div>
               <div style={{ fontSize:18, fontWeight:700, color:"#374151", marginTop:12 }}>No requests found</div>
+              <div style={{ fontSize:13, color:"#9ca3af", marginTop:6 }}>
+                {historyFilter === "All" ? "You haven't submitted any leave requests yet." : `No ${historyFilter} requests found.`}
+              </div>
             </div>
           ) : (
             <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
@@ -514,15 +649,22 @@ export default function LeaveRequestView({
                 const exp = expandedId === leave.id;
                 return (
                   <div key={leave.id} style={{ background:"#FAFAFA", borderRadius:12, border:"1px solid #E5E7EB", overflow:"hidden", borderLeft:`4px solid ${lc.dot}` }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 18px", cursor:"pointer" }}
-                      onClick={() => setExpandedId(exp ? null : leave.id)}>
-                      <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                    <div
+                      style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 18px", cursor:"pointer" }}
+                      onClick={() => setExpandedId(exp ? null : leave.id)}
+                    >
+                      <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
                         <span style={{ background:lc.bg, color:lc.text, borderRadius:8, padding:"4px 12px", fontSize:12, fontWeight:700 }}>
-                          {leave.leaveType}
+                          {LEAVE_ICONS[leave.leaveType] ?? "📋"} {leave.leaveType}
                         </span>
                         <span style={{ fontSize:13, color:"#374151", fontWeight:500 }}>
                           {leave.fromDate} → {leave.toDate}
                         </span>
+                        {leave.days && (
+                          <span style={{ fontSize:11, color:"#9ca3af", fontWeight:600 }}>
+                            ({leave.days}d)
+                          </span>
+                        )}
                       </div>
                       <div style={{ display:"flex", alignItems:"center", gap:10 }}>
                         <span style={{ background:sc.bg, color:sc.text, border:`1px solid ${sc.ring}`, borderRadius:8, padding:"4px 12px", fontSize:12, fontWeight:700 }}>
@@ -553,32 +695,24 @@ export default function LeaveRequestView({
         </div>
       )}
 
-      {/* ── HOLIDAYS TAB ─────────────────────────────────── */}
+      {/* ── HOLIDAYS TAB ── */}
       {tab === "holidays" && (
         <div style={S.card}>
           <div style={S.cardTitle}>🗓️ Company Holiday Calendar</div>
           <HolidayCalendar holidays={holidays} />
         </div>
       )}
-
     </div>
   );
 }
 
 // ── STYLES ────────────────────────────────────────────────
 const S: Record<string, React.CSSProperties> = {
-  root:     { fontFamily:"'DM Sans','Segoe UI',sans-serif", maxWidth:820, margin:"0 auto", padding:24, background:"#F8FAFC", minHeight:"100vh" },
-  hero:     { background:"linear-gradient(135deg,#1E3A5F 0%,#2D6A9F 100%)", borderRadius:20, padding:"28px 32px", display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:24, boxShadow:"0 8px 32px #1E3A5F44" },
-  avatarRing: { width:56, height:56, borderRadius:"50%", background:"rgba(255,255,255,0.2)", display:"flex", alignItems:"center", justifyContent:"center" },
-  heroName: { fontSize:22, fontWeight:800, color:"#fff", letterSpacing:-0.5 },
-  heroSub:  { fontSize:13, color:"rgba(255,255,255,0.72)", marginTop:2 },
-  balCard:  { background:"#fff", borderRadius:16, padding:"18px 16px", borderTop:"4px solid #6366F1", boxShadow:"0 2px 12px #0000000D", textAlign:"center" },
-  bar:      { height:5, background:"#F3F4F6", borderRadius:10, overflow:"hidden", marginBottom:6 },
-  fill:     { height:"100%", borderRadius:10, transition:"width 0.6s ease" },
-  tab:      { padding:"10px 20px", borderRadius:12, border:"2px solid #E5E7EB", background:"#fff", fontSize:13, fontWeight:600, cursor:"pointer", color:"#6B7280" },
-  tabActive:{ background:"#1E3A5F", color:"#fff", border:"2px solid #1E3A5F" },
-  card:     { background:"#fff", borderRadius:20, padding:28, boxShadow:"0 4px 24px #0000000F" },
-  cardTitle:{ fontSize:18, fontWeight:800, color:"#111827", marginBottom:20 },
-  label:    { display:"block", fontSize:12, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:0.8, marginBottom:8, marginTop:16 },
-  input:    { border:"2px solid #E5E7EB", borderRadius:10, padding:"10px 14px", fontSize:14, width:"100%", outline:"none", boxSizing:"border-box" },
+  root:      { fontFamily:"'DM Sans','Segoe UI',sans-serif", maxWidth:820, margin:"0 auto", padding:24, background:"#F8FAFC", minHeight:"100vh" },
+  tab:       { padding:"10px 20px", borderRadius:12, border:"2px solid #E5E7EB", background:"#fff", fontSize:13, fontWeight:600, cursor:"pointer", color:"#6B7280" },
+  tabActive: { background:"#1E3A5F", color:"#fff", border:"2px solid #1E3A5F" },
+  card:      { background:"#fff", borderRadius:20, padding:28, boxShadow:"0 4px 24px #0000000F" },
+  cardTitle: { fontSize:18, fontWeight:800, color:"#111827", marginBottom:20 },
+  label:     { display:"block", fontSize:12, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:0.8, marginBottom:8, marginTop:16 },
+  input:     { border:"2px solid #E5E7EB", borderRadius:10, padding:"10px 14px", fontSize:14, width:"100%", outline:"none", boxSizing:"border-box" },
 };

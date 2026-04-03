@@ -368,13 +368,18 @@ export default function EmployeeDetails({
           <InfoSection title="Financial & Bank" icon="💰" isEditing={isEditing}>
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 sm:col-span-1">
-                <Field label="Monthly Salary" value={editedUser.salary} editing={isEditing && isAdmin} onChange={(v) => setEditedUser({ ...editedUser, salary: v ? Number(v) : undefined })} type="number" prefix="₹" />
+                <Field label="Monthly Salary" value={editedUser.salary} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, salary: v ? Number(v) : undefined })} type="number" prefix="₹" />
               </div>
-              <div className="col-span-2 sm:col-span-1"><Field label="Bank Name" value={editedUser.bankName} editing={isEditing && isAdmin} onChange={(v) => setEditedUser({ ...editedUser, bankName: v })} /></div>
-              <Field label="Account No." value={editedUser.accountNumber} editing={isEditing && isAdmin} onChange={(v) => setEditedUser({ ...editedUser, accountNumber: v })} />
-              <Field label="IFSC Code" value={editedUser.ifscCode} editing={isEditing && isAdmin} onChange={(v) => setEditedUser({ ...editedUser, ifscCode: v })} />
-              <Field label="PAN Number" value={editedUser.panNumber} editing={isEditing && isAdmin} onChange={(v) => setEditedUser({ ...editedUser, panNumber: v })} />
-              <Field label="Aadhar No." value={editedUser.aadharNumber} editing={isEditing && isAdmin} onChange={(v) => setEditedUser({ ...editedUser, aadharNumber: v })} />
+              <div className="col-span-2 sm:col-span-1">
+<Field label="Bank Name" value={editedUser.bankName} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, bankName: v })} /></div>
+
+<Field label="Account No." value={editedUser.accountNumber} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, accountNumber: v })} />
+
+<Field label="IFSC Code" value={editedUser.ifscCode} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, ifscCode: v })} />
+
+<Field label="PAN Number" value={editedUser.panNumber} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, panNumber: v })} />
+
+<Field label="Aadhar No." value={editedUser.aadharNumber} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, aadharNumber: v })} />
             </div>
           </InfoSection>
 

@@ -105,14 +105,40 @@ const isHoliday = (dateStr: string): { title: string } | null => {
 };
 
 const sidebarGroups = [
-  { title: "WORKSPACE",          items: [["dashboard","Dashboard","📊"]] },
-  { title: "WORK",               items: [["work-update","Work Update","📝"],["attendance","Attendance","⏰"],["projects","Projects","📁"]] },
-  { title: "PROJECT MANAGEMENT", items: [["projects","Projects","📁"]] },
-  { title: "LEAVE & HOLIDAYS",   items: [["leave-request","Apply Leave","📋"],["leave-history","Leave History","📜"],["holidays","Holidays","🎉"]] },
-  { title: "COMMUNICATION",      items: [["notifications","Notifications","🔔"]] },
-  { title: "ACCOUNT",            items: [["profile","Profile","👤"],["help","Help","❓"]] },
-  { title: "PAYSLIPS", items: [["payslips","Payslips","💰"]] }
+  // 🔥 Dashboard without group (direct item)
+  // { items: [["dashboard","Dashboard","📊"]] },
+
+  { title: "WORK", items: [
+    ["work-update","Work Update","📝"],
+    ["attendance","Attendance","⏰"],
+    ["projects","Projects","📁"]
+  ]},
+
+  { title: "PROJECT MANAGEMENT", items: [
+    ["projects","Projects","📁"]
+  ]},
+
+  { title: "LEAVE & HOLIDAYS", items: [
+    ["leave-request","Apply Leave","📋"],
+    ["leave-history","Leave History","📜"],
+    ["holidays","Holidays","🎉"]
+  ]},
+
+  { title: "COMMUNICATION", items: [
+    ["notifications","Notifications","🔔"]
+  ]},
+
+  { title: "ACCOUNT", items: [
+    ["profile","Profile","👤"],
+    ["help","Help","❓"]
+  ]},
+
+  { title: "PAYSLIPS", items: [
+    ["payslips","Payslips","💰"]
+  ]}
 ];
+
+
 
 // ── Announcement Bar ──────────────────────────────────────
 function AnnouncementBar({ messages }: { messages: string[] }) {
@@ -700,48 +726,92 @@ export default function ZohoStyleEmployeeDashboard() {
           </div>
         )}
 
-        <nav className="flex-1 px-2 py-3 space-y-1.5 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20">
-          {sidebarCollapsed ? (
-            sidebarGroups.flatMap(group =>
-              group.items.map(([id, label, icon]) => (
-                <button key={`${group.title}-${id}`}
+        <nav className="flex-1 px-2 py-3 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20">
+
+  {/* 🔥 DASHBOARD DIRECT BUTTON */}
+  <button
+    onClick={() => { setActiveView("dashboard"); setMobileMenuOpen(false); }}
+    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition
+      ${activeView === "dashboard" ? "bg-white/10" : "hover:bg-white/5"}`}
+  >
+    {/* <span className="text-base"></span> */}
+    {!sidebarCollapsed && <span className="text-sm font-medium">DASHBOARD</span>}
+  </button>
+
+ 
+  {/* 🔥 REST OF GROUPS */}
+  {sidebarCollapsed ? (
+    sidebarGroups
+      .filter(group => group.title !== "DASHBORD") // remove dashboard group
+      .flatMap(group =>
+        group.items.map(([id, label, icon]) => (
+          <button
+            key={`${group.title}-${id}`}
+            onClick={() => { setActiveView(id as ViewType); setMobileMenuOpen(false); }}
+            className={`w-full flex items-center justify-center p-2.5 rounded-lg transition relative group
+              ${activeView === id ? "bg-white/10" : "hover:bg-white/5"}`}
+            title={label}
+          >
+            <span className="text-xl">{icon}</span>
+
+            {id === "notifications" && totalNotifications > 0 && (
+              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+            )}
+
+            <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap">
+              {label}
+            </div>
+          </button>
+        ))
+      )
+  ) : (
+    sidebarGroups
+      .filter(group => group.title !== "DASHBORD") // remove dashboard group
+      .map(group => (
+        <div key={group.title} className="mb-2">
+
+          {/* GROUP HEADER */}
+          <button
+            onClick={() => setOpenGroup(openGroup === group.title ? null : group.title)}
+            className="w-full flex justify-between items-center px-2 py-1.5 text-xs font-bold text-white/60 hover:text-white transition"
+          >
+            {group.title}
+            <svg
+              className={`w-3.5 h-3.5 transition-transform ${openGroup === group.title ? "rotate-180" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {/* GROUP ITEMS */}
+          {openGroup === group.title && (
+            <div className="mt-0.5 space-y-0.5">
+              {group.items.map(([id, label, icon]) => (
+                <button
+                  key={id}
                   onClick={() => { setActiveView(id as ViewType); setMobileMenuOpen(false); }}
-                  className={`w-full flex items-center justify-center p-2.5 rounded-lg transition relative group ${activeView === id ? "bg-white/10" : "hover:bg-white/5"}`}
-                  title={label}>
-                  <span className="text-xl">{icon}</span>
-                  {id === "notifications" && totalNotifications > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />}
-                  <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap">{label}</div>
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition relative
+                    ${activeView === id ? "bg-white/10" : "hover:bg-white/5"}`}
+                >
+                  <span className="text-base">{icon}</span>
+                  <span className="text-sm">{label}</span>
+
+                  {id === "notifications" && totalNotifications > 0 && (
+                    <span className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full font-semibold">
+                      {totalNotifications}
+                    </span>
+                  )}
                 </button>
-              ))
-            )
-          ) : (
-            sidebarGroups.map(group => (
-              <div key={group.title} className="mb-2">
-                <button onClick={() => setOpenGroup(openGroup === group.title ? null : group.title)}
-                  className="w-full flex justify-between items-center px-2 py-1.5 text-xs font-bold text-white/60 hover:text-white transition">
-                  {group.title}
-                  <svg className={`w-3.5 h-3.5 transition-transform ${openGroup === group.title ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                {openGroup === group.title && (
-                  <div className="mt-0.5 space-y-0.5">
-                    {group.items.map(([id, label, icon]) => (
-                      <button key={id} onClick={() => { setActiveView(id as ViewType); setMobileMenuOpen(false); }}
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition relative ${activeView === id ? "bg-white/10" : "hover:bg-white/5"}`}>
-                        <span className="text-base">{icon}</span>
-                        <span className="text-sm">{label}</span>
-                        {id === "notifications" && totalNotifications > 0 && (
-                          <span className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full font-semibold">{totalNotifications}</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))
+              ))}
+            </div>
           )}
-        </nav>
+        </div>
+      ))
+  )}
+</nav>
 
         {!sidebarCollapsed ? (
           <button onClick={async () => { await signOut(auth); router.push("/login"); }}
@@ -1024,6 +1094,7 @@ export default function ZohoStyleEmployeeDashboard() {
             {activeView === "leave-history" && <LeaveHistoryView leaveRequests={leaveRequests} />}
             {activeView === "leave-request" && (
               <LeaveRequestView
+                user={user}
                 leaveType={leaveType} setLeaveType={handleSetLeaveType}
                 fromDate={fromDate} setFromDate={setFromDate}
                 toDate={toDate} setToDate={setToDate}

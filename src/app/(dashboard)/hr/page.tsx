@@ -423,15 +423,18 @@ function HRDashboard() {
             <SideNavItem key={n.key} label={n.label} icon={n.icon} active={view===n.key} onClick={()=>{setView(n.key);setSidebarOpen(false);}} badge={n.badge}/>
           ))}
 
-          <div className="pt-4">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3 mb-2">Quick Links</p>
-            <button onClick={()=>router.push("/admin/it-assets")} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-all text-left">
-              <span className="text-base">🖥️</span><span>IT Assets</span>
-            </button>
-            <button onClick={()=>window.open("/meet","_blank")} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-all text-left">
-              <span className="text-base">📹</span><span>Video Meet</span>
-            </button>
-          </div>
+<div className="pt-4">
+  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3 mb-2">Quick Links</p>
+  <button onClick={()=>router.push("/admin/it-assets")} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-all text-left">
+    <span className="text-base">🖥️</span><span>IT Assets</span>
+  </button>
+  <button onClick={()=>router.push("/admin/greetings")} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-all text-left">
+  <span className="text-base">🎉</span><span>Greetings Hub</span>
+</button>
+  <button onClick={()=>window.open("/meet","_blank")} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-all text-left">
+    <span className="text-base">📹</span><span>Video Meet</span>
+  </button>
+</div>
         </nav>
 
         {/* User */}

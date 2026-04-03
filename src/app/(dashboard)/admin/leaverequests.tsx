@@ -21,8 +21,8 @@ import {
   Palmtree, Stethoscope, Home, TrendingUp,
 } from "lucide-react";
 import {
-  collection, query, orderBy, onSnapshot,
-  updateDoc, doc, addDoc, serverTimestamp,
+  collection, query, where, orderBy, onSnapshot,
+  updateDoc, doc, addDoc, getDocs, serverTimestamp,
   Timestamp, getDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -540,40 +540,84 @@ export default function AdminLeaveRequests() {
         notificationRead: false,   // employee will see notification dot
       });
 
-      // 2. If approved, decrement leaveBalance in employees collection (and users as fallback)
-      if (newStatus === "Approved" && req.uid) {
-        const lc         = getLeaveCfg(req.leaveType);
-        const balanceKey = lc.balanceKey;           // "casual" | "sick" | "annual" | null
-        const days       = getDays(req.fromDate ?? "", req.toDate ?? "");
+      // 2. If approved, deduct from leaveBalances collection (used by employee dashboard)
+if (newStatus === "Approved" && req.uid) {
+  const lc         = getLeaveCfg(req.leaveType);
+  const balanceKey = lc.balanceKey; // "casual" | "sick" | "annual" | null
+  const days       = getDays(req.fromDate ?? "", req.toDate ?? "");
 
-        if (balanceKey) {
-          // Try employees collection
-          const empRef  = doc(db, "employees", req.uid);
-          const empSnap = await getDoc(empRef);
+  // ── Write to leaveBalances (what DashboardView reads via onSnapshot) ──
+  const leaveBalSnap = await getDocs(
+    query(collection(db, "leaveBalances"), where("uid", "==", req.uid))
+  );
 
-          if (empSnap.exists()) {
-            const current = empSnap.data().leaveBalance ?? { annual: 18, sick: 12, casual: 6 };
-            const updated = {
-              ...current,
-              [balanceKey]: Math.max(0, (current[balanceKey] ?? 0) - days),
-            };
-            await updateDoc(empRef, { leaveBalance: updated });
-          } else {
-            // Fallback: users collection
-            const userRef  = doc(db, "users", req.uid);
-            const userSnap = await getDoc(userRef);
-            if (userSnap.exists()) {
-              const current = userSnap.data().leaveBalance ?? { annual: 18, sick: 12, casual: 6 };
-              const updated = {
-                ...current,
-                [balanceKey]: Math.max(0, (current[balanceKey] ?? 0) - days),
-              };
-              await updateDoc(userRef, { leaveBalance: updated });
-            }
-          }
-        }
+  if (balanceKey === "casual" || balanceKey === "sick") {
+    if (!leaveBalSnap.empty) {
+      // Doc exists — update used count
+      const balDoc      = leaveBalSnap.docs[0];
+      const balData     = balDoc.data();
+      const currentUsed = balData?.[balanceKey]?.used  ?? 0;
+      const quota       = balData?.[balanceKey]?.quota ?? 12;
+      const newUsed     = Math.min(currentUsed + days, quota);
+
+      await updateDoc(doc(db, "leaveBalances", balDoc.id), {
+        [`${balanceKey}.used`]:  newUsed,
+        [`${balanceKey}.quota`]: quota,
+      });
+    } else {
+      // Doc doesn't exist — create it
+      await addDoc(collection(db, "leaveBalances"), {
+        uid:    req.uid,
+        sick:   { quota: 12, used: balanceKey === "sick"   ? Math.min(days, 12) : 0 },
+        casual: { quota: 12, used: balanceKey === "casual" ? Math.min(days, 12) : 0 },
+        lop:    { used: 0 },
+        wfh:    { used: 0 },
+      });
+    }
+  }
+
+  // ── LOP / WFH — track usage only, no quota ──
+  const leaveKeyLower = req.leaveType?.toLowerCase();
+  if (leaveKeyLower === "lop" || leaveKeyLower === "wfh") {
+    if (!leaveBalSnap.empty) {
+      const balDoc      = leaveBalSnap.docs[0];
+      const balData     = balDoc.data();
+      const currentUsed = balData?.[leaveKeyLower]?.used ?? 0;
+      await updateDoc(doc(db, "leaveBalances", balDoc.id), {
+        [`${leaveKeyLower}.used`]: currentUsed + days,
+      });
+    } else {
+      await addDoc(collection(db, "leaveBalances"), {
+        uid:    req.uid,
+        sick:   { quota: 12, used: 0 },
+        casual: { quota: 12, used: 0 },
+        lop:    { used: leaveKeyLower === "lop" ? days : 0 },
+        wfh:    { used: leaveKeyLower === "wfh" ? days : 0 },
+      });
+    }
+  }
+
+  // ── Also keep employees/users collection in sync (existing logic) ──
+  if (balanceKey) {
+    const empRef  = doc(db, "employees", req.uid);
+    const empSnap = await getDoc(empRef);
+    if (empSnap.exists()) {
+      const current = empSnap.data().leaveBalance ?? { annual: 18, sick: 12, casual: 6 };
+      await updateDoc(empRef, {
+        leaveBalance: { ...current, [balanceKey]: Math.max(0, (current[balanceKey] ?? 0) - days) },
+      });
+    } else {
+      const userRef  = doc(db, "users", req.uid);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        const current = userSnap.data().leaveBalance ?? { annual: 18, sick: 12, casual: 6 };
+        await updateDoc(userRef, {
+          leaveBalance: { ...current, [balanceKey]: Math.max(0, (current[balanceKey] ?? 0) - days) },
+        });
       }
-
+    }
+  }
+}
       // 3. Write a notification so employee's bell shows it immediately
       //    This matches the notifications collection the employee dashboard already listens to
       if (req.uid) {

@@ -116,7 +116,338 @@ function Modal({ onClose, children, wide = false }: {
     </div>
   );
 }
+// ─── EMPLOYEE + LEAVE + HOLIDAY STACK CARDS ──────────────────────────────────
+function EmployeeLeaveHolidayCards({ 
+  user, 
+  setActiveModal 
+}: { 
+  user: any; 
+  setActiveModal: (v: string) => void;
+}) {
+  const [profile,   setProfile]   = useState<any>(null);
+  const [leaveData, setLeaveData] = useState<any>(null);
+  const [holidays,  setHolidays]  = useState<any[]>([]);
+  const [loading,   setLoading]   = useState(true);
 
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const unsubUser = onSnapshot(
+      query(collection(db, "users"), where("uid", "==", user.uid)),
+      (snap) => {
+        if (!snap.empty) setProfile(snap.docs[0].data());
+      }
+    );
+
+    const unsubLeave = onSnapshot(
+      query(collection(db, "leaveBalances"), where("uid", "==", user.uid)),
+      (snap) => {
+        if (!snap.empty) setLeaveData(snap.docs[0].data());
+      }
+    );
+
+    getDocs(query(collection(db, "holidays"), orderBy("date", "asc")))
+      .then((snap) => {
+        if (!snap.empty) {
+          setHolidays(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        } else {
+          setHolidays(CANONICAL_HOLIDAYS);
+        }
+      })
+      .catch(() => setHolidays(CANONICAL_HOLIDAYS))
+      .finally(() => setLoading(false));
+
+    return () => { unsubUser(); unsubLeave(); };
+  }, [user]);
+
+  const initials = (name: string) =>
+    (name ?? "").split(" ").slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
+
+  // ── 12 Sick + 12 Casual = 24 total ──
+const leaveRowsRaw = [
+  {
+    key: "sick",
+    label: "Sick Leaves",
+    quota: leaveData?.sick?.quota ?? leaveData?.SICK?.quota ?? 12,
+    used: leaveData?.sick?.used ?? leaveData?.SICK?.used ?? 0,
+    color: "#6366f1",
+  },
+  {
+    key: "casual",
+    label: "Casual Leaves",
+    quota: leaveData?.casual?.quota ?? leaveData?.CASUAL?.quota ?? 12,
+    used: leaveData?.casual?.used ?? leaveData?.CASUAL?.used ?? 0,
+    color: "#f59e0b",
+  },
+];
+
+// ✅ Hide completed leaves
+const leaveRows = leaveRowsRaw.filter(row => row.used < row.quota);;
+
+  const todayMs = new Date().setHours(0, 0, 0, 0);
+  const upcomingHolidays = holidays
+  .filter((h) => new Date(h.date + "T00:00:00").getTime() >= todayMs)
+  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+const pastHolidays = holidays
+  .filter((h) => new Date(h.date + "T00:00:00").getTime() < todayMs)
+  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // most recent first
+
+  const typeColor: Record<string, string> = {
+    National: "#6366f1", Festival: "#f59e0b", Optional: "#06b6d4",
+  };
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        {[0, 1].map((i) => (
+          <div key={i} className="dash-card p-5 animate-pulse">
+            <div className="h-4 bg-gray-100 rounded w-1/2 mb-3" />
+            <div className="h-3 bg-gray-100 rounded w-3/4 mb-2" />
+            <div className="h-3 bg-gray-100 rounded w-2/3" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+
+      {/* ── Card 1: Employee Details + Leave Status ── */}
+      <div className="dash-card p-5 flex flex-col gap-4">
+
+        {/* Profile */}
+        <div className="flex items-center gap-3">
+          {profile?.profilePhoto ? (
+            <img
+              src={profile.profilePhoto}
+              alt={profile?.name}
+              className="w-14 h-14 rounded-xl object-cover shrink-0"
+              style={{ border: "2px solid #e0e7ff" }}
+            />
+          ) : (
+            <div
+              className="w-14 h-14 rounded-xl flex items-center justify-center text-white font-black text-base shrink-0"
+              style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}
+            >
+              {initials(profile?.name ?? profile?.displayName ?? user?.displayName ?? "?")}
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="font-black text-gray-900 text-base truncate">
+              {profile?.name ?? profile?.displayName ?? user?.displayName ?? "Employee"}
+            </p>
+            <p className="text-xs text-gray-400 mt-0.5 font-semibold truncate">
+              {profile?.employeeId ?? profile?.empId ?? "—"} ·{" "}
+              {profile?.employmentType ?? profile?.empType ?? "Full Time"}
+            </p>
+            <p className="text-sm font-bold mt-0.5 truncate" style={{ color: "#6366f1" }}>
+              {profile?.designation ?? profile?.role ?? "Employee"}
+            </p>
+          </div>
+        </div>
+
+        {/* Employee Information */}
+        <div className="flex flex-col gap-2 pt-3" style={{ borderTop: "1px solid #f1f5f9" }}>
+          <h1
+            style={{
+              fontFamily: "inherit",
+              fontSize: "14px",
+              fontWeight: 800,
+              color: "#1e1b4b",
+              letterSpacing: "-0.01em",
+              marginBottom: "6px",
+            }}
+          >
+            Employee Information
+          </h1>
+          {[
+            { label: "Mobile",  value: profile?.phone ?? profile?.mobile ?? "—" },
+            { label: "Email",   value: profile?.email ?? user?.email ?? "—" },
+            { label: "Address", value: profile?.address ?? profile?.workLocation ?? "—" },
+          ].map(({ label, value }) => (
+            <div key={label} className="flex gap-2">
+              <span
+                className="text-gray-400 shrink-0 font-semibold"
+                style={{ minWidth: 60, fontSize: 12.5 }}
+              >
+                {label}
+              </span>
+              <span
+                className="text-gray-700 truncate font-medium"
+                style={{ fontSize: 12.5 }}
+              >
+                {value}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Leave Status */}
+        <div className="flex flex-col gap-3 pt-3" style={{ borderTop: "1px solid #f1f5f9" }}>
+
+          {/* Header row: label + Apply Leave button */}
+          <div className="flex items-center justify-between">
+            <p
+              style={{
+                fontSize: 10,
+                fontWeight: 800,
+                textTransform: "uppercase",
+                letterSpacing: "0.12em",
+                color: "#9ca3af",
+              }}
+            >
+              Leave Status
+            </p>
+            <button
+  onClick={() => setActiveModal("applyLeave")}
+  style={{
+    background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+    color: "#fff",
+    border: "none",
+    borderRadius: 8,
+    padding: "5px 14px",
+    fontSize: 11,
+    fontWeight: 700,
+    fontFamily: "inherit",
+    cursor: "pointer",
+    letterSpacing: "0.02em",
+    boxShadow: "0 2px 8px rgba(99,102,241,0.28)",
+  }}
+>
+  Apply Leave
+</button>
+          </div>
+
+          {/* Leave rows */}
+          {leaveRows.map(({ label, quota, used, color }) => {
+            const balance   = quota - used;
+            const pct       = quota > 0 ? Math.min((used / quota) * 100, 100) : 0;
+            const completed = balance <= 0;
+            const leftColor = completed ? "#ef4444" : balance <= 3 ? "#f59e0b" : "#10b981";
+            const barColor  = pct >= 100 ? "#ef4444" : pct > 75 ? "#f59e0b" : color;
+
+            return (
+              <div key={label}>
+                {/* Row header */}
+                <div className="flex justify-between items-center mb-1">
+                  <div className="flex items-center gap-2">
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#374151" }}>
+                      {label}
+                    </span>
+                    {completed && (
+                      <span
+                        style={{
+                          fontSize: 9,
+                          fontWeight: 800,
+                          background: "#fee2e2",
+                          color: "#ef4444",
+                          padding: "1px 7px",
+                          borderRadius: 99,
+                        }}
+                      >
+                        Completed
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-3">
+                    <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 500 }}>
+                      Total{" "}
+                      <strong style={{ color: "#374151", fontWeight: 700 }}>{quota}</strong>
+                    </span>
+                    <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 500 }}>
+                      Used{" "}
+                      <strong style={{ color: "#374151", fontWeight: 700 }}>{used}</strong>
+                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: leftColor }}>
+                      Left {balance}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                <div
+                  className="rounded-full overflow-hidden"
+                  style={{ height: 5, background: "#f1f5f9" }}
+                >
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{ width: `${pct}%`, background: barColor }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Card 2: Holidays ── */}
+<div className="dash-card p-5 flex flex-col gap-3">
+  {/* Header */}
+  <div className="flex items-center justify-between">
+    <div className="flex items-center gap-2">
+      <span style={{ fontSize: 18 }}>🗓️</span>
+      <p style={{ fontSize: 14, fontWeight: 700, color: "#1a1d2e" }}>
+        Holidays {new Date().getFullYear()}
+      </p>
+    </div>
+    <span style={{
+      fontSize: 10, fontWeight: 700, padding: "2px 10px", borderRadius: 99,
+      background: "#fef3c7", color: "#d97706", border: "1px solid #fcd34d55",
+    }}>
+      {upcomingHolidays.length} upcoming
+    </span>
+  </div>
+
+  {/* List */}
+  <div className="flex flex-col overflow-y-auto" style={{ maxHeight: 380 }}>
+    {upcomingHolidays.map((h, i) => {
+      const d = new Date(h.date + "T00:00:00");
+      const diffDays = Math.ceil((d.getTime() - Date.now()) / 86400000);
+      const isToday = diffDays === 0;
+      const isSoon = diffDays <= 20 && !isToday;
+      return (
+        <div key={h.id ?? h.date}>
+          <div
+            className="flex items-center gap-3 py-2"
+            onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = "#f7f9fc"}
+            onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = "transparent"}
+            style={{ transition: "background 0.12s" }}
+          >
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#3b82f6", flexShrink: 0, display: "inline-block" }} />
+            <span style={{ minWidth: 158, fontSize: 12, color: "#374151", fontWeight: 500 }}>
+              {d.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+            </span>
+            <span style={{ flex: 1, fontSize: 12, fontWeight: 700, color: "#1a1d2e" }}>{h.title}</span>
+            {isToday && (
+              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "#dcfce7", color: "#16a34a", flexShrink: 0 }}>
+                Today 🎉
+              </span>
+            )}
+            {isSoon && (
+              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: "#fff3e0", color: "#d97706", flexShrink: 0 }}>
+                {diffDays === 1 ? "Tomorrow" : `${diffDays} days`}
+              </span>
+            )}
+          </div>
+          {i < upcomingHolidays.length - 1 && (
+            <div style={{ height: 1, background: "#f0f2f7" }} />
+          )}
+        </div>
+      );
+    })}
+
+    {upcomingHolidays.length === 0 && (
+      <div style={{ textAlign: "center", padding: "32px 0", color: "#94a3b8", fontSize: 13 }}>
+        No upcoming holidays
+      </div>
+    )}
+  </div>
+</div>
+    </div>
+  );
+}
 // ─── Modal Header ─────────────────────────────────────────────────────────────
 function ModalHeader({ emoji, title, subtitle, color, onClose }: {
   emoji: string; title: string; subtitle: string; color: string; onClose: () => void;
@@ -159,7 +490,7 @@ function WorkUpdateModal({ onClose }: { onClose: () => void }) {
   const [saving,   setSaving]   = useState(false);
   const [done,     setDone]     = useState(false);
   const [error,    setError]    = useState("");
-
+  
   const STATUSES  = [{ label:"In Progress",color:"#6366f1",icon:"🔄"},{label:"Completed",color:"#10b981",icon:"✅"},{label:"In Review",color:"#f59e0b",icon:"👀"}];
   const PRIORITIES = [{label:"Low",color:"#10b981"},{label:"Medium",color:"#f59e0b"},{label:"High",color:"#ef4444"}];
   const activeStatus   = STATUSES.find(s=>s.label===status)!;
@@ -234,13 +565,43 @@ function WorkUpdateModal({ onClose }: { onClose: () => void }) {
 }
 
 // ─── APPLY LEAVE MODAL ────────────────────────────────────────────────────────
-function ApplyLeaveModal({ leaveType,setLeaveType,fromDate,setFromDate,toDate,setToDate,leaveReason,setLeaveReason,handleSubmitLeave,submitting,leaveMsg,onClose }: {
-  leaveType:string;setLeaveType:(v:any)=>void;fromDate:string;setFromDate:(v:string)=>void;toDate:string;setToDate:(v:string)=>void;leaveReason:string;setLeaveReason:(v:string)=>void;handleSubmitLeave:()=>void;submitting:boolean;leaveMsg:string;onClose:()=>void;
+function ApplyLeaveModal({ leaveType,setLeaveType,fromDate,setFromDate,toDate,setToDate,leaveReason,setLeaveReason,handleSubmitLeave,submitting,leaveMsg,onClose,leaveData }: {
+  leaveType:string;setLeaveType:(v:any)=>void;fromDate:string;setFromDate:(v:string)=>void;toDate:string;setToDate:(v:string)=>void;leaveReason:string;setLeaveReason:(v:string)=>void;handleSubmitLeave:()=>void;submitting:boolean;leaveMsg:string;onClose:()=>void;leaveData?:any;
 }) {
   const [sessionSuccess,setSessionSuccess]=useState(false);
   useEffect(()=>{if(leaveMsg==="✅ Request submitted"){setSessionSuccess(true);const t=setTimeout(onClose,1500);return()=>clearTimeout(t);}},[leaveMsg,onClose]);
   useEffect(()=>{setSessionSuccess(false);},[]);
-  const TYPES=[{label:"Casual",icon:"🌴",color:"#6366f1"},{label:"Sick",icon:"🤒",color:"#ef4444"},{label:"Work From Home",icon:"🏠",color:"#10b981"}];
+  const TYPES_RAW = [
+  { key: "casual", label: "Casual",         icon: "🌴", color: "#6366f1", unlimited: false },
+  { key: "sick",   label: "Sick",           icon: "🤒", color: "#ef4444", unlimited: false },
+  { key: "lop",    label: "LOP",            icon: "💸", color: "#dc2626", unlimited: true  },
+  { key: "wfh",    label: "Work From Home", icon: "🏠", color: "#10b981", unlimited: true  },
+];
+
+const TYPES = TYPES_RAW.filter(t => {
+  if (t.unlimited) return true;
+  const quota = leaveData?.[t.key]?.quota ?? leaveData?.[t.key.toUpperCase()]?.quota ?? 12;
+  const used  = leaveData?.[t.key]?.used  ?? leaveData?.[t.key.toUpperCase()]?.used  ?? 0;
+  return used < quota;
+});
+
+if (TYPES.length === 0) {
+  return (
+    <>
+      <ModalHeader emoji="📋" title="Apply for Leave" subtitle="Submit a new leave request" color="#10b981" onClose={onClose}/>
+      <div className="px-6 py-10 text-center">
+        <p className="text-4xl mb-3">🚫</p>
+        <p className="text-red-500 font-semibold text-sm">No leave balance available</p>
+      </div>
+    </>
+  );
+}
+
+useEffect(() => {
+  if (TYPES.length > 0 && !TYPES.find(t => t.label === leaveType)) {
+    setLeaveType(TYPES[0].label);
+  }
+}, [TYPES.length]);
   const days=fromDate&&toDate?Math.max(0,Math.ceil((new Date(toDate).getTime()-new Date(fromDate).getTime())/86400000)+1):0;
   const active=TYPES.find(t=>t.label===leaveType)||TYPES[0];
   return (
@@ -268,6 +629,13 @@ function ApplyLeaveModal({ leaveType,setLeaveType,fromDate,setFromDate,toDate,se
   );
 }
 
+// useEffect(() => {
+//   if (!user?.uid) return;
+//   return onSnapshot(
+//     query(collection(db, "leaveBalances"), where("uid", "==", user.uid)),
+//     snap => { if (!snap.empty) setEmployeeLeaveData(snap.docs[0].data()); }
+//   );
+// }, [user]);
 // ─── HOLIDAYS ─────────────────────────────────────────────────────────────────
 const CANONICAL_HOLIDAYS = [
   {title:"New Year",date:"2026-01-01",type:"National"},{title:"Bhogi",date:"2026-01-13",type:"Festival"},{title:"Pongal",date:"2026-01-14",type:"Festival"},
@@ -421,121 +789,10 @@ function BirthdayFestivalSection() {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
 
       {/* ── FEATURED birthday card: only when someone's birthday is within 7 days ── */}
-      {nextFeatured ? (
-        <div className="dash-card overflow-hidden">
-          <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-50">
-            <div className="flex items-center gap-2">
-              <span className="text-base">🎂</span>
-              <span className="font-bold text-gray-800 text-sm">Upcoming Birthday</span>
-              {sameDayBdays.length > 1 && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:"#f5f3ff",color:"#7c3aed",border:"1px solid #ddd6fe"}}>+{sameDayBdays.length} same day</span>
-              )}
-            </div>
-          </div>
-
-          <div className="p-4">
-            {/* Week strip — always shown here since daysLeft ≤ 7 */}
-            <div style={{display:"flex",gap:4,marginBottom:14,background:"#f8fafc",borderRadius:10,padding:"8px 10px",border:"1px solid #f1f5f9"}}>
-              {getWeekStrip(nextFeatured.daysLeft).map((day, i) => (
-                <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3}}>
-                  <span style={{fontSize:9,fontWeight:700,textTransform:"uppercase",color:day.isBday?"#7c3aed":day.isToday?"#6366f1":"#94a3b8",letterSpacing:".4px"}}>{day.label}</span>
-                  <div style={{width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:day.isBday?14:11,fontWeight:800,background:day.isBday?"linear-gradient(135deg,#7c3aed,#a855f7)":day.isToday?"linear-gradient(135deg,#6366f1,#818cf8)":"transparent",color:day.isBday||day.isToday?"#fff":"#374151",border:day.isBday?"2px solid #7c3aed":day.isToday?"2px solid #6366f1":"2px solid transparent",boxShadow:day.isBday?"0 2px 10px rgba(124,58,237,.35)":day.isToday?"0 2px 8px rgba(99,102,241,.2)":"none"}}>
-                    {day.isBday ? "🎂" : day.date}
-                  </div>
-                  <span style={{width:4,height:4,borderRadius:"50%",display:"block",background:day.isBday?"#7c3aed":day.isToday?"#6366f1":"transparent"}}/>
-                </div>
-              ))}
-            </div>
-
-            {/* Employee + ring */}
-            <div className="flex items-center gap-4" style={{marginBottom: upcomingBdays.length > 0 ? 14 : 0}}>
-              <div style={{position:"relative",flexShrink:0}}>
-                <svg width="72" height="72" viewBox="0 0 72 72" style={nextFeatured.daysLeft===0?{animation:"bdayPulse 1.6s ease-in-out infinite"}:{}}>
-                  <style>{`@keyframes bdayPulse{0%{opacity:1}50%{opacity:.5}100%{opacity:1}}`}</style>
-                  <circle cx="36" cy="36" r="30" fill="none" stroke="#f3e8ff" strokeWidth="6"/>
-                  <circle cx="36" cy="36" r="30" fill="none"
-                    stroke={nextFeatured.daysLeft===0?"#7c3aed":nextFeatured.daysLeft<=3?"#e11d48":"#db2877"}
-                    strokeWidth="6" strokeLinecap="round"
-                    strokeDasharray={""+2*Math.PI*30}
-                    strokeDashoffset={""+2*Math.PI*30*(nextFeatured.daysLeft/7)}
-                    transform="rotate(-90 36 36)"
-                    style={{transition:"stroke-dashoffset 1.2s ease"}}
-                  />
-                </svg>
-                <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-                  {nextFeatured.daysLeft===0
-                    ?<span style={{fontSize:22}}>🎉</span>
-                    :<><span style={{fontSize:18,fontWeight:900,color:"#0f172a",lineHeight:1}}>{nextFeatured.daysLeft}</span><span style={{fontSize:8,color:"#94a3b8",fontWeight:700}}>DAYS</span></>
-                  }
-                </div>
-              </div>
-              <div style={{flex:1,minWidth:0}}>
-                {sameDayBdays.slice(0,2).map((e,i)=>{
-                  const [g1,g2] = bdayGradient(e.name);
-                  return (
-                    <div key={e.id} style={{display:"flex",alignItems:"center",gap:9,marginBottom:i<Math.min(sameDayBdays.length,2)-1?10:0}}>
-                      <div style={{width:38,height:38,borderRadius:10,background:"linear-gradient(135deg,"+g1+","+g2+")",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:800,color:"#fff",flexShrink:0}}>{bdayInitials(e.name)}</div>
-                      <div style={{minWidth:0}}>
-                        <div style={{fontWeight:800,color:"#0f172a",fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.name}</div>
-                        <div style={{fontSize:11,color:"#94a3b8",marginTop:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.department||e.email}</div>
-                        <div style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:10,fontWeight:800,marginTop:4,padding:"2px 8px",borderRadius:20,background:e.daysLeft===0?"#f3e8ff":e.daysLeft<=3?"#fff1f2":"#fef3c7",color:e.daysLeft===0?"#7c3aed":e.daysLeft<=3?"#e11d48":"#b45309"}}>
-                          🎂 {countdownLabel(e.daysLeft)}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {sameDayBdays.length > 2 && <div style={{fontSize:11,color:"#94a3b8",marginTop:4}}>+{sameDayBdays.length-2} more on same day</div>}
-              </div>
-            </div>
-
-            {/* Upcoming birthdays beyond 7 days */}
-            {upcomingBdays.length > 0 && (
-              <div style={{borderTop:"1px solid #f1f5f9",paddingTop:12}}>
-                <div style={{fontSize:10,fontWeight:800,color:"#94a3b8",textTransform:"uppercase",letterSpacing:".6px",marginBottom:8}}>Also Coming Up</div>
-                {upcomingBdays.slice(0,3).map(e=>{
-                  const [g1,g2] = bdayGradient(e.name);
-                  return (
-                    <div key={e.id} style={{display:"flex",alignItems:"center",gap:9,marginBottom:6}}>
-                      <div style={{width:24,height:24,borderRadius:7,background:"linear-gradient(135deg,"+g1+","+g2+")",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,color:"#fff",flexShrink:0}}>{bdayInitials(e.name)}</div>
-                      <div style={{flex:1,fontSize:12,fontWeight:600,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.name}</div>
-                      <span style={{fontSize:10.5,fontWeight:800,color:"#94a3b8",flexShrink:0}}>{e.daysLeft}d</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-      ) : upcomingBdays.length > 0 ? (
-        /* ── No birthday within 7 days — show compact list only (no ring, no week strip) ── */
-        <div className="dash-card overflow-hidden">
-          <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b border-gray-50">
-            <span className="text-base">🎂</span>
-            <span className="font-bold text-gray-800 text-sm">Upcoming Birthdays</span>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:"#eff6ff",color:"#1d4ed8",border:"1px solid #bfdbfe"}}>{upcomingBdays.length} coming up</span>
-          </div>
-          <div className="p-4 space-y-2">
-            {upcomingBdays.slice(0, 5).map(e => {
-              const [g1,g2] = bdayGradient(e.name);
-              return (
-                <div key={e.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:10,background:"#f8fafc",border:"1px solid #f1f5f9"}}>
-                  <div style={{width:32,height:32,borderRadius:9,background:"linear-gradient(135deg,"+g1+","+g2+")",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:"#fff",flexShrink:0}}>{bdayInitials(e.name)}</div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:13,fontWeight:700,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.name}</div>
-                    <div style={{fontSize:11,color:"#94a3b8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{e.department||e.email}</div>
-                  </div>
-                  <span style={{fontSize:10,fontWeight:800,color:"#64748b",background:"#f1f5f9",borderRadius:6,padding:"2px 7px",flexShrink:0,whiteSpace:"nowrap"}}>{e.daysLeft}d</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
+     
 
       {/* ── EMPLOYEE DIRECTORY (inline, replaces festival card) ── */}
-      <InlineEmployeeDirectory />
+      
     </div>
   );
 }
@@ -689,15 +946,16 @@ export default function DashboardView({
   totalSeconds=0, onGoToChat,
 }: Props) {
 
-  const [activeModal,        setActiveModal]    = useState<string|null>(null);
-  const [leaveRequests,      setLeaveRequests]  = useState<any[]>([]);
-  const [announcements,      setAnnouncements]  = useState<any[]>([]);
-  const [leaveNotifications, setLeaveNotifs]    = useState<any[]>([]);
-  const [queryNotifications, setQueryNotifs]    = useState<any[]>([]);
-  const [chatNotifCount,     setChatNotifCount] = useState(0);
-  const [recentUpdates,      setRecentUpdates]  = useState<any[]>([]);
-  const [now,                setNow]            = useState(new Date());
-  const [employeeProfile,    setEmployeeProfile]= useState<{displayName?:string}|null>(null);
+const [activeModal,        setActiveModal]    = useState<string|null>(null);
+const [leaveRequests,      setLeaveRequests]  = useState<any[]>([]);
+const [announcements,      setAnnouncements]  = useState<any[]>([]);
+const [leaveNotifications, setLeaveNotifs]    = useState<any[]>([]);
+const [queryNotifications, setQueryNotifs]    = useState<any[]>([]);
+const [chatNotifCount,     setChatNotifCount] = useState(0);
+const [recentUpdates,      setRecentUpdates]  = useState<any[]>([]);
+const [now,                setNow]            = useState(new Date());
+const [employeeProfile,    setEmployeeProfile]= useState<{displayName?:string}|null>(null);
+const [employeeLeaveData,  setEmployeeLeaveData] = useState<any>(null);
 
   const close = useCallback(()=>setActiveModal(null),[]);
 
@@ -714,6 +972,14 @@ export default function DashboardView({
   useEffect(()=>{if(!user)return;return onSnapshot(query(collection(db,"employeeQueries"),where("employeeId","==",user.uid),where("employeeUnread","==",true)),s=>setQueryNotifs(s.docs.map(d=>({id:d.id,...d.data()}))));},[user]);
   useEffect(()=>{if(!user)return;return onSnapshot(query(collection(db,"notifications"),where("toUid","==",user.uid),where("read","==",false)),s=>setChatNotifCount(s.size));},[user]);
   useEffect(()=>{if(!user)return;return onSnapshot(query(collection(db,"workUpdates"),where("uid","==",user.uid),orderBy("createdAt","desc"),limit(5)),s=>setRecentUpdates(s.docs.map(d=>({id:d.id,...d.data()}))));},[user]);
+
+  useEffect(()=>{
+  if(!user?.uid)return;
+  return onSnapshot(
+    query(collection(db,"leaveBalances"),where("uid","==",user.uid)),
+    (snap)=>{ if(!snap.empty) setEmployeeLeaveData(snap.docs[0].data()); }
+  );
+},[user]);
 
   const markLeaveNotifRead=async(id:string)=>updateDoc(doc(db,"leaveRequests",id),{notificationRead:true});
   const markQueryNotifRead=async(id:string)=>updateDoc(doc(db,"employeeQueries",id),{employeeUnread:false});
@@ -768,7 +1034,7 @@ export default function DashboardView({
 
       {/* ── MODALS ── */}
       {activeModal==="workUpdate"&&<Modal onClose={close}><WorkUpdateModal onClose={close}/></Modal>}
-      {activeModal==="applyLeave"&&<Modal onClose={close} wide><ApplyLeaveModal leaveType={leaveType} setLeaveType={setLeaveType} fromDate={fromDate} setFromDate={setFromDate} toDate={toDate} setToDate={setToDate} leaveReason={leaveReason} setLeaveReason={setLeaveReason} handleSubmitLeave={handleSubmitLeave} submitting={submitting} leaveMsg={leaveMsg} onClose={close}/></Modal>}
+      {activeModal==="applyLeave"&&<Modal onClose={close} wide><ApplyLeaveModal leaveType={leaveType} setLeaveType={setLeaveType} fromDate={fromDate} setFromDate={setFromDate} toDate={toDate} setToDate={setToDate} leaveReason={leaveReason} setLeaveReason={setLeaveReason} handleSubmitLeave={handleSubmitLeave} submitting={submitting} leaveMsg={leaveMsg} onClose={close} leaveData={employeeLeaveData}/></Modal>}
       {activeModal==="holidays"&&<Modal onClose={close}><HolidaysModal onClose={close}/></Modal>}
       {activeModal==="myLeaves"&&<Modal onClose={close} wide><MyLeavesModal user={user} onClose={close}/></Modal>}
       {activeModal==="notifications"&&(
@@ -784,6 +1050,25 @@ export default function DashboardView({
         </Modal>
       )}
 
+      {/* {activeModal === "applyLeave" && (
+  <Modal onClose={close}>
+    <ApplyLeaveModal
+      leaveType={leaveType}
+      setLeaveType={setLeaveType}
+      fromDate={fromDate}
+      setFromDate={setFromDate}
+      toDate={toDate}
+      setToDate={setToDate}
+      leaveReason={leaveReason}
+      setLeaveReason={setLeaveReason}
+      handleSubmitLeave={handleSubmitLeave}
+      submitting={submitting}
+      leaveMsg={leaveMsg}
+      onClose={close}
+    />
+  </Modal>
+)} */}
+
       {/* ── WELCOME BANNER ── */}
       <div className="dash-card overflow-hidden relative" style={{background:"#234567",border:"none",borderRadius:14}}>
         <div className="absolute top-0 right-0 w-56 h-56 rounded-full pointer-events-none" style={{background:"radial-gradient(circle,rgba(255,255,255,0.06),transparent)",transform:"translate(25%,-25%)"}}/>
@@ -794,8 +1079,8 @@ export default function DashboardView({
             <h2 className="text-white text-xl font-black mt-0.5 tracking-tight">Welcome back, {userName}</h2>
             <p className="text-white/40 text-xs mt-0.5">{now.toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.15)"}}>
+          <div className="flex items-center gap-5 shrink-0">
+            <div className="flex items-center gap-2 px-3 py-4 rounded-xl" style={{background:"rgba(255,255,255,0.1)",border:"1px solid rgba(255,255,255,0.15)"}}>
               {isCheckedIn?<div className="pulse-dot"/>:<div className="w-2 h-2 rounded-full bg-slate-400"/>}
               <span className="text-white font-semibold text-sm">{isCheckedIn?"Online":"Offline"}</span>
             </div>
@@ -806,17 +1091,17 @@ export default function DashboardView({
           </div>
         </div>
         <div className="px-5 pb-3">
-          <div className="flex justify-between items-center mb-1">
+          {/* <div className="flex justify-between items-center mb-1">
             <p className="text-white/40 text-[10px] font-medium">Daily progress (8h target)</p>
             <p className="text-white/60 text-[10px] font-bold">{Math.round(progressPct)}%</p>
-          </div>
-          <div style={{height:4,borderRadius:99,background:"rgba(255,255,255,0.08)",overflow:"hidden"}}>
+          </div> */}
+          {/* <div style={{height:4,borderRadius:99,background:"rgba(255,255,255,0.08)",overflow:"hidden"}}>
             <div style={{height:"100%",width:progressPct+"%",borderRadius:99,background:"linear-gradient(90deg,#34d399,#10b981)",transition:"width .8s ease"}}/>
-          </div>
+          </div> */}
         </div>
       </div>
 
-      {/* ── STAT CARDS ── */}
+      {/* ── STAT CARDS ──
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           {label:"Status",value:isCheckedIn?"Online":"Offline",sub:isCheckedIn?"Currently working":"Not checked in",icon:<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" strokeWidth={1.8}/><path strokeLinecap="round" strokeWidth={1.8} d="M12 8v4l3 2"/></svg>,iconBg:isCheckedIn?"linear-gradient(135deg,#10b981,#059669)":"linear-gradient(135deg,#94a3b8,#64748b)",dot:isCheckedIn},
@@ -836,8 +1121,11 @@ export default function DashboardView({
             <p className="text-xs text-gray-400 mt-0.5">{s.sub}</p>
           </div>
         ))}
-      </div>
-
+      </div> */}
+<EmployeeLeaveHolidayCards 
+  user={user} 
+  setActiveModal={setActiveModal}
+/>
       {/* ── QUICK ACTIONS ── */}
       <div className="dash-card p-4">
         <div className="flex items-center justify-between mb-3">
@@ -903,10 +1191,7 @@ export default function DashboardView({
                 </div>
               );
             })}
-            <div className="mt-3 p-2.5 rounded-xl flex items-center justify-between" style={{background:"linear-gradient(135deg,#f8fafc,#f1f5f9)",border:"1px solid #e2e8f0"}}>
-              <span className="text-sm font-semibold text-gray-600">Total worked today</span>
-              <span className="font-black text-[#234567] text-base">{formatTotal(totalWorked)}</span>
-            </div>
+           
           </>
         )}
       </div>
@@ -914,7 +1199,7 @@ export default function DashboardView({
       {/* ── 🎂 BIRTHDAY + 👥 EMPLOYEE DIRECTORY ── */}
       <BirthdayFestivalSection />
 
-      {/* ── BOTTOM ROW ── */}
+      {/* ── BOTTOM ROW ──
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <div className="dash-card p-4">
           <div className="flex items-center justify-between mb-3">
@@ -965,34 +1250,9 @@ export default function DashboardView({
           )}
         </div>
 
-        <div className="dash-card p-4 lg:col-span-2">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-bold text-gray-800 text-[14px]">📣 Announcements</h3>
-            <span className="badge" style={{background:"#f59e0b15",color:"#d97706"}}>{announcements.length} new</span>
-          </div>
-          {announcements.length===0?(
-            <div className="text-center py-7"><p className="text-3xl mb-2">📭</p><p className="text-sm text-gray-400">No announcements right now</p></div>
-          ):(
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {announcements.slice(0,6).map((a:any,i:number)=>(
-                <div key={a.id} className="flex gap-2.5 p-3 rounded-xl transition-all hover:scale-[1.01]" style={{background:"#f8fafc",border:"1px solid #f1f5f9"}}>
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-base" style={{background:["#234567","#10b981","#f59e0b"][i%3]+"12"}}>{["📌","🔔","💡"][i%3]}</div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm text-gray-700 font-medium leading-snug">{a.text}</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">{a.createdAt?.toDate?a.createdAt.toDate().toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}):"Recent"}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+      </div> */}
 
-      {/* ── 🧠 SMART INSIGHTS ── */}
-      <SmartInsights totalWorked={totalWorked} sessions={sessions} isCheckedIn={isCheckedIn}/>
-
-      {/* ── 📊 PERFORMANCE & ANALYTICS ── */}
-      <PerformanceAnalytics user={user} sessions={sessions} totalWorked={totalWorked}/>
+    
 
     </div>
   );
@@ -1097,6 +1357,7 @@ function PerformanceAnalytics({user,sessions,totalWorked}:{user:any;sessions:any
     </div>
   );
 }
+
 
 // ─── 👥 EMPLOYEE DIRECTORY ────────────────────────────────────────────────────
 function EmployeeDirectory() {
