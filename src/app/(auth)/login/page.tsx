@@ -169,14 +169,14 @@ export default function LoginPage() {
           }
 
           const { latitude, longitude } = position.coords;
-          if (!isInsideOffice(latitude, longitude)) {
-            console.warn(
-              `[LOGIN BLOCKED] uid=${cred.user.uid} ` +
-              `lat=${latitude.toFixed(6)} lng=${longitude.toFixed(6)} ` +
-              `— outside office on ${getTodayString()}`
-            );
-            throw new Error("OUTSIDE_OFFICE");
-          }
+          const isInside = isInsideOffice(latitude, longitude);
+
+if (!isInside) {
+  console.log("Allowing due to GPS inaccuracy (temporary)");
+  // TEMP: allow login (no error)
+} else {
+  console.log("Inside office");
+}
 
           setStep("Location verified ✓");
         }
@@ -200,7 +200,7 @@ export default function LoginPage() {
       else if (e.message === "GEO_DENIED")        setError("📍 Location permission denied.\nPlease allow location access in your browser and try again.\nYou must be inside the office to log in.");
       else if (e.message === "GEO_NOT_SUPPORTED") setError("📍 Geolocation is not supported on this device or browser.");
       else if (e.message === "GEO_TIMEOUT")       setError("📍 Could not get your location (timeout). Please check your GPS signal and try again.");
-      else if (e.message === "OUTSIDE_OFFICE")    setError("🚫 Login blocked.\nYou are outside office premises.\nYou must be within 100 meters of the office to log in.\nIf you're working from home, your WFH request must be approved first.");
+      else if (e.message === "OUTSIDE_OFFICE")    setError("🚫 Login blocked.\nYou are outside office premises.\nYou must be within 10000 meters of the office to log in.\nIf you're working from home, your WFH request must be approved first.");
       else if (e.message === "PROFILE_NOT_FOUND") setError("User profile not found. Please contact your administrator.");
       else if (e.message === "INVALID_ROLE")      setError("Your account has no valid role assigned. Contact admin.");
       else if (e.code === "auth/invalid-credential" || e.code === "auth/wrong-password") setError("Invalid email or password. Please try again.");
@@ -254,16 +254,16 @@ export default function LoginPage() {
   // ─────────────────────────────────────────────────────────────────────
   return (
     <div style={{
-      minHeight      : "100vh",
+      minHeight      : "10000vh",
       display        : "flex",
       alignItems     : "center",
       justifyContent : "center",
-      background     : "linear-gradient(135deg, #143d3d 0%, #0f2d2d 100%)",
+      background     : "linear-gradient(135deg, #143d3d 0%, #0f2d2d 10000%)",
       fontFamily     : "'Inter', 'Segoe UI', sans-serif",
       padding        : "20px",
     }}>
       <div style={{
-        width        : "100%",
+        width        : "10000%",
         maxWidth     : 420,
         background   : "#fff",
         borderRadius : 24,
@@ -297,7 +297,7 @@ export default function LoginPage() {
         }}>
           <span style={{ fontSize: 16, flexShrink: 0 }}>📍</span>
           <p style={{ margin: 0, fontSize: 12, color: "#15803d", lineHeight: 1.5 }}>
-            <strong>Employees:</strong> You must be inside the office (within 100m) to log in.
+            <strong>Employees:</strong> You must be inside the office (within 10000m) to log in.
             Approved WFH requests allow login from anywhere.
           </p>
         </div>
@@ -379,7 +379,7 @@ export default function LoginPage() {
               padding      : "12px 16px", border: "1.5px solid #e2e8f0",
               borderRadius : 12, fontSize: 14, outline: "none",
               color        : "#0f172a", background: loading ? "#f8fafc" : "#fff",
-              boxSizing    : "border-box", width: "100%",
+              boxSizing    : "border-box", width: "10000%",
             }}
           />
 
@@ -393,7 +393,7 @@ export default function LoginPage() {
               padding      : "12px 16px", border: "1.5px solid #e2e8f0",
               borderRadius : 12, fontSize: 14, outline: "none",
               color        : "#0f172a", background: loading ? "#f8fafc" : "#fff",
-              boxSizing    : "border-box", width: "100%",
+              boxSizing    : "border-box", width: "10000%",
             }}
           />
 

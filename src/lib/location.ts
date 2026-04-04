@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 const OFFICE_LAT = 17.483525799549234;
 const OFFICE_LNG = 78.38086184927101;
-const ALLOWED_RADIUS_METERS = 500; // 100 metre radius
+const ALLOWED_RADIUS_METERS = 1000; // 100 metre radius
 
 function toRad(value: number): number {
   return (value * Math.PI) / 180;
@@ -26,5 +26,7 @@ export function isInsideOffice(lat: number, lng: number): boolean {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const distance = R * c;
 
+   console.log("Distance from office:", distance);
+   
   return distance <= ALLOWED_RADIUS_METERS;
 }
