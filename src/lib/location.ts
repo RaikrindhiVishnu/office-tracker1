@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 const OFFICE_LAT = 17.483525799549234;
 const OFFICE_LNG = 78.38086184927101;
-const ALLOWED_RADIUS_METERS = 100; // 100 metre radius
+const ALLOWED_RADIUS_METERS = 500; // 100 metre radius
 
 function toRad(value: number): number {
   return (value * Math.PI) / 180;
