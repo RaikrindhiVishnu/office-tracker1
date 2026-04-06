@@ -121,11 +121,46 @@ export default function MeetChatAppUpdated({ users, isOpen = false, onClose }: M
         padding: "0 16px", flexShrink: 0, borderBottom: "1px solid rgba(255,255,255,.08)",
       }}>
         {/* Left — wordmark */}
-        <div style={{ display: "flex", alignItems: "center" }}>
-          <span style={{ fontSize: 19, fontWeight: 800, letterSpacing: "-.5px", color: "#fff" }}>
-            Meet<span style={{ color: "#e8512a" }}>Chat</span>
-          </span>
-        </div>
+     <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+
+  {/* Logo */}
+  <span style={{ fontSize: 19, fontWeight: 800 }}>
+    Meet<span style={{ color: "#e8512a" }}>Chat</span>
+  </span>
+
+  {/* NEW TABS */}
+  <div style={{ display: "flex", gap: 6 }}>
+    <button
+      onClick={() => setActiveTab("chat")}
+      style={{
+        padding: "6px 14px",
+        borderRadius: 8,
+        border: "none",
+        cursor: "pointer",
+        background: activeTab === "chat" ? "#e8512a" : "transparent",
+        color: activeTab === "chat" ? "#fff" : "rgba(255,255,255,.7)",
+        fontWeight: 600,
+      }}
+    >
+      Chats
+    </button>
+
+    <button
+      onClick={() => setActiveTab("calls")}
+      style={{
+        padding: "6px 14px",
+        borderRadius: 8,
+        border: "none",
+        cursor: "pointer",
+        background: activeTab === "calls" ? "#e8512a" : "transparent",
+        color: activeTab === "calls" ? "#fff" : "rgba(255,255,255,.7)",
+        fontWeight: 600,
+      }}
+    >
+      Calls
+    </button>
+  </div>
+</div>
 
         {/* Right — notification bell, settings, profile, close */}
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>

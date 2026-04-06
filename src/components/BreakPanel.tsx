@@ -236,7 +236,7 @@ export default function BreakPanel({
           {/* ── Live break display (when on break) ── */}
           {activeBreak && (
             <div
-              className={`rounded-xl p-4 bg-gradient-to-r ${BREAK_CONFIG[activeBreak.type].from} ${BREAK_CONFIG[activeBreak.type].to}`}
+              className={`rounded-xl p-4 bg-linear-to-r ${BREAK_CONFIG[activeBreak.type].from} ${BREAK_CONFIG[activeBreak.type].to}`}
               style={{ animation: "fadeUp 0.3s ease" }}
             >
               <div className="flex items-center justify-between">
@@ -279,10 +279,10 @@ export default function BreakPanel({
                       relative flex flex-col items-center gap-1.5 px-2 py-3.5 rounded-xl
                       font-semibold text-xs transition-all duration-200
                       ${active
-                        ? `bg-gradient-to-br ${c.from} ${c.to} text-white shadow-lg ${c.glow} scale-[1.03]`
+                        ? `bg-linear-to-br ${c.from} ${c.to} text-white shadow-lg ${c.glow} scale-[1.03]`
                         : disabled
                         ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                        : `bg-gray-50 hover:bg-gradient-to-br hover:${c.from} hover:${c.to} hover:text-white border border-gray-200 hover:border-transparent hover:shadow-md hover:${c.glow} hover:scale-[1.03] active:scale-[0.98] text-gray-700`
+                        : `bg-gray-50 hover:bg-linear-to-br hover:${c.from} hover:${c.to} hover:text-white border border-gray-200 hover:border-transparent hover:shadow-md hover:${c.glow} hover:scale-[1.03] active:scale-[0.98] text-gray-700`
                       }
                     `}
                   >
@@ -305,7 +305,7 @@ export default function BreakPanel({
               <button
                 onClick={endBreak}
                 disabled={loading}
-                className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-red-500 to-rose-600 text-white rounded-xl font-bold text-sm hover:shadow-lg hover:shadow-red-500/30 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 disabled:opacity-60"
+                className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-3 bg-linear-to-r from-red-500 to-rose-600 text-white rounded-xl font-bold text-sm hover:shadow-lg hover:shadow-red-500/30 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 disabled:opacity-60"
               >
                 {loading ? (
                   <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -329,7 +329,7 @@ export default function BreakPanel({
             ) : (
               <div className="relative pl-4 space-y-0">
                 {/* Vertical line */}
-                <div className="absolute left-[7px] top-3 bottom-3 w-0.5 bg-gray-200 rounded-full" />
+                <div className="absolute left-1.75 top-3 bottom-3 w-0.5 bg-gray-200 rounded-full" />
                 {breaks.map((b, i) => {
                   const c = BREAK_CONFIG[b.type];
                   const isActive = !b.endTime;
@@ -366,7 +366,7 @@ export default function BreakPanel({
             )}
 
             {/* Total break time */}
-            <div className="mt-3 flex items-center justify-between px-4 py-3 bg-gradient-to-r from-slate-800 to-slate-900 rounded-xl">
+            <div className="mt-3 flex items-center justify-between px-4 py-3 bg-linear-to-r from-slate-800 to-slate-900 rounded-xl">
               <div className="flex items-center gap-2">
                 <span className="text-sm">⏱</span>
                 <span className="text-xs font-bold text-white/60 uppercase tracking-wider">Total Break</span>

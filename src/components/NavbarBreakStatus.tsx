@@ -222,7 +222,7 @@ export default function NavbarBreakStatus({
       {/* ── DROPDOWN ── */}
       {open && isCheckedIn && (
         <div
-          className="absolute right-0 top-full mt-2 w-72 z-[200] rounded-2xl overflow-hidden shadow-2xl border border-white/10"
+          className="absolute right-0 top-full mt-2 w-72 z-200 rounded-2xl overflow-hidden shadow-2xl border border-white/10"
           style={{
             background: "linear-gradient(135deg, #0f1e35 0%, #1a2e4a 60%, #0d2236 100%)",
             animation: "dropIn 0.18s cubic-bezier(0.22,1,0.36,1)",
@@ -264,7 +264,7 @@ export default function NavbarBreakStatus({
                     transition-all duration-150
                     ${disabled
                       ? "opacity-40 cursor-not-allowed bg-white/5"
-                      : `bg-gradient-to-r ${meta.btnGrad} hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] cursor-pointer`
+                      : `bg-linear-to-r ${meta.btnGrad} hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] cursor-pointer`
                     }
                   `}
                 >
@@ -282,7 +282,7 @@ export default function NavbarBreakStatus({
               <button
                 onClick={endBreak}
                 disabled={loading}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] transition-all duration-150 mt-1"
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-linear-to-r from-red-500 to-rose-600 hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] transition-all duration-150 mt-1"
               >
                 <span className="text-base">⏹</span>
                 <div className="flex-1 min-w-0">

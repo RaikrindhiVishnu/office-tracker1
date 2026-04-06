@@ -21,7 +21,7 @@ export default function MeetChatApp({ users }: { users: User[] }) {
   const [showProfessionalChat, setShowProfessionalChat] = useState(false);
 
   return (
-    <div className="h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex items-center justify-center p-4">
+    <div className="h-screen bg-linear-to-br from-gray-50 via-white to-gray-50 flex items-center justify-center p-4">
       
       {/* ✅ CHAT MODAL */}
       {showProfessionalChat && (
@@ -68,7 +68,7 @@ export default function MeetChatApp({ users }: { users: User[] }) {
           <div className="grid md:grid-cols-2 gap-6">
             
             {/* VIDEO */}
-            <div className="bg-gradient-to-br from-blue-50 to-white p-6 rounded-2xl border border-blue-100">
+            <div className="bg-linear-to-br from-blue-50 to-white p-6 rounded-2xl border border-blue-100">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center">
                   <svg
@@ -94,7 +94,7 @@ export default function MeetChatApp({ users }: { users: User[] }) {
             </div>
 
             {/* CALL HISTORY */}
-            <div className="bg-gradient-to-br from-purple-50 to-white p-6 rounded-2xl border border-purple-100">
+            <div className="bg-linear-to-br from-purple-50 to-white p-6 rounded-2xl border border-purple-100">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center">
                   <svg

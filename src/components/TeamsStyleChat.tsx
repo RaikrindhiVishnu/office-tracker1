@@ -26,6 +26,7 @@ type Chat = {
   lastMessageTime?: any; unreadCount?: {[uid:string]:number};
   isGroup?: boolean; groupName?: string; groupAvatar?: string;
   createdBy?: string; createdAt?: any;
+  admins?: string[]; // ✅ NEW
 };
 type Call = {
   id: string; callerId: string; callerName: string; receiverId: string;
@@ -230,7 +231,7 @@ const CSS = `
 .zc-mitm:last-child{border-bottom:none;}
 .zc-mitm:hover{background:#f9fafb;}
 .zc-mitm.sel{background:#fff3ef;}
-.zc-chk{width:15px;height:15px;border-radius:4px;border:2px solid #d1d5db;display:flex;align-items:center;justify-content:center;transition:all .12s;flex-shrink:0;}
+.zc-chk{width:15px;height:15px;border-radius:4px;border:2px solid #d1d5db;display:flex;align-items:center;justify-content:center;transition:all .12px;flex-shrink:0;}
 .zc-chk.on{background:#e8512a;border-color:#e8512a;}
 .zc-mfooter{display:flex;gap:7px;margin-top:16px;justify-content:flex-end;}
 .zc-btn{padding:7px 18px;border-radius:8px;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;border:none;cursor:pointer;transition:all .14s;}
@@ -239,7 +240,25 @@ const CSS = `
 .zc-btn.primary{background:#e8512a;color:#fff;}
 .zc-btn.primary:hover{background:#d04420;}
 .zc-btn.primary:disabled{background:#e8eaf0;color:#b0b7c3;cursor:not-allowed;}
+.zc-btn.danger{background:#fee2e2;color:#ef4444;}
+.zc-btn.danger:hover{background:#fecaca;}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);}
+
+/* ── Group Settings Modal extras ── */
+.zc-gs-member{display:flex;align-items:center;gap:9px;padding:8px 11px;border-bottom:1px solid #f0f2f5;background:#fff;}
+.zc-gs-member:last-child{border-bottom:none;}
+.zc-gs-mbtn{padding:3px 8px;border-radius:5px;font-size:11px;font-weight:600;border:1.5px solid;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .12s;}
+.zc-gs-mbtn.admin{border-color:#f59e0b;color:#f59e0b;background:transparent;}
+.zc-gs-mbtn.admin:hover{background:#fef3c7;}
+.zc-gs-mbtn.remove{border-color:#ef4444;color:#ef4444;background:transparent;}
+.zc-gs-mbtn.remove:hover{background:#fee2e2;}
+.zc-gs-add-list{max-height:140px;overflow-y:auto;border:1.5px solid #e8eaf0;border-radius:8px;}
+.zc-gs-add-item{display:flex;align-items:center;gap:9px;padding:7px 11px;cursor:pointer;transition:background .12s;border-bottom:1px solid #f0f2f5;font-size:13px;}
+.zc-gs-add-item:last-child{border-bottom:none;}
+.zc-gs-add-item:hover{background:#f0fdf4;}
+.zc-gs-add-item span{flex:1;font-weight:500;color:#1a1d23;}
+.zc-gs-avatar-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:8px;border:1.5px dashed #d1d5db;border-radius:8px;background:#f9fafb;cursor:pointer;font-size:12.5px;color:#6b7280;font-family:'DM Sans',sans-serif;font-weight:600;transition:all .14s;margin-top:8px;}
+.zc-gs-avatar-btn:hover{border-color:#e8512a;color:#e8512a;background:#fff3ef;}
 `;
 
 export default function TeamsStyleChat({ users }: { users: User[] }) {
@@ -270,6 +289,11 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
   const [callTimer,setCallTimer]       = useState(0);
   const [userStatuses,setUserStatuses] = useState<Record<string,{status:UserStatus;online:boolean}>>({});
 
+  // ── NEW: Group Settings state ─────────────────────────────────────────────
+  const [showGroupSettings,setShowGroupSettings] = useState(false);
+  const [groupData,setGroupData]       = useState<any>(null);
+  const avatarFileRef                  = useRef<HTMLInputElement>(null);
+
   const msgsEnd   = useRef<HTMLDivElement>(null);
   const typingRef = useRef<any>(null);
   const peerRef   = useRef<RTCPeerConnection|null>(null);
@@ -279,16 +303,16 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
   const iceQueue  = useRef<RTCIceCandidateInit[]>([]);
   const dotsRef   = useRef<HTMLDivElement>(null);
 
-  // ── SEPARATE REFS FOR VIDEO AND AUDIO (prevents stream routing bugs) ───────
-  const localVideoRef  = useRef<HTMLVideoElement>(null);  // local camera PiP
-  const remoteVideoRef = useRef<HTMLVideoElement>(null);  // remote video stream
-  const localAudioRef  = useRef<HTMLAudioElement>(null);  // local mic element (muted)
-  const remoteAudioRef = useRef<HTMLAudioElement>(null);  // remote audio output
-
-  // Track call type in a ref so async ontrack closures always see current value
-  const callTypeRef = useRef<"video"|"audio">("audio");
+  const localVideoRef  = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const localAudioRef  = useRef<HTMLAudioElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
+  const callTypeRef    = useRef<"video"|"audio">("audio");
 
   const chatId = useMemo(()=>selectedChat?.id||null,[selectedChat]);
+
+  // ── Derived admin check ───────────────────────────────────────────────────
+  const isAdmin = groupData?.admins?.includes(user?.uid);
 
   // ── Ringtone helpers ──────────────────────────────────────────────────────
   const ringCtxRef  = useRef<AudioContext|null>(null);
@@ -362,7 +386,6 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
     return()=>stopRing();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[activeCall?.status]);
-  // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(()=>{
     const h=(e:MouseEvent)=>{
@@ -410,7 +433,6 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
     return onSnapshot(doc(db,"calls",activeCall.id),async snap=>{
       if(!snap.exists()){endCall();return;}
       const call={id:snap.id,...snap.data()} as Call;
-      // Apply answer SDP exactly once (caller side)
       if(call.answer&&peerRef.current&&!peerRef.current.remoteDescription){
         await peerRef.current.setRemoteDescription(new RTCSessionDescription(call.answer));
         for(const c of iceQueue.current)
@@ -455,7 +477,7 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
           setChats(prev=>{
             const ex=prev.find(c=>c.id===gDoc.id);
             if(ex) return prev.map(c=>c.id===gDoc.id?{...c,unreadCount:{...c.unreadCount,[user.uid]:unread},lastMessage:last?.text||last?.fileName||"File",lastMessageTime:last?.createdAt}:c);
-            return[...prev,{id:gDoc.id,participants:gd.participants,unreadCount:{[user.uid]:unread},lastMessage:last?.text||last?.fileName||"File",lastMessageTime:last?.createdAt,isGroup:true,groupName:gd.groupName,groupAvatar:gd.groupAvatar,createdBy:gd.createdBy}];
+            return[...prev,{id:gDoc.id,participants:gd.participants,unreadCount:{[user.uid]:unread},lastMessage:last?.text||last?.fileName||"File",lastMessageTime:last?.createdAt,isGroup:true,groupName:gd.groupName,groupAvatar:gd.groupAvatar,createdBy:gd.createdBy,admins:gd.admins}];
           });
         }));
       });
@@ -484,6 +506,15 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
       setTyping(t);
     });
   },[chatId,selectedChat,user,users]);
+
+  // ── NEW: Listen to live group data ────────────────────────────────────────
+  useEffect(()=>{
+    if(!selectedChat?.isGroup) return;
+    const unsub = onSnapshot(doc(db,"groupChats",selectedChat.id),(snap)=>{
+      if(snap.exists()) setGroupData({id:snap.id,...snap.data()});
+    });
+    return()=>unsub();
+  },[selectedChat]);
 
   const handleTyping=async()=>{
     if(!chatId||!user||!selectedChat)return;
@@ -532,11 +563,69 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
     await b.commit();
   };
 
-  // ── Build ontrack handler — routes stream to the correct ref ─────────────
+  // ── Group Management Functions ─────────────────────────────────────────────
+
+  const addMember=async(uid:string)=>{
+    if(!groupData)return;
+    await updateDoc(doc(db,"groupChats",groupData.id),{
+      participants:[...groupData.participants,uid],
+    });
+  };
+
+  const removeMember=async(uid:string)=>{
+    if(!groupData)return;
+    await updateDoc(doc(db,"groupChats",groupData.id),{
+      participants:groupData.participants.filter((u:string)=>u!==uid),
+      admins:groupData.admins?.filter((a:string)=>a!==uid),
+    });
+  };
+
+  const toggleAdmin=async(uid:string)=>{
+    if(!groupData)return;
+    const isAlreadyAdmin=groupData.admins?.includes(uid);
+    await updateDoc(doc(db,"groupChats",groupData.id),{
+      admins:isAlreadyAdmin
+        ?groupData.admins.filter((a:string)=>a!==uid)
+        :[...(groupData.admins||[]),uid],
+    });
+  };
+
+  const renameGroup=async(newName:string)=>{
+    if(!groupData||!newName.trim())return;
+    await updateDoc(doc(db,"groupChats",groupData.id),{groupName:newName.trim()});
+  };
+
+  const changeGroupAvatar=async(file:File)=>{
+    if(!groupData)return;
+    const storageRef=ref(storage,`group-avatar/${groupData.id}`);
+    await uploadBytes(storageRef,file);
+    const url=await getDownloadURL(storageRef);
+    await updateDoc(doc(db,"groupChats",groupData.id),{groupAvatar:url});
+  };
+
+  const leaveGroup=async()=>{
+    if(!groupData||!user)return;
+    if(!confirm("Leave this group?"))return;
+    await updateDoc(doc(db,"groupChats",groupData.id),{
+      participants:groupData.participants.filter((u:string)=>u!==user.uid),
+      admins:groupData.admins?.filter((a:string)=>a!==user.uid),
+    });
+    setShowGroupSettings(false);
+    setSelectedChat(null);
+  };
+
+  const deleteGroup=async()=>{
+    if(!groupData)return;
+    if(!confirm("Delete this group for everyone?"))return;
+    await deleteDoc(doc(db,"groupChats",groupData.id));
+    setShowGroupSettings(false);
+    setSelectedChat(null);
+  };
+
+  // ── Build ontrack handler ─────────────────────────────────────────────────
   const buildOnTrack = (pc: RTCPeerConnection) => {
     pc.ontrack = (e) => {
       const remoteStream = e.streams[0];
-      console.log("ontrack — type:", callTypeRef.current, "tracks:", remoteStream.getTracks().map(t=>t.kind));
       if(callTypeRef.current === "video"){
         if(remoteVideoRef.current){
           remoteVideoRef.current.srcObject = remoteStream;
@@ -553,13 +642,11 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
     };
   };
 
-  // ── Attach local stream to the right element ─────────────────────────────
   const attachLocalStream = (stream: MediaStream, type: "video"|"audio") => {
     if(type === "video" && localVideoRef.current) localVideoRef.current.srcObject = stream;
     if(type === "audio" && localAudioRef.current) localAudioRef.current.srcObject = stream;
   };
 
-  // ── INITIATE CALL ─────────────────────────────────────────────────────────
   const initiateCall=async(type:"video"|"audio")=>{
     if(!user||!selectedChat||selectedChat.isGroup)return;
     const rid=selectedChat.participants.find(p=>p!==user.uid);if(!rid)return;
@@ -590,10 +677,9 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
     }catch(e){console.error(e);alert("Camera/mic access failed.");}
   };
 
-  // ── ACCEPT CALL ───────────────────────────────────────────────────────────
   const acceptCall=async()=>{
     if(!incomingCall||!user)return;
-    callTypeRef.current = incomingCall.type;   // ← set BEFORE creating RTCPeerConnection
+    callTypeRef.current = incomingCall.type;
     try{
       const stream=await navigator.mediaDevices.getUserMedia({
         video:incomingCall.type==="video"?{width:1280,height:720,facingMode:"user"}:false,
@@ -601,11 +687,10 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
       });
       streamRef.current=stream;
       attachLocalStream(stream,incomingCall.type);
-      const pc=new RTCPeerConnection(ICE_SERVERS);   // ← was "STUN" — FIXED
+      const pc=new RTCPeerConnection(ICE_SERVERS);
       peerRef.current=pc;
       stream.getTracks().forEach(t=>pc.addTrack(t,stream));
       buildOnTrack(pc);
-      // Flush any ICE candidates that arrived before accept
       for(const c of iceQueue.current)
         await pc.addIceCandidate(new RTCIceCandidate(c)).catch(console.error);
       iceQueue.current=[];
@@ -626,7 +711,6 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
     }catch(e){console.error(e);rejectCall();}
   };
 
-  // ── REJECT CALL ───────────────────────────────────────────────────────────
   const rejectCall=async()=>{
     if(!incomingCall)return;
     stopRing();
@@ -635,12 +719,10 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
     setIncomingCall(null);
   };
 
-  // ── END CALL ──────────────────────────────────────────────────────────────
   const endCall=async()=>{
     stopRing();
     streamRef.current?.getTracks().forEach(t=>t.stop());
     peerRef.current?.close();
-    // Clear all media elements
     if(localVideoRef.current)  localVideoRef.current.srcObject  = null;
     if(remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
     if(localAudioRef.current)  localAudioRef.current.srcObject  = null;
@@ -664,13 +746,20 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
 
   const fmtT=(s:number)=>{const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return h>0?`${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`:`${m}:${String(sec).padStart(2,"0")}`;};
 
+  // ── UPDATED: createGroup now adds admins field ────────────────────────────
   const createGroup=async()=>{
     if(!groupName.trim()||selectedMembers.length<2||!user)return;
     const all=[...selectedMembers,user.uid];
-    const gr=await addDoc(collection(db,"groupChats"),{groupName:groupName.trim(),participants:all,createdBy:user.uid,createdAt:serverTimestamp()});
+    const gr=await addDoc(collection(db,"groupChats"),{
+      groupName:groupName.trim(),
+      participants:all,
+      createdBy:user.uid,
+      admins:[user.uid], // ✅ creator is admin
+      createdAt:serverTimestamp(),
+    });
     await addDoc(collection(db,"groupChats",gr.id,"messages"),{text:`${getUserName(user)} created "${groupName.trim()}"`,senderUid:"system",senderName:"System",createdAt:serverTimestamp(),readBy:all});
     setGroupName("");setSelectedMembers([]);setShowCreateGroup(false);
-    setSelectedChat({id:gr.id,participants:all,isGroup:true,groupName:groupName.trim(),createdBy:user.uid});
+    setSelectedChat({id:gr.id,participants:all,isGroup:true,groupName:groupName.trim(),createdBy:user.uid,admins:[user.uid]});
   };
 
   const getChatName=(c:Chat)=>{if(c.isGroup)return c.groupName||"Group";const ou=users.find(u=>u.uid===c.participants.find(p=>p!==user?.uid));return ou?.name||ou?.email||"Unknown";};
@@ -723,8 +812,10 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
     <>
       <style>{CSS}</style>
       <input ref={fileRef} type="file" className="sr-only" onChange={e=>e.target.files?.[0]&&setSelectedFile(e.target.files[0])}/>
+      {/* Hidden avatar file input for group settings */}
+      <input ref={avatarFileRef} type="file" accept="image/*" className="sr-only" onChange={e=>{if(e.target.files?.[0])changeGroupAvatar(e.target.files[0]);}}/>
 
-      {/* ── HIDDEN AUDIO ELEMENTS — always in DOM so refs are always attached ── */}
+      {/* ── HIDDEN AUDIO ELEMENTS ── */}
       <audio ref={localAudioRef}  autoPlay muted style={{display:"none"}}/>
       <audio ref={remoteAudioRef} autoPlay       style={{display:"none"}}/>
 
@@ -760,7 +851,6 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
                   <div style={{color:"rgba(255,255,255,.45)",fontSize:14,fontFamily:"'DM Sans',sans-serif"}}>{activeCall.status==="ringing"?"Calling…":fmtT(callTimer)}</div>
                 </div>
             }
-            {/* Local video PiP (video calls only) */}
             {activeCall.type==="video"&&(
               <div style={{position:"absolute",bottom:16,right:16,width:180,height:135,borderRadius:12,overflow:"hidden",border:"2px solid rgba(255,255,255,.2)"}}>
                 <video ref={localVideoRef} autoPlay playsInline muted style={{width:"100%",height:"100%",objectFit:"cover"}}/>
@@ -816,16 +906,131 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
         </div>
       )}
 
+      {/* ── GROUP SETTINGS MODAL ── */}
+      {showGroupSettings&&groupData&&(
+        <div className="zc-mbk" onClick={e=>e.target===e.currentTarget&&setShowGroupSettings(false)}>
+          <div className="zc-modal">
+            {/* Header */}
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
+              <div style={{fontSize:15,fontWeight:700,color:"#1a1d23"}}>Group Settings</div>
+              <button style={{background:"none",border:"none",cursor:"pointer",color:"#9aa0ad",fontSize:20,lineHeight:1}} onClick={()=>setShowGroupSettings(false)}>×</button>
+            </div>
+
+            {/* Group Avatar */}
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",margin:"12px 0 4px"}}>
+              <div style={{position:"relative",cursor:"pointer"}} onClick={()=>avatarFileRef.current?.click()}>
+                <div className="zc-av" style={{
+                  background:groupData.groupAvatar?"transparent":`linear-gradient(135deg,#0891b2,#22d3ee)`,
+                  width:64,height:64,borderRadius:16,fontSize:22,
+                }}>
+                  {groupData.groupAvatar?<img src={groupData.groupAvatar} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:initials(groupData.groupName||"G")}
+                </div>
+                {isAdmin&&<div style={{position:"absolute",bottom:-4,right:-4,width:20,height:20,borderRadius:"50%",background:"#e8512a",border:"2px solid #fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff"}}>✏️</div>}
+              </div>
+            </div>
+
+            {/* Group Name */}
+            <div className="zc-mlbl">Group Name</div>
+            {isAdmin
+              ?<input className="zc-mi" defaultValue={groupData.groupName} onBlur={e=>renameGroup(e.target.value)} placeholder="Group name"/>
+              :<div style={{fontSize:14,fontWeight:600,color:"#1a1d23",padding:"8px 0"}}>{groupData.groupName}</div>
+            }
+
+            {/* Members */}
+            <div className="zc-mlbl" style={{marginTop:14}}>
+              Members ({groupData.participants?.length||0})
+            </div>
+            <div className="zc-mlist">
+              {(groupData.participants||[]).map((uid:string)=>{
+                const u=users.find(x=>x.uid===uid);
+                const uName=u?.name||u?.email||"Unknown";
+                const isUserAdmin=groupData.admins?.includes(uid);
+                const isSelf=uid===user?.uid;
+                const[g1,g2]=avGrad(uName);
+                return(
+                  <div key={uid} className="zc-gs-member">
+                    <div className="zc-av" style={{background:`linear-gradient(135deg,${g1},${g2})`,width:32,height:32,borderRadius:9,fontSize:11,flexShrink:0}}>
+                      {u?.profilePhoto?<img src={u.profilePhoto} alt=""/>:initials(uName)}
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:600,color:"#1a1d23",display:"flex",alignItems:"center",gap:5}}>
+                        {uName}{isSelf&&<span style={{fontSize:10,color:"#9aa0ad"}}>(you)</span>}
+                      </div>
+                      {isUserAdmin&&<div style={{fontSize:10.5,color:"#f59e0b",fontWeight:700,marginTop:1}}>👑 Admin</div>}
+                    </div>
+                    {isAdmin&&!isSelf&&(
+                      <div style={{display:"flex",gap:5,flexShrink:0}}>
+                        <button
+                          className="zc-gs-mbtn admin"
+                          onClick={()=>toggleAdmin(uid)}
+                          title={isUserAdmin?"Remove admin":"Make admin"}
+                        >
+                          {isUserAdmin?"- Admin":"+ Admin"}
+                        </button>
+                        <button
+                          className="zc-gs-mbtn remove"
+                          onClick={()=>removeMember(uid)}
+                          title="Remove from group"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Add Member — admins only */}
+            {isAdmin&&(()=>{
+              const nonMembers=users.filter(u=>!(groupData.participants||[]).includes(u.uid));
+              if(nonMembers.length===0)return null;
+              return(
+                <>
+                  <div className="zc-mlbl" style={{marginTop:14}}>Add Member</div>
+                  <div className="zc-gs-add-list">
+                    {nonMembers.map(u=>{
+                      const uName=getUserName(u);const[g1,g2]=avGrad(uName);
+                      return(
+                        <div key={u.uid} className="zc-gs-add-item" onClick={()=>addMember(u.uid)}>
+                          <div className="zc-av" style={{background:`linear-gradient(135deg,${g1},${g2})`,width:28,height:28,borderRadius:8,fontSize:10,flexShrink:0}}>
+                            {u.profilePhoto?<img src={u.profilePhoto} alt=""/>:initials(uName)}
+                          </div>
+                          <span>{uName}</span>
+                          <span style={{fontSize:18,color:"#22c55e"}}>➕</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              );
+            })()}
+
+            {/* Footer actions */}
+            <div className="zc-mfooter" style={{justifyContent:"space-between"}}>
+              <button className="zc-btn danger" onClick={leaveGroup}>
+                🚪 Leave Group
+              </button>
+              {isAdmin&&(
+                <button className="zc-btn primary" onClick={deleteGroup} style={{background:"#ef4444"}}>
+                  🗑 Delete Group
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── MAIN LAYOUT ── */}
       <div className="zc">
-        <div className="zc-sb">
+        {/* <div className="zc-sb">
           <div className={`zc-sb-ico${tab==="chats"?" on":""}`} onClick={()=>setTab("chats")} title="Chats">
             <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
           </div>
           <div className={`zc-sb-ico${tab==="calls"?" on":""}`} onClick={()=>setTab("calls")} title="Calls">
             <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
           </div>
-        </div>
+        </div> */}
 
         {/* ── CHATS TAB ── */}
         {tab==="chats"&&(
@@ -867,7 +1072,7 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
                           <div key={c.id} className={`zc-chat-item${selectedChat?.id===c.id?" on":""}`} onClick={()=>setSelectedChat(c)}>
                             <div style={{position:"relative",flexShrink:0}}>
                               <div className="zc-av" style={{background:c.isGroup?`linear-gradient(135deg,#0891b2,#22d3ee)`:`linear-gradient(135deg,${g1},${g2})`,width:38,height:38,borderRadius:10,fontSize:13}}>
-                                {ou?.profilePhoto?<img src={ou.profilePhoto} alt=""/>:initials(name)}
+                                {c.groupAvatar?<img src={c.groupAvatar} alt=""/>:ou?.profilePhoto?<img src={ou.profilePhoto} alt=""/>:initials(name)}
                               </div>
                               {!c.isGroup&&<div className="zc-sdot" style={{width:10,height:10,background:stCfg.color,border:"2px solid #fff",bottom:-2,right:-2}}/>}
                             </div>
@@ -906,7 +1111,7 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
                       return(<>
                         <div style={{position:"relative"}}>
                           <div className="zc-av" style={{background:selectedChat.isGroup?`linear-gradient(135deg,#0891b2,#22d3ee)`:`linear-gradient(135deg,${g1},${g2})`,width:36,height:36,borderRadius:10,fontSize:12}}>
-                            {ou?.profilePhoto?<img src={ou.profilePhoto} alt=""/>:initials(name)}
+                            {selectedChat.groupAvatar?<img src={selectedChat.groupAvatar} alt=""/>:ou?.profilePhoto?<img src={ou.profilePhoto} alt=""/>:initials(name)}
                           </div>
                           {!selectedChat.isGroup&&<div className="zc-sdot" style={{width:10,height:10,background:stCfg.color,border:"2px solid #fff",bottom:-2,right:-2}}/>}
                         </div>
@@ -926,6 +1131,16 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
                         <button className="zc-hd-btn" title="Video call" onClick={()=>initiateCall("video")}><svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
                       </>
                     )}
+                    {/* ── GROUP SETTINGS BUTTON ── */}
+                    {selectedChat.isGroup&&(
+                      <button className="zc-hd-btn" title="Group settings" onClick={()=>setShowGroupSettings(true)}>
+                        <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                          <circle cx="9" cy="7" r="4"/>
+                          <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+                        </svg>
+                      </button>
+                    )}
                     <div ref={dotsRef} style={{position:"relative"}}>
                       <button className="zc-hd-btn" title="More" onClick={()=>setShowDots(p=>!p)}>
                         <svg width="17" height="17" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
@@ -934,8 +1149,8 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
                         <div className="zc-dd" style={{width:185,top:38,right:0}}>
                           <div className="zc-ds">
                             {[{e:"🔍",l:"Search in chat"},{e:"📌",l:"Pin conversation"},{e:"🔕",l:"Mute notifications"},{e:"📁",l:"View files"},{e:"👤",l:"View profile"},
-                              ...(selectedChat.isGroup?[{e:"👥",l:"Members"},{e:"✏️",l:"Edit group"}]:[])].map(item=>(
-                              <div key={item.l} className="zc-di" onClick={()=>setShowDots(false)}><span style={{fontSize:13}}>{item.e}</span>{item.l}</div>
+                              ...(selectedChat.isGroup?[{e:"⚙️",l:"Group settings",fn:()=>setShowGroupSettings(true)}]:[])].map(item=>(
+                              <div key={item.l} className="zc-di" onClick={()=>{setShowDots(false);(item as any).fn?.();}}><span style={{fontSize:13}}>{item.e}</span>{item.l}</div>
                             ))}
                             <div className="zc-di red" onClick={()=>{setShowDots(false);setSelectedChat(null);}}><span style={{fontSize:13}}>🚪</span>Close chat</div>
                           </div>

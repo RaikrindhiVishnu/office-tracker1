@@ -1,5 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { logActivity } from "@/lib/notifications";
+import NotificationBell from "@/components/NotificationBell";
 import {
   AreaChart, Area, BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -12,6 +14,7 @@ import {
   query, where, orderBy, Timestamp, serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
+import { useAuth } from "@/context/AuthContext";
 
 // ─────────────────────────────────────────────────────────────
 // 1. FIREBASE CONFIG
@@ -130,10 +133,29 @@ export async function deleteEmployee(id: string) {
   return deleteDoc(doc(getDB(), "employees", id));
 }
 
-export async function addPayroll(data: Omit<PayrollEntry, "id" | "finalSalary" | "createdAt">) {
+export async function addPayroll(
+  data: Omit<PayrollEntry, "id" | "finalSalary" | "createdAt">
+) {
   const db = getDB();
   const finalSalary = data.baseSalary + data.bonus - data.deduction;
-  return addDoc(collection(db, "payroll"), { ...data, finalSalary, createdAt: serverTimestamp() });
+
+  const ref = await addDoc(collection(db, "payroll"), {
+    ...data,
+    finalSalary,
+    createdAt: serverTimestamp(),
+  });
+
+  await logActivity({
+    type: "PAYROLL_PROCESSED",
+    title: "Payroll entry added",
+    message: `${data.employeeName}'s salary of ₹${finalSalary.toLocaleString("en-IN")} processed for ${data.month}`,
+    icon: "💰",
+    createdBy: "Finance",
+    visibleTo: ["hr", "admin"],
+    priority: "medium",
+  });
+
+  return ref;
 }
 export async function deletePayroll(id: string) {
   return deleteDoc(doc(getDB(), "payroll", id));
@@ -156,7 +178,25 @@ export function subscribePayroll(
 export async function addExpense(data: Omit<Expense, "id" | "month" | "createdAt">) {
   const db = getDB();
   const month = data.date.slice(0, 7);
-  return addDoc(collection(db, "expenses"), { ...data, month, createdAt: serverTimestamp() });
+
+  const ref = await addDoc(collection(db, "expenses"), {
+    ...data,
+    month,
+    createdAt: serverTimestamp(),
+  });
+
+  await logActivity({
+    type: "EXPENSE_ADDED",
+    title: "New expense logged",
+    message: `${data.category} expense of ₹${data.amount.toLocaleString("en-IN")} added for ${month}`,
+    icon: "🧾",
+    createdBy: "Finance",
+    relatedId: ref.id,
+    visibleTo: ["hr", "sales", "admin"],
+    priority: data.amount >= 50000 ? "high" : "low",
+  });
+
+  return ref;
 }
 export async function deleteExpense(id: string) {
   return deleteDoc(doc(getDB(), "expenses", id));
@@ -1157,6 +1197,7 @@ export default function FinancialDashboard() {
   const handleDelPayroll = useCallback((id: string)                                               => deletePayroll(id), []);
   const handleAddAsset   = useCallback((d: Omit<Asset,        "id"|"totalCost"|"createdAt">)    => addAsset(d),    []);
   const handleDelAsset   = useCallback((id: string)                                               => deleteAsset(id),  []);
+  const { user } = useAuth();
 
   const TABS: { key: Tab; label: string; count?: number }[] = [
     { key: "overview",  label: "Overview" },
@@ -1209,6 +1250,12 @@ export default function FinancialDashboard() {
         </div> */}
 
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+   <NotificationBell
+  role="finance"
+  uid={user?.uid || ""}
+  accentColor="#2563eb"
+/>
+
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 11, color: T.inkMid, fontWeight: 700 }}>Month</span>
             <select

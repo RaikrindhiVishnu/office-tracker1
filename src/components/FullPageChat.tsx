@@ -338,7 +338,7 @@ export default function FullPageChat({ users, onClose }: { users: User[]; onClos
 
   /* ---------------- RENDER ---------------- */
   return (
-    <div className="h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 flex">
+    <div className="h-screen bg-linear-to-br from-gray-50 via-white to-gray-50 flex">
       {/* NOTIFICATIONS */}
       {notifications.map((notification) => (
         <WhatsAppNotification
@@ -500,7 +500,7 @@ export default function FullPageChat({ users, onClose }: { users: User[]; onClos
                   } group`}
                 >
                   {/* Avatar */}
-                  <div className="w-8 h-8 flex-shrink-0">
+                  <div className="w-8 h-8 shrink-0">
                     {!mine && showAvatar && (
                       <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-700 text-xs font-bold">
                         {(selectedUser.name || selectedUser.email)
@@ -533,7 +533,7 @@ export default function FullPageChat({ users, onClose }: { users: User[]; onClos
                       ) : (
                         <>
                           {m.text && (
-                            <p className="leading-relaxed break-words">
+                            <p className="leading-relaxed wrap-break-words">
                               {m.text}
                             </p>
                           )}

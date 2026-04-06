@@ -74,7 +74,7 @@ const ChatNotification = ({
 
   return (
     <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right duration-300">
-      <div className="bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden min-w-[320px] max-w-[400px]">
+      <div className="bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden min-w-[320px] max-w-100">
         {/* Notification Header */}
         <div className="bg-green-600 text-white px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -98,14 +98,14 @@ const ChatNotification = ({
         {/* Notification Body */}
         <div className="p-4">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-700 font-bold flex-shrink-0">
+            <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-700 font-bold shrink-0">
               {notification.senderName.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-gray-800 text-sm">
                 {notification.senderName}
               </p>
-              <p className="text-gray-600 text-sm mt-1 break-words">
+              <p className="text-gray-600 text-sm mt-1 wrap-break-words">
                 {notification.body}
               </p>
               <p className="text-xs text-gray-400 mt-2">
@@ -331,7 +331,7 @@ const ProfessionalChatPopup = ({
     >
       {/* Header */}
       <div
-        className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-3 rounded-t-lg flex items-center justify-between cursor-move"
+        className="bg-linear-to-r from-blue-600 to-blue-700 text-white px-4 py-3 rounded-t-lg flex items-center justify-between cursor-move"
         onMouseDown={handleMouseDown}
       >
         <div className="flex items-center gap-3">
@@ -403,7 +403,7 @@ const ProfessionalChatPopup = ({
                     <i className="text-xs opacity-60">Message deleted</i>
                   ) : (
                     <>
-                      {m.text && <p className="break-words">{m.text}</p>}
+                      {m.text && <p className="wrap-break-words">{m.text}</p>}
                       {m.imageUrl && (
                         <img
                           src={m.imageUrl}
@@ -773,7 +773,7 @@ const SingleChatView = ({
                     <i className="text-xs opacity-60">Message deleted</i>
                   ) : (
                     <>
-                      {m.text && <p className="break-words">{m.text}</p>}
+                      {m.text && <p className="wrap-break-words">{m.text}</p>}
                       {m.imageUrl && (
                         <img
                           src={m.imageUrl}
@@ -976,7 +976,7 @@ export default function ProfessionalChatSystem({ users, onClose }: { users: User
 
       {/* WhatsApp-style Interface */}
       <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center">
-        <div className="bg-white w-full max-w-md h-[600px] rounded-lg shadow-2xl flex flex-col">
+        <div className="bg-white w-full max-w-md h-150 rounded-lg shadow-2xl flex flex-col">
           {!selectedUser ? (
             <>
               {/* User List View */}

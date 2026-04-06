@@ -10,7 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 
 interface Payslip {
   id: string;
-  month: string;
+  month: any; // any because Firestore may return Timestamp, Date, or string
   gross: number;
   deductions: number;
   netSalary: number;
@@ -23,6 +23,20 @@ const MONTH_NAMES = [
 ];
 
 const ITEMS_PER_PAGE = 10;
+
+/* ── Global helper: normalize any month value → "YYYY-MM" string ── */
+const toMonthKey = (value: any): string => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (value?.toDate) {
+    const d = value.toDate();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+  if (value instanceof Date) {
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}`;
+  }
+  return "";
+};
 
 export default function Payslips() {
   const { user } = useAuth();
@@ -51,17 +65,18 @@ export default function Payslips() {
       const list: Payslip[] = snap.docs.map((d) => ({
         id: d.id, ...d.data(),
       })) as Payslip[];
-      list.sort((a, b) => b.month.localeCompare(a.month));
+
+      // Safe sort using normalized keys
+      list.sort((a, b) => toMonthKey(b.month).localeCompare(toMonthKey(a.month)));
+
       setAllPayslips(list);
 
-      // Get join date from user doc
       const userData = userDoc.data();
       setJoinDate(userData?.dateOfJoining || null);
 
-      // Default selected = latest month up to today
       const now = new Date();
       const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-      setSelectedKey(list.length > 0 ? list[0].month : currentKey);
+      setSelectedKey(list.length > 0 ? toMonthKey(list[0].month) : currentKey);
 
       setLoading(false);
     })();
@@ -70,27 +85,37 @@ export default function Payslips() {
   /* ── Helpers ── */
   const generatedMap = useMemo(() => {
     const map = new Map<string, Payslip>();
-    allPayslips.forEach((p) => map.set(p.month, p));
+    allPayslips.forEach((p) => {
+      const key = toMonthKey(p.month);
+      if (key) map.set(key, p);
+    });
     return map;
   }, [allPayslips]);
 
   const fmtKey = (key: string) => {
     const [y, m] = key.split("-").map(Number);
+    if (!y || !m) return key;
     return `${MONTH_NAMES[m - 1]} ${y}`;
   };
 
   const availableYears = useMemo(() => {
     const now = new Date();
     const years = new Set<string>();
-    // Add all years from payslips
-    allPayslips.forEach((p) => years.add(p.month.split("-")[0]));
-    // Always include current year
+
+    allPayslips.forEach((p) => {
+      const key = toMonthKey(p.month);
+      if (key) years.add(key.split("-")[0]);
+    });
+
     years.add(String(now.getFullYear()));
-    // Add join year if available
+
     if (joinDate) {
-      const jy = joinDate.split("-")[0] || joinDate.split("/")[2];
+      const jy = joinDate.includes("-")
+        ? joinDate.split("-")[0]
+        : joinDate.split("/")[2];
       if (jy) years.add(jy);
     }
+
     return Array.from(years).sort((a, b) => Number(b) - Number(a));
   }, [allPayslips, joinDate]);
 
@@ -98,9 +123,8 @@ export default function Payslips() {
   const allMonthRows = useMemo(() => {
     const now = new Date();
     const endYear  = now.getFullYear();
-    const endMonth = now.getMonth() + 1; // 1-based
+    const endMonth = now.getMonth() + 1;
 
-    // Parse join date (support YYYY-MM-DD or DD/MM/YYYY)
     let startYear  = endYear;
     let startMonth = 1;
 
@@ -115,11 +139,13 @@ export default function Payslips() {
         startMonth = Number(parts[1]);
       }
     } else if (allPayslips.length > 0) {
-      // Fallback: oldest payslip month
-      const oldest = allPayslips[allPayslips.length - 1].month;
-      const [oy, om] = oldest.split("-").map(Number);
-      startYear  = oy;
-      startMonth = om;
+      // Safe fallback using oldest payslip
+      const oldestKey = toMonthKey(allPayslips[allPayslips.length - 1].month);
+      if (oldestKey) {
+        const [oy, om] = oldestKey.split("-").map(Number);
+        startYear  = oy || endYear;
+        startMonth = om || 1;
+      }
     }
 
     const rows: string[] = [];
@@ -131,7 +157,7 @@ export default function Payslips() {
       if (m === 0) { m = 12; y--; }
     }
 
-    return rows; // already latest-first
+    return rows;
   }, [joinDate, allPayslips]);
 
   /* ── Filter ── */
@@ -322,9 +348,8 @@ export default function Payslips() {
         </p>
       </div>
 
-      {/* ── FILTER — tight pill ── */}
+      {/* ── FILTER ── */}
       <div className="inline-flex items-center w-fit rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-
         <div className="relative">
           <select
             value={filterYear}
@@ -448,7 +473,6 @@ export default function Payslips() {
           </p>
         </div>
 
-        {/* Table head */}
         <div className="grid grid-cols-4 px-5 py-2.5 bg-slate-50 border-b border-slate-100 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
           <span>Employee</span>
           <span>Month</span>
@@ -456,7 +480,6 @@ export default function Payslips() {
           <span className="text-right">Action</span>
         </div>
 
-        {/* Rows — every month from join → now */}
         {paginatedRows.length === 0 ? (
           <div className="py-10 text-center">
             <p className="text-sm font-semibold text-slate-500">No records found</p>
@@ -473,15 +496,10 @@ export default function Payslips() {
               onClick={() => setSelectedKey(monthKey)}
               className={`grid grid-cols-4 items-center px-5 py-3 border-t border-slate-50 cursor-pointer transition-colors ${isSel ? "bg-blue-50" : "hover:bg-slate-50"}`}
             >
-              {/* Employee */}
               <span className={`text-sm font-medium truncate ${isSel ? "text-blue-700" : "text-slate-800"}`}>
                 {user?.displayName || "Employee"}
               </span>
-
-              {/* Month */}
               <span className="text-sm text-slate-600">{fmtKey(monthKey)}</span>
-
-              {/* Status */}
               <div className="flex justify-center">
                 {rowGenerated ? (
                   <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 rounded-md px-2 py-0.5">
@@ -497,8 +515,6 @@ export default function Payslips() {
                   </span>
                 )}
               </div>
-
-              {/* Action */}
               <div className="flex justify-end">
                 {rowGenerated ? (
                   <button
@@ -536,7 +552,6 @@ export default function Payslips() {
           );
         })}
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex justify-center items-center gap-1.5 py-3 border-t border-slate-100">
             <button
@@ -546,7 +561,6 @@ export default function Payslips() {
             >
               ← Prev
             </button>
-
             {Array.from({ length: totalPages }).map((_, i) => (
               <button
                 key={i}
@@ -558,7 +572,6 @@ export default function Payslips() {
                 {i + 1}
               </button>
             ))}
-
             <button
               disabled={page === totalPages}
               onClick={() => setPage(page + 1)}

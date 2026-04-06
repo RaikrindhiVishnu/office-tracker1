@@ -17,7 +17,7 @@ const LEAVE_COLORS: Record<string, { bg: string; text: string; dot: string }> = 
 };
 
 const LEAVE_ICONS: Record<string, string> = {
-  casual:          "🌴",
+  casual:          "🧑🏻‍💻",
   sick:            "🤒",
   "Work From Home":"🏠",
   annual:          "📅",
@@ -339,7 +339,7 @@ export default function LeaveRequestView({
             },
             {
               type:      "casual",
-              icon:      "🌴",
+              icon:      "🧑🏻‍💻",
               remaining: (data?.casual?.quota ?? 12) - (data?.casual?.used ?? 0),
               total:     data?.casual?.quota ?? 12,
             },

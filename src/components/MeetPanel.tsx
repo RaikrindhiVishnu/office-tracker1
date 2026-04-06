@@ -104,7 +104,7 @@ export default function MeetPanel({ users }: Props) {
 
       {open && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="bg-white w-[380px] rounded-2xl shadow-2xl p-6">
+          <div className="bg-white w-95 rounded-2xl shadow-2xl p-6">
             <h2 className="text-xl font-bold mb-4">Start a Meet</h2>
 
             {/* MODE SELECT */}

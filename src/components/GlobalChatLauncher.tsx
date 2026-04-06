@@ -85,7 +85,7 @@ export default function GlobalChatLauncher() {
           {/* Main Chat Button */}
           <button
             onClick={() => setShowChat(true)}
-            className="w-16 h-16 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-full shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-110 flex items-center justify-center group relative overflow-hidden"
+            className="w-16 h-16 bg-linear-to-r from-green-500 to-green-600 text-white rounded-full shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-110 flex items-center justify-center group relative overflow-hidden"
             title="Open Chat"
           >
             {/* WhatsApp Icon */}
@@ -94,7 +94,7 @@ export default function GlobalChatLauncher() {
             </svg>
 
             {/* Hover Effect Background */}
-            <div className="absolute inset-0 bg-gradient-to-r from-green-600 to-green-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <div className="absolute inset-0 bg-linear-to-r from-green-600 to-green-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           </button>
 
           {/* Quick Actions Tooltip */}

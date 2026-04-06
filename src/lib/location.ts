@@ -1,10 +1,9 @@
-// lib/location.ts
-// ─────────────────────────────────────────────────────────────
+
 //  Office GPS coordinates — update these if office moves
-// ─────────────────────────────────────────────────────────────
+
 const OFFICE_LAT = 17.483525799549234;
 const OFFICE_LNG = 78.38086184927101;
-const ALLOWED_RADIUS_METERS = 1000; // 100 metre radius
+const ALLOWED_RADIUS_METERS = 2000; //metre radius
 
 function toRad(value: number): number {
   return (value * Math.PI) / 180;
@@ -12,7 +11,7 @@ function toRad(value: number): number {
 
 // Haversine formula — calculates straight-line distance between two GPS points
 export function isInsideOffice(lat: number, lng: number): boolean {
-  const R = 6371000; // Earth radius in metres
+  const R = 6371000;
 
   const dLat = toRad(lat - OFFICE_LAT);
   const dLng = toRad(lng - OFFICE_LNG);
@@ -26,7 +25,16 @@ export function isInsideOffice(lat: number, lng: number): boolean {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const distance = R * c;
 
-   console.log("Distance from office:", distance);
-   
-  return distance <= ALLOWED_RADIUS_METERS;
+  console.log("Distance from office:", distance);
+
+  // ✅ MAIN FIX
+  if (distance <= ALLOWED_RADIUS_METERS) return true;
+
+  // ✅ GPS ERROR BUFFER (VERY IMPORTANT)
+  if (distance <= ALLOWED_RADIUS_METERS + 50) {
+    console.log("Allowed due to GPS inaccuracy");
+    return true;
+  }
+
+  return false;
 }
