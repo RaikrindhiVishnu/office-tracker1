@@ -1,120 +1,73 @@
-/**
- * AdminQueriesView.tsx  — fully typed TypeScript version
- *
- * SETUP:
- * 1. npm install firebase lucide-react
- * 2. Create src/lib/firebase.ts with your Firebase config
- * 3. Firestore collection: "employeeQueries"
- */
-
 "use client";
 
+/**
+ * AdminQueriesView.tsx — Refined Helpdesk UI
+ * - Light font weights throughout
+ * - Delete option on rows + drawer
+ * - Wider drawer (680px)
+ * - Cleaner, more polished aesthetics
+ * - All Firebase logic preserved
+ */
+
 import { useState, useEffect, useRef } from "react";
-import { FileText, Clock, CheckCircle, Bell } from "lucide-react";
 import {
-  collection,
-  query,
-  orderBy,
-  onSnapshot,
-  updateDoc,
-  doc,
-  serverTimestamp,
+  Search, ChevronLeft, ChevronRight,
+  X, Send, RotateCcw, CheckCircle2, MessageSquare, Trash2,
+} from "lucide-react";
+import {
+  collection, query, orderBy, onSnapshot,
+  updateDoc, deleteDoc, doc, serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Reply {
-  author:      string;
-  text:        string;
-  time:        number;
+  author: string;
+  text: string;
+  time: number;
   assignedTo?: string;
 }
 
 interface EmployeeQuery {
-  id:             string;
-  employeeName:   string;
-  employeeEmail:  string;
-  department:     string;
-  subject:        string;
-  message:        string;
-  status:         string;
-  priority:       string;
-  category:       string;
-  adminUnread:    boolean;
-  employeeUnread: boolean;
-  createdAt:      { seconds: number; nanoseconds: number } | string | number | null;
-  replies?:       Reply[];
-  adminReply?:    string;
-  repliedAt?:     { seconds: number; nanoseconds: number } | null;
-  assignedTo?:    string | null;
-}
-
-interface PriorityConfig {
-  label:  string;
-  bg:     string;
-  color:  string;
-  dot:    string;
-  border: string;
-}
-
-interface CategoryConfig {
-  bg:    string;
-  color: string;
-}
-
-interface AvatarColor {
-  bg:    string;
-  color: string;
-}
-
-interface ChipProps {
-  label:   string;
-  bg:      string;
-  color:   string;
-  border?: string;
-  dot?:    string;
-}
-
-interface AvatarProps {
-  name:   string;
-  size?:  number;
-}
-
-interface StatusChipProps {
+  id: string;
+  employeeName: string;
+  employeeEmail: string;
+  department: string;
+  subject: string;
+  message: string;
   status: string;
+  priority: string;
+  category: string;
+  adminUnread: boolean;
+  employeeUnread: boolean;
+  createdAt: { seconds: number; nanoseconds: number } | string | number | null;
+  replies?: Reply[];
+  adminReply?: string;
+  repliedAt?: { seconds: number; nanoseconds: number } | null;
+  assignedTo?: string | null;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const PRIORITY_CONFIG: Record<string, PriorityConfig> = {
-  low:    { label: "Low",    bg: "#f0fdf4", color: "#15803d", dot: "#22c55e", border: "#bbf7d0" },
-  medium: { label: "Medium", bg: "#fffbeb", color: "#d97706", dot: "#f59e0b", border: "#fde68a" },
-  high:   { label: "High",   bg: "#fff1f2", color: "#e11d48", dot: "#f43f5e", border: "#fecdd3" },
-  urgent: { label: "Urgent", bg: "#fdf4ff", color: "#9333ea", dot: "#a855f7", border: "#e9d5ff" },
+const PRIORITY_CONFIG: Record<string, { label: string; bg: string; color: string; dot: string }> = {
+  low:    { label: "Low",    bg: "#f0fdf4", color: "#16a34a", dot: "#4ade80" },
+  medium: { label: "Medium", bg: "#fffbeb", color: "#d97706", dot: "#fbbf24" },
+  high:   { label: "High",   bg: "#fff1f2", color: "#e11d48", dot: "#fb7185" },
+  urgent: { label: "Urgent", bg: "#faf5ff", color: "#9333ea", dot: "#c084fc" },
 };
 
-const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
-  "IT Support": { bg: "#eff6ff", color: "#3b82f6" },
-  "Payroll":    { bg: "#f0fdf4", color: "#15803d" },
-  "HR Policy":  { bg: "#fdf4ff", color: "#9333ea" },
+const CATEGORY_CONFIG: Record<string, { bg: string; color: string }> = {
+  "IT Support": { bg: "#eff6ff", color: "#2563eb" },
+  "Payroll":    { bg: "#f0fdf4", color: "#16a34a" },
+  "HR Policy":  { bg: "#faf5ff", color: "#9333ea" },
   "Software":   { bg: "#fff7ed", color: "#ea580c" },
   "Facilities": { bg: "#f0f9ff", color: "#0284c7" },
-  "Finance":    { bg: "#fffbeb", color: "#d97706" },
+  "Finance":    { bg: "#fefce8", color: "#ca8a04" },
+  "General":    { bg: "#f8fafc", color: "#64748b" },
 };
 
-const AVATAR_COLORS: AvatarColor[] = [
-  { bg: "#eff0ff", color: "#6366f1" },
-  { bg: "#fce7f3", color: "#db2777" },
-  { bg: "#d1fae5", color: "#059669" },
-  { bg: "#fffbeb", color: "#d97706" },
-  { bg: "#ede9fe", color: "#7c3aed" },
-  { bg: "#e0f2fe", color: "#0284c7" },
-  { bg: "#fef9c3", color: "#ca8a04" },
-  { bg: "#fee2e2", color: "#dc2626" },
-];
-
-const ADMIN_AGENTS: string[] = [
+const ADMIN_AGENTS = [
   "Unassigned",
   "Admin — madhuri.",
   "Admin — phani.",
@@ -122,31 +75,36 @@ const ADMIN_AGENTS: string[] = [
   "IT — team leads.",
 ];
 
+const PAGE_SIZES = [10, 20, 50];
+
+const AVATAR_PALETTE = [
+  { bg: "#e0e7ff", color: "#4338ca" },
+  { bg: "#fce7f3", color: "#be185d" },
+  { bg: "#d1fae5", color: "#065f46" },
+  { bg: "#fef3c7", color: "#92400e" },
+  { bg: "#ede9fe", color: "#6d28d9" },
+  { bg: "#dbeafe", color: "#1d4ed8" },
+  { bg: "#fee2e2", color: "#b91c1c" },
+  { bg: "#ccfbf1", color: "#0f766e" },
+];
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getAvatarStyle(name: string): AvatarColor {
-  const idx = ((name ?? "").charCodeAt(0) || 65) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[idx];
+function getAvatarStyle(name: string) {
+  const idx = ((name ?? "").charCodeAt(0) || 65) % AVATAR_PALETTE.length;
+  return AVATAR_PALETTE[idx];
 }
 
 function getInitials(name: string): string {
-  return (name ?? "")
-    .split(" ")
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("");
+  return (name ?? "").split(" ").slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
 }
 
 function timeAgo(ts: EmployeeQuery["createdAt"] | number): string {
   if (ts === null || ts === undefined) return "—";
   let d: Date;
-  if (typeof ts === "object" && "seconds" in ts) {
-    d = new Date(ts.seconds * 1000);
-  } else if (typeof ts === "string") {
-    d = new Date(ts);
-  } else {
-    d = new Date(ts as number);
-  }
+  if (typeof ts === "object" && "seconds" in ts) d = new Date(ts.seconds * 1000);
+  else if (typeof ts === "string") d = new Date(ts);
+  else d = new Date(ts as number);
   const diff = Math.floor((Date.now() - d.getTime()) / 1000);
   if (diff < 60)     return "Just now";
   if (diff < 3600)   return `${Math.floor(diff / 60)}m ago`;
@@ -157,589 +115,1065 @@ function timeAgo(ts: EmployeeQuery["createdAt"] | number): string {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function Avatar({ name, size = 36 }: AvatarProps) {
+function Avatar({ name, size = 32 }: { name: string; size?: number }) {
   const { bg, color } = getAvatarStyle(name);
-  const initials = getInitials(name);
   return (
     <div style={{
       width: size, height: size, borderRadius: "50%",
-      background: bg, color, border: `1.5px solid ${color}30`,
+      background: bg, color,
       display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: size * 0.35, fontWeight: 700, flexShrink: 0,
-      letterSpacing: "-0.3px",
+      fontSize: size * 0.34, fontWeight: 600,
+      flexShrink: 0, letterSpacing: "0px",
     }}>
-      {initials || "?"}
+      {getInitials(name) || "?"}
     </div>
   );
 }
 
-function Chip({ label, bg, color, border, dot }: ChipProps) {
+function Badge({ label, bg, color, dot }: { label: string; bg: string; color: string; dot?: string }) {
   return (
     <span style={{
-      display: "inline-flex", alignItems: "center", gap: 4,
-      fontSize: 10, fontWeight: 700, padding: "2px 8px",
-      borderRadius: 20, background: bg, color,
-      border: border ? `1px solid ${border}` : "none",
-      whiteSpace: "nowrap",
+      display: "inline-flex", alignItems: "center", gap: 5,
+      fontSize: 11, fontWeight: 500,
+      padding: "3px 9px", borderRadius: 100,
+      background: bg, color, whiteSpace: "nowrap",
     }}>
-      {dot && <span style={{ width: 5, height: 5, borderRadius: "50%", background: dot }} />}
+      {dot && <span style={{ width: 5, height: 5, borderRadius: "50%", background: dot, flexShrink: 0 }} />}
       {label}
     </span>
   );
 }
 
-function StatusChip({ status }: StatusChipProps) {
+function StatusBadge({ status }: { status: string }) {
   return status === "resolved"
-    ? <Chip label="✓ Resolved" bg="#f0fdf4" color="#15803d" />
-    : <Chip label="⏳ Pending"  bg="#fffbeb" color="#d97706" />;
-}
-
-function LoadingSpinner() {
-  return (
-    <div style={{
-      flex: 1, display: "flex", alignItems: "center",
-      justifyContent: "center", flexDirection: "column", gap: 12,
-      color: "#94a3b8",
-    }}>
-      <div style={{
-        width: 32, height: 32, border: "3px solid #e2e8f0",
-        borderTopColor: "#6366f1", borderRadius: "50%",
-        animation: "spin 0.8s linear infinite",
-      }} />
-      <span style={{ fontSize: 13, fontWeight: 500 }}>Loading queries…</span>
-    </div>
-  );
+    ? <Badge label="Resolved" bg="#f0fdf4" color="#16a34a" dot="#4ade80" />
+    : <Badge label="Pending"  bg="#fffbeb" color="#d97706" dot="#fbbf24" />;
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AdminQueriesView() {
-  const [queries,   setQueries]   = useState<EmployeeQuery[]>([]);
-  const [loading,   setLoading]   = useState<boolean>(true);
-  const [error,     setError]     = useState<string | null>(null);
-  const [filter,    setFilter]    = useState<string>("all");
-  const [search,    setSearch]    = useState<string>("");
-  const [selected,  setSelected]  = useState<EmployeeQuery | null>(null);
-  const [replyText, setReplyText] = useState<string>("");
-  const [assignTo,  setAssignTo]  = useState<string>("");
-  const [sending,   setSending]   = useState<boolean>(false);
+  const [queries,        setQueries]        = useState<EmployeeQuery[]>([]);
+  const [loading,        setLoading]        = useState(true);
+  const [error,          setError]          = useState<string | null>(null);
+  const [statusFilter,   setStatusFilter]   = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [search,         setSearch]         = useState("");
+  const [page,           setPage]           = useState(1);
+  const [pageSize,       setPageSize]       = useState(10);
+  const [drawer,         setDrawer]         = useState<EmployeeQuery | null>(null);
+  const [replyText,      setReplyText]      = useState("");
+  const [assignTo,       setAssignTo]       = useState("Unassigned");
+  const [sending,        setSending]        = useState(false);
+  const [deleteConfirm,  setDeleteConfirm]  = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // ── Firestore real-time listener ────────────────────────────────────────────
+  // ── Firestore ────────────────────────────────────────────────────────────────
   useEffect(() => {
-    const q = query(
-      collection(db, "employeeQueries"),
-      orderBy("createdAt", "desc"),
-    );
-
+    const q = query(collection(db, "employeeQueries"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(
       q,
-      (snapshot) => {
-        const data: EmployeeQuery[] = snapshot.docs.map((d) => ({
+      (snap) => {
+        const data: EmployeeQuery[] = snap.docs.map((d) => ({
           id: d.id,
           ...(d.data() as Omit<EmployeeQuery, "id">),
         }));
         setQueries(data);
         setLoading(false);
-        setSelected((prev) =>
-          prev ? data.find((item) => item.id === prev.id) ?? prev : null,
-        );
+        setDrawer((prev) => prev ? (data.find((x) => x.id === prev.id) ?? prev) : null);
       },
       (err) => {
-        console.error("Firestore error:", err);
-        setError("Failed to load queries. Check your Firestore rules.");
+        console.error(err);
+        setError("Failed to load queries. Check Firestore rules.");
         setLoading(false);
       },
     );
-
     return () => unsub();
   }, []);
 
-  // Auto-scroll chat to bottom when replies update
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [selected?.replies?.length]);
+  }, [drawer?.replies?.length]);
 
-  // ── Actions ─────────────────────────────────────────────────────────────────
-
-  const handleSelectQuery = async (item: EmployeeQuery): Promise<void> => {
-    setSelected(item);
+  // ── Actions ──────────────────────────────────────────────────────────────────
+  const openDrawer = async (item: EmployeeQuery) => {
+    setDrawer(item);
     setReplyText("");
+    setDeleteConfirm(null);
+    setAssignTo(item.assignedTo || "Unassigned");
     if (item.adminUnread) {
-      try {
-        await updateDoc(doc(db, "employeeQueries", item.id), {
-          adminUnread: false,
-        });
-      } catch (e) {
-        console.error("markRead error:", e);
-      }
+      await updateDoc(doc(db, "employeeQueries", item.id), { adminUnread: false }).catch(console.error);
     }
   };
 
-  const handleSendReply = async (): Promise<void> => {
-    if (!replyText.trim() || !selected || sending) return;
+  const closeDrawer = () => { setDrawer(null); setReplyText(""); setDeleteConfirm(null); };
+
+  const handleDelete = async (id: string) => {
+    if (deleteConfirm !== id) {
+      setDeleteConfirm(id);
+      return;
+    }
+    try {
+      await deleteDoc(doc(db, "employeeQueries", id));
+      if (drawer?.id === id) closeDrawer();
+      setDeleteConfirm(null);
+    } catch (e) {
+      console.error(e);
+      alert("Failed to delete query.");
+    }
+  };
+
+  const handleSendReply = async () => {
+    if (!replyText.trim() || !drawer || sending) return;
     setSending(true);
     try {
-      const newReply: Reply = {
-        author:     "Admin",
-        text:       replyText.trim(),
-        time:       Date.now(),
-        assignedTo: assignTo || "Unassigned",
-      };
-      const updatedReplies: Reply[] = [...(selected.replies ?? []), newReply];
-      await updateDoc(doc(db, "employeeQueries", selected.id), {
-        replies:        updatedReplies,
-        adminReply:     replyText.trim(),
-        status:         "resolved",
-        adminUnread:    false,
+      const newReply: Reply = { author: "Admin", text: replyText.trim(), time: Date.now(), assignedTo: assignTo };
+      const updatedReplies = [...(drawer.replies ?? []), newReply];
+      await updateDoc(doc(db, "employeeQueries", drawer.id), {
+        replies: updatedReplies,
+        adminReply: replyText.trim(),
+        status: "resolved",
+        adminUnread: false,
         employeeUnread: true,
-        repliedAt:      serverTimestamp(),
-        assignedTo:     assignTo || null,
+        repliedAt: serverTimestamp(),
+        assignedTo: assignTo || null,
       });
       setReplyText("");
     } catch (e) {
-      console.error("Reply error:", e);
-      alert("Failed to send reply. Check Firestore permissions.");
+      console.error(e);
+      alert("Failed to send reply.");
     } finally {
       setSending(false);
     }
   };
 
-  const handleChangePriority = async (priority: string): Promise<void> => {
-    if (!selected) return;
-    try {
-      await updateDoc(doc(db, "employeeQueries", selected.id), { priority });
-    } catch (e) {
-      console.error("Priority update error:", e);
-    }
+  const handleChangePriority = async (priority: string) => {
+    if (!drawer) return;
+    await updateDoc(doc(db, "employeeQueries", drawer.id), { priority }).catch(console.error);
   };
 
-  const handleReopenQuery = async (): Promise<void> => {
-    if (!selected) return;
-    try {
-      await updateDoc(doc(db, "employeeQueries", selected.id), {
-        status: "pending",
-      });
-    } catch (e) {
-      console.error("Reopen error:", e);
-    }
+  const handleReopen = async () => {
+    if (!drawer) return;
+    await updateDoc(doc(db, "employeeQueries", drawer.id), { status: "pending" }).catch(console.error);
   };
 
-  // ── Derived data ─────────────────────────────────────────────────────────────
-
+  // ── Derived ──────────────────────────────────────────────────────────────────
   const total    = queries.length;
   const pending  = queries.filter((q) => q.status !== "resolved").length;
   const resolved = queries.filter((q) => q.status === "resolved").length;
   const unread   = queries.filter((q) => q.adminUnread).length;
+  const categories = Array.from(new Set(queries.map((q) => q.category).filter(Boolean)));
 
   const filtered = queries.filter((q) => {
-    const matchFilter =
-      filter === "all" ||
-      (filter === "pending"  && q.status !== "resolved") ||
-      (filter === "resolved" && q.status === "resolved");
+    if (statusFilter === "pending"  && q.status === "resolved")      return false;
+    if (statusFilter === "resolved" && q.status !== "resolved")      return false;
+    if (priorityFilter !== "all"   && q.priority !== priorityFilter) return false;
+    if (categoryFilter !== "all"   && q.category !== categoryFilter) return false;
     const s = search.toLowerCase();
-    const matchSearch =
-      !s ||
-      (q.employeeName  || "").toLowerCase().includes(s) ||
-      (q.subject       || "").toLowerCase().includes(s) ||
-      (q.message       || "").toLowerCase().includes(s) ||
-      (q.department    || "").toLowerCase().includes(s);
-    return matchFilter && matchSearch;
+    if (s && ![q.employeeName, q.subject, q.message, q.department, q.employeeEmail]
+      .some((f) => (f || "").toLowerCase().includes(s))) return false;
+    return true;
   });
 
-  // ── Render ───────────────────────────────────────────────────────────────────
+  const totalPages = Math.ceil(filtered.length / pageSize) || 1;
+  const paginated  = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const resetPage  = () => setPage(1);
 
+  // ─────────────────────────────────────────────────────────────────────────────
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&display=swap');
-        * { box-sizing: border-box; }
-        .adq-root { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif; background: #f4f6fb; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes slideIn { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: translateX(0); } }
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-        .adq-slide  { animation: slideIn 0.2s ease; }
-        .adq-fadeup { animation: fadeUp  0.18s ease; }
-        .adq-topbar { background: #fff; border-bottom: 1px solid #e8ecf3; padding: 0 24px; height: 54px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
-        .adq-logo { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg,#6366f1,#8b5cf6); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 15px; flex-shrink: 0; }
-        .adq-topbar-title { font-size: 15px; font-weight: 800; color: #0f172a; letter-spacing: -0.4px; }
-        .adq-topbar-sep { width: 1px; height: 18px; background: #e2e8f0; }
-        .adq-topbar-sub { font-size: 13px; color: #64748b; font-weight: 500; }
-        .adq-unread-badge { background: #ef4444; color: #fff; font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 20px; margin-left: auto; }
-        .adq-admin-av { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg,#6366f1,#8b5cf6); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; }
-        .adq-stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; padding: 16px 24px 0; flex-shrink: 0; }
-        .adq-stat-card { background: #fff; border: 1px solid #e8ecf3; border-radius: 14px; padding: 18px 20px; display: flex; align-items: center; gap: 14px; min-width: 0; }
-        .adq-stat-icon { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .adq-stat-val { font-size: 28px; font-weight: 700; color: #0f172a; line-height: 1; letter-spacing: -1px; }
-        .adq-stat-lbl { font-size: 12px; color: #64748b; font-weight: 400; margin-top: 4px; }
-        .adq-main { display: flex; gap: 0; flex: 1; min-height: 0; margin: 16px 24px 24px; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #e8ecf3; }
-        .adq-left { width: 380px; flex-shrink: 0; display: flex; flex-direction: column; background: #fff; border-right: 1px solid #f1f5f9; }
-        .adq-left-head { padding: 14px 14px 10px; border-bottom: 1px solid #f1f5f9; flex-shrink: 0; }
-        .adq-search-wrap { position: relative; margin-bottom: 10px; }
-        .adq-search { width: 100%; padding: 8px 12px 8px 34px; border: 1.5px solid #e8ecf3; border-radius: 10px; font-size: 12px; font-family: inherit; font-weight: 500; color: #1e293b; background: #f8fafc; outline: none; transition: border-color 0.15s; }
-        .adq-search:focus { border-color: #6366f1; background: #fff; box-shadow: 0 0 0 3px rgba(99,102,241,0.09); }
-        .adq-search::placeholder { color: #cbd5e1; }
-        .adq-search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 13px; pointer-events: none; }
-        .adq-filters { display: flex; gap: 3px; background: #f1f5f9; padding: 3px; border-radius: 9px; }
-        .adq-filter-btn { flex: 1; font-size: 11px; font-weight: 700; padding: 5px 8px; border-radius: 7px; border: none; cursor: pointer; background: transparent; color: #64748b; font-family: inherit; transition: all 0.13s; white-space: nowrap; }
-        .adq-filter-btn.on { background: #0f172a; color: #fff; }
-        .adq-filter-btn:not(.on):hover { background: #e2e8f0; color: #334155; }
-        .adq-qlist { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
-        .adq-qlist::-webkit-scrollbar { width: 4px; }
-        .adq-qlist::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 6px; }
-        .adq-qcard { padding: 12px; border-radius: 10px; border: 1px solid #e8ecf3; cursor: pointer; transition: all 0.13s; position: relative; background: #fff; }
-        .adq-qcard:hover { background: #f8faff; border-color: #dde6f7; }
-        .adq-qcard.active { background: #eff0ff; border-color: #a5b4fc; box-shadow: 0 0 0 1px #a5b4fc; }
-        .adq-unread-bar { position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 55%; background: #6366f1; border-radius: 0 3px 3px 0; }
-        .adq-qcard-row { display: flex; gap: 10px; align-items: flex-start; }
-        .adq-qcard-body { flex: 1; min-width: 0; }
-        .adq-qcard-nameline { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1px; }
-        .adq-qcard-name { font-size: 12px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 5px; }
-        .adq-qcard-time { font-size: 10px; color: #94a3b8; font-weight: 500; flex-shrink: 0; }
-        .adq-qcard-email { font-size: 11px; color: #94a3b8; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .adq-qcard-subj { font-size: 12px; font-weight: 600; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
-        .adq-qcard-msg { font-size: 11px; color: #64748b; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.5; }
-        .adq-qcard-chips { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
-        .adq-unread-dot { width: 6px; height: 6px; border-radius: 50%; background: #6366f1; flex-shrink: 0; }
-        .adq-right { flex: 1; display: flex; flex-direction: column; background: #fff; min-width: 0; }
-        .adq-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #94a3b8; }
-        .adq-empty-icon { font-size: 44px; }
-        .adq-det-head { padding: 16px 20px; border-bottom: 1px solid #f1f5f9; flex-shrink: 0; }
-        .adq-det-top { display: flex; align-items: flex-start; gap: 12px; }
-        .adq-det-meta { flex: 1; min-width: 0; }
-        .adq-det-subj { font-size: 15px; font-weight: 800; color: #0f172a; letter-spacing: -0.3px; margin-bottom: 3px; }
-        .adq-det-info { font-size: 12px; color: #64748b; }
-        .adq-det-chips { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
-        .adq-close-btn { font-size: 12px; font-weight: 600; padding: 6px 12px; border: 1.5px solid #e2e8f0; border-radius: 9px; background: transparent; cursor: pointer; color: #64748b; font-family: inherit; flex-shrink: 0; transition: all 0.13s; }
-        .adq-close-btn:hover { background: #f1f5f9; }
-        .adq-chat { flex: 1; overflow-y: auto; padding: 18px 20px; display: flex; flex-direction: column; gap: 16px; }
-        .adq-chat::-webkit-scrollbar { width: 4px; }
-        .adq-chat::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 6px; }
-        .adq-msg-row { display: flex; gap: 10px; align-items: flex-start; }
-        .adq-msg-row.admin-row { flex-direction: row-reverse; }
-        .adq-msg-av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
-        .adq-msg-content { max-width: 72%; }
-        .adq-msg-sender { font-size: 11px; color: #94a3b8; font-weight: 600; margin-bottom: 4px; }
-        .adq-msg-row.admin-row .adq-msg-sender { text-align: right; }
-        .adq-bubble { padding: 12px 14px; font-size: 13px; line-height: 1.7; font-weight: 400; word-break: break-word; }
-        .adq-bubble.emp { background: #f8fafc; border: 1.5px solid #e8ecf3; border-radius: 4px 14px 14px 14px; color: #334155; }
-        .adq-bubble.adm { background: #6366f1; border-radius: 14px 4px 14px 14px; color: #fff; }
-        .adq-reply-footer { border-top: 1px solid #f1f5f9; padding: 14px 20px; background: #fafbfc; flex-shrink: 0; }
-        .adq-reply-controls { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
-        .adq-mini-label { font-size: 11px; color: #64748b; font-weight: 600; }
-        .adq-mini-select { font-size: 12px; font-weight: 500; padding: 5px 10px; border: 1.5px solid #e2e8f0; border-radius: 8px; background: #fff; color: #475569; cursor: pointer; outline: none; font-family: inherit; }
-        .adq-mini-select:focus { border-color: #6366f1; }
-        .adq-textarea { width: 100%; padding: 11px 14px; font-size: 13px; font-family: inherit; font-weight: 400; border: 1.5px solid #e2e8f0; border-radius: 12px; background: #fff; color: #1e293b; resize: none; outline: none; line-height: 1.6; transition: border-color 0.15s; }
-        .adq-textarea:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.09); }
-        .adq-textarea::placeholder { color: #cbd5e1; }
-        .adq-reply-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
-        .adq-send-btn { font-size: 13px; font-weight: 700; padding: 8px 20px; background: #6366f1; color: #fff; border: none; border-radius: 10px; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 6px; transition: background 0.13s; }
-        .adq-send-btn:hover:not(:disabled) { background: #4f46e5; }
-        .adq-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        .adq-cancel-btn { font-size: 12px; font-weight: 600; padding: 7px 14px; border: 1.5px solid #e2e8f0; border-radius: 9px; background: transparent; cursor: pointer; color: #64748b; font-family: inherit; transition: all 0.13s; }
-        .adq-cancel-btn:hover { background: #f1f5f9; }
-        .adq-reopen-btn { font-size: 11px; font-weight: 700; padding: 6px 13px; border: 1.5px solid #e2e8f0; border-radius: 8px; background: #f8fafc; cursor: pointer; color: #64748b; font-family: inherit; }
-        .adq-reopen-btn:hover { background: #f1f5f9; }
-        .adq-resolved-bar { padding: 12px 20px; background: #f0fdf4; border-top: 1px solid #bbf7d0; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-        .adq-resolved-text { font-size: 12px; color: #15803d; font-weight: 600; }
-        .adq-error { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 10px; color: #ef4444; padding: 20px; text-align: center; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+        .q-wrap *, .q-wrap *::before, .q-wrap *::after {
+          box-sizing: border-box;
+        }
+
+        .q-wrap {
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+          background: #ffffff;
+          width: 100%;
+          color: #1a202c;
+          padding: 24px 24px 48px;
+          min-height: 100vh;
+        }
+
+        /* ── TITLE ROW ── */
+        .q-title-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 20px;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+        .q-title {
+          font-size: 18px;
+          font-weight: 600;
+          color: #1a202c;
+          letter-spacing: -0.2px;
+          line-height: 1;
+        }
+        .q-counts {
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+        .q-chip {
+          font-size: 12px;
+          font-weight: 500;
+          padding: 4px 12px;
+          border-radius: 6px;
+          border: 1px solid transparent;
+          white-space: nowrap;
+        }
+
+        /* ── FILTER ROW ── */
+        .q-filters {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+          flex-wrap: wrap;
+          margin-bottom: 0px;
+        }
+        .q-search-wrap {
+          position: relative;
+          flex: 1;
+          min-width: 160px;
+          max-width: 260px;
+        }
+        .q-search-icon {
+          position: absolute;
+          left: 11px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: #a0aec0;
+          pointer-events: none;
+        }
+        .q-search {
+          width: 100%;
+          padding: 8px 12px 8px 33px;
+          border: 1.5px solid #e2e8f0;
+          border-radius: 8px;
+          font-size: 13px;
+          font-family: 'Inter', sans-serif;
+          font-weight: 400;
+          color: #2d3748;
+          background: #fff;
+          outline: none;
+          transition: border-color 0.13s;
+        }
+        .q-search:focus { border-color: #3182ce; }
+        .q-search::placeholder { color: #a0aec0; }
+
+        /* Status pill buttons — exactly like screenshot */
+        .q-tabs {
+          display: flex;
+          gap: 4px;
+        }
+        .q-tab {
+          padding: 6px 14px;
+          border-radius: 20px;
+          border: 1.5px solid #e2e8f0;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 500;
+          font-family: 'Inter', sans-serif;
+          color: #718096;
+          background: #fff;
+          transition: all 0.13s;
+          white-space: nowrap;
+        }
+        .q-tab.on {
+          background: #2d3748;
+          color: #fff;
+          border-color: #2d3748;
+          font-weight: 500;
+        }
+        .q-tab:not(.on):hover { border-color: #cbd5e0; color: #4a5568; }
+
+        .q-sel {
+          padding: 7px 12px;
+          border: 1.5px solid #e2e8f0;
+          border-radius: 8px;
+          font-size: 13px;
+          font-family: 'Inter', sans-serif;
+          font-weight: 400;
+          color: #4a5568;
+          background: #fff;
+          outline: none;
+          cursor: pointer;
+          transition: border-color 0.13s;
+        }
+        .q-sel:focus { border-color: #3182ce; }
+
+        /* ── TABLE CARD ── */
+        .q-card {
+          background: #fff;
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          overflow: hidden;
+          margin-top: 16px;
+        }
+        .q-tscroll { overflow-x: auto; }
+        .q-table {
+          width: 100%;
+          border-collapse: collapse;
+          min-width: 780px;
+        }
+        .q-thead { background: #fff; border-bottom: 1.5px solid #edf2f7; }
+        .q-th {
+          padding: 12px 16px;
+          font-size: 12px;
+          font-weight: 500;
+          color: #a0aec0;
+          text-align: left;
+          white-space: nowrap;
+          letter-spacing: 0px;
+        }
+        .q-th:first-child { padding-left: 20px; }
+
+        .q-tr {
+          border-bottom: 1px solid #f7fafc;
+          cursor: pointer;
+          transition: background 0.1s;
+        }
+        .q-tr:last-child { border-bottom: none; }
+        .q-tr:hover { background: #f7fafc; }
+        .q-tr.unread { border-left: 3px solid #4299e1; background: #ebf8ff; }
+        .q-tr.active { background: #ebf8ff; }
+
+        .q-td {
+          padding: 14px 16px;
+          vertical-align: middle;
+        }
+        .q-td:first-child { padding-left: 20px; }
+
+        .q-emp-cell { display: flex; align-items: center; gap: 10px; }
+        .q-emp-name {
+          font-size: 13.5px;
+          font-weight: 500;
+          color: #2d3748;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          line-height: 1.3;
+        }
+        .q-emp-dept {
+          font-size: 12px;
+          font-weight: 400;
+          color: #a0aec0;
+          margin-top: 1px;
+        }
+        .q-unread-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: #4299e1;
+          flex-shrink: 0;
+        }
+        .q-subj {
+          font-size: 13.5px;
+          font-weight: 500;
+          color: #2d3748;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 240px;
+        }
+        .q-preview {
+          font-size: 12px;
+          font-weight: 400;
+          color: #a0aec0;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 240px;
+          margin-top: 2px;
+        }
+        .q-reply-count {
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          font-size: 13px;
+          font-weight: 400;
+          color: #a0aec0;
+        }
+        .q-time-txt {
+          font-size: 13px;
+          font-weight: 400;
+          color: #a0aec0;
+          white-space: nowrap;
+        }
+        .q-assigned-txt {
+          font-size: 13px;
+          font-weight: 400;
+          color: #4a5568;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 140px;
+        }
+
+        /* Delete button in table row */
+        .q-del-btn {
+          width: 28px; height: 28px;
+          border-radius: 6px;
+          border: 1px solid transparent;
+          background: transparent;
+          cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          color: #cbd5e0;
+          transition: all 0.13s;
+          flex-shrink: 0;
+        }
+        .q-del-btn:hover { color: #e53e3e; border-color: #fed7d7; background: #fff5f5; }
+        .q-del-btn.confirm { color: #e53e3e; border-color: #fc8181; background: #fff5f5; }
+
+        /* ── EMPTY / LOADING ── */
+        .q-empty {
+          text-align: center;
+          padding: 60px 20px;
+          color: #a0aec0;
+        }
+        .q-empty-title {
+          font-size: 14px;
+          font-weight: 500;
+          color: #718096;
+          margin-bottom: 5px;
+        }
+        .q-empty-sub { font-size: 13px; font-weight: 400; color: #a0aec0; }
+        .q-spinner {
+          width: 26px; height: 26px;
+          border: 2px solid #e2e8f0;
+          border-top-color: #4299e1;
+          border-radius: 50%;
+          animation: qspin 0.8s linear infinite;
+          margin: 60px auto;
+        }
+        @keyframes qspin { to { transform: rotate(360deg); } }
+
+        /* ── PAGINATION ── */
+        .q-pager {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 12px 20px;
+          border-top: 1px solid #edf2f7;
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+        .q-pager-info {
+          font-size: 13px;
+          font-weight: 400;
+          color: #a0aec0;
+        }
+        .q-pager-right { display: flex; align-items: center; gap: 6px; }
+        .q-pager-sel {
+          font-size: 13px;
+          padding: 5px 8px;
+          border: 1.5px solid #e2e8f0;
+          border-radius: 6px;
+          font-family: 'Inter', sans-serif;
+          font-weight: 400;
+          color: #4a5568;
+          background: #fff;
+          outline: none;
+          cursor: pointer;
+        }
+        .q-pager-num {
+          font-size: 13px;
+          font-weight: 400;
+          color: #718096;
+          padding: 0 8px;
+        }
+        .q-pager-btn {
+          width: 30px; height: 30px;
+          border-radius: 6px;
+          border: 1.5px solid #e2e8f0;
+          background: #fff;
+          cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          color: #a0aec0;
+          transition: all 0.12s;
+        }
+        .q-pager-btn:hover:not(:disabled) { border-color: #4299e1; color: #4299e1; }
+        .q-pager-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        /* ── DRAWER OVERLAY ── */
+        .q-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.18);
+          z-index: 9998;
+          animation: qfade 0.16s ease;
+        }
+        @keyframes qfade { from { opacity: 0; } to { opacity: 1; } }
+
+        /* ── DRAWER ── */
+        .q-drawer {
+          position: fixed;
+          top: 0; right: 0; bottom: 0;
+          width: min(680px, 96vw);
+          background: #fff;
+          box-shadow: -4px 0 24px rgba(0,0,0,0.08);
+          display: flex; flex-direction: column;
+          z-index: 9999;
+          animation: qdraw 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+          overflow: hidden;
+        }
+        @keyframes qdraw { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+        /* Drawer header */
+        .q-dhead {
+          padding: 20px 22px 16px;
+          border-bottom: 1px solid #edf2f7;
+          flex-shrink: 0;
+        }
+        .q-dhead-top {
+          display: flex; align-items: flex-start; gap: 12px;
+          margin-bottom: 10px;
+        }
+        .q-dhead-meta { flex: 1; min-width: 0; }
+        .q-dhead-subj {
+          font-size: 15px;
+          font-weight: 600;
+          color: #1a202c;
+          margin-bottom: 3px;
+          line-height: 1.3;
+        }
+        .q-dhead-info {
+          font-size: 12.5px;
+          font-weight: 400;
+          color: #a0aec0;
+          line-height: 1.5;
+        }
+        .q-dhead-info strong { font-weight: 500; color: #718096; }
+        .q-dhead-badges {
+          display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+        }
+        .q-dclose {
+          width: 30px; height: 30px;
+          border-radius: 6px;
+          border: 1.5px solid #e2e8f0;
+          background: transparent;
+          cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          color: #a0aec0; flex-shrink: 0;
+          transition: all 0.12s;
+        }
+        .q-dclose:hover { border-color: #cbd5e0; color: #718096; }
+
+        /* Delete in drawer header */
+        .q-ddel-btn {
+          width: 30px; height: 30px;
+          border-radius: 6px;
+          border: 1.5px solid #fed7d7;
+          background: #fff5f5;
+          cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          color: #fc8181; flex-shrink: 0;
+          transition: all 0.12s;
+        }
+        .q-ddel-btn:hover { background: #fed7d7; color: #e53e3e; }
+
+        /* Delete confirm banner */
+        .q-del-confirm {
+          margin: 0 22px 12px;
+          padding: 10px 14px;
+          background: #fff5f5;
+          border: 1px solid #fed7d7;
+          border-radius: 8px;
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 10px;
+        }
+        .q-del-confirm-txt {
+          font-size: 13px;
+          font-weight: 400;
+          color: #c53030;
+        }
+        .q-del-confirm-btns { display: flex; gap: 6px; }
+        .q-del-yes {
+          padding: 5px 12px;
+          background: #e53e3e; color: #fff;
+          border: none; border-radius: 6px;
+          font-size: 12.5px; font-weight: 500;
+          font-family: 'Inter', sans-serif;
+          cursor: pointer; transition: background 0.12s;
+        }
+        .q-del-yes:hover { background: #c53030; }
+        .q-del-no {
+          padding: 5px 12px;
+          background: transparent; color: #718096;
+          border: 1.5px solid #e2e8f0; border-radius: 6px;
+          font-size: 12.5px; font-weight: 400;
+          font-family: 'Inter', sans-serif;
+          cursor: pointer; transition: all 0.12s;
+        }
+        .q-del-no:hover { border-color: #cbd5e0; color: #4a5568; }
+
+        /* Chat */
+        .q-chat {
+          flex: 1; overflow-y: auto;
+          padding: 20px 22px;
+          display: flex; flex-direction: column; gap: 18px;
+        }
+        .q-chat::-webkit-scrollbar { width: 4px; }
+        .q-chat::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 6px; }
+        .q-msg { display: flex; gap: 10px; align-items: flex-start; }
+        .q-msg.adm { flex-direction: row-reverse; }
+        .q-msg-av {
+          width: 30px; height: 30px; border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 11px; font-weight: 600; flex-shrink: 0;
+        }
+        .q-msg-body { max-width: 78%; }
+        .q-msg-who {
+          font-size: 11.5px; font-weight: 400; color: #a0aec0;
+          margin-bottom: 5px;
+        }
+        .q-msg.adm .q-msg-who { text-align: right; }
+        .q-bubble {
+          padding: 10px 14px; font-size: 13.5px;
+          font-weight: 400; line-height: 1.65;
+          word-break: break-word;
+          font-family: 'Inter', sans-serif;
+        }
+        .q-bubble.emp {
+          background: #f7fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 4px 12px 12px 12px;
+          color: #4a5568;
+        }
+        .q-bubble.adm {
+          background: #2d3748;
+          border-radius: 12px 4px 12px 12px;
+          color: #e2e8f0;
+        }
+
+        /* Drawer footer */
+        .q-dfooter {
+          border-top: 1px solid #edf2f7;
+          padding: 14px 22px;
+          flex-shrink: 0;
+          background: #f7fafc;
+        }
+        .q-dfooter-controls {
+          display: flex; gap: 8px; align-items: center;
+          flex-wrap: wrap; margin-bottom: 10px;
+        }
+        .q-flabel {
+          font-size: 11px; font-weight: 500; color: #a0aec0;
+          text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .q-fsel {
+          padding: 5px 10px;
+          border: 1.5px solid #e2e8f0; border-radius: 6px;
+          font-size: 12.5px; font-family: 'Inter', sans-serif;
+          font-weight: 400; color: #4a5568; background: #fff;
+          outline: none; cursor: pointer;
+        }
+        .q-fsel:focus { border-color: #4299e1; }
+        .q-textarea {
+          width: 100%; padding: 10px 13px;
+          font-size: 13.5px; font-family: 'Inter', sans-serif;
+          font-weight: 400; border: 1.5px solid #e2e8f0;
+          border-radius: 8px; background: #fff; color: #2d3748;
+          resize: none; outline: none; line-height: 1.6;
+          transition: border-color 0.13s;
+        }
+        .q-textarea:focus { border-color: #4299e1; }
+        .q-textarea::placeholder { color: #cbd5e0; }
+        .q-footer-row {
+          display: flex; justify-content: space-between;
+          align-items: center; margin-top: 10px;
+        }
+        .q-send-btn {
+          display: flex; align-items: center; gap: 7px;
+          padding: 8px 18px; background: #2d3748; color: #fff;
+          border: none; border-radius: 8px;
+          font-size: 13px; font-weight: 500;
+          font-family: 'Inter', sans-serif; cursor: pointer;
+          transition: background 0.12s;
+        }
+        .q-send-btn:hover:not(:disabled) { background: #1a202c; }
+        .q-send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+        .q-ghost-btn {
+          padding: 7px 14px;
+          border: 1.5px solid #e2e8f0; border-radius: 8px;
+          background: transparent; font-size: 13px; font-weight: 400;
+          font-family: 'Inter', sans-serif; color: #a0aec0;
+          cursor: pointer; transition: all 0.12s;
+          display: flex; align-items: center; gap: 5px;
+        }
+        .q-ghost-btn:hover { background: #f7fafc; border-color: #cbd5e0; color: #4a5568; }
+
+        /* Resolved bar */
+        .q-resolved-bar {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 14px 22px; background: #f0fff4;
+          border-top: 1px solid #9ae6b4; flex-shrink: 0;
+        }
+        .q-resolved-txt {
+          font-size: 13px; font-weight: 500; color: #276749;
+          display: flex; align-items: center; gap: 6px;
+        }
+
+        /* View full message area in drawer */
+        .q-orig-msg {
+          background: #f7fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 8px;
+          padding: 12px 14px;
+          font-size: 13.5px;
+          font-weight: 400;
+          color: #4a5568;
+          line-height: 1.65;
+          white-space: pre-wrap;
+          word-break: break-word;
+        }
       `}</style>
 
-      <div className="adq-root">
+      <div className="q-wrap">
 
-        {/* ── TOP BAR ─────────────────────────────────────────────────────── */}
-        <div className="adq-topbar">
-          <div className="adq-logo">💬</div>
-          <span className="adq-topbar-title">HelpDesk</span>
-          <div className="adq-topbar-sep" />
-          <span className="adq-topbar-sub">Admin Console</span>
-          {unread > 0 && (
-            <div className="adq-unread-badge">{unread} unread</div>
-          )}
-          <div className="adq-admin-av" style={{ marginLeft: unread > 0 ? 0 : "auto" }}>A</div>
-        </div>
-
-        {/* ── STAT CARDS ──────────────────────────────────────────────────── */}
-        <div className="adq-stats">
-          {([
-            { icon: <FileText    size={22} color="#534ab7" />, bg: "#eeedfe", label: "Total Queries", value: total    },
-            { icon: <Clock       size={22} color="#854f0b" />, bg: "#faeeda", label: "Pending",        value: pending  },
-            { icon: <CheckCircle size={22} color="#3b6d11" />, bg: "#eaf3de", label: "Resolved",       value: resolved },
-            { icon: <Bell        size={22} color="#854f0b" />, bg: "#faeeda", label: "Unread",         value: unread   },
-          ] as const).map(({ icon, label, value, bg }) => (
-            <div className="adq-stat-card" key={label}>
-              <div className="adq-stat-icon" style={{ background: bg }}>{icon}</div>
-              <div>
-                <div className="adq-stat-val">{value}</div>
-                <div className="adq-stat-lbl">{label}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* ── MAIN SPLIT PANEL ────────────────────────────────────────────── */}
-        <div className="adq-main">
-
-          {/* ── LEFT: QUERY LIST ──────────────────────────────────────────── */}
-          <div className="adq-left">
-            <div className="adq-left-head">
-              <div className="adq-search-wrap">
-                <span className="adq-search-icon">🔍</span>
-                <input
-                  className="adq-search"
-                  placeholder="Search name, subject, department…"
-                  value={search}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
-                />
-              </div>
-              <div className="adq-filters">
-                {([
-                  ["all",      `All (${total})`],
-                  ["pending",  `Pending (${pending})`],
-                  ["resolved", `Resolved (${resolved})`],
-                ] as [string, string][]).map(([f, label]) => (
-                  <button
-                    key={f}
-                    className={`adq-filter-btn${filter === f ? " on" : ""}`}
-                    onClick={() => setFilter(f)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="adq-qlist">
-              {loading ? (
-                <LoadingSpinner />
-              ) : error ? (
-                <div className="adq-error">
-                  <span style={{ fontSize: 28 }}>⚠️</span>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{error}</div>
-                </div>
-              ) : filtered.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "50px 16px", color: "#94a3b8" }}>
-                  <div style={{ fontSize: 36, marginBottom: 10 }}>📭</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#475569", marginBottom: 4 }}>No queries found</div>
-                  <div style={{ fontSize: 12 }}>
-                    {search ? "Try a different search term" : "Nothing here yet"}
-                  </div>
-                </div>
-              ) : (
-                filtered.map((q) => {
-                  const pc       = PRIORITY_CONFIG[q.priority] ?? PRIORITY_CONFIG["medium"];
-                  const cc       = CATEGORY_CONFIG[q.category] ?? { bg: "#f1f5f9", color: "#64748b" };
-                  const isActive = selected?.id === q.id;
-                  return (
-                    <div
-                      key={q.id}
-                      className={`adq-qcard${isActive ? " active" : ""}`}
-                      style={{ borderLeft: q.adminUnread ? "3px solid #6366f1" : "3px solid transparent" }}
-                      onClick={() => handleSelectQuery(q)}
-                    >
-                      {q.adminUnread && <div className="adq-unread-bar" />}
-                      <div className="adq-qcard-row">
-                        <Avatar name={q.employeeName || ""} size={34} />
-                        <div className="adq-qcard-body">
-                          <div className="adq-qcard-nameline">
-                            <div className="adq-qcard-name">
-                              {q.employeeName || "Unknown"}
-                              {q.adminUnread && <span className="adq-unread-dot" />}
-                            </div>
-                            <span className="adq-qcard-time">{timeAgo(q.createdAt)}</span>
-                          </div>
-                          <div className="adq-qcard-email">
-                            {q.employeeEmail} · {q.department}
-                          </div>
-                          <div className="adq-qcard-subj">{q.subject || "—"}</div>
-                          <div className="adq-qcard-msg">{q.message}</div>
-                          <div className="adq-qcard-chips">
-                            <Chip label={q.category || "General"} bg={cc.bg} color={cc.color} />
-                            <Chip label={pc.label} bg={pc.bg} color={pc.color} dot={pc.dot} border={pc.border} />
-                            <StatusChip status={q.status} />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* ── RIGHT: DETAIL / CHAT ──────────────────────────────────────── */}
-          <div className="adq-right">
-            {!selected ? (
-              <div className="adq-empty">
-                <div className="adq-empty-icon">💬</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#475569" }}>
-                  Select a query
-                </div>
-                <div style={{ fontSize: 13 }}>
-                  Click any query on the left to view and reply
-                </div>
-              </div>
-            ) : (
-              <div className="adq-slide" style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-
-                {/* Detail header */}
-                <div className="adq-det-head">
-                  <div className="adq-det-top">
-                    <Avatar name={selected.employeeName || ""} size={44} />
-                    <div className="adq-det-meta">
-                      <div className="adq-det-subj">{selected.subject}</div>
-                      <div className="adq-det-info">
-                        <strong style={{ color: "#1e293b" }}>{selected.employeeName}</strong>
-                        {" · "}{selected.employeeEmail}{" · "}{selected.department}
-                      </div>
-                      <div className="adq-det-chips">
-                        {(() => {
-                          const pc = PRIORITY_CONFIG[selected.priority] ?? PRIORITY_CONFIG["medium"];
-                          const cc = CATEGORY_CONFIG[selected.category] ?? { bg: "#f1f5f9", color: "#64748b" };
-                          return (
-                            <>
-                              <Chip label={selected.category || "General"} bg={cc.bg} color={cc.color} />
-                              <Chip label={pc.label} bg={pc.bg} color={pc.color} dot={pc.dot} border={pc.border} />
-                              <StatusChip status={selected.status} />
-                              <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500 }}>
-                                🕐 {timeAgo(selected.createdAt)}
-                              </span>
-                              {selected.assignedTo && selected.assignedTo !== "Unassigned" && (
-                                <span style={{ fontSize: 11, color: "#6366f1", fontWeight: 600 }}>
-                                  👤 {selected.assignedTo}
-                                </span>
-                              )}
-                            </>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                    <button className="adq-close-btn" onClick={() => setSelected(null)}>
-                      ✕ Close
-                    </button>
-                  </div>
-                </div>
-
-                {/* Chat thread */}
-                <div className="adq-chat">
-                  {/* Original message */}
-                  <div className="adq-msg-row">
-                    <div
-                      className="adq-msg-av"
-                      style={{
-                        background: getAvatarStyle(selected.employeeName || "").bg,
-                        color:      getAvatarStyle(selected.employeeName || "").color,
-                      }}
-                    >
-                      {getInitials(selected.employeeName || "")}
-                    </div>
-                    <div className="adq-msg-content">
-                      <div className="adq-msg-sender">
-                        {selected.employeeName} · {timeAgo(selected.createdAt)}
-                      </div>
-                      <div className="adq-bubble emp">{selected.message}</div>
-                    </div>
-                  </div>
-
-                  {/* All replies */}
-                  {(selected.replies ?? []).map((r, i) => (
-                    <div
-                      key={i}
-                      className={`adq-msg-row adq-fadeup${r.author === "Admin" ? " admin-row" : ""}`}
-                    >
-                      <div
-                        className="adq-msg-av"
-                        style={{
-                          background: r.author === "Admin" ? "#6366f1" : getAvatarStyle(r.author || "").bg,
-                          color:      r.author === "Admin" ? "#fff"     : getAvatarStyle(r.author || "").color,
-                        }}
-                      >
-                        {r.author === "Admin" ? "A" : getInitials(r.author || "")}
-                      </div>
-                      <div className="adq-msg-content">
-                        <div className="adq-msg-sender">
-                          {r.author === "Admin" ? "You (Admin)" : r.author}
-                          {r.assignedTo && r.assignedTo !== "Unassigned" && (
-                            <span style={{ color: "#6366f1", marginLeft: 6 }}>via {r.assignedTo}</span>
-                          )}
-                          {" · "}{timeAgo(r.time)}
-                        </div>
-                        <div className={`adq-bubble ${r.author === "Admin" ? "adm" : "emp"}`}>
-                          {r.text}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  <div ref={chatEndRef} />
-                </div>
-
-                {/* Reply footer or resolved bar */}
-                {selected.status === "resolved" && (selected.replies ?? []).length > 0 ? (
-                  <div className="adq-resolved-bar">
-                    <span className="adq-resolved-text">✓ This query is resolved</span>
-                    <button className="adq-reopen-btn" onClick={handleReopenQuery}>
-                      Reopen
-                    </button>
-                  </div>
-                ) : (
-                  <div className="adq-reply-footer">
-                    <div className="adq-reply-controls">
-                      <span className="adq-mini-label">Assign to:</span>
-                      <select
-                        className="adq-mini-select"
-                        value={assignTo}
-                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setAssignTo(e.target.value)}
-                      >
-                        {ADMIN_AGENTS.map((a) => (
-                          <option key={a} value={a}>{a}</option>
-                        ))}
-                      </select>
-                      <span className="adq-mini-label" style={{ marginLeft: 6 }}>Priority:</span>
-                      <select
-                        className="adq-mini-select"
-                        value={selected.priority || "medium"}
-                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChangePriority(e.target.value)}
-                      >
-                        {Object.entries(PRIORITY_CONFIG).map(([k, v]) => (
-                          <option key={k} value={k}>{v.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <textarea
-                      className="adq-textarea"
-                      rows={3}
-                      placeholder="Write a reply… (Enter to send, Shift+Enter for new line)"
-                      value={replyText}
-                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setReplyText(e.target.value)}
-                      onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          void handleSendReply();
-                        }
-                      }}
-                    />
-                    <div className="adq-reply-actions">
-                      <button
-                        className="adq-cancel-btn"
-                        onClick={() => { setSelected(null); setReplyText(""); }}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        className="adq-send-btn"
-                        disabled={!replyText.trim() || sending}
-                        onClick={() => void handleSendReply()}
-                      >
-                        {sending ? "Sending…" : "Send Reply ↗"}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+        {/* ── TITLE ROW ── */}
+        {/* <div className="q-title-row">
+          <span className="q-title">Employee Queries</span>
+          <div className="q-counts">
+            <span className="q-chip" style={{ background: "#edf2f7", color: "#4a5568", borderColor: "#e2e8f0" }}>
+              {total} Total
+            </span>
+            <span className="q-chip" style={{ background: "#fefcbf", color: "#975a16", borderColor: "#f6e05e" }}>
+              {pending} Pending
+            </span>
+            <span className="q-chip" style={{ background: "#c6f6d5", color: "#276749", borderColor: "#9ae6b4" }}>
+              {resolved} Resolved
+            </span>
+            {unread > 0 && (
+              <span className="q-chip" style={{ background: "#bee3f8", color: "#2c5282", borderColor: "#90cdf4" }}>
+                {unread} Unread
+              </span>
             )}
           </div>
+        </div> */}
+
+        {/* ── FILTERS ── */}
+        <div className="q-filters">
+          <div className="q-search-wrap">
+            <Search size={13} className="q-search-icon" />
+            <input
+              className="q-search"
+              placeholder="Search queries…"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); resetPage(); }}
+            />
+          </div>
+
+          <div className="q-tabs">
+            {([
+              ["all",      `All (${total})`],
+              ["pending",  `Pending (${pending})`],
+              ["resolved", `Resolved (${resolved})`],
+            ] as [string, string][]).map(([f, label]) => (
+              <button
+                key={f}
+                className={`q-tab${statusFilter === f ? " on" : ""}`}
+                onClick={() => { setStatusFilter(f); resetPage(); }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <select className="q-sel" value={priorityFilter} onChange={(e) => { setPriorityFilter(e.target.value); resetPage(); }}>
+            <option value="all">All Priorities</option>
+            {Object.entries(PRIORITY_CONFIG).map(([k, v]) => (
+              <option key={k} value={k}>{v.label}</option>
+            ))}
+          </select>
+
+          <select className="q-sel" value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); resetPage(); }}>
+            <option value="all">All Categories</option>
+            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
         </div>
+
+        {/* ── TABLE ── */}
+        <div className="q-card">
+          <div className="q-tscroll">
+            <table className="q-table">
+              <thead className="q-thead">
+                <tr>
+                  <th className="q-th">Employee</th>
+                  <th className="q-th">Subject / Preview</th>
+                  <th className="q-th">Category</th>
+                  <th className="q-th">Priority</th>
+                  <th className="q-th">Status</th>
+                  <th className="q-th">Assigned To</th>
+                  <th className="q-th">Replies</th>
+                  <th className="q-th">Time</th>
+                  <th className="q-th"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={9}><div className="q-spinner" /></td></tr>
+                ) : error ? (
+                  <tr><td colSpan={9}>
+                    <div className="q-empty">
+                      <div className="q-empty-title">⚠️ Error loading data</div>
+                      <div className="q-empty-sub">{error}</div>
+                    </div>
+                  </td></tr>
+                ) : paginated.length === 0 ? (
+                  <tr><td colSpan={9}>
+                    <div className="q-empty">
+                      <div className="q-empty-title">No queries found</div>
+                      <div className="q-empty-sub">{search ? "Try a different search term" : "Nothing here yet"}</div>
+                    </div>
+                  </td></tr>
+                ) : paginated.map((q) => {
+                  const pc = PRIORITY_CONFIG[q.priority] ?? PRIORITY_CONFIG["medium"];
+                  const cc = CATEGORY_CONFIG[q.category] ?? CATEGORY_CONFIG["General"];
+                  const isConfirming = deleteConfirm === q.id;
+                  return (
+                    <tr
+                      key={q.id}
+                      className={`q-tr${q.adminUnread ? " unread" : ""}${drawer?.id === q.id ? " active" : ""}`}
+                      onClick={() => openDrawer(q)}
+                    >
+                      <td className="q-td">
+                        <div className="q-emp-cell">
+                          <Avatar name={q.employeeName || ""} size={34} />
+                          <div>
+                            <div className="q-emp-name">
+                              {q.employeeName || "Unknown"}
+                              {q.adminUnread && <span className="q-unread-dot" />}
+                            </div>
+                            <div className="q-emp-dept">{q.department}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="q-td">
+                        <div className="q-subj">{q.subject || "—"}</div>
+                        <div className="q-preview">{q.message}</div>
+                      </td>
+                      <td className="q-td">
+                        <Badge label={q.category || "General"} bg={cc.bg} color={cc.color} />
+                      </td>
+                      <td className="q-td">
+                        <Badge label={pc.label} bg={pc.bg} color={pc.color} dot={pc.dot} />
+                      </td>
+                      <td className="q-td">
+                        <StatusBadge status={q.status} />
+                      </td>
+                      <td className="q-td">
+                        <div className="q-assigned-txt">{q.assignedTo || "Unassigned"}</div>
+                      </td>
+                      <td className="q-td">
+                        <div className="q-reply-count">
+                          <MessageSquare size={12} />
+                          {(q.replies ?? []).length}
+                        </div>
+                      </td>
+                      <td className="q-td">
+                        <div className="q-time-txt">{timeAgo(q.createdAt)}</div>
+                      </td>
+                      <td className="q-td" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          className={`q-del-btn${isConfirming ? " confirm" : ""}`}
+                          title={isConfirming ? "Click again to confirm delete" : "Delete query"}
+                          onClick={(e) => { e.stopPropagation(); void handleDelete(q.id); }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {!loading && !error && filtered.length > 0 && (
+            <div className="q-pager">
+              <span className="q-pager-info">
+                {Math.min((page - 1) * pageSize + 1, filtered.length)}–{Math.min(page * pageSize, filtered.length)} of {filtered.length} queries
+              </span>
+              <div className="q-pager-right">
+                <select
+                  className="q-pager-sel"
+                  value={pageSize}
+                  onChange={(e) => { setPageSize(Number(e.target.value)); resetPage(); }}
+                >
+                  {PAGE_SIZES.map((s) => <option key={s} value={s}>{s} / page</option>)}
+                </select>
+                <button className="q-pager-btn" disabled={page === 1} onClick={() => setPage(1)}>
+                  <ChevronLeft size={12} style={{ marginRight: -4 }} /><ChevronLeft size={12} />
+                </button>
+                <button className="q-pager-btn" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
+                  <ChevronLeft size={14} />
+                </button>
+                <span className="q-pager-num">Page {page} / {totalPages}</span>
+                <button className="q-pager-btn" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}>
+                  <ChevronRight size={14} />
+                </button>
+                <button className="q-pager-btn" disabled={page === totalPages} onClick={() => setPage(totalPages)}>
+                  <ChevronRight size={12} style={{ marginLeft: -4 }} /><ChevronRight size={12} />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── DRAWER ── */}
+        {drawer && (
+          <>
+            <div className="q-overlay" onClick={closeDrawer} />
+            <div className="q-drawer">
+
+              {/* Header */}
+              <div className="q-dhead">
+                <div className="q-dhead-top">
+                  <Avatar name={drawer.employeeName || ""} size={42} />
+                  <div className="q-dhead-meta">
+                    <div className="q-dhead-subj">{drawer.subject}</div>
+                    <div className="q-dhead-info">
+                      <strong>{drawer.employeeName}</strong>
+                      {" · "}{drawer.employeeEmail}
+                      {" · "}{drawer.department}
+                    </div>
+                  </div>
+                  <button
+                    className="q-ddel-btn"
+                    title="Delete this query"
+                    onClick={() => setDeleteConfirm(drawer.id)}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                  <button className="q-dclose" onClick={closeDrawer}><X size={13} /></button>
+                </div>
+                <div className="q-dhead-badges">
+                  {(() => {
+                    const pc = PRIORITY_CONFIG[drawer.priority] ?? PRIORITY_CONFIG["medium"];
+                    const cc = CATEGORY_CONFIG[drawer.category] ?? CATEGORY_CONFIG["General"];
+                    return (
+                      <>
+                        <Badge label={drawer.category || "General"} bg={cc.bg} color={cc.color} />
+                        <Badge label={pc.label} bg={pc.bg} color={pc.color} dot={pc.dot} />
+                        <StatusBadge status={drawer.status} />
+                        <span style={{ fontSize: 11, color: "#c4c9d4", fontWeight: 400 }}>
+                          {timeAgo(drawer.createdAt)}
+                        </span>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Delete confirmation banner */}
+              {deleteConfirm === drawer.id && (
+                <div className="q-del-confirm">
+                  <span className="q-del-confirm-txt">Permanently delete this query? This cannot be undone.</span>
+                  <div className="q-del-confirm-btns">
+                    <button className="q-del-no" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+                    <button className="q-del-yes" onClick={() => void handleDelete(drawer.id)}>Delete</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Chat */}
+              <div className="q-chat">
+                <div className="q-msg">
+                  <div className="q-msg-av" style={{
+                    background: getAvatarStyle(drawer.employeeName || "").bg,
+                    color: getAvatarStyle(drawer.employeeName || "").color,
+                  }}>
+                    {getInitials(drawer.employeeName || "")}
+                  </div>
+                  <div className="q-msg-body">
+                    <div className="q-msg-who">{drawer.employeeName} · {timeAgo(drawer.createdAt)}</div>
+                    <div className="q-bubble emp">{drawer.message}</div>
+                  </div>
+                </div>
+
+                {(drawer.replies ?? []).map((r, i) => (
+                  <div key={i} className={`q-msg${r.author === "Admin" ? " adm" : ""}`}>
+                    <div className="q-msg-av" style={{
+                      background: r.author === "Admin" ? "#2d3748" : getAvatarStyle(r.author || "").bg,
+                      color:      r.author === "Admin" ? "#e2e8f0" : getAvatarStyle(r.author || "").color,
+                    }}>
+                      {r.author === "Admin" ? "A" : getInitials(r.author || "")}
+                    </div>
+                    <div className="q-msg-body">
+                      <div className="q-msg-who">
+                        {r.author === "Admin" ? "You (Admin)" : r.author}
+                        {r.assignedTo && r.assignedTo !== "Unassigned" && (
+                          <span style={{ color: "#6366f1", marginLeft: 5 }}>via {r.assignedTo}</span>
+                        )}
+                        {" · "}{timeAgo(r.time)}
+                      </div>
+                      <div className={`q-bubble ${r.author === "Admin" ? "adm" : "emp"}`}>{r.text}</div>
+                    </div>
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Footer */}
+              {drawer.status === "resolved" && (drawer.replies ?? []).length > 0 ? (
+                <div className="q-resolved-bar">
+                  <span className="q-resolved-txt"><CheckCircle2 size={14} /> Query resolved</span>
+                  <button className="q-ghost-btn" onClick={handleReopen}>
+                    <RotateCcw size={12} /> Reopen
+                  </button>
+                </div>
+              ) : (
+                <div className="q-dfooter">
+                  <div className="q-dfooter-controls">
+                    <span className="q-flabel">Assign</span>
+                    <select className="q-fsel" value={assignTo} onChange={(e) => setAssignTo(e.target.value)}>
+                      {ADMIN_AGENTS.map((a) => <option key={a} value={a}>{a}</option>)}
+                    </select>
+                    <span className="q-flabel" style={{ marginLeft: 4 }}>Priority</span>
+                    <select
+                      className="q-fsel"
+                      value={drawer.priority || "medium"}
+                      onChange={(e) => handleChangePriority(e.target.value)}
+                    >
+                      {Object.entries(PRIORITY_CONFIG).map(([k, v]) => (
+                        <option key={k} value={k}>{v.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <textarea
+                    className="q-textarea"
+                    rows={3}
+                    placeholder="Write a reply… (Enter to send, Shift+Enter for newline)"
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleSendReply(); }
+                    }}
+                  />
+                  <div className="q-footer-row">
+                    <button className="q-ghost-btn" onClick={closeDrawer}>Cancel</button>
+                    <button
+                      className="q-send-btn"
+                      disabled={!replyText.trim() || sending}
+                      onClick={() => void handleSendReply()}
+                    >
+                      <Send size={13} />
+                      {sending ? "Sending…" : "Send Reply"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </>
   );

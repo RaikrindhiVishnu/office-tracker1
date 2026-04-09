@@ -1235,7 +1235,7 @@ export default function FinancialDashboard() {
           }}>💰</div>
           <div>
             <div style={{ fontSize: 15, fontWeight: 900, color: T.ink, letterSpacing: "-0.3px" }}>Finance ERP</div>
-            <div style={{ fontSize: 9, color: T.green, fontWeight: 700 }}>● LIVE · Firebase Firestore</div>
+            <div style={{ fontSize: 9, color: T.green, fontWeight: 700 }}>● LIVE</div>
           </div>
         </div>
 
