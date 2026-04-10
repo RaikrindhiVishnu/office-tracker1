@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   collection,
   query,
@@ -19,7 +19,6 @@ import { db, storage } from "@/lib/firebase";
 
 /* ─── TYPES ─── */
 interface Column { id: string; label: string; }
-
 type TicketType = "story" | "task" | "bug" | "defect";
 
 interface Task {
@@ -96,11 +95,49 @@ interface DailyTask {
   category: string;
 }
 
+/* ─── PERMISSIONS ─── */
+function getPermissions(user: any, project: any) {
+  const isAdmin = user?.accountType === "ADMIN";
+  const isPM = !!(
+    project?.projectManager === user?.uid ||
+    (Array.isArray(project?.projectManagers) && project.projectManagers.includes(user?.uid))
+  );
+  const fullControl = isAdmin || isPM;
+  const designation: string = user?.designation || "";
+
+  const isDevEngineer = [
+    "Software Engineer", "Senior Software Engineer", "Frontend Engineer",
+    "Backend Engineer", "Full Stack Engineer", "Android Developer",
+    "Mobile App Developer", "DevOps Engineer",
+  ].some(d => designation.toLowerCase().includes(d.toLowerCase()));
+
+  const isQA = designation.toLowerCase().includes("qa");
+  const isPMDesignation =
+    designation.toLowerCase().includes("project manager") ||
+    designation.toLowerCase().includes("manager") ||
+    designation.toLowerCase().includes("director");
+
+  let canCreateTypes: TicketType[] = ["task"];
+  if (fullControl || isPMDesignation) canCreateTypes = ["story", "task", "bug", "defect"];
+  else if (isDevEngineer) canCreateTypes = ["task", "bug"];
+  else if (isQA) canCreateTypes = ["bug", "defect"];
+
+  return {
+    isPM,
+    isAdmin,
+    fullControl,
+    canCreateTypes,
+    canEdit: fullControl,
+    canDelete: fullControl,
+    canAssign: fullControl,
+  };
+}
+
 /* ─── TICKET TYPE CONFIG ─── */
 const TICKET_TYPES: Record<TicketType, { label: string; icon: string; color: string; bg: string; border: string; description: string }> = {
   story:  { label: "Story",  icon: "📖", color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", description: "A user story — can contain tasks, bugs & defects" },
   task:   { label: "Task",   icon: "✅", color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", description: "A unit of work" },
-  bug:    { label: "Bug",    icon: "🐛", color: "#dc2626", bg: "#fef2f2", border: "#fecaca", description: "Something that needs fixing" },
+  bug:    { label: "Bug",    icon: "🐞", color: "#dc2626", bg: "#fef2f2", border: "#fecaca", description: "Something that needs fixing" },
   defect: { label: "Defect", icon: "⚠️", color: "#d97706", bg: "#fffbeb", border: "#fde68a", description: "A quality issue found in testing" },
 };
 
@@ -153,14 +190,13 @@ function getDaysInMonth(year: number, month: number) { return new Date(year, mon
 function getFirstDayOfMonth(year: number, month: number) { const d = new Date(year, month, 1).getDay(); return d === 0 ? 6 : d - 1; }
 const WEEKDAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const nanoid = () => Math.random().toString(36).slice(2, 10);
-
 function generateTaskCode(ticketType: TicketType, count: number) {
   const prefixMap: Record<TicketType, string> = { story: "STR", task: "TSK", bug: "BUG", defect: "DEF" };
   return `${prefixMap[ticketType]}-${String(count).padStart(3, "0")}`;
 }
 
 /* ─── SHARED UI ─── */
-const Avatar = ({ name, size = "sm", highlight = false }: { name?: string; size?: "xs" | "sm" | "md" | "lg"; highlight?: boolean }) => {
+const Avatar = ({ name, size = "sm", highlight = false }: { name?: string; size?: "xs"|"sm"|"md"|"lg"; highlight?: boolean }) => {
   const s = { xs: "w-6 h-6 text-[10px]", sm: "w-8 h-8 text-xs", md: "w-10 h-10 text-sm", lg: "w-12 h-12 text-base" };
   const colors = ["#6366f1","#8b5cf6","#ec4899","#f59e0b","#10b981","#3b82f6"];
   const bg = colors[(name?.charCodeAt(0) || 0) % colors.length];
@@ -175,13 +211,13 @@ const ProgressRing = ({ pct, size = 44, stroke = 4, color = "#6366f1" }: { pct: 
   const r = (size - stroke) / 2, circ = 2 * Math.PI * r, offset = circ - (pct / 100) * circ;
   return (
     <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#e2e8f0" strokeWidth={stroke} />
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" style={{ transition: "stroke-dashoffset 0.6s ease" }} />
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#e2e8f0" strokeWidth={stroke} />
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" style={{ transition: "stroke-dashoffset 0.6s ease" }} />
     </svg>
   );
 };
 
-const TicketBadge = ({ type, size = "sm" }: { type?: TicketType; size?: "xs" | "sm" }) => {
+const TicketBadge = ({ type, size = "sm" }: { type?: TicketType; size?: "xs"|"sm" }) => {
   const cfg = TICKET_TYPES[type || "task"];
   const pad = size === "xs" ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]";
   return (
@@ -192,12 +228,125 @@ const TicketBadge = ({ type, size = "sm" }: { type?: TicketType; size?: "xs" | "
   );
 };
 
+/* ─── PERMISSION TOAST ─── */
+function PermissionToast({ message, onHide }: { message: string; onHide: () => void }) {
+  useEffect(() => { const t = setTimeout(onHide, 2500); return () => clearTimeout(t); }, []);
+  return (
+    <div className="fixed bottom-6 right-6 z-9999 bg-gray-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-xl flex items-center gap-2">
+      🔒 {message}
+    </div>
+  );
+}
+
+/* ── TEAM BUTTON ── */
+function TeamButton({ users, activeProject, user, projectColor }: { users: any[]; activeProject: any; user: any; projectColor: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const members = (users || []).filter((u: any) => activeProject?.members?.includes(u.uid));
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const colors = ["#6366f1","#8b5cf6","#ec4899","#f59e0b","#10b981","#3b82f6"];
+
+  return (
+    <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display: "flex", alignItems: "center", gap: 6,
+          padding: "5px 10px 5px 6px",
+          background: "white", border: "0.5px solid #d1d5db",
+          borderRadius: 10, cursor: "pointer", fontSize: 12,
+          fontWeight: 600, color: "#374151",
+        }}>
+        <div style={{ display: "flex", alignItems: "center" }}>
+          {members.slice(0, 4).map((u, i) => {
+            const name = u.displayName || u.name || u.email?.split("@")[0] || "?";
+            return (
+              <div key={u.uid} style={{
+                width: 22, height: 22, borderRadius: "50%",
+                background: colors[i % colors.length],
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#fff", fontSize: 9, fontWeight: 700,
+                border: "2px solid white",
+                marginLeft: i === 0 ? 0 : -7,
+                zIndex: 4 - i, position: "relative",
+              }}>{name[0]?.toUpperCase()}</div>
+            );
+          })}
+          {members.length > 4 && (
+            <div style={{
+              width: 22, height: 22, borderRadius: "50%", background: "#e5e7eb",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 9, fontWeight: 700, color: "#6b7280",
+              border: "2px solid white", marginLeft: -7, position: "relative", zIndex: 0,
+            }}>+{members.length - 4}</div>
+          )}
+        </div>
+        <span style={{ color: "#6b7280", fontSize: 11 }}>Team</span>
+        <svg width="11" height="11" viewBox="0 0 12 12" fill="none"
+          style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s", color: "#9ca3af" }}>
+          <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 6px)", right: 0,
+          minWidth: 220, background: "white",
+          border: "0.5px solid #e5e7eb", borderRadius: 12,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.08)", zIndex: 999, overflow: "hidden",
+        }}>
+          <div style={{ padding: "8px 12px 6px", fontSize: 10, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.07em", textTransform: "uppercase", borderBottom: "0.5px solid #f3f4f6" }}>
+            {members.length} member{members.length !== 1 ? "s" : ""}
+          </div>
+          {members.map((u, i) => {
+            const name = u.displayName || u.name || u.email?.split("@")[0] || "?";
+            const isPM = activeProject?.projectManagers?.includes(u.uid) || activeProject?.projectManager === u.uid;
+            const isMe = u.uid === user?.uid;
+            const bg = colors[i % colors.length];
+            const outline = isMe ? `2px solid ${bg}` : "none";
+            return (
+              <div key={u.uid} style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "7px 12px", cursor: "default",
+                background: "white", transition: "background 0.15s",
+              }}
+                onMouseEnter={e => (e.currentTarget.style.background = "#f9fafb")}
+                onMouseLeave={e => (e.currentTarget.style.background = "white")}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: "50%", background: bg,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#fff", fontSize: 11, fontWeight: 700, flexShrink: 0,
+                  outline, outlineOffset: 2,
+                }}>{name[0]?.toUpperCase()}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+                    {isPM && <span style={{ fontSize: 10, background: "#fef9c3", color: "#a16207", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>PM</span>}
+                  </div>
+                  {isMe && <span style={{ fontSize: 11, color: bg, fontWeight: 600 }}>you</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════
    TASK MODAL
 ═══════════════════════════════════════════ */
 function TaskModal({
   open, onClose, onSubmit, users, columns, projectColor, initialData, stories,
-  currentUserId, isProjectManager,
+  currentUserId, isProjectManager, allowedTypes,
 }: {
   open: boolean; onClose: () => void;
   onSubmit: (data: Partial<Task>) => Promise<void>;
@@ -206,19 +355,19 @@ function TaskModal({
   stories?: Task[];
   currentUserId?: string;
   isProjectManager?: boolean;
+  allowedTypes?: TicketType[];
 }) {
   const isEdit = !!(initialData?.id);
+  const allowed = allowedTypes || ["task"];
 
   const [form, setForm] = useState<Partial<Task>>({
     title: "", description: "", priority: "Medium",
     status: columns[0]?.id || "todo",
     estimatedHours: 0, storyPoints: 0, tags: [],
-    ticketType: "task",
-    parentStoryId: "",
-    parentStoryTitle: "",
+    ticketType: allowed[0] || "task",
+    parentStoryId: "", parentStoryTitle: "",
     ...initialData,
   });
-
   const [tagsInput, setTagsInput] = useState((initialData?.tags || []).join(", "));
   const [saving, setSaving] = useState(false);
   const [childTickets, setChildTickets] = useState<Partial<Task>[]>([]);
@@ -229,9 +378,8 @@ function TaskModal({
       title: "", description: "", priority: "Medium",
       status: columns[0]?.id || "todo",
       estimatedHours: 0, storyPoints: 0, tags: [],
-      ticketType: "task",
-      parentStoryId: "",
-      parentStoryTitle: "",
+      ticketType: allowed[0] || "task",
+      parentStoryId: "", parentStoryTitle: "",
       ...initialData,
     });
     setTagsInput((initialData?.tags || []).join(", "));
@@ -255,7 +403,6 @@ function TaskModal({
     setChildTickets(prev => [...prev, { ...newChild, id: nanoid() }]);
     setNewChild({ title: "", ticketType: "task", priority: "Medium" });
   };
-
   const removeChild = (idx: number) => setChildTickets(prev => prev.filter((_, i) => i !== idx));
 
   const isStory = form.ticketType === "story";
@@ -265,8 +412,6 @@ function TaskModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
-
-        {/* Header */}
         <div className="shrink-0 px-6 py-4 border-b border-gray-100" style={{ background: `linear-gradient(135deg, ${projectColor}15, ${projectColor}05)` }}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -280,7 +425,6 @@ function TaskModal({
           </div>
         </div>
 
-        {/* Ticket Type Selector */}
         {!isEdit && (
           <div className="shrink-0 px-6 pt-4 pb-0">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Ticket Type</p>
@@ -288,21 +432,25 @@ function TaskModal({
               {(Object.keys(TICKET_TYPES) as TicketType[]).map(type => {
                 const cfg = TICKET_TYPES[type];
                 const selected = form.ticketType === type;
+                const isAllowed = isProjectManager || allowed.includes(type);
                 return (
                   <button key={type}
                     onClick={() => {
-                      const newCode = generateTaskCode(type, Date.now() % 1000);
-                      setForm(f => ({ ...f, ticketType: type, taskCode: newCode }));
+                      if (!isAllowed) return;
+                      setForm(f => ({ ...f, ticketType: type, taskCode: generateTaskCode(type, Date.now() % 1000) }));
                     }}
-                    className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border-2 transition-all"
+                    disabled={!isAllowed}
+                    className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border-2 transition-all relative"
                     style={{
                       borderColor: selected ? cfg.color : "#e5e7eb",
-                      background: selected ? cfg.bg : "white",
+                      background: selected ? cfg.bg : isAllowed ? "white" : "#f9fafb",
                       boxShadow: selected ? `0 0 0 3px ${cfg.color}20` : "none",
-                    }}
-                  >
+                      opacity: isAllowed ? 1 : 0.45,
+                      cursor: isAllowed ? "pointer" : "not-allowed",
+                    }}>
+                    {!isAllowed && <span className="absolute top-1 right-1 text-[9px]">🔒</span>}
                     <span className="text-xl">{cfg.icon}</span>
-                    <span className="text-[11px] font-black" style={{ color: selected ? cfg.color : "#6b7280" }}>{cfg.label}</span>
+                    <span className="text-[11px] font-black" style={{ color: selected ? cfg.color : isAllowed ? "#6b7280" : "#9ca3af" }}>{cfg.label}</span>
                   </button>
                 );
               })}
@@ -310,41 +458,29 @@ function TaskModal({
           </div>
         )}
 
-        {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-
-          {/* Parent Story link */}
           {!isStory && stories && stories.length > 0 && (
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">
-                Link to Story <span className="text-gray-300 normal-case font-normal">(optional)</span>
-              </label>
-              <select
-                value={form.parentStoryId || ""}
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Link to Story <span className="text-gray-300 normal-case font-normal">(optional)</span></label>
+              <select value={form.parentStoryId || ""}
                 onChange={e => {
                   const story = stories.find(s => s.id === e.target.value);
                   setForm(f => ({ ...f, parentStoryId: e.target.value, parentStoryTitle: story?.title || "" }));
                 }}
-                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
-              >
+                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
                 <option value="">— No parent story —</option>
                 {stories.map(s => <option key={s.id} value={s.id}>📖 {s.title}</option>)}
               </select>
             </div>
           )}
 
-          {/* Task ID */}
           <div>
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Task ID</label>
-            <input
-              value={form.taskCode || ""}
-              onChange={e => setForm(f => ({ ...f, taskCode: e.target.value }))}
+            <input value={form.taskCode || ""} onChange={e => setForm(f => ({ ...f, taskCode: e.target.value }))}
               placeholder="Auto-generated (e.g. TSK-001)"
-              className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 font-mono"
-            />
+              className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 font-mono" />
           </div>
 
-          {/* Title */}
           <div>
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Title <span className="text-red-400">*</span></label>
             <input autoFocus value={form.title || ""} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
@@ -352,7 +488,6 @@ function TaskModal({
               className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
           </div>
 
-          {/* Description */}
           <div>
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Description</label>
             <textarea value={form.description || ""} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
@@ -360,7 +495,6 @@ function TaskModal({
               className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none" />
           </div>
 
-          {/* Priority + Status */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Priority</label>
@@ -378,28 +512,35 @@ function TaskModal({
             </div>
           </div>
 
-          {/* Due Date + Assignee */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Due Date</label>
               <input type="date" value={form.dueDate || ""} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))}
                 className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
             </div>
-            <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Assignee</label>
-              <select value={form.assignedTo || ""}
-                onChange={e => {
-                  const u = users?.find((u: any) => u.uid === e.target.value);
-                  setForm(f => ({ ...f, assignedTo: e.target.value, assignedToName: u ? (u.displayName || u.email?.split("@")[0]) : "" }));
-                }}
-                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
-                <option value="">Unassigned</option>
-                {users?.map((u: any) => <option key={u.uid} value={u.uid}>{u.displayName || u.email?.split("@")[0]}</option>)}
-              </select>
-            </div>
+            {isProjectManager ? (
+              <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Assignee</label>
+                <select value={form.assignedTo || ""}
+                  onChange={e => {
+                    const u = users?.find((u: any) => u.uid === e.target.value);
+                    setForm(f => ({ ...f, assignedTo: e.target.value, assignedToName: u ? (u.displayName || u.email?.split("@")[0]) : "" }));
+                  }}
+                  className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
+                  <option value="">Unassigned</option>
+                  {users?.map((u: any) => <option key={u.uid} value={u.uid}>{u.displayName || u.email?.split("@")[0]}</option>)}
+                </select>
+              </div>
+            ) : (
+              <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Assignee 🔒</label>
+                <div className="w-full text-sm border border-gray-100 rounded-xl px-3 py-2.5 bg-gray-50 text-gray-400 flex items-center gap-2">
+                  <span>🔒</span><span>Only PM can assign tasks</span>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Est. Hours + Story Points + Tags */}
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Est. Hours</label>
@@ -418,7 +559,6 @@ function TaskModal({
             </div>
           </div>
 
-          {/* Story child tickets */}
           {isStory && !isEdit && (
             <div className="border border-purple-100 rounded-2xl overflow-hidden">
               <div className="px-4 py-3 bg-purple-50 border-b border-purple-100 flex items-center justify-between">
@@ -429,7 +569,6 @@ function TaskModal({
                 </div>
                 <p className="text-[10px] text-purple-400">Add tasks, bugs & defects under this story</p>
               </div>
-
               {childTickets.length > 0 && (
                 <div className="divide-y divide-gray-50">
                   {childTickets.map((c, i) => {
@@ -451,7 +590,6 @@ function TaskModal({
                   })}
                 </div>
               )}
-
               <div className="px-4 py-3 bg-gray-50/50 border-t border-gray-100">
                 <div className="flex gap-2 mb-2">
                   {(["task","bug","defect"] as TicketType[]).map(type => {
@@ -477,16 +615,13 @@ function TaskModal({
                     className="flex-1 text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white" />
                   <button onClick={addChildTicket} disabled={!newChild.title.trim()}
                     className="px-3 py-2 text-xs font-bold text-white rounded-xl disabled:opacity-40 transition"
-                    style={{ background: "#7c3aed" }}>
-                    + Add
-                  </button>
+                    style={{ background: "#7c3aed" }}>+ Add</button>
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Footer */}
         <div className="shrink-0 px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className="text-lg">{tc.icon}</span>
@@ -516,43 +651,97 @@ function TaskModal({
 ═══════════════════════════════════════════ */
 function TaskDetailModal({
   task, onClose, columns, projectColor, projectName, currentUserId,
-  isProjectManager, users, onStatusChange, onSave, db: firestoreDb, storage: firebaseStorage, user,
+  isProjectManager, canDelete, users, onStatusChange, onSave,
+  db: firestoreDb, storage: firebaseStorage, user,
 }: {
   task: Task; onClose: () => void; columns: Column[]; projectColor: string; projectName: string;
-  currentUserId: string; isProjectManager: boolean; users: any[];
-  onStatusChange: (taskId: string, newStatus: string) => void;
+  currentUserId: string; isProjectManager: boolean; canDelete: boolean; users: any[];
+  onStatusChange: (taskId: string, newStatus: string) => void
   onSave: (updated: Task) => Promise<void>;
   db: any; storage: any; user: any;
 }) {
-  const [taskTab, setTaskTab] = useState<"details" | "subtasks" | "files" | "comments">("details");
+  const [taskTab, setTaskTab] = useState<"details"|"subtasks"|"files"|"comments"|"worklogs"|"empsheet">("details");
   const [comments, setComments] = useState<any[]>([]);
   const [taskFiles, setTaskFiles] = useState<any[]>([]);
   const [subtasks, setSubtasks] = useState<any[]>([]);
+  const [taskWorklogs, setTaskWorklogs] = useState<WorkLog[]>([]);
+  const [taskEmpEntries, setTaskEmpEntries] = useState<any[]>([]);
   const [commentText, setCommentText] = useState("");
   const [uploading, setUploading] = useState(false);
   const [showWorkLogForm, setShowWorkLogForm] = useState(false);
   const [localTask, setLocalTask] = useState<Task>(task);
   const [saving, setSaving] = useState(false);
+
+  // Worklogs form state
   const [wl, setWl] = useState({ description: "", hoursWorked: "", workStatus: "In Progress" as WorkLog["workStatus"], date: new Date().toISOString().split("T")[0] });
 
+  // ── MY WORK (EMPSHEET) state ──
+  const [workDesc, setWorkDesc] = useState("");
+  const [workHours, setWorkHours] = useState("");
+  const [workStatus, setWorkStatus] = useState<"done" | "progress" | "blocked">("progress");
+  const [empSubmitting, setEmpSubmitting] = useState(false);
+
   const canEdit = isProjectManager || task.assignedTo === currentUserId;
-  const userName = user?.email?.split("@")[0] || "";
+  const userName = user?.displayName || user?.email?.split("@")[0] || "";
   const tc = TICKET_TYPES[task.ticketType || "task"];
   const pc = PRIORITY_CONFIG[task.priority];
 
   useEffect(() => { setLocalTask(task); }, [task.id]);
 
   useEffect(() => {
-    const u1 = onSnapshot(query(collection(firestoreDb, "taskComments"), where("taskId", "==", task.id), orderBy("createdAt", "asc")), s => setComments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const u2 = onSnapshot(query(collection(firestoreDb, "taskFiles"), where("taskId", "==", task.id), orderBy("createdAt", "desc")), s => setTaskFiles(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const u3 = onSnapshot(query(collection(firestoreDb, "subtasks"), where("taskId", "==", task.id)), s => setSubtasks(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    return () => { u1(); u2(); u3(); };
+    const u1 = onSnapshot(query(collection(firestoreDb, "taskComments"), where("taskId","==",task.id), orderBy("createdAt","asc")), s => setComments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const u2 = onSnapshot(query(collection(firestoreDb, "taskFiles"), where("taskId","==",task.id), orderBy("createdAt","desc")), s => setTaskFiles(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const u3 = onSnapshot(query(collection(firestoreDb, "subtasks"), where("taskId","==",task.id)), s => setSubtasks(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const u4 = onSnapshot(query(collection(firestoreDb, "workLogs"), where("taskId","==",task.id), orderBy("createdAt","desc")), s => setTaskWorklogs(s.docs.map(d => ({ id: d.id, ...d.data() } as WorkLog))));
+    // Load emp entries for this task
+    const u5 = onSnapshot(
+      query(collection(firestoreDb, "dailyEntries"), where("taskId","==",task.id), orderBy("createdAt","desc")),
+      s => setTaskEmpEntries(s.docs.map(d => ({ id: d.id, ...d.data() })))
+    );
+    return () => { u1(); u2(); u3(); u4(); u5(); };
   }, [task.id]);
 
-  const handleSave = async () => {
-    setSaving(true);
-    try { await onSave(localTask); } finally { setSaving(false); }
+  // ── SUBMIT MY WORK (EMPSHEET) ──
+  const handleAddEmpWork = async () => {
+    if (!workDesc.trim() || !workHours) return;
+    setEmpSubmitting(true);
+    try {
+      await addDoc(collection(firestoreDb, "dailyEntries"), {
+        userId: currentUserId,
+        userName,
+        projectId: task.projectId,
+        projectName,
+        taskId: task.id,
+        taskTitle: task.title,
+        description: workDesc,
+        hoursWorked: Number(workHours),
+        workStatus: workStatus === "done" ? "Completed" : workStatus === "progress" ? "In Progress" : "Blocked",
+        date: new Date().toISOString().split("T")[0],
+        month: new Date().toISOString().slice(0, 7),
+        tasks: [{
+          id: nanoid(),
+          projectId: task.projectId,
+          projectName,
+          taskTitle: task.title,
+          description: workDesc,
+          hoursWorked: Number(workHours),
+          workStatus: workStatus === "done" ? "Completed" : workStatus === "progress" ? "In Progress" : "Blocked",
+          category: "Development",
+        }],
+        totalHours: Number(workHours),
+        status: "submitted",
+        submittedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+      });
+      setWorkDesc("");
+      setWorkHours("");
+      setWorkStatus("progress");
+    } finally {
+      setEmpSubmitting(false);
+    }
   };
+
+  const handleSave = async () => { setSaving(true); try { await onSave(localTask); } finally { setSaving(false); } };
 
   const handleAddComment = async () => {
     if (!commentText.trim()) return;
@@ -575,8 +764,13 @@ function TaskDetailModal({
 
   const handleSubmitWorkLog = async () => {
     if (!wl.description.trim() || !wl.hoursWorked) return;
-    await addDoc(collection(firestoreDb, "workLogs"), { userId: currentUserId, userName, projectId: task.projectId, projectName, taskId: task.id, taskName: task.title, description: wl.description, hoursWorked: Number(wl.hoursWorked), workStatus: wl.workStatus, date: wl.date, createdAt: serverTimestamp() });
-    const td = await getDocs(query(collection(firestoreDb, "projectTasks"), where("projectId", "==", task.projectId)));
+    await addDoc(collection(firestoreDb, "workLogs"), {
+      userId: currentUserId, userName, projectId: task.projectId, projectName,
+      taskId: task.id, taskName: task.title,
+      description: wl.description, hoursWorked: Number(wl.hoursWorked),
+      workStatus: wl.workStatus, date: wl.date, createdAt: serverTimestamp(),
+    });
+    const td = await getDocs(query(collection(firestoreDb, "projectTasks"), where("projectId","==",task.projectId)));
     const found = td.docs.find(d => d.id === task.id);
     if (found) await updateDoc(doc(firestoreDb, "projectTasks", task.id), { actualHours: (found.data().actualHours || 0) + Number(wl.hoursWorked) });
     setWl({ description: "", hoursWorked: "", workStatus: "In Progress", date: new Date().toISOString().split("T")[0] });
@@ -584,6 +778,24 @@ function TaskDetailModal({
   };
 
   const subtasksDone = subtasks.filter(s => s.done).length;
+  const totalLoggedHours = taskWorklogs.reduce((s, l) => s + l.hoursWorked, 0);
+  const totalEmpHours = taskEmpEntries.reduce((s, e) => s + (e.hoursWorked || 0), 0);
+
+type TabItem = {
+  id: string;
+  icon: string;
+  label: string;
+  badge?: string | null; // ✅ FIX
+};
+
+const TABS: TabItem[] = [
+  { id: "details",  icon: "📋", label: "Details", badge: null },
+  { id: "subtasks", icon: "✅", label: "Subtasks", badge: subtasks.length > 0 ? `${subtasksDone}/${subtasks.length}` : null },
+  { id: "files",    icon: "📎", label: "Files", badge: taskFiles.length > 0 ? String(taskFiles.length) : null },
+  { id: "comments", icon: "💬", label: "Comments", badge: comments.length > 0 ? String(comments.length) : null },
+  { id: "worklogs", icon: "⏱", label: "Logs", badge: taskWorklogs.length > 0 ? `${totalLoggedHours}h` : null },
+  { id: "empsheet", icon: "📝", label: "My Work", badge: taskEmpEntries.length > 0 ? `${totalEmpHours}h` : null },
+];
 
   return (
     <div className="fixed inset-0 z-50 flex items-stretch" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
@@ -602,6 +814,7 @@ function TaskDetailModal({
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {isProjectManager && <span className="text-[10px] font-bold bg-yellow-400/20 text-yellow-200 px-2 py-0.5 rounded-full">👑 PM</span>}
                 {!isProjectManager && canEdit && <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full">✏️ Your Task</span>}
                 {!canEdit && <span className="text-[10px] font-bold bg-white/10 text-white/60 px-2 py-0.5 rounded-full">👁 View Only</span>}
                 {canEdit && (
@@ -610,14 +823,12 @@ function TaskDetailModal({
                     {saving ? "Saving..." : "Save"}
                   </button>
                 )}
-                {isProjectManager && (
-                  <button
-                    onClick={async () => {
-                      if (!confirm("Delete this task?")) return;
-                      try { await deleteDoc(doc(firestoreDb, "projectTasks", task.id)); onClose(); }
-                      catch (err) { console.error("Delete failed", err); }
-                    }}
-                    className="px-3 py-1.5 text-xs font-bold bg-red-500 hover:bg-red-600 text-white rounded-lg transition">
+                {canDelete && (
+                  <button onClick={async () => {
+                    if (!confirm("Delete this task?")) return;
+                    try { await deleteDoc(doc(firestoreDb, "projectTasks", task.id)); onClose(); }
+                    catch (err) { console.error("Delete failed", err); }
+                  }} className="px-3 py-1.5 text-xs font-bold bg-red-500 hover:bg-red-600 text-white rounded-lg transition">
                     🗑 Delete
                   </button>
                 )}
@@ -633,21 +844,18 @@ function TaskDetailModal({
             <div className="flex flex-wrap gap-2 items-center">
               <TicketBadge type={task.ticketType} />
               <span className="text-xs font-semibold px-2 py-0.5 rounded-md" style={{ background: pc?.bg, color: pc?.color }}>{pc?.icon} {task.priority}</span>
-              {task.parentStoryTitle && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-white/20 text-white flex items-center gap-1">📖 {task.parentStoryTitle}</span>
-              )}
+              {task.parentStoryTitle && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-white/20 text-white flex items-center gap-1">📖 {task.parentStoryTitle}</span>}
               {task.tags?.map(t => <span key={t} className="text-xs px-2 py-0.5 rounded-md bg-white/20 text-white">#{t}</span>)}
             </div>
           </div>
 
           {/* Tabs */}
-          <div className="flex border-t border-white/20">
-            {([["details","📋"],["subtasks","✅"],["files","📎"],["comments","💬"]] as const).map(([t, icon]) => (
-              <button key={t} onClick={() => setTaskTab(t)}
-                className={`flex-1 py-2.5 text-xs font-semibold transition flex items-center justify-center gap-1 ${taskTab === t ? "bg-white/20 text-white border-b-2 border-white" : "text-white/60 hover:text-white/80"}`}>
-                {icon} {t.charAt(0).toUpperCase() + t.slice(1)}
-                {t === "comments" && comments.length > 0 && <span className="bg-white/30 text-white text-[10px] rounded-full px-1.5 py-0.5">{comments.length}</span>}
-                {t === "subtasks" && subtasks.length > 0 && <span className="bg-white/30 text-white text-[10px] rounded-full px-1.5 py-0.5">{subtasksDone}/{subtasks.length}</span>}
+          <div className="flex border-t border-white/20 overflow-x-auto">
+            {TABS.map(({ id, icon, label, badge }) => (
+              <button key={id} onClick={() => setTaskTab(id as any)}
+                className={`flex-1 py-2.5 text-xs font-semibold transition flex items-center justify-center gap-1 whitespace-nowrap px-2 ${taskTab === id ? "bg-white/20 text-white border-b-2 border-white" : "text-white/60 hover:text-white/80"}`}>
+                {icon} {label}
+                {badge && <span className="bg-white/30 text-white text-[10px] rounded-full px-1.5 py-0.5">{badge}</span>}
               </button>
             ))}
           </div>
@@ -655,6 +863,8 @@ function TaskDetailModal({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-5 bg-gray-50">
+
+          {/* ── DETAILS ── */}
           {taskTab === "details" && (
             <div className="space-y-4">
               <div>
@@ -705,28 +915,10 @@ function TaskDetailModal({
                   </div>
                 </div>
               </div>
-              {canEdit && (
-                <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Log Work</h3>
-                    <button onClick={() => setShowWorkLogForm(!showWorkLogForm)} className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white" style={{ background: projectColor }}>⏱ Log Hours</button>
-                  </div>
-                  {showWorkLogForm && (
-                    <div className="space-y-3 mt-3 pt-3 border-t border-gray-100">
-                      <textarea value={wl.description} onChange={e => setWl({ ...wl, description: e.target.value })} placeholder="What did you work on?" rows={2} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none" />
-                      <div className="grid grid-cols-3 gap-2">
-                        <input type="number" value={wl.hoursWorked} onChange={e => setWl({ ...wl, hoursWorked: e.target.value })} placeholder="Hours" min="0.5" step="0.5" className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none" />
-                        <select value={wl.workStatus} onChange={e => setWl({ ...wl, workStatus: e.target.value as any })} className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none"><option>In Progress</option><option>Completed</option><option>Blocked</option></select>
-                        <input type="date" value={wl.date} onChange={e => setWl({ ...wl, date: e.target.value })} className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none" />
-                      </div>
-                      <button onClick={handleSubmitWorkLog} disabled={!wl.description.trim() || !wl.hoursWorked} className="w-full py-2.5 text-sm font-bold text-white rounded-xl disabled:opacity-40" style={{ background: projectColor }}>Submit Work Log</button>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           )}
 
+          {/* ── SUBTASKS ── */}
           {taskTab === "subtasks" && (
             <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm space-y-2">
               <div className="flex items-center justify-between mb-3">
@@ -746,6 +938,7 @@ function TaskDetailModal({
             </div>
           )}
 
+          {/* ── FILES ── */}
           {taskTab === "files" && (
             <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
               <div className="flex items-center justify-between mb-3">
@@ -768,6 +961,7 @@ function TaskDetailModal({
             </div>
           )}
 
+          {/* ── COMMENTS ── */}
           {taskTab === "comments" && (
             <div className="space-y-3">
               {comments.map(c => (
@@ -783,8 +977,189 @@ function TaskDetailModal({
               {comments.length === 0 && <div className="text-center py-12 text-gray-300"><div className="text-5xl mb-3">💬</div><p className="text-sm">No comments yet</p></div>}
             </div>
           )}
+
+          {/* ── WORKLOGS ── */}
+          {taskTab === "worklogs" && (
+            <div className="space-y-4">
+              {canEdit && (
+                <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Log Work</h3>
+                    <button onClick={() => setShowWorkLogForm(!showWorkLogForm)}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white transition"
+                      style={{ background: projectColor }}>
+                      {showWorkLogForm ? "Cancel" : "⏱ Log Hours"}
+                    </button>
+                  </div>
+                  {showWorkLogForm && (
+                    <div className="space-y-3 mt-3 pt-3 border-t border-gray-100">
+                      <textarea value={wl.description} onChange={e => setWl({ ...wl, description: e.target.value })}
+                        placeholder="What did you work on?" rows={2}
+                        className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none" />
+                      <div className="grid grid-cols-3 gap-2">
+                        <input type="number" value={wl.hoursWorked} onChange={e => setWl({ ...wl, hoursWorked: e.target.value })}
+                          placeholder="Hours" min="0.5" step="0.5"
+                          className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none" />
+                        <select value={wl.workStatus} onChange={e => setWl({ ...wl, workStatus: e.target.value as any })}
+                          className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none">
+                          <option>In Progress</option><option>Completed</option><option>Blocked</option>
+                        </select>
+                        <input type="date" value={wl.date} onChange={e => setWl({ ...wl, date: e.target.value })}
+                          className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none" />
+                      </div>
+                      <button onClick={handleSubmitWorkLog} disabled={!wl.description.trim() || !wl.hoursWorked}
+                        className="w-full py-2.5 text-sm font-bold text-white rounded-xl disabled:opacity-40 transition"
+                        style={{ background: projectColor }}>
+                        Submit Work Log
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
+                  <h3 className="text-sm font-semibold text-gray-700">All Work Logs</h3>
+                  <span className="text-sm font-black" style={{ color: projectColor }}>{totalLoggedHours}h total</span>
+                </div>
+                {taskWorklogs.length === 0
+                  ? <div className="text-center py-10 text-gray-300"><div className="text-4xl mb-2">⏱</div><p className="text-sm">No work logged yet</p></div>
+                  : <div className="divide-y divide-gray-50">
+                      {taskWorklogs.map(log => (
+                        <div key={log.id} className="flex items-start gap-3 p-4 hover:bg-gray-50 transition">
+                          <Avatar name={log.userName} size="sm" highlight={log.userId === currentUserId} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <span className="text-xs font-bold text-gray-700">{log.userName}</span>
+                              {log.userId === currentUserId && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ background: projectColor }}>You</span>}
+                            </div>
+                            <p className="text-sm text-gray-600">{log.description}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-xs text-gray-400">{log.date}</span>
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${log.workStatus === "Completed" ? "bg-green-100 text-green-700" : log.workStatus === "Blocked" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>{log.workStatus}</span>
+                            </div>
+                          </div>
+                          <span className="text-xl font-black shrink-0" style={{ color: projectColor }}>{log.hoursWorked}h</span>
+                        </div>
+                      ))}
+                    </div>
+                }
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════
+              MY WORK (EMPSHEET) TAB
+              — Matches admin UI exactly
+          ══════════════════════════════════════ */}
+          {taskTab === "empsheet" && (
+            <div className="space-y-4">
+
+              {/* Add Work Card */}
+              <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                <div className="flex items-center gap-2 mb-4">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <rect x="2" y="2" width="12" height="12" rx="2" stroke="#534AB7" strokeWidth="1.2"/>
+                    <path d="M5 6h6M5 9h4" stroke="#534AB7" strokeWidth="1.2" strokeLinecap="round"/>
+                  </svg>
+                  <span className="text-sm font-semibold text-gray-800">Add daily work</span>
+                </div>
+
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                  What did you work on?
+                </label>
+                <textarea
+                  placeholder="Describe what you completed today…"
+                  rows={3}
+                  className="w-full resize-y text-sm border border-gray-200 rounded-lg px-3 py-2.5 bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-colors"
+                  value={workDesc}
+                  onChange={e => setWorkDesc(e.target.value)}
+                />
+
+                <div className="flex gap-3 mt-3">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Hours</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 2.5"
+                      className="w-24 text-sm border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-colors"
+                      value={workHours}
+                      onChange={e => setWorkHours(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 flex-1">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</label>
+                    <div className="flex border border-gray-200 rounded-lg overflow-hidden text-sm">
+                      {(["done", "progress", "blocked"] as const).map((s, i) => (
+                        <button
+                          key={s}
+                          onClick={() => setWorkStatus(s)}
+                          className={`flex-1 py-2 px-2 font-medium transition-colors ${i < 2 ? "border-r border-gray-200" : ""} ${
+                            workStatus === s
+                              ? s === "done"     ? "bg-green-50 text-green-800 font-semibold"
+                              : s === "progress" ? "bg-indigo-50 text-indigo-800 font-semibold"
+                              :                   "bg-red-50 text-red-800 font-semibold"
+                              : "bg-white text-gray-500 hover:bg-gray-50"
+                          }`}
+                        >
+                          {s === "done" ? "Completed" : s === "progress" ? "In progress" : "Blocked"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleAddEmpWork}
+                  disabled={!workDesc.trim() || !workHours || empSubmitting}
+                  className="mt-4 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-all disabled:opacity-40 active:scale-[0.97]"
+                  style={{ background: projectColor }}
+                >
+                  {empSubmitting ? "Submitting..." : "Submit work"}
+                </button>
+              </div>
+
+              {/* Work History */}
+              {taskEmpEntries.length === 0 ? (
+                <p className="text-center text-sm text-gray-400 py-6">No entries yet — add your first work log above.</p>
+              ) : (
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                    <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Work History</h3>
+                    <span className="text-sm font-black" style={{ color: projectColor }}>{totalEmpHours}h total</span>
+                  </div>
+                  <div className="divide-y divide-gray-50">
+                    {taskEmpEntries.map((entry: any) => (
+                      <div key={entry.id} className="flex items-start gap-3 p-4 hover:bg-gray-50 transition">
+                        <Avatar name={entry.userName} size="sm" highlight={entry.userId === currentUserId} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-xs font-bold text-gray-800">{entry.userName}</span>
+                            {entry.userId === currentUserId && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ background: projectColor }}>You</span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600">{entry.description}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-gray-400">{entry.date}</span>
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                              entry.workStatus === "Completed" ? "bg-green-100 text-green-700"
+                              : entry.workStatus === "Blocked"   ? "bg-red-100 text-red-700"
+                              :                                    "bg-blue-100 text-blue-700"
+                            }`}>{entry.workStatus}</span>
+                          </div>
+                        </div>
+                        <span className="text-xl font-black shrink-0" style={{ color: projectColor }}>{entry.hoursWorked}h</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
+        {/* Comments input footer */}
         {taskTab === "comments" && (
           <div className="shrink-0 p-4 bg-white border-t border-gray-100">
             <div className="flex gap-2">
@@ -802,18 +1177,23 @@ function TaskDetailModal({
 }
 
 /* ═══════════════════════════════════════════
-   KANBAN BOARD
+   KANBAN BOARD — with reliable drag & drop
 ═══════════════════════════════════════════ */
 function KanbanBoard({
   tasks, columns, projectColor, currentUserId, isProjectManager,
-  onTaskClick, onStatusChange, onUpdateColumns, onAddChildToStory,
+  onTaskClick, onStatusChange, onUpdateColumns, onAddChildToStory, onToast,user,          
+  activeProject 
 }: {
   tasks: Task[]; columns: Column[]; projectColor: string; currentUserId: string;
   isProjectManager: boolean; onTaskClick: (t: Task) => void;
-  onStatusChange: (taskId: string, newStatus: string) => void;
+  onStatusChange: (taskId: string, newStatus: string) => void | Promise<void>;
   onUpdateColumns: (cols: Column[]) => Promise<void>;
   onAddChildToStory: (story: Task, ticketType: TicketType) => void;
+  onToast: (msg: string) => void;user: any;   allowedChildTypes?: TicketType[];            
+  activeProject: any; 
+ 
 }) {
+   const permissions = getPermissions(user, activeProject);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [localTasks, setLocalTasks] = useState<Task[]>(tasks);
@@ -823,44 +1203,64 @@ function KanbanBoard({
   const [newColLabel, setNewColLabel] = useState("");
   const [collapsedStories, setCollapsedStories] = useState<Set<string>>(new Set());
   const [storyPopup, setStoryPopup] = useState<{ storyId: string } | null>(null);
-  const dragTaskRef = useRef<Task | null>(null);
+
+  // Track which task is being dragged via ref (survives re-renders)
+  const draggingTaskRef = useRef<Task | null>(null);
 
   useEffect(() => { setLocalTasks(tasks); }, [tasks]);
 
+  const isMyTask = (task: Task) => !!(task.assignedTo && task.assignedTo === currentUserId);
+  const canDrag  = (task: Task) => isProjectManager || isMyTask(task);
+
   const toggleStory = (id: string) => {
-    setCollapsedStories(prev => {
-      const s = new Set(prev);
-      s.has(id) ? s.delete(id) : s.add(id);
-      return s;
-    });
+    setCollapsedStories(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
   };
 
-  const isMyTask = (task: Task) => task.assignedTo === currentUserId;
-  const canDrag = (task: Task) => isProjectManager || isMyTask(task);
-  const colTasks = (colId: string) => localTasks.filter(t => t.status === colId);
-
-  const handleDragStart = (e: React.DragEvent, task: Task) => {
-    if (!canDrag(task)) { e.preventDefault(); return; }
-    dragTaskRef.current = task;
+  /* ── DRAG HANDLERS ── */
+  const handleDragStart = useCallback((e: React.DragEvent, task: Task) => {
+    if (!canDrag(task)) {
+      e.preventDefault();
+      onToast("You can only move your own tasks");
+      return;
+    }
+    draggingTaskRef.current = task;
     setDraggingId(task.id);
     e.dataTransfer.effectAllowed = "move";
+    // Must set data — some browsers require this
+    e.dataTransfer.setData("text/plain", task.id);
+    // Defer opacity so ghost image captures the normal look
     const el = e.currentTarget as HTMLElement;
-    setTimeout(() => { if (el) el.style.opacity = "0.4"; }, 0);
-  };
+    requestAnimationFrame(() => { el.style.opacity = "0.4"; });
+  }, [isProjectManager, currentUserId]);
 
-  const handleDragEnd = (e: React.DragEvent) => {
+  const handleDragEnd = useCallback((e: React.DragEvent) => {
     (e.currentTarget as HTMLElement).style.opacity = "1";
-    setDraggingId(null); setDragOverCol(null); dragTaskRef.current = null;
-  };
+    setDraggingId(null);
+    setDragOverCol(null);
+    draggingTaskRef.current = null;
+  }, []);
 
-  const handleDrop = async (e: React.DragEvent, colId: string) => {
+  const handleDragOver = useCallback((e: React.DragEvent, colId: string) => {
     e.preventDefault();
-    const task = dragTaskRef.current;
-    if (!task || task.status === colId) { setDraggingId(null); setDragOverCol(null); return; }
+    e.dataTransfer.dropEffect = "move";
+    setDragOverCol(colId);
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent, colId: string) => {
+    e.preventDefault();
+    const taskId = e.dataTransfer.getData("text/plain");
+    const task = draggingTaskRef.current || localTasks.find(t => t.id === taskId);
+    if (!task) return;
+    if (!canDrag(task)) { onToast("Not allowed"); return; }
+    if (task.status === colId) return;
+
+    // Optimistic update
     setLocalTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: colId } : t));
-    setDraggingId(null); setDragOverCol(null); dragTaskRef.current = null;
+    setDraggingId(null);
+    setDragOverCol(null);
+    draggingTaskRef.current = null;
     onStatusChange(task.id, colId);
-  };
+  }, [localTasks, isProjectManager, currentUserId]);
 
   const handleRenameCol = async (colId: string) => {
     if (!editingColLabel.trim()) { setEditingColId(null); return; }
@@ -875,6 +1275,8 @@ function KanbanBoard({
     setNewColLabel(""); setAddingCol(false);
   };
 
+  const colTasks = (colId: string) => localTasks.filter(t => t.status === colId);
+
   return (
     <div className="flex h-full gap-0 overflow-x-auto">
       {columns.map((col, colIndex) => {
@@ -886,12 +1288,12 @@ function KanbanBoard({
 
         return (
           <div key={col.id}
-            className="flex flex-col shrink-0 w-67.5 border-r last:border-r-0 transition-colors duration-150"
+            className="flex flex-col shrink-0 w-72 border-r last:border-r-0 transition-colors duration-150"
             style={{ borderColor: isOver ? cfg.color + "50" : "#e5e7eb", background: isOver ? cfg.bg : "white" }}
-            onDragOver={e => { e.preventDefault(); setDragOverCol(col.id); }}
+            onDragOver={e => handleDragOver(e, col.id)}
             onDrop={e => handleDrop(e, col.id)}
-            onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverCol(null); }}
-          >
+            onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverCol(null); }}>
+
             {/* Column header */}
             <div className="shrink-0 border-b" style={{ background: cfg.headerBg, borderColor: cfg.border }}>
               <div className="flex items-center justify-between px-4 py-2.5 gap-2">
@@ -911,7 +1313,7 @@ function KanbanBoard({
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span className="text-xs font-black px-2 py-0.5 rounded border bg-white tabular-nums" style={{ color: cfg.color, borderColor: cfg.border }}>{colTaskList.length}</span>
-                  {isProjectManager && <button onClick={() => onUpdateColumns(columns.filter(c => c.id !== col.id))} disabled={columns.length <= 1} className="text-gray-300 hover:text-red-400 text-xs transition" style={{ opacity: columns.length <= 1 ? 0.3 : 1 }}>✕</button>}
+                  {isProjectManager && <button onClick={() => onUpdateColumns(columns.filter(c => c.id !== col.id))} disabled={columns.length <= 1} className="text-gray-300 hover:text-red-400 text-xs transition">✕</button>}
                 </div>
               </div>
               <div className="grid px-4 py-1 border-t text-[10px] font-bold text-gray-400 uppercase tracking-wider gap-2"
@@ -922,8 +1324,6 @@ function KanbanBoard({
 
             {/* Task rows */}
             <div className="flex-1 overflow-y-auto">
-
-              {/* Empty state */}
               {colTaskList.length === 0 && !isOver && (
                 <div className="flex flex-col items-center justify-center h-24 mt-4 text-gray-200">
                   <div className="w-8 h-8 rounded-lg border-2 border-dashed flex items-center justify-center mb-1" style={{ borderColor: cfg.color + "30" }}>
@@ -933,7 +1333,7 @@ function KanbanBoard({
                 </div>
               )}
 
-              {/* ── STORIES + their children ── */}
+              {/* ── STORIES ── */}
               {colStories.map(story => {
                 const storyChildren = localTasks.filter(t => t.parentStoryId === story.id && t.ticketType !== "story");
                 const isCollapsed = collapsedStories.has(story.id);
@@ -944,165 +1344,123 @@ function KanbanBoard({
 
                 return (
                   <div key={story.id} className="border-b" style={{ borderColor: "#f3f4f6" }}>
-
-                    {/* ── Story header row ── */}
+                    {/* Story row — draggable */}
                     <div
                       draggable={draggable}
                       onDragStart={e => handleDragStart(e, story)}
                       onDragEnd={handleDragEnd}
-                      className={`group transition-all select-none ${draggingId === story.id ? "opacity-40" : "hover:bg-indigo-50/50"}`}
-                      style={{
-                        borderLeftWidth: "3px",
-                        borderLeftColor: mine ? projectColor : "#a5b4fc",
-                        opacity: draggingId === story.id ? 0.4 : 1,
-                      }}
-                    >
+                      onClick={() => onTaskClick(story)}
+                      className={`group transition-all select-none cursor-pointer ${draggingId === story.id ? "opacity-40" : "hover:bg-indigo-50/50"}`}
+                      style={{ borderLeftWidth: "3px", borderLeftColor: mine ? projectColor : "#a5b4fc" }}>
                       <div className="grid px-3 py-2.5 items-center gap-2" style={{ gridTemplateColumns: "auto auto 1fr auto auto auto auto" }}>
-
-                        {/* 1 — Collapse toggle */}
-                        <button
-                          onClick={e => { e.stopPropagation(); toggleStory(story.id); }}
-                          className="w-4 h-4 flex items-center justify-center text-indigo-400 hover:text-indigo-600 transition text-[10px] shrink-0"
-                        >
+                        <button onClick={e => { e.stopPropagation(); toggleStory(story.id); }}
+                          className="w-4 h-4 flex items-center justify-center text-indigo-400 hover:text-indigo-600 transition text-[10px] shrink-0">
                           {isCollapsed ? "▶" : "▼"}
                         </button>
-
-                        {/* 2 — Story icon */}
-                        <span className="text-sm shrink-0" title="Story">📖</span>
-
-                        {/* 3 — Title + child count */}
-                        <div className="min-w-0 cursor-pointer" onClick={() => onTaskClick(story)}>
+                        <span className="text-sm shrink-0">📖</span>
+                        <div className="min-w-0">
                           <div className="flex items-center gap-1 mb-0.5">
                             <span className="text-[10px] font-mono font-bold text-indigo-400">{story.taskCode || "STR-000"}</span>
-                            <p className="text-xs font-bold text-indigo-800 leading-tight truncate group-hover:text-indigo-600 transition-colors">
-                              {story.title}
-                            </p>
-                            {mine && (
-                              <span className="shrink-0 text-[9px] font-black px-1 rounded" style={{ background: projectColor + "20", color: projectColor }}>You</span>
-                            )}
+                            <p className="text-xs font-bold text-indigo-800 leading-tight truncate group-hover:text-indigo-600">{story.title}</p>
+                            {mine && <span className="shrink-0 text-[9px] font-black px-1 rounded" style={{ background: projectColor + "20", color: projectColor }}>You</span>}
                           </div>
-                          <span className="text-[10px] font-semibold text-indigo-300">
-                            {storyChildren.length} {storyChildren.length === 1 ? "task" : "tasks"}
-                          </span>
+                          <span className="text-[10px] font-semibold text-indigo-300">{storyChildren.length} {storyChildren.length === 1 ? "task" : "tasks"}</span>
                         </div>
-
-                        {/* 4 — + button with dropdown */}
+                        {/* Add child button */}
                         <div className="relative shrink-0" onClick={e => e.stopPropagation()}>
-                          <button
-                            onClick={e => {
-                              e.stopPropagation();
-                              setStoryPopup(prev => prev?.storyId === story.id ? null : { storyId: story.id });
-                            }}
-                            className="w-6 h-6 rounded-md flex items-center justify-center text-white text-sm font-bold transition hover:scale-110 active:scale-95 shadow-sm"
-                            style={{ background: projectColor }}
-                            title="Add child ticket"
-                          >
-                            +
-                          </button>
+                          <button onClick={e => { e.stopPropagation(); setStoryPopup(prev => prev?.storyId === story.id ? null : { storyId: story.id }); }}
+                            className="w-6 h-6 rounded-md flex items-center justify-center text-white text-sm font-bold transition hover:scale-110 shadow-sm"
+                            style={{ background: projectColor }}>+</button>
                           {storyPopup?.storyId === story.id && (
                             <>
                               <div className="fixed inset-0 z-40" onClick={() => setStoryPopup(null)} />
                               <div className="absolute right-0 top-8 z-50 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden w-44 py-1">
                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider px-3 py-2 border-b border-gray-50">Add to Story</p>
-                                {(["task", "bug", "defect"] as TicketType[]).map(type => {
-                                  const cfg = TICKET_TYPES[type];
-                                  return (
-                                    <button
-                                      key={type}
-                                      onClick={() => { setStoryPopup(null); onAddChildToStory(story, type); }}
-                                      className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm font-semibold hover:bg-gray-50 transition text-left"
-                                      style={{ color: cfg.color }}
-                                    >
-                                      <span className="text-base">{cfg.icon}</span>
-                                      <span>{cfg.label}</span>
-                                    </button>
-                                  );
-                                })}
+                                {(["task","bug","defect"] as TicketType[])
+.filter(type => isProjectManager || permissions.canCreateTypes.includes(type))
+  .map(type => {
+    const cfg = TICKET_TYPES[type];
+    return (
+      <button key={type} onClick={() => { setStoryPopup(null); onAddChildToStory(story, type); }}
+        className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm font-semibold hover:bg-gray-50 transition text-left"
+        style={{ color: cfg.color }}>
+        <span className="text-base">{cfg.icon}</span>
+        <span>{cfg.label}</span>
+      </button>
+    );
+  })
+}
+
+{(["task","bug","defect"] as TicketType[])
+
+.filter(type => !isProjectManager && !permissions.canCreateTypes.includes(type))
+  .map(type => {
+    const cfg = TICKET_TYPES[type];
+    return (
+      <div key={type} className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm opacity-40 cursor-not-allowed select-none">
+        <span className="text-base">{cfg.icon}</span>
+        <span style={{ color: cfg.color }}>{cfg.label}</span>
+        <span className="ml-auto text-[10px]">🔒</span>
+      </div>
+    );
+  })
+}
                               </div>
                             </>
                           )}
                         </div>
-
-                        {/* 5 — Priority */}
-                        <span className="text-[10px] font-bold px-1 py-0.5 rounded shrink-0" style={{ background: pc?.bg || "#f1f5f9", color: pc?.color || "#64748b" }}>
-                          {pc?.icon || "•"}
-                        </span>
-
-                        {/* 6 — Due date */}
-                        <span className="text-[10px] font-medium tabular-nums shrink-0 whitespace-nowrap" style={{ color: isOverdue ? "#dc2626" : "#94a3b8" }}>
-                          {story.dueDate ? story.dueDate.slice(5) : "—"}
-                        </span>
-
-                        {/* 7 — Avatar */}
-                        <div className="shrink-0">
-                          {story.assignedToName
-                            ? <Avatar name={story.assignedToName} size="xs" highlight={mine} />
-                            : <div className="w-6 h-6 rounded-full border-2 border-dashed border-gray-200" />
-                          }
-                        </div>
-
+                        <span className="text-[10px] font-bold px-1 py-0.5 rounded shrink-0" style={{ background: pc?.bg || "#f1f5f9", color: pc?.color || "#64748b" }}>{pc?.icon || "•"}</span>
+                        <span className="text-[10px] font-medium tabular-nums shrink-0 whitespace-nowrap" style={{ color: isOverdue ? "#dc2626" : "#94a3b8" }}>{story.dueDate ? story.dueDate.slice(5) : "—"}</span>
+                        <div className="shrink-0">{story.assignedToName ? <Avatar name={story.assignedToName} size="xs" highlight={mine} /> : <div className="w-6 h-6 rounded-full border-2 border-dashed border-gray-200" />}</div>
                       </div>
                       {draggable && <p className="text-[9px] text-gray-300 px-3 pb-1.5">↕ drag to move</p>}
                     </div>
 
-                    {/* ── Child tasks (collapsible) ── */}
+                    {/* Story children */}
                     {!isCollapsed && (
                       <div style={{ background: "#f8f7ff" }}>
-                        {storyChildren.length === 0 && (
-                          <div className="py-2 pl-10 text-[10px] text-gray-300 italic">No tasks yet</div>
-                        )}
-                        {storyChildren.map(task => {
-                          const tmine = isMyTask(task);
-                          const tdraggable = canDrag(task);
-                          const tpc = PRIORITY_CONFIG[task.priority];
-                          const ttc = TICKET_TYPES[task.ticketType || "task"];
-                          const tOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done";
-
+                        {storyChildren.length === 0 && <div className="py-2 pl-10 text-[10px] text-gray-300 italic">No tasks yet</div>}
+                        {storyChildren.map(childTask => {
+                          const tmine = isMyTask(childTask);
+                          const tdraggable = canDrag(childTask);
+                          const tpc = PRIORITY_CONFIG[childTask.priority];
+                          const ttc = TICKET_TYPES[childTask.ticketType || "task"];
+                          const tOverdue = childTask.dueDate && new Date(childTask.dueDate) < new Date() && childTask.status !== "done";
                           return (
                             <div
-                              key={task.id}
+                              key={childTask.id}
                               draggable={tdraggable}
-                              onDragStart={e => handleDragStart(e, task)}
+                              onDragStart={e => handleDragStart(e, childTask)}
                               onDragEnd={handleDragEnd}
-                              onClick={() => onTaskClick(task)}
-                              className={`group border-b cursor-pointer select-none transition-all ${draggingId === task.id ? "opacity-40" : "hover:bg-white/80"}`}
+                              onClick={() => onTaskClick(childTask)}
+                              className={`group border-b cursor-pointer select-none transition-all ${draggingId === childTask.id ? "opacity-40" : "hover:bg-white/80"}`}
                               style={{
                                 borderColor: "#ede9fe",
                                 borderLeftWidth: "3px",
                                 borderLeftColor: tmine ? projectColor : "transparent",
                                 paddingLeft: "10px",
-                                opacity: draggingId === task.id ? 0.4 : (tmine || isProjectManager) ? 1 : 0.55,
-                              }}
-                            >
+                                opacity: draggingId === childTask.id ? 0.4 : (tmine || isProjectManager) ? 1 : 0.55,
+                              }}>
                               <div className="grid px-3 py-2 items-center gap-2" style={{ gridTemplateColumns: "auto 1fr auto auto auto" }}>
-                                <span className="text-xs shrink-0" title={ttc.label}>{ttc.icon}</span>
+                                <span className="text-xs shrink-0">{ttc.icon}</span>
                                 <div className="min-w-0">
                                   <div className="flex items-center gap-1 mb-0.5">
-                                    <span className="text-[10px] font-mono font-bold text-gray-400">{task.taskCode || "TSK-000"}</span>
-                                    <p className="text-xs font-semibold text-gray-700 leading-tight truncate group-hover:text-indigo-700 transition-colors">{task.title}</p>
-                                    {tmine && (
-                                      <span className="shrink-0 text-[9px] font-black px-1 rounded" style={{ background: projectColor + "20", color: projectColor }}>You</span>
-                                    )}
+                                    <span className="text-[10px] font-mono font-bold text-gray-400">{childTask.taskCode || "TSK-000"}</span>
+                                    <p className="text-xs font-semibold text-gray-700 leading-tight truncate group-hover:text-indigo-700">{childTask.title}</p>
+                                    {tmine && <span className="shrink-0 text-[9px] font-black px-1 rounded" style={{ background: projectColor + "20", color: projectColor }}>You</span>}
                                   </div>
-                                  {task.estimatedHours ? (
+                                  {childTask.estimatedHours ? (
                                     <div className="flex items-center gap-1.5">
                                       <div className="flex-1 max-w-14 h-0.5 bg-gray-100 rounded-full overflow-hidden">
-                                        <div className="h-full rounded-full" style={{ width: `${Math.min(((task.actualHours || 0) / task.estimatedHours) * 100, 100)}%`, background: projectColor }} />
+                                        <div className="h-full rounded-full" style={{ width: `${Math.min(((childTask.actualHours || 0) / childTask.estimatedHours) * 100, 100)}%`, background: projectColor }} />
                                       </div>
-                                      <span className="text-[9px] text-gray-400 tabular-nums">{task.actualHours || 0}/{task.estimatedHours}h</span>
+                                      <span className="text-[9px] text-gray-400 tabular-nums">{childTask.actualHours || 0}/{childTask.estimatedHours}h</span>
                                     </div>
                                   ) : null}
                                 </div>
                                 <span className="text-[10px] font-bold px-1 py-0.5 rounded shrink-0" style={{ background: tpc?.bg || "#f1f5f9", color: tpc?.color || "#64748b" }}>{tpc?.icon || "•"}</span>
-                                <span className="text-[10px] font-medium tabular-nums shrink-0 whitespace-nowrap" style={{ color: tOverdue ? "#dc2626" : "#94a3b8" }}>
-                                  {task.dueDate ? task.dueDate.slice(5) : "—"}{tOverdue && "⚠"}
-                                </span>
-                                <div className="shrink-0">
-                                  {task.assignedToName
-                                    ? <Avatar name={task.assignedToName} size="xs" highlight={tmine} />
-                                    : <div className="w-6 h-6 rounded-full border-2 border-dashed border-gray-200" />
-                                  }
-                                </div>
+                                <span className="text-[10px] font-medium tabular-nums shrink-0 whitespace-nowrap" style={{ color: tOverdue ? "#dc2626" : "#94a3b8" }}>{childTask.dueDate ? childTask.dueDate.slice(5) : "—"}{tOverdue && "⚠"}</span>
+                                <div className="shrink-0">{childTask.assignedToName ? <Avatar name={childTask.assignedToName} size="xs" highlight={tmine} /> : <div className="w-6 h-6 rounded-full border-2 border-dashed border-gray-200" />}</div>
                               </div>
                               {tdraggable && <p className="text-[9px] text-gray-300 px-3 pb-1.5">↕ drag to move</p>}
                             </div>
@@ -1114,35 +1472,34 @@ function KanbanBoard({
                 );
               })}
 
-              {/* ── ORPHAN tasks ── */}
+              {/* ── ORPHAN TASKS ── */}
               {colOrphans.map(task => {
                 const mine = isMyTask(task);
                 const draggable = canDrag(task);
-                const pc = PRIORITY_CONFIG[task.priority];
                 const isDragging = draggingId === task.id;
+                const pc = PRIORITY_CONFIG[task.priority];
                 const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done";
                 const tc = TICKET_TYPES[task.ticketType || "task"];
-
                 return (
-                  <div key={task.id}
+                  <div
+                    key={task.id}
                     draggable={draggable}
                     onDragStart={e => handleDragStart(e, task)}
                     onDragEnd={handleDragEnd}
-                    onClick={() => onTaskClick(task)}
+                    onClick={() => !isDragging && onTaskClick(task)}
                     className={`group border-b transition-all cursor-pointer select-none ${isDragging ? "opacity-40" : "hover:bg-gray-50/70"}`}
                     style={{
                       borderColor: "#f3f4f6",
                       borderLeftWidth: "3px",
                       borderLeftColor: mine ? projectColor : "transparent",
                       opacity: isDragging ? 0.4 : (mine || isProjectManager) ? 1 : 0.55,
-                    }}
-                  >
+                    }}>
                     <div className="grid px-3 py-2.5 items-center gap-2" style={{ gridTemplateColumns: "auto 1fr auto auto auto" }}>
-                      <span className="text-sm shrink-0" title={tc.label}>{tc.icon}</span>
+                      <span className="text-sm shrink-0">{tc.icon}</span>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1 mb-0.5">
                           <span className="text-[10px] font-mono font-bold text-gray-400">{task.taskCode || "TSK-000"}</span>
-                          <p className="text-xs font-semibold text-gray-800 leading-tight truncate group-hover:text-indigo-700 transition-colors">{task.title}</p>
+                          <p className="text-xs font-semibold text-gray-800 leading-tight truncate group-hover:text-indigo-700">{task.title}</p>
                           {mine && <span className="shrink-0 text-[9px] font-black px-1 rounded" style={{ background: projectColor + "20", color: projectColor }}>You</span>}
                         </div>
                         {task.estimatedHours ? (
@@ -1155,12 +1512,8 @@ function KanbanBoard({
                         ) : null}
                       </div>
                       <span className="text-[10px] font-bold px-1 py-0.5 rounded shrink-0" style={{ background: pc?.bg || "#f1f5f9", color: pc?.color || "#64748b" }}>{pc?.icon || "•"}</span>
-                      <span className="text-[10px] font-medium tabular-nums shrink-0 whitespace-nowrap" style={{ color: isOverdue ? "#dc2626" : "#94a3b8" }}>
-                        {task.dueDate ? task.dueDate.slice(5) : "—"}{isOverdue && "⚠"}
-                      </span>
-                      <div className="shrink-0">
-                        {task.assignedToName ? <Avatar name={task.assignedToName} size="xs" highlight={mine} /> : <div className="w-6 h-6 rounded-full border-2 border-dashed border-gray-200" />}
-                      </div>
+                      <span className="text-[10px] font-medium tabular-nums shrink-0 whitespace-nowrap" style={{ color: isOverdue ? "#dc2626" : "#94a3b8" }}>{task.dueDate ? task.dueDate.slice(5) : "—"}{isOverdue && "⚠"}</span>
+                      <div className="shrink-0">{task.assignedToName ? <Avatar name={task.assignedToName} size="xs" highlight={mine} /> : <div className="w-6 h-6 rounded-full border-2 border-dashed border-gray-200" />}</div>
                     </div>
                     {draggable && <p className="text-[9px] text-gray-300 px-3 pb-1.5">↕ drag to move</p>}
                   </div>
@@ -1178,9 +1531,9 @@ function KanbanBoard({
         );
       })}
 
-      {/* Add Column (PM only) */}
+      {/* Add Column — PM only */}
       {isProjectManager && (
-        <div className="flex flex-col shrink-0 w-55 border-r border-dashed border-gray-200 bg-gray-50/50">
+        <div className="flex flex-col shrink-0 w-56 border-r border-dashed border-gray-200 bg-gray-50/50">
           {addingCol ? (
             <div className="p-4 space-y-2">
               <input autoFocus value={newColLabel} onChange={e => setNewColLabel(e.target.value)}
@@ -1193,7 +1546,7 @@ function KanbanBoard({
               </div>
             </div>
           ) : (
-            <button onClick={() => setAddingCol(true)} className="flex flex-col items-center justify-center gap-2 h-full min-h-30 text-gray-300 hover:text-indigo-400 hover:bg-indigo-50/40 transition-all">
+            <button onClick={() => setAddingCol(true)} className="flex flex-col items-center justify-center gap-2 h-full min-h-32 text-gray-300 hover:text-indigo-400 hover:bg-indigo-50/40 transition-all">
               <div className="w-10 h-10 rounded-xl border-2 border-dashed border-gray-200 hover:border-indigo-300 flex items-center justify-center transition-colors">
                 <span className="text-xl font-light">+</span>
               </div>
@@ -1214,21 +1567,21 @@ function EmployeeDailySheet({ user, projects }: { user: any; projects: any[] }) 
   const [viewMonth, setViewMonth] = useState(currentMonth);
   const [entries, setEntries] = useState<DailyEntry[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [mode, setMode] = useState<"calendar" | "fill" | "summary">("calendar");
+  const [mode, setMode] = useState<"calendar"|"fill"|"summary">("calendar");
   const [currentEntry, setCurrentEntry] = useState<DailyEntry | null>(null);
   const [taskList, setTaskList] = useState<DailyTask[]>([]);
   const [saving, setSaving] = useState(false);
   const [popupDate, setPopupDate] = useState<string | null>(null);
   const [tf, setTf] = useState({ projectId: "", taskTitle: "", description: "", hoursWorked: 1, workStatus: "Completed" as DailyTask["workStatus"], category: "Development" });
 
-  const userName = user?.email?.split("@")[0] || "";
+  const userName = user?.displayName || user?.email?.split("@")[0] || "";
   const myProjects = projects?.filter(p => p.members?.includes(user?.uid)) || [];
 
-  const parsedYear = parseInt(viewMonth.split("-")[0], 10);
+  const parsedYear  = parseInt(viewMonth.split("-")[0], 10);
   const parsedMonth = parseInt(viewMonth.split("-")[1], 10) - 1;
   const daysInMonth = getDaysInMonth(parsedYear, parsedMonth);
-  const firstDay = getFirstDayOfMonth(parsedYear, parsedMonth);
-  const monthName = new Date(parsedYear, parsedMonth, 1).toLocaleString("default", { month: "long", year: "numeric" });
+  const firstDay    = getFirstDayOfMonth(parsedYear, parsedMonth);
+  const monthName   = new Date(parsedYear, parsedMonth, 1).toLocaleString("default", { month: "long", year: "numeric" });
 
   const buildMonthStr = (y: number, m0: number) => `${y}-${String(m0 + 1).padStart(2, "0")}`;
   const prevMonth = () => { const d = new Date(parsedYear, parsedMonth - 1, 1); setViewMonth(buildMonthStr(d.getFullYear(), d.getMonth())); };
@@ -1237,13 +1590,13 @@ function EmployeeDailySheet({ user, projects }: { user: any; projects: any[] }) 
   useEffect(() => {
     if (!user?.uid) return;
     const start = `${viewMonth}-01`;
-    const end = `${viewMonth}-${String(daysInMonth).padStart(2, "0")}`;
-    const q = query(collection(db, "dailyEntries"), where("userId", "==", user.uid), where("date", ">=", start), where("date", "<=", end), orderBy("date", "asc"));
+    const end   = `${viewMonth}-${String(daysInMonth).padStart(2, "0")}`;
+    const q = query(collection(db, "dailyEntries"), where("userId","==",user.uid), where("date",">=",start), where("date","<=",end), orderBy("date","asc"));
     return onSnapshot(q, snap => setEntries(snap.docs.map(d => ({ id: d.id, ...d.data() } as DailyEntry))));
   }, [user?.uid, viewMonth]);
 
-  const getEntry = (dateStr: string) => entries.find(e => e.date === dateStr) || null;
-  const openFill = (dateStr: string) => {
+  const getEntry  = (dateStr: string) => entries.find(e => e.date === dateStr) || null;
+  const openFill  = (dateStr: string) => {
     const entry = getEntry(dateStr);
     setSelectedDate(dateStr); setCurrentEntry(entry);
     setTaskList(entry ? [...entry.tasks] : []);
@@ -1257,7 +1610,7 @@ function EmployeeDailySheet({ user, projects }: { user: any; projects: any[] }) 
     setTf(t => ({ ...t, taskTitle: "", description: "", hoursWorked: 1 }));
   };
 
-  const saveEntry = async (status: "submitted" | "draft") => {
+  const saveEntry = async (status: "submitted"|"draft") => {
     if (!selectedDate || !user?.uid) return;
     setSaving(true);
     const totalHours = taskList.reduce((s, t) => s + t.hoursWorked, 0);
@@ -1271,9 +1624,9 @@ function EmployeeDailySheet({ user, projects }: { user: any; projects: any[] }) 
   };
 
   const totalMonthHours = entries.reduce((s, e) => s + e.totalHours, 0);
-  const submittedDays = entries.filter(e => e.status === "submitted").length;
-  const todayStr = new Date().toISOString().split("T")[0];
-  const popupEntry = popupDate ? getEntry(popupDate) : null;
+  const submittedDays   = entries.filter(e => e.status === "submitted").length;
+  const todayStr        = new Date().toISOString().split("T")[0];
+  const popupEntry      = popupDate ? getEntry(popupDate) : null;
 
   if (mode === "fill" && selectedDate) {
     const dateLabel = new Date(selectedDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
@@ -1308,8 +1661,16 @@ function EmployeeDailySheet({ user, projects }: { user: any; projects: any[] }) 
             <div className="divide-y divide-gray-50">{taskList.map(task => (
               <div key={task.id} className="flex items-start gap-4 px-5 py-4 group hover:bg-gray-50 transition">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-black shrink-0" style={{ background: myProjects.find(p => p.id === task.projectId)?.color || "#6366f1" }}>{task.projectName[0]}</div>
-                <div className="flex-1 min-w-0"><div className="flex items-center gap-2 mb-0.5"><span className="text-xs font-bold text-indigo-600">{task.projectName}</span><span className="text-[10px] text-gray-400">· {task.category}</span></div><p className="text-sm font-semibold text-gray-800">{task.taskTitle}</p>{task.description && <p className="text-xs text-gray-400 mt-0.5">{task.description}</p>}<span className={`inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${task.workStatus === "Completed" ? "bg-green-100 text-green-700" : task.workStatus === "Blocked" ? "bg-red-100 text-red-700" : task.workStatus === "Review" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}>{task.workStatus}</span></div>
-                <div className="flex items-center gap-3"><span className="text-2xl font-black text-indigo-600">{task.hoursWorked}h</span><button onClick={() => setTaskList(prev => prev.filter(t => t.id !== task.id))} className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 text-red-400 transition text-xs">✕</button></div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5"><span className="text-xs font-bold text-indigo-600">{task.projectName}</span><span className="text-[10px] text-gray-400">· {task.category}</span></div>
+                  <p className="text-sm font-semibold text-gray-800">{task.taskTitle}</p>
+                  {task.description && <p className="text-xs text-gray-400 mt-0.5">{task.description}</p>}
+                  <span className={`inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${task.workStatus === "Completed" ? "bg-green-100 text-green-700" : task.workStatus === "Blocked" ? "bg-red-100 text-red-700" : task.workStatus === "Review" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}>{task.workStatus}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl font-black text-indigo-600">{task.hoursWorked}h</span>
+                  <button onClick={() => setTaskList(prev => prev.filter(t => t.id !== task.id))} className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 text-red-400 transition text-xs">✕</button>
+                </div>
               </div>
             ))}</div>
           </div>
@@ -1326,24 +1687,30 @@ function EmployeeDailySheet({ user, projects }: { user: any; projects: any[] }) 
         <div className="flex items-center gap-3">
           <button onClick={() => setMode("calendar")} className="p-2 rounded-xl bg-white border border-gray-200 text-gray-500 hover:text-gray-800 transition shadow-sm">←</button>
           <h2 className="text-lg font-black text-gray-900">Month Summary — {monthName}</h2>
-          <div className="ml-auto flex gap-4"><div className="text-center"><p className="text-2xl font-black text-indigo-600">{totalMonthHours}h</p><p className="text-xs text-gray-400">Total Hours</p></div><div className="text-center"><p className="text-2xl font-black text-green-600">{submittedDays}</p><p className="text-xs text-gray-400">Days Submitted</p></div></div>
+          <div className="ml-auto flex gap-4">
+            <div className="text-center"><p className="text-2xl font-black text-indigo-600">{totalMonthHours}h</p><p className="text-xs text-gray-400">Total Hours</p></div>
+            <div className="text-center"><p className="text-2xl font-black text-green-600">{submittedDays}</p><p className="text-xs text-gray-400">Days Submitted</p></div>
+          </div>
         </div>
         <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100"><tr>{["Date","Project","Task","Category","Status","Hours"].map(h => <th key={h} className="px-5 py-3.5 text-left text-[11px] font-black text-gray-400 uppercase tracking-wider">{h}</th>)}</tr></thead>
-            <tbody>{entries.flatMap(entry => entry.tasks.map((task, ti) => {
-              const d = new Date(entry.date + "T12:00:00");
-              return (
-                <tr key={`${entry.id}-${ti}`} className="border-b border-gray-50 hover:bg-indigo-50/20 transition">
-                  <td className="px-5 py-3.5"><div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${entry.status === "submitted" ? "bg-green-400" : "bg-yellow-400"}`} /><span className="text-sm font-semibold text-gray-700">{d.toLocaleDateString("en-US", { month: "short", day: "numeric", weekday: "short" })}</span></div></td>
-                  <td className="px-5 py-3.5"><span className="text-xs font-bold px-2 py-1 rounded-lg bg-indigo-50 text-indigo-600">{task.projectName}</span></td>
-                  <td className="px-5 py-3.5 text-sm font-semibold text-gray-800">{task.taskTitle}</td>
-                  <td className="px-5 py-3.5 text-xs text-gray-500">{task.category}</td>
-                  <td className="px-5 py-3.5"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${task.workStatus === "Completed" ? "bg-green-100 text-green-700" : task.workStatus === "Blocked" ? "bg-red-100 text-red-700" : task.workStatus === "Review" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}>{task.workStatus}</span></td>
-                  <td className="px-5 py-3.5 text-xl font-black text-indigo-600">{task.hoursWorked}h</td>
-                </tr>
-              );
-            }))}{entries.length === 0 && <tr><td colSpan={6} className="py-16 text-center text-gray-300"><div className="text-4xl mb-2">📋</div><p className="text-sm">No entries this month</p></td></tr>}</tbody>
+            <tbody>
+              {entries.flatMap(entry => entry.tasks.map((task, ti) => {
+                const d = new Date(entry.date + "T12:00:00");
+                return (
+                  <tr key={`${entry.id}-${ti}`} className="border-b border-gray-50 hover:bg-indigo-50/20 transition">
+                    <td className="px-5 py-3.5"><div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${entry.status === "submitted" ? "bg-green-400" : "bg-yellow-400"}`} /><span className="text-sm font-semibold text-gray-700">{d.toLocaleDateString("en-US", { month: "short", day: "numeric", weekday: "short" })}</span></div></td>
+                    <td className="px-5 py-3.5"><span className="text-xs font-bold px-2 py-1 rounded-lg bg-indigo-50 text-indigo-600">{task.projectName}</span></td>
+                    <td className="px-5 py-3.5 text-sm font-semibold text-gray-800">{task.taskTitle}</td>
+                    <td className="px-5 py-3.5 text-xs text-gray-500">{task.category}</td>
+                    <td className="px-5 py-3.5"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${task.workStatus === "Completed" ? "bg-green-100 text-green-700" : task.workStatus === "Blocked" ? "bg-red-100 text-red-700" : task.workStatus === "Review" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}>{task.workStatus}</span></td>
+                    <td className="px-5 py-3.5 text-xl font-black text-indigo-600">{task.hoursWorked}h</td>
+                  </tr>
+                );
+              }))}
+              {entries.length === 0 && <tr><td colSpan={6} className="py-16 text-center text-gray-300"><div className="text-4xl mb-2">📋</div><p className="text-sm">No entries this month</p></td></tr>}
+            </tbody>
             {entries.length > 0 && <tfoot><tr className="border-t border-gray-200 bg-gray-50"><td colSpan={5} className="px-5 py-3.5 text-xs font-black text-gray-400 uppercase tracking-wider">Month Total</td><td className="px-5 py-3.5 text-2xl font-black text-indigo-600">{totalMonthHours}h</td></tr></tfoot>}
           </table>
         </div>
@@ -1358,17 +1725,47 @@ function EmployeeDailySheet({ user, projects }: { user: any; projects: any[] }) 
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
-              <div><p className="font-black text-gray-900 text-base">{new Date(popupDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</p><div className="flex items-center gap-3 mt-1"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${popupEntry.status === "submitted" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>{popupEntry.status === "submitted" ? "✅ Submitted" : "📝 Draft"}</span><span className="text-sm font-black text-indigo-600">{popupEntry.totalHours}h total</span></div></div>
-              <div className="flex items-center gap-2"><button onClick={() => { setPopupDate(null); openFill(popupDate); }} className="px-3 py-1.5 text-xs font-bold rounded-xl border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition">✏️ Edit</button><button onClick={() => setPopupDate(null)} className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition">✕</button></div>
+              <div>
+                <p className="font-black text-gray-900 text-base">{new Date(popupDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</p>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${popupEntry.status === "submitted" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>{popupEntry.status === "submitted" ? "✅ Submitted" : "📝 Draft"}</span>
+                  <span className="text-sm font-black text-indigo-600">{popupEntry.totalHours}h total</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => { setPopupDate(null); openFill(popupDate); }} className="px-3 py-1.5 text-xs font-bold rounded-xl border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition">✏️ Edit</button>
+                <button onClick={() => setPopupDate(null)} className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition">✕</button>
+              </div>
             </div>
-            <div className="flex-1 overflow-y-auto divide-y divide-gray-50">{popupEntry.tasks.map((task, ti) => (<div key={ti} className="px-5 py-4"><div className="flex items-start justify-between gap-3"><div className="flex-1 min-w-0"><div className="flex items-center gap-2 mb-1"><span className="text-xs font-bold text-indigo-600">{task.projectName}</span><span className="text-[10px] text-gray-400">· {task.category}</span></div><p className="text-sm font-bold text-gray-800">{task.taskTitle}</p>{task.description && <p className="text-xs text-gray-500 mt-1">{task.description}</p>}</div><span className="text-2xl font-black text-indigo-600">{task.hoursWorked}h</span></div></div>))}</div>
+            <div className="flex-1 overflow-y-auto divide-y divide-gray-50">
+              {popupEntry.tasks.map((task, ti) => (
+                <div key={ti} className="px-5 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1"><span className="text-xs font-bold text-indigo-600">{task.projectName}</span><span className="text-[10px] text-gray-400">· {task.category}</span></div>
+                      <p className="text-sm font-bold text-gray-800">{task.taskTitle}</p>
+                      {task.description && <p className="text-xs text-gray-500 mt-1">{task.description}</p>}
+                    </div>
+                    <span className="text-2xl font-black text-indigo-600">{task.hoursWorked}h</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
       <div className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3 shadow-sm">
-        <div className="flex items-center gap-1 bg-gray-100 rounded-xl px-1 py-1"><button onClick={prevMonth} className="w-7 h-7 rounded-lg hover:bg-white flex items-center justify-center text-gray-500 text-sm transition">←</button><span className="px-3 text-sm font-bold text-gray-800">{monthName}</span><button onClick={nextMonth} className="w-7 h-7 rounded-lg hover:bg-white flex items-center justify-center text-gray-500 text-sm transition">→</button></div>
-        <div className="ml-auto flex items-center gap-4"><div className="text-center"><p className="text-2xl font-black text-indigo-600">{totalMonthHours}h</p><p className="text-[10px] text-gray-400 uppercase tracking-wider">Month Hrs</p></div><div className="text-center"><p className="text-2xl font-black text-green-600">{submittedDays}</p><p className="text-[10px] text-gray-400 uppercase tracking-wider">Submitted</p></div><button onClick={() => setMode("summary")} className="px-4 py-2 text-xs font-bold rounded-xl border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition">📊 Summary</button></div>
+        <div className="flex items-center gap-1 bg-gray-100 rounded-xl px-1 py-1">
+          <button onClick={prevMonth} className="w-7 h-7 rounded-lg hover:bg-white flex items-center justify-center text-gray-500 text-sm transition">←</button>
+          <span className="px-3 text-sm font-bold text-gray-800">{monthName}</span>
+          <button onClick={nextMonth} className="w-7 h-7 rounded-lg hover:bg-white flex items-center justify-center text-gray-500 text-sm transition">→</button>
+        </div>
+        <div className="ml-auto flex items-center gap-4">
+          <div className="text-center"><p className="text-2xl font-black text-indigo-600">{totalMonthHours}h</p><p className="text-[10px] text-gray-400 uppercase tracking-wider">Month Hrs</p></div>
+          <div className="text-center"><p className="text-2xl font-black text-green-600">{submittedDays}</p><p className="text-[10px] text-gray-400 uppercase tracking-wider">Submitted</p></div>
+          <button onClick={() => setMode("summary")} className="px-4 py-2 text-xs font-bold rounded-xl border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition">📊 Summary</button>
+        </div>
       </div>
 
       <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
@@ -1378,7 +1775,7 @@ function EmployeeDailySheet({ user, projects }: { user: any; projects: any[] }) 
           {Array(daysInMonth).fill(null).map((_, i) => {
             const day = i + 1;
             const dateStr = `${viewMonth}-${String(day).padStart(2, "0")}`;
-            const entry = getEntry(dateStr);
+            const entry   = getEntry(dateStr);
             const isToday = dateStr === todayStr;
             const isFuture = dateStr > todayStr;
             return (
@@ -1386,10 +1783,16 @@ function EmployeeDailySheet({ user, projects }: { user: any; projects: any[] }) 
                 className={`h-28 border-r border-b border-gray-50 p-2 flex flex-col transition-all ${isFuture ? "opacity-35 cursor-not-allowed" : isToday ? "bg-indigo-50/60 cursor-pointer hover:bg-indigo-100/50" : "cursor-pointer hover:bg-gray-50"}`}>
                 <div className="flex items-center justify-between mb-1">
                   <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${isToday ? "bg-indigo-600 text-white" : "text-gray-400"}`}>{day}</div>
-                  {entry && (<div className="flex items-center gap-1"><span className="text-[10px] font-black text-indigo-500">{entry.totalHours}h</span><span className={`w-2 h-2 rounded-full ${entry.status === "submitted" ? "bg-green-400" : "bg-yellow-400"}`} /></div>)}
+                  {entry && <div className="flex items-center gap-1"><span className="text-[10px] font-black text-indigo-500">{entry.totalHours}h</span><span className={`w-2 h-2 rounded-full ${entry.status === "submitted" ? "bg-green-400" : "bg-yellow-400"}`} /></div>}
                 </div>
-                {entry ? (<div className="flex-1 overflow-hidden space-y-0.5">{entry.tasks.slice(0, 3).map((t, ti) => (<div key={ti} className="flex items-center gap-1 min-w-0"><div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: t.workStatus === "Completed" ? "#22c55e" : t.workStatus === "Blocked" ? "#ef4444" : "#3b82f6" }} /><p className="text-[9px] text-gray-600 truncate font-medium">{t.taskTitle}</p></div>))}{entry.tasks.length > 3 && <p className="text-[9px] font-bold text-indigo-400">+{entry.tasks.length - 3} more</p>}</div>)
-                : !isFuture ? (<div className="flex-1 flex items-center justify-center"><p className="text-[10px] text-gray-300 font-semibold">{isToday ? "Log today" : "+ Add"}</p></div>) : null}
+                {entry ? (
+                  <div className="flex-1 overflow-hidden space-y-0.5">
+                    {entry.tasks.slice(0, 3).map((t, ti) => (<div key={ti} className="flex items-center gap-1 min-w-0"><div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: t.workStatus === "Completed" ? "#22c55e" : t.workStatus === "Blocked" ? "#ef4444" : "#3b82f6" }} /><p className="text-[9px] text-gray-600 truncate font-medium">{t.taskTitle}</p></div>))}
+                    {entry.tasks.length > 3 && <p className="text-[9px] font-bold text-indigo-400">+{entry.tasks.length - 3} more</p>}
+                  </div>
+                ) : !isFuture ? (
+                  <div className="flex-1 flex items-center justify-center"><p className="text-[10px] text-gray-300 font-semibold">{isToday ? "Log today" : "+ Add"}</p></div>
+                ) : null}
               </div>
             );
           })}
@@ -1403,120 +1806,84 @@ function EmployeeDailySheet({ user, projects }: { user: any; projects: any[] }) 
    MAIN COMPONENT
 ═══════════════════════════════════════════ */
 export default function ProjectManagement({ user, projects, users }: any) {
-  const [activeProject, setActiveProject] = useState<any>(null);
-  const [viewingTask, setViewingTask] = useState<Task | null>(null);
+  const [activeProject, setActiveProject]     = useState<any>(null);
+  const [viewingTask, setViewingTask]         = useState<Task | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [quickAddStory, setQuickAddStory] = useState<{ story: Task; ticketType: TicketType } | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [sprints, setSprints] = useState<any[]>([]);
-  const [activeSprint, setActiveSprint] = useState<any>(null);
-  const [activities, setActivities] = useState<any[]>([]);
-  const [myWorkLogs, setMyWorkLogs] = useState<WorkLog[]>([]);
-  const [allWorkLogs, setAllWorkLogs] = useState<WorkLog[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [milestones, setMilestones] = useState<any[]>([]);
-  const [columns, setColumns] = useState<Column[]>(DEFAULT_COLUMNS);
-  const [viewMode, setViewMode] = useState<"kanban" | "list" | "timeline" | "logs">("kanban");
-  const [filterPriority, setFilterPriority] = useState("all");
-  const [filterTicketType, setFilterTicketType] = useState<"all" | TicketType>("all");
-  const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"dashboard" | "projects" | "dailysheet" | "notifications">("dashboard");
+  const [quickAddStory, setQuickAddStory]     = useState<{ story: Task; ticketType: TicketType } | null>(null);
+  const [tasks, setTasks]                     = useState<Task[]>([]);
+  const [sprints, setSprints]                 = useState<any[]>([]);
+  const [activeSprint, setActiveSprint]       = useState<any>(null);
+  const [activities, setActivities]           = useState<any[]>([]);
+  const [myWorkLogs, setMyWorkLogs]           = useState<WorkLog[]>([]);
+  const [allWorkLogs, setAllWorkLogs]         = useState<WorkLog[]>([]);
+  const [notifications, setNotifications]     = useState<Notification[]>([]);
+  const [milestones, setMilestones]           = useState<any[]>([]);
+  const [columns, setColumns]                 = useState<Column[]>(DEFAULT_COLUMNS);
+  const [viewMode, setViewMode]               = useState<"kanban"|"list"|"timeline"|"logs">("kanban");
+  const [filterPriority, setFilterPriority]   = useState("all");
+  const [filterTicketType, setFilterTicketType] = useState<"all"|TicketType>("all");
+  const [search, setSearch]                   = useState("");
+  const [activeTab, setActiveTab]             = useState<"dashboard"|"projects"|"dailysheet"|"notifications">("dashboard");
   const [showWorkLogForm, setShowWorkLogForm] = useState(false);
+  const [toastMsg, setToastMsg]               = useState<string | null>(null);
   const [wl, setWl] = useState({ taskId: "", taskName: "", description: "", hoursWorked: "", workStatus: "In Progress" as WorkLog["workStatus"], date: new Date().toISOString().split("T")[0] });
 
-  const myProjects = projects?.filter((p: any) => p.members?.includes(user?.uid)) || [];
-  const userName = user?.email?.split("@")[0] || "";
+  const myProjects   = projects?.filter((p: any) => p.members?.includes(user?.uid)) || [];
+  const userName     = user?.displayName || user?.email?.split("@")[0] || "";
   const projectColor = activeProject?.color || "#6366f1";
-  const isProjectManager: boolean = !!(activeProject?.projectManager && activeProject.projectManager === user?.uid);
+
+  const permissions      = getPermissions(user, activeProject);
+  const isProjectManager = permissions.fullControl;
   const stories = tasks.filter(t => t.ticketType === "story");
 
-  const handleAddChildToStory = (story: Task, ticketType: TicketType) => {
-    setQuickAddStory({ story, ticketType });
-  };
+  const showToast = (msg: string) => setToastMsg(msg);
+  const handleAddChildToStory = (story: Task, ticketType: TicketType) => setQuickAddStory({ story, ticketType });
 
-  /* Sync columns */
   useEffect(() => {
     if (!activeProject?.id) return;
-    const q = query(
-      collection(db, "projectColumns"),
-      where("projectId", "==", activeProject.id)
-    );
-    const unsub = onSnapshot(q, (snap) => {
+    const q = query(collection(db, "projectColumns"), where("projectId","==",activeProject.id));
+    return onSnapshot(q, snap => {
       if (!snap.empty) {
         const data = snap.docs[0].data();
         setColumns(Array.isArray(data.columns) && data.columns.length > 0 ? data.columns : DEFAULT_COLUMNS);
-      } else {
-        setColumns(DEFAULT_COLUMNS);
-      }
+      } else { setColumns(DEFAULT_COLUMNS); }
     });
-    return () => unsub();
   }, [activeProject?.id]);
 
-const handleUpdateColumns = async (updated: Column[]) => {
+  const handleUpdateColumns = async (updated: Column[]) => {
     if (!activeProject?.id || !isProjectManager) return;
     setColumns(updated);
-
-    const q = query(
-      collection(db, "projectColumns"),
-      where("projectId", "==", activeProject.id)
-    );
+    const q = query(collection(db, "projectColumns"), where("projectId","==",activeProject.id));
     const snap = await getDocs(q);
-
-    if (!snap.empty) {
-      await updateDoc(doc(db, "projectColumns", snap.docs[0].id), {
-        columns: updated,
-        updatedAt: serverTimestamp(),
-      });
-    } else {
-      await addDoc(collection(db, "projectColumns"), {
-        projectId: activeProject.id,
-        columns: updated,
-        updatedAt: serverTimestamp(),
-      });
-    }
+    if (!snap.empty) await updateDoc(doc(db, "projectColumns", snap.docs[0].id), { columns: updated, updatedAt: serverTimestamp() });
+    else await addDoc(collection(db, "projectColumns"), { projectId: activeProject.id, columns: updated, updatedAt: serverTimestamp() });
   };
 
   useEffect(() => {
     if (!user?.uid) return;
-    const q = query(collection(db, "notifications"), where("userId", "==", user.uid), orderBy("createdAt", "desc"));
-    return onSnapshot(q, s => setNotifications(s.docs.map(d => ({ id: d.id, ...d.data() } as Notification))));
+    return onSnapshot(query(collection(db, "notifications"), where("userId","==",user.uid), orderBy("createdAt","desc")), s => setNotifications(s.docs.map(d => ({ id: d.id, ...d.data() } as Notification))));
   }, [user?.uid]);
 
   useEffect(() => {
     if (!user?.uid) return;
-    const q = query(collection(db, "workLogs"), where("userId", "==", user.uid), orderBy("createdAt", "desc"));
-    return onSnapshot(q, s => setMyWorkLogs(s.docs.map(d => ({ id: d.id, ...d.data() } as WorkLog))));
+    return onSnapshot(query(collection(db, "workLogs"), where("userId","==",user.uid), orderBy("createdAt","desc")), s => setMyWorkLogs(s.docs.map(d => ({ id: d.id, ...d.data() } as WorkLog))));
   }, [user?.uid]);
 
   useEffect(() => {
     if (!activeProject) return;
-
-    const tq = activeSprint
-      ? query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id), where("sprintId", "==", activeSprint.id))
-      : query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id));
-
+    const tq = query(collection(db, "projectTasks"), where("projectId","==",activeProject.id));
     const u1 = onSnapshot(tq, s => setTasks(s.docs.map(d => ({ id: d.id, ...d.data() } as Task))));
-    const u2 = onSnapshot(query(collection(db, "sprints"), where("projectId", "==", activeProject.id), orderBy("createdAt", "desc")), s => setSprints(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const u3 = onSnapshot(query(collection(db, "projectActivities"), where("projectId", "==", activeProject.id), orderBy("createdAt", "desc")), s => setActivities(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const u4 = onSnapshot(query(collection(db, "workLogs"), where("projectId", "==", activeProject.id), orderBy("createdAt", "desc")), s => setAllWorkLogs(s.docs.map(d => ({ id: d.id, ...d.data() } as WorkLog))));
-    const u5 = onSnapshot(query(collection(db, "milestones"), where("projectId", "==", activeProject.id)), s => setMilestones(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-
-    // Initialize columns in Firestore if not exists yet for this project
-    const initColumns = async () => {
-      const colQ = query(collection(db, "projectColumns"), where("projectId", "==", activeProject.id));
-      const colSnap = await getDocs(colQ);
-      if (colSnap.empty) {
-        await addDoc(collection(db, "projectColumns"), {
-          projectId: activeProject.id,
-          columns: DEFAULT_COLUMNS,
-          updatedAt: serverTimestamp(),
-        });
-      }
+    const u2 = onSnapshot(query(collection(db, "sprints"), where("projectId","==",activeProject.id), orderBy("createdAt","desc")), s => setSprints(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const u3 = onSnapshot(query(collection(db, "projectActivities"), where("projectId","==",activeProject.id), orderBy("createdAt","desc")), s => setActivities(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const u4 = onSnapshot(query(collection(db, "workLogs"), where("projectId","==",activeProject.id), orderBy("createdAt","desc")), s => setAllWorkLogs(s.docs.map(d => ({ id: d.id, ...d.data() } as WorkLog))));
+    const u5 = onSnapshot(query(collection(db, "milestones"), where("projectId","==",activeProject.id)), s => setMilestones(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const initCols = async () => {
+      const colSnap = await getDocs(query(collection(db, "projectColumns"), where("projectId","==",activeProject.id)));
+      if (colSnap.empty) await addDoc(collection(db, "projectColumns"), { projectId: activeProject.id, columns: DEFAULT_COLUMNS, updatedAt: serverTimestamp() });
     };
-    initColumns();
-
+    initCols();
     return () => { u1(); u2(); u3(); u4(); u5(); };
-  }, [activeProject, activeSprint]);
+  }, [activeProject]);
 
   const logActivity = async (projectId: string, action: string, description: string, taskId?: string) => {
     await addDoc(collection(db, "projectActivities"), { projectId, userId: user.uid, userName, action, description, taskId: taskId ?? null, createdAt: serverTimestamp() });
@@ -1524,44 +1891,56 @@ const handleUpdateColumns = async (updated: Column[]) => {
 
   const handleStatusChange = async (taskId: string, newStatus: string) => {
     const task = tasks.find(t => t.id === taskId);
-    if (!task || (!isProjectManager && task.assignedTo !== user?.uid)) return;
+    if (!task) return;
+    if (!isProjectManager && task.assignedTo !== user?.uid) { showToast("You can only move your own tasks"); return; }
     await updateDoc(doc(db, "projectTasks", taskId), { status: newStatus, ...(newStatus === "inprogress" ? { startedAt: serverTimestamp() } : {}), ...(newStatus === "done" ? { completedAt: serverTimestamp() } : {}) });
     await logActivity(activeProject.id, "moved task", `"${task.title}" → ${columns.find(c => c.id === newStatus)?.label ?? newStatus}`, taskId);
-    const snap = await getDocs(query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id)));
+    const snap = await getDocs(query(collection(db, "projectTasks"), where("projectId","==",activeProject.id)));
     const all = snap.docs.map(d => d.data());
     if (all.length) await updateDoc(doc(db, "projects", activeProject.id), { progress: Math.round((all.filter(t => t.status === "done").length / all.length) * 100) });
   };
+  const handleAddChild = async (story: Task, ticketType: TicketType) => {
+  try {
+    await addDoc(collection(db, "projectTasks"), {
+      title: "",
+      description: "",
+      projectId: story.projectId,
+      parentStoryId: story.id,
+      parentStoryTitle: story.title,
+      ticketType: ticketType,
+      status: "todo",
+      priority: "Medium",
+      createdAt: serverTimestamp(),
+    });
+  } catch (err) {
+    console.error("Error adding child task:", err);
+  }
+};
 
   const handleCreateTask = async (data: Partial<Task> & { childTickets?: Partial<Task>[] }) => {
     const { childTickets: children, ...taskData } = data as any;
     const docRef = await addDoc(collection(db, "projectTasks"), {
-      ...taskData,
-      projectId: activeProject.id,
+      ...taskData, projectId: activeProject.id,
       ticketType: taskData.ticketType || "task",
       parentStoryId: taskData.parentStoryId || null,
-      createdAt: serverTimestamp(),
-      actualHours: 0,
+      sprintId: activeSprint?.id || null,
+      createdAt: serverTimestamp(), actualHours: 0,
     });
     await logActivity(activeProject.id, "created task", `"${taskData.title}" (${taskData.ticketType || "task"})`, docRef.id);
-
     if (children && children.length > 0) {
       for (const child of children) {
         await addDoc(collection(db, "projectTasks"), {
-          ...child,
-          projectId: activeProject.id,
-          parentStoryId: docRef.id,
-          parentStoryTitle: taskData.title,
+          ...child, projectId: activeProject.id,
+          parentStoryId: docRef.id, parentStoryTitle: taskData.title,
           ticketType: child.ticketType || "task",
           status: taskData.status || columns[0]?.id || "todo",
-          createdAt: serverTimestamp(),
-          actualHours: 0,
+          sprintId: activeSprint?.id || null,
+          createdAt: serverTimestamp(), actualHours: 0,
         });
       }
     }
-
-    setShowCreateModal(false);
-    setQuickAddStory(null);
-    const snap = await getDocs(query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id)));
+    setShowCreateModal(false); setQuickAddStory(null);
+    const snap = await getDocs(query(collection(db, "projectTasks"), where("projectId","==",activeProject.id)));
     const all = snap.docs.map(d => d.data());
     if (all.length) await updateDoc(doc(db, "projects", activeProject.id), { progress: Math.round((all.filter(t => t.status === "done").length / all.length) * 100) });
   };
@@ -1574,28 +1953,37 @@ const handleUpdateColumns = async (updated: Column[]) => {
   const markAllRead = async () => { for (const n of notifications.filter(n => !n.read)) await updateDoc(doc(db, "notifications", n.id), { read: true }); };
   const markRead = async (nid: string) => { await updateDoc(doc(db, "notifications", nid), { read: true }); };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
-  const myTasks = tasks.filter(t => t.assignedTo === user?.uid);
-  const myDone = myTasks.filter(t => t.status === "done").length;
-  const myProgress = myTasks.length > 0 ? Math.round((myDone / myTasks.length) * 100) : 0;
+  const unreadCount  = notifications.filter(n => !n.read).length;
+  const myTasks      = tasks.filter(t => t.assignedTo === user?.uid);
+  const myDone       = myTasks.filter(t => t.status === "done").length;
+  const myProgress   = myTasks.length > 0 ? Math.round((myDone / myTasks.length) * 100) : 0;
   const overdueTasks = myTasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "done");
-  const todayStr = new Date().toISOString().split("T")[0];
-  const todayLogs = myWorkLogs.filter(l => l.date === todayStr);
-  const todayHours = todayLogs.reduce((s, l) => s + l.hoursWorked, 0);
+  const todayStr     = new Date().toISOString().split("T")[0];
+  const todayLogs    = myWorkLogs.filter(l => l.date === todayStr);
+  const todayHours   = todayLogs.reduce((s, l) => s + l.hoursWorked, 0);
   const totalHoursAll = myWorkLogs.reduce((s, l) => s + l.hoursWorked, 0);
+  const { isPM } = getPermissions(user, activeProject);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [showTaskDetail, setShowTaskDetail] = useState(false);
 
-  const filteredTasks = tasks.filter(t =>
+  const sprintFilteredTasks = activeSprint ? tasks.filter(t => t.sprintId === activeSprint.id) : tasks;
+  const filteredTasks = sprintFilteredTasks.filter(t =>
     (filterPriority === "all" || t.priority === filterPriority) &&
     (filterTicketType === "all" || t.ticketType === filterTicketType) &&
     (!search || t.title.toLowerCase().includes(search.toLowerCase()))
   );
+
+  const handleTaskClick = (task: Task) => {
+  setSelectedTask(task);
+  setShowTaskDetail(true);
+};
 
   const handleSubmitWorkLog = async () => {
     if (!wl.description.trim() || !wl.hoursWorked || !activeProject) return;
     const taskObj = tasks.find(t => t.id === wl.taskId);
     await addDoc(collection(db, "workLogs"), { userId: user.uid, userName, projectId: activeProject.id, projectName: activeProject.name, taskId: wl.taskId || null, taskName: wl.taskName || taskObj?.title || null, description: wl.description, hoursWorked: Number(wl.hoursWorked), workStatus: wl.workStatus, date: wl.date, createdAt: serverTimestamp() });
     if (wl.taskId) {
-      const snap = await getDocs(query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id)));
+      const snap = await getDocs(query(collection(db, "projectTasks"), where("projectId","==",activeProject.id)));
       const td = snap.docs.find(d => d.id === wl.taskId);
       if (td) await updateDoc(doc(db, "projectTasks", wl.taskId), { actualHours: (td.data().actualHours || 0) + Number(wl.hoursWorked) });
     }
@@ -1604,11 +1992,15 @@ const handleUpdateColumns = async (updated: Column[]) => {
     setShowWorkLogForm(false);
   };
 
-  /* ── PROJECT VIEW ── */
+  /* ══════════════════════════════════
+     PROJECT VIEW
+  ══════════════════════════════════ */
   if (activeProject) {
     return (
       <div className="h-screen flex flex-col bg-gray-50 overflow-hidden" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
         <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap');`}</style>
+
+        {toastMsg && <PermissionToast message={toastMsg} onHide={() => setToastMsg(null)} />}
 
         {/* Top bar */}
         <div className="shrink-0 bg-white border-b border-gray-200 shadow-sm">
@@ -1618,10 +2010,17 @@ const handleUpdateColumns = async (updated: Column[]) => {
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full" style={{ background: projectColor }} />
               <h1 className="font-bold text-gray-900 text-sm">{activeProject.name}</h1>
+              {isProjectManager && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white ml-1" style={{ background: projectColor }}>👑 PM</span>
+              )}
+              {permissions.isAdmin && !permissions.isPM && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 ml-1">⚙️ Admin</span>
+              )}
             </div>
             <div className="flex items-center gap-4 ml-auto">
               <div className="flex items-center gap-2"><ProgressRing pct={myProgress} size={32} stroke={3} color={projectColor} /><div><p className="text-xs font-bold text-gray-700">{myProgress}%</p><p className="text-[10px] text-gray-400">My tasks</p></div></div>
               {overdueTasks.length > 0 && <span className="text-xs font-semibold bg-red-50 text-red-600 border border-red-100 px-2.5 py-1 rounded-full">⚠️ {overdueTasks.length} overdue</span>}
+              <TeamButton users={users} activeProject={activeProject} user={user} projectColor={projectColor} />
             </div>
           </div>
 
@@ -1645,9 +2044,7 @@ const handleUpdateColumns = async (updated: Column[]) => {
             </select>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search..." className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none w-36" />
             <div className="flex-1" />
-            <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-1.5 text-xs font-bold px-4 py-1.5 rounded-lg text-white shadow-sm transition" style={{ background: projectColor }}>
-              + New Ticket
-            </button>
+            <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-1.5 text-xs font-bold px-4 py-1.5 rounded-lg text-white shadow-sm transition" style={{ background: projectColor }}>+ New Ticket</button>
             <button onClick={() => setShowWorkLogForm(!showWorkLogForm)} className="flex items-center gap-1.5 text-xs font-bold px-4 py-1.5 rounded-lg text-white shadow-sm" style={{ background: "#64748b" }}>⏱ Log Work</button>
           </div>
 
@@ -1659,7 +2056,7 @@ const handleUpdateColumns = async (updated: Column[]) => {
           )}
         </div>
 
-        {/* Work Log inline form */}
+        {/* Inline work log form */}
         {showWorkLogForm && (
           <div className="shrink-0 px-6 py-3 bg-indigo-50 border-b border-indigo-100">
             <div className="flex items-start gap-4 flex-wrap">
@@ -1678,12 +2075,12 @@ const handleUpdateColumns = async (updated: Column[]) => {
         {/* Stats bar */}
         <div className="shrink-0 px-6 py-2.5 bg-white border-b border-gray-100 flex items-center gap-6">
           {[
-            { label: "My Tasks",    val: myTasks.length,                                              color: "#64748b" },
-            { label: "Done",        val: myDone,                                                      color: "#16a34a" },
-            { label: "In Progress", val: myTasks.filter(t => t.status === "inprogress").length,       color: "#2563eb" },
-            { label: "Overdue",     val: overdueTasks.length,                                         color: "#dc2626" },
-            { label: "Stories",     val: tasks.filter(t => t.ticketType === "story").length,          color: "#7c3aed" },
-            { label: "Bugs",        val: tasks.filter(t => t.ticketType === "bug").length,            color: "#dc2626" },
+            { label: "My Tasks",    val: myTasks.length,                                        color: "#64748b" },
+            { label: "Done",        val: myDone,                                                color: "#16a34a" },
+            { label: "In Progress", val: myTasks.filter(t => t.status === "inprogress").length, color: "#2563eb" },
+            { label: "Overdue",     val: overdueTasks.length,                                   color: "#dc2626" },
+            { label: "Stories",     val: tasks.filter(t => t.ticketType === "story").length,    color: "#7c3aed" },
+            { label: "Bugs",        val: tasks.filter(t => t.ticketType === "bug").length,      color: "#dc2626" },
           ].map(s => (
             <div key={s.label} className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full" style={{ background: s.color }} />
@@ -1696,21 +2093,28 @@ const handleUpdateColumns = async (updated: Column[]) => {
           </div>
         </div>
 
+        {/* Team members strip */}
+
         {/* Main content */}
         <div className="flex-1 overflow-auto">
           {viewMode === "kanban" && (
             <div className="h-full border border-gray-200 rounded-xl m-4 overflow-hidden bg-white shadow-sm">
-              <KanbanBoard
-                tasks={filteredTasks}
-                columns={columns}
-                projectColor={projectColor}
-                currentUserId={user?.uid}
-                isProjectManager={isProjectManager}
-                onTaskClick={t => setViewingTask(t)}
-                onStatusChange={handleStatusChange}
-                onUpdateColumns={handleUpdateColumns}
-                onAddChildToStory={handleAddChildToStory}
-              />
+             <KanbanBoard
+  tasks={tasks}
+  columns={columns}
+  projectColor={activeProject?.color || "#6366f1"}
+  currentUserId={user?.uid || ""}
+  isProjectManager={isPM}
+  onTaskClick={handleTaskClick}
+  onStatusChange={handleStatusChange}
+  onUpdateColumns={handleUpdateColumns}
+  onAddChildToStory={handleAddChild}
+  user={user}
+  activeProject={activeProject}
+
+  // ✅ ADD THIS
+  onToast={(msg) => alert(msg)} // simple fix
+/>
             </div>
           )}
 
@@ -1722,10 +2126,10 @@ const handleUpdateColumns = async (updated: Column[]) => {
                   <tbody>
                     {filteredTasks.map(task => {
                       const mine = task.assignedTo === user?.uid;
-                      const pc = PRIORITY_CONFIG[task.priority];
+                      const pc   = PRIORITY_CONFIG[task.priority];
                       const colIdx = columns.findIndex(c => c.id === task.status);
-                      const cc = getColStyle(task.status, colIdx >= 0 ? colIdx : 0);
-                      const tc = TICKET_TYPES[task.ticketType || "task"];
+                      const cc   = getColStyle(task.status, colIdx >= 0 ? colIdx : 0);
+                      const tc   = TICKET_TYPES[task.ticketType || "task"];
                       return (
                         <tr key={task.id} onClick={() => setViewingTask(task)}
                           className={`border-b border-gray-50 cursor-pointer transition group ${(mine || isProjectManager) ? "hover:bg-indigo-50/40" : "hover:bg-gray-50 opacity-60"}`}>
@@ -1759,7 +2163,10 @@ const handleUpdateColumns = async (updated: Column[]) => {
                       {i < activities.length - 1 && <div className="absolute left-4 top-9 bottom-0 w-px bg-gray-100" />}
                       <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0 mt-0.5" style={a.userId === user?.uid ? { background: projectColor } : { background: "#cbd5e1" }}>{a.userName?.[0]?.toUpperCase()}</div>
                       <div className={`flex-1 pb-4 rounded-xl p-3 border ${a.userId === user?.uid ? "bg-indigo-50/40 border-indigo-100" : "bg-gray-50 border-gray-100"}`}>
-                        <div className="flex items-center justify-between mb-1"><p className="text-sm"><span className="font-semibold text-gray-800">{a.userName}</span>{a.userId === user?.uid && <span className="text-xs text-indigo-500 ml-1">(you)</span>} <span className="text-gray-400">{a.action}</span></p><span className="text-xs text-gray-400">{a.createdAt?.toDate().toLocaleString()}</span></div>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-sm"><span className="font-semibold text-gray-800">{a.userName}</span>{a.userId === user?.uid && <span className="text-xs text-indigo-500 ml-1">(you)</span>} <span className="text-gray-400">{a.action}</span></p>
+                          <span className="text-xs text-gray-400">{a.createdAt?.toDate().toLocaleString()}</span>
+                        </div>
                         <p className="text-xs text-gray-600">{a.description}</p>
                       </div>
                     </div>
@@ -1772,12 +2179,27 @@ const handleUpdateColumns = async (updated: Column[]) => {
           {viewMode === "logs" && (
             <div className="p-6">
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="p-5 border-b border-gray-50 flex items-center justify-between"><h3 className="font-bold text-gray-800">My Work Logs — {activeProject.name}</h3><span className="text-sm font-bold" style={{ color: projectColor }}>{allWorkLogs.filter(l => l.userId === user?.uid).reduce((s, l) => s + l.hoursWorked, 0)}h total</span></div>
+                <div className="p-5 border-b border-gray-50 flex items-center justify-between">
+                  <h3 className="font-bold text-gray-800">My Work Logs — {activeProject.name}</h3>
+                  <span className="text-sm font-bold" style={{ color: projectColor }}>{allWorkLogs.filter(l => l.userId === user?.uid).reduce((s, l) => s + l.hoursWorked, 0)}h total</span>
+                </div>
                 <div className="divide-y divide-gray-50">
                   {allWorkLogs.filter(l => l.userId === user?.uid).map(log => (
                     <div key={log.id} className="flex items-start gap-4 p-4 hover:bg-gray-50 transition">
                       <Avatar name={log.userName} size="sm" />
-                      <div className="flex-1"><div className="flex items-start justify-between gap-3"><div>{log.taskName && <p className="text-xs font-semibold text-gray-500 mb-0.5">{log.taskName}</p>}<p className="text-sm text-gray-700">{log.description}</p><div className="flex items-center gap-2 mt-1"><span className="text-xs text-gray-400">{log.date}</span><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${log.workStatus === "Completed" ? "bg-green-100 text-green-700" : log.workStatus === "Blocked" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>{log.workStatus}</span></div></div><span className="text-2xl font-black shrink-0" style={{ color: projectColor }}>{log.hoursWorked}h</span></div></div>
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            {log.taskName && <p className="text-xs font-semibold text-gray-500 mb-0.5">{log.taskName}</p>}
+                            <p className="text-sm text-gray-700">{log.description}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-xs text-gray-400">{log.date}</span>
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${log.workStatus === "Completed" ? "bg-green-100 text-green-700" : log.workStatus === "Blocked" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>{log.workStatus}</span>
+                            </div>
+                          </div>
+                          <span className="text-2xl font-black shrink-0" style={{ color: projectColor }}>{log.hoursWorked}h</span>
+                        </div>
+                      </div>
                     </div>
                   ))}
                   {allWorkLogs.filter(l => l.userId === user?.uid).length === 0 && <div className="text-center py-16 text-gray-300"><div className="text-5xl mb-3">⏱</div><p className="text-sm">No work logged yet</p></div>}
@@ -1787,7 +2209,7 @@ const handleUpdateColumns = async (updated: Column[]) => {
           )}
         </div>
 
-        {/* CREATE TASK MODAL */}
+        {/* Modals */}
         {showCreateModal && (
           <TaskModal
             open={showCreateModal}
@@ -1800,16 +2222,16 @@ const handleUpdateColumns = async (updated: Column[]) => {
             stories={stories}
             currentUserId={user?.uid}
             isProjectManager={isProjectManager}
+            allowedTypes={permissions.canCreateTypes}
           />
         )}
 
-        {/* QUICK ADD CHILD TO STORY MODAL */}
         {quickAddStory && (
           <TaskModal
             open={!!quickAddStory}
             onClose={() => setQuickAddStory(null)}
             onSubmit={handleCreateTask}
-            users={users}
+            users={users || []}
             columns={columns}
             projectColor={projectColor}
             initialData={{
@@ -1822,10 +2244,10 @@ const handleUpdateColumns = async (updated: Column[]) => {
             stories={stories}
             currentUserId={user?.uid}
             isProjectManager={isProjectManager}
+            allowedTypes={permissions.canCreateTypes}
           />
         )}
 
-        {/* VIEW/EDIT TASK DETAIL */}
         {viewingTask && (
           <TaskDetailModal
             task={viewingTask}
@@ -1835,6 +2257,7 @@ const handleUpdateColumns = async (updated: Column[]) => {
             projectName={activeProject.name}
             currentUserId={user?.uid}
             isProjectManager={isProjectManager}
+            canDelete={permissions.canDelete}
             users={users}
             onStatusChange={handleStatusChange}
             onSave={handleSaveTask}
@@ -1847,15 +2270,25 @@ const handleUpdateColumns = async (updated: Column[]) => {
     );
   }
 
-  /* ── MAIN DASHBOARD ── */
+  /* ══════════════════════════════════
+     MAIN DASHBOARD
+  ══════════════════════════════════ */
   return (
     <div className="min-h-screen bg-gray-50" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap');`}</style>
 
-      {/* Nav */}
       <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-40">
         <div className="px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3"><Avatar name={userName} size="md" highlight /><div><p className="font-bold text-sm text-gray-900">Hey, {userName} 👋</p><p className="text-xs text-gray-400">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p></div></div>
+          <div className="flex items-center gap-3">
+            <Avatar name={userName} size="md" highlight />
+            <div>
+              <p className="font-bold text-sm text-gray-900">Hey, {userName} 👋</p>
+              <p className="text-xs text-gray-400">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
+            </div>
+            {user?.designation && (
+              <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 ml-1">{user.designation}</span>
+            )}
+          </div>
           <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
             {([["dashboard","🏠 Dashboard"],["projects","📁 Projects"],["dailysheet","📋 Daily Sheet"],["notifications","🔔 Inbox"]] as const).map(([t, label]) => (
               <button key={t} onClick={() => setActiveTab(t)} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition ${activeTab === t ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"}`}>
@@ -1868,33 +2301,64 @@ const handleUpdateColumns = async (updated: Column[]) => {
       </div>
 
       <div className="max-w-6xl mx-auto px-6 py-6 space-y-6">
+
         {activeTab === "dailysheet" && <EmployeeDailySheet user={user} projects={myProjects} />}
 
         {activeTab === "dashboard" && (
           <div className="space-y-5">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { icon: "📁", label: "My Projects", val: myProjects.length, bg: "#e8f1ff" },
-                { icon: "⏱", label: "Today's Hours", val: `${todayHours}h`, bg: "#e7f8ee" },
-                { icon: "📊", label: "Total Hours", val: `${totalHoursAll}h`, bg: "#eef2ff" },
-                { icon: "⚠️", label: "Overdue Tasks", val: overdueTasks.length, bg: "#fff4e5" },
+                { icon: "📁", label: "My Projects",   val: myProjects.length,   bg: "#e8f1ff" },
+                { icon: "⏱", label: "Today's Hours",  val: `${todayHours}h`,    bg: "#e7f8ee" },
+                { icon: "📊", label: "Total Hours",    val: `${totalHoursAll}h`, bg: "#eef2ff" },
+                { icon: "⚠️", label: "Overdue Tasks",  val: overdueTasks.length, bg: "#fff4e5" },
               ].map(s => (
                 <div key={s.label} className="rounded-2xl p-5 shadow-sm" style={{ background: s.bg }}>
-                  <div className="flex justify-between items-start"><div><p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{s.label}</p><p className="text-4xl font-black text-gray-800">{s.val}</p></div><span className="text-3xl">{s.icon}</span></div>
+                  <div className="flex justify-between items-start">
+                    <div><p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{s.label}</p><p className="text-4xl font-black text-gray-800">{s.val}</p></div>
+                    <span className="text-3xl">{s.icon}</span>
+                  </div>
                 </div>
               ))}
             </div>
             <div className="grid md:grid-cols-2 gap-5">
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="p-5 border-b border-gray-50 flex items-center justify-between"><div><h3 className="font-bold text-gray-800">Today's Work</h3><p className="text-xs text-gray-400 mt-0.5">{todayStr}</p></div><span className="text-2xl font-black text-indigo-600">{todayHours}h</span></div>
+                <div className="p-5 border-b border-gray-50 flex items-center justify-between">
+                  <div><h3 className="font-bold text-gray-800">Today's Work</h3><p className="text-xs text-gray-400 mt-0.5">{todayStr}</p></div>
+                  <span className="text-2xl font-black text-indigo-600">{todayHours}h</span>
+                </div>
                 {todayLogs.length === 0
                   ? <div className="text-center py-10 text-gray-300"><div className="text-4xl mb-2">📝</div><p className="text-sm font-medium">No work logged today</p></div>
-                  : <div className="divide-y divide-gray-50">{todayLogs.map(log => (<div key={log.id} className="flex items-start gap-3 p-4"><div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-indigo-400" /><div className="flex-1"><p className="text-xs font-bold text-indigo-600 mb-0.5">{log.projectName}</p>{log.taskName && <p className="text-xs text-gray-400">{log.taskName}</p>}<p className="text-sm text-gray-700 mt-0.5">{log.description}</p></div><div className="text-right shrink-0"><p className="font-black text-lg text-indigo-600">{log.hoursWorked}h</p></div></div>))}</div>
+                  : <div className="divide-y divide-gray-50">{todayLogs.map(log => (
+                      <div key={log.id} className="flex items-start gap-3 p-4">
+                        <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-indigo-400" />
+                        <div className="flex-1"><p className="text-xs font-bold text-indigo-600 mb-0.5">{log.projectName}</p>{log.taskName && <p className="text-xs text-gray-400">{log.taskName}</p>}<p className="text-sm text-gray-700 mt-0.5">{log.description}</p></div>
+                        <p className="font-black text-lg text-indigo-600">{log.hoursWorked}h</p>
+                      </div>
+                    ))}</div>
                 }
               </div>
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="p-5 border-b border-gray-50 flex items-center justify-between"><h3 className="font-bold text-gray-800">My Projects</h3><button onClick={() => setActiveTab("projects")} className="text-xs font-semibold text-indigo-600">View all →</button></div>
-                <div className="divide-y divide-gray-50">{myProjects.slice(0, 4).map((p: any) => (<div key={p.id} onClick={() => { setActiveProject(p); setActiveTab("projects"); }} className="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 transition group"><div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0" style={{ background: p.color || "#6366f1" }}>{p.name[0]}</div><div className="flex-1 min-w-0"><p className="font-semibold text-sm text-gray-800 truncate group-hover:text-indigo-700">{p.name}</p><div className="flex items-center gap-2 mt-1"><div className="flex-1 bg-gray-100 rounded-full h-1"><div className="h-1 rounded-full" style={{ width: `${p.progress || 0}%`, background: p.color || "#6366f1" }} /></div><span className="text-[10px] font-bold" style={{ color: p.color || "#6366f1" }}>{p.progress || 0}%</span></div></div><span className="text-gray-300 group-hover:text-indigo-400">→</span></div>))}{myProjects.length === 0 && <div className="text-center py-10 text-gray-300"><div className="text-4xl mb-2">📭</div><p className="text-sm">No projects yet</p></div>}</div>
+                <div className="p-5 border-b border-gray-50 flex items-center justify-between">
+                  <h3 className="font-bold text-gray-800">My Projects</h3>
+                  <button onClick={() => setActiveTab("projects")} className="text-xs font-semibold text-indigo-600">View all →</button>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {myProjects.slice(0, 4).map((p: any) => (
+                    <div key={p.id} onClick={() => { setActiveProject(p); setActiveTab("projects"); }} className="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 transition group">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0" style={{ background: p.color || "#6366f1" }}>{p.name[0]}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-gray-800 truncate group-hover:text-indigo-700">{p.name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="flex-1 bg-gray-100 rounded-full h-1"><div className="h-1 rounded-full" style={{ width: `${p.progress || 0}%`, background: p.color || "#6366f1" }} /></div>
+                          <span className="text-[10px] font-bold" style={{ color: p.color || "#6366f1" }}>{p.progress || 0}%</span>
+                        </div>
+                      </div>
+                      <span className="text-gray-300 group-hover:text-indigo-400">→</span>
+                    </div>
+                  ))}
+                  {myProjects.length === 0 && <div className="text-center py-10 text-gray-300"><div className="text-4xl mb-2">📭</div><p className="text-sm">No projects yet</p></div>}
+                </div>
               </div>
             </div>
           </div>
@@ -1902,30 +2366,41 @@ const handleUpdateColumns = async (updated: Column[]) => {
 
         {activeTab === "projects" && (
           <div className="space-y-5">
-            <div className="flex items-center justify-between"><div><h2 className="text-2xl font-black text-gray-900">My Projects</h2><p className="text-sm text-gray-400">{myProjects.length} project{myProjects.length !== 1 ? "s" : ""}</p></div></div>
+            <div className="flex items-center justify-between">
+              <div><h2 className="text-2xl font-black text-gray-900">My Projects</h2><p className="text-sm text-gray-400">{myProjects.length} project{myProjects.length !== 1 ? "s" : ""}</p></div>
+            </div>
             {myProjects.length === 0
               ? <div className="text-center py-24 bg-white rounded-2xl border border-gray-100 text-gray-300"><div className="text-6xl mb-4">📭</div><p className="text-xl font-bold text-gray-400">No projects yet</p></div>
               : <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                  {myProjects.map((project: any) => (
-                    <div key={project.id} onClick={() => setActiveProject(project)} className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all cursor-pointer group overflow-hidden">
-                      <div className="h-1.5" style={{ background: project.color || "#6366f1" }} />
-                      <div className="p-5">
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0" style={{ background: project.color || "#6366f1" }}>{project.name[0]}</div>
-                            <div><h3 className="font-bold text-sm text-gray-900 group-hover:text-indigo-700">{project.name}</h3>{project.clientName && <p className="text-xs text-gray-400">{project.clientName}</p>}</div>
+                  {myProjects.map((project: any) => {
+                    const projPerms = getPermissions(user, project);
+                    return (
+                      <div key={project.id} onClick={() => setActiveProject(project)} className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all cursor-pointer group overflow-hidden">
+                        <div className="h-1.5" style={{ background: project.color || "#6366f1" }} />
+                        <div className="p-5">
+                          <div className="flex items-start justify-between gap-3 mb-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0" style={{ background: project.color || "#6366f1" }}>{project.name[0]}</div>
+                              <div><h3 className="font-bold text-sm text-gray-900 group-hover:text-indigo-700">{project.name}</h3>{project.clientName && <p className="text-xs text-gray-400">{project.clientName}</p>}</div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1">
+                              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${project.status === "Completed" ? "bg-green-100 text-green-700" : project.status === "In Progress" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>{project.status}</span>
+                              {projPerms.fullControl && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background: project.color || "#6366f1" }}>👑 PM</span>}
+                            </div>
                           </div>
-                          <div className="flex flex-col items-end gap-1">
-                            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${project.status === "Completed" ? "bg-green-100 text-green-700" : project.status === "In Progress" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>{project.status}</span>
-                            {project.projectManager === user?.uid && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background: project.color || "#6366f1" }}>👑 PM</span>}
+                          <p className="text-xs text-gray-400 line-clamp-2 mb-4 leading-relaxed">{project.description || "No description"}</p>
+                          <div>
+                            <div className="flex justify-between mb-1.5"><span className="text-xs text-gray-400">Progress</span><span className="text-xs font-bold" style={{ color: project.color || "#6366f1" }}>{project.progress || 0}%</span></div>
+                            <div className="w-full bg-gray-100 rounded-full h-1.5"><div className="h-1.5 rounded-full" style={{ width: `${project.progress || 0}%`, background: project.color || "#6366f1" }} /></div>
+                          </div>
+                          <div className="mt-3 flex items-center justify-between">
+                            {project.endDate && <span className="text-xs text-gray-400">📅 {project.endDate}</span>}
+                            <span className="text-xs font-semibold text-indigo-600 group-hover:underline ml-auto">Open →</span>
                           </div>
                         </div>
-                        <p className="text-xs text-gray-400 line-clamp-2 mb-4 leading-relaxed">{project.description || "No description"}</p>
-                        <div><div className="flex justify-between mb-1.5"><span className="text-xs text-gray-400">Progress</span><span className="text-xs font-bold" style={{ color: project.color || "#6366f1" }}>{project.progress || 0}%</span></div><div className="w-full bg-gray-100 rounded-full h-1.5"><div className="h-1.5 rounded-full" style={{ width: `${project.progress || 0}%`, background: project.color || "#6366f1" }} /></div></div>
-                        <div className="mt-3 flex items-center justify-between">{project.endDate && <span className="text-xs text-gray-400">📅 {project.endDate}</span>}<span className="text-xs font-semibold text-indigo-600 group-hover:underline ml-auto">Open →</span></div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
             }
           </div>
@@ -1933,10 +2408,33 @@ const handleUpdateColumns = async (updated: Column[]) => {
 
         {activeTab === "notifications" && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between"><div><h2 className="text-2xl font-black text-gray-900">Inbox</h2><p className="text-sm text-gray-400">{unreadCount} unread</p></div>{unreadCount > 0 && <button onClick={markAllRead} className="text-xs font-bold px-4 py-2 rounded-xl border border-indigo-200 text-indigo-600 hover:bg-indigo-50">Mark all read ✓</button>}</div>
+            <div className="flex items-center justify-between">
+              <div><h2 className="text-2xl font-black text-gray-900">Inbox</h2><p className="text-sm text-gray-400">{unreadCount} unread</p></div>
+              {unreadCount > 0 && <button onClick={markAllRead} className="text-xs font-bold px-4 py-2 rounded-xl border border-indigo-200 text-indigo-600 hover:bg-indigo-50">Mark all read ✓</button>}
+            </div>
             {notifications.length === 0
               ? <div className="text-center py-24 bg-white rounded-2xl border border-gray-100 text-gray-300"><div className="text-6xl mb-4">🔔</div><p className="text-xl font-bold text-gray-400">All clear!</p></div>
-              : <div className="space-y-2">{notifications.map(n => (<div key={n.id} onClick={() => markRead(n.id)} className={`bg-white rounded-2xl border p-4 cursor-pointer hover:shadow-md transition-all ${!n.read ? "border-indigo-100 shadow-sm" : "border-gray-100"}`}><div className="flex items-start gap-4"><div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 ${n.type === "project_added" ? "bg-indigo-100" : n.type === "task_assigned" ? "bg-amber-100" : "bg-gray-100"}`}>{n.type === "project_added" ? "📁" : n.type === "task_assigned" ? "📋" : "🔔"}</div><div className="flex-1"><div className="flex items-start justify-between gap-2"><div><p className="font-bold text-sm text-gray-800">{n.title}</p><p className="text-sm text-gray-500 mt-0.5">{n.message}</p></div>{!n.read && <div className="w-2 h-2 rounded-full bg-indigo-500 shrink-0 mt-1.5" />}</div><div className="flex items-center gap-3 mt-2"><span className="text-xs text-gray-400">{n.createdAt?.toDate().toLocaleString()}</span>{n.projectId && <button onClick={e => { e.stopPropagation(); const p = myProjects.find((proj: any) => proj.id === n.projectId); if (p) { setActiveProject(p); setActiveTab("projects"); } markRead(n.id); }} className="text-xs font-semibold text-indigo-600">Open Project →</button>}</div></div></div></div>))}</div>
+              : <div className="space-y-2">
+                  {notifications.map(n => (
+                    <div key={n.id} onClick={() => markRead(n.id)} className={`bg-white rounded-2xl border p-4 cursor-pointer hover:shadow-md transition-all ${!n.read ? "border-indigo-100 shadow-sm" : "border-gray-100"}`}>
+                      <div className="flex items-start gap-4">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 ${n.type === "project_added" ? "bg-indigo-100" : n.type === "task_assigned" ? "bg-amber-100" : "bg-gray-100"}`}>{n.type === "project_added" ? "📁" : n.type === "task_assigned" ? "📋" : "🔔"}</div>
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div><p className="font-bold text-sm text-gray-800">{n.title}</p><p className="text-sm text-gray-500 mt-0.5">{n.message}</p></div>
+                            {!n.read && <div className="w-2 h-2 rounded-full bg-indigo-500 shrink-0 mt-1.5" />}
+                          </div>
+                          <div className="flex items-center gap-3 mt-2">
+                            <span className="text-xs text-gray-400">{n.createdAt?.toDate().toLocaleString()}</span>
+                            {n.projectId && (
+                              <button onClick={e => { e.stopPropagation(); const p = myProjects.find((proj: any) => proj.id === n.projectId); if (p) { setActiveProject(p); setActiveTab("projects"); } markRead(n.id); }} className="text-xs font-semibold text-indigo-600">Open Project →</button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
             }
           </div>
         )}

@@ -114,9 +114,9 @@ const sidebarGroups = [
     ["projects","Projects","📁"]
   ]},
 
-  { title: "PROJECT MANAGEMENT", items: [
-    ["projects","Projects","📁"]
-  ]},
+  // { title: "PROJECT MANAGEMENT", items: [
+  //   ["projects","Projects","📁"]
+  // ]},
 
   { title: "LEAVE & HOLIDAYS", items: [
     ["leave-request","Apply Leave","📋"],
@@ -728,16 +728,33 @@ export default function ZohoStyleEmployeeDashboard() {
 
         <nav className="flex-1 px-2 py-3 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20">
 
-  {/* 🔥 DASHBOARD DIRECT BUTTON */}
-  <button
-    onClick={() => { setActiveView("dashboard"); setMobileMenuOpen(false); }}
-    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition
-      ${activeView === "dashboard" ? "bg-white/10" : "hover:bg-white/5"}`}
-  >
-    {/* <span className="text-base"></span> */}
-    {!sidebarCollapsed && <span className="text-sm font-medium">DASHBOARD</span>}
-  </button>
+  {/*DIRECT BUTTON */}
+  {/* DASHBOARD */}
+<button
+  onClick={() => { setActiveView("dashboard"); setMobileMenuOpen(false); }}
+  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition
+    ${activeView === "dashboard" ? "bg-white/10" : "hover:bg-white/5"}`}
+>
+  {!sidebarCollapsed && <span className="text-sm font-medium">📊 DASHBOARD</span>}
+</button>
 
+{/* PROJECTS */}
+<button
+  onClick={() => { setActiveView("projects"); setMobileMenuOpen(false); }}
+  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition
+    ${activeView === "projects" ? "bg-white/10" : "hover:bg-white/5"}`}
+>
+  {!sidebarCollapsed && <span className="text-sm font-medium">📁 PROJECTS</span>}
+</button>
+
+{/* PAYSLIPS */}
+<button
+  onClick={() => { setActiveView("payslips"); setMobileMenuOpen(false); }}
+  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition
+    ${activeView === "payslips" ? "bg-white/10" : "hover:bg-white/5"}`}
+>
+  {!sidebarCollapsed && <span className="text-sm font-medium">💰 PAYSLIPS</span>}
+</button>
  
   {/* 🔥 REST OF GROUPS */}
   {sidebarCollapsed ? (

@@ -24,7 +24,14 @@ interface Project {
   columns?: KanbanColumn[];
 }
 interface Sprint { id: string; name: string; projectId: string; startDate?: string; endDate?: string; status: string; createdAt: any; }
-interface WorkLog { id: string; userId: string; userName: string; projectId: string; projectName: string; taskId?: string; taskName?: string; description: string; hoursWorked: number; workStatus: "Completed" | "In Progress" | "Blocked"; date: string; createdAt: any; }
+interface WorkLog {
+  id: string; userId: string; userName: string; projectId: string; projectName: string;
+  taskId?: string; taskName?: string; description: string; hoursWorked: number;
+  workStatus: "Completed" | "In Progress" | "Blocked"; date: string; createdAt: any;
+  // Add these two:
+  status?: "done" | "progress" | "blocked";
+  hours?: number;
+}
 interface Milestone { id: string; projectId: string; title: string; dueDate?: string; status: "pending" | "completed"; createdAt: any; }
 interface DailyTask { id: string; projectId: string; projectName: string; taskTitle: string; description: string; hoursWorked: number; workStatus: "Completed" | "In Progress" | "Blocked" | "Review"; category: string; }
 interface DailyEntry { id: string; userId: string; userName: string; userEmail: string; date: string; month: string; tasks: DailyTask[]; totalHours: number; status: "submitted" | "draft"; submittedAt?: any; createdAt: any; }
@@ -183,17 +190,28 @@ function SprintPicker({ sprints, activeSprint, onSelect, onDelete }: {
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
+
+  
+  const getSprintStatus = (s: Sprint) => {
+    const now = new Date();
+    if (s.status === "completed") return { label: "Completed", color: "#16a34a", bg: "#f0fdf4" };
+    if (s.endDate && new Date(s.endDate) < now) return { label: "Ended", color: "#dc2626", bg: "#fef2f2" };
+    if (s.startDate && new Date(s.startDate) > now) return { label: "Upcoming", color: "#d97706", bg: "#fffbeb" };
+    return { label: "Active", color: "#2563eb", bg: "#eff6ff" };
+  };
+
   return (
     <div ref={ref} className="relative">
       <button onClick={() => setOpen(o => !o)}
         className="flex items-center gap-1.5 text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white hover:bg-gray-50 transition focus:outline-none"
-        style={{minWidth:"130px"}}>
-        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{background: activeSprint ? "#8b5cf6" : "#d1d5db"}} />
+        style={{ minWidth: "150px" }}>
+        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: activeSprint ? "#8b5cf6" : "#d1d5db" }} />
         <span className="flex-1 text-left text-gray-700 truncate">{activeSprint ? activeSprint.name : "All Sprints"}</span>
+        {activeSprint && (() => { const st = getSprintStatus(activeSprint); return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: st.bg, color: st.color }}>{st.label}</span>; })()}
         <span className="text-gray-400 text-[10px] shrink-0">{open ? "▴" : "▾"}</span>
       </button>
       {open && (
-        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1" style={{minWidth:"200px",maxWidth:"240px",boxShadow:"0 8px 24px rgba(0,0,0,0.12)"}}>
+        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1" style={{ minWidth: "220px", maxWidth: "260px", boxShadow: "0 8px 24px rgba(0,0,0,0.12)" }}>
           <div onClick={() => { onSelect(null); setOpen(false); }}
             className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition text-xs ${!activeSprint ? "bg-indigo-50 text-indigo-700 font-semibold" : "hover:bg-gray-50 text-gray-700"}`}>
             <span className="w-1.5 h-1.5 rounded-full bg-gray-300 shrink-0" />
@@ -203,20 +221,24 @@ function SprintPicker({ sprints, activeSprint, onSelect, onDelete }: {
           {sprints.length > 0 && <div className="border-t border-gray-100 my-1" />}
           {sprints.length === 0
             ? <div className="px-3 py-3 text-[11px] text-gray-400 text-center">No sprints yet</div>
-            : sprints.map(s => (
-              <div key={s.id}
-                className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition group/spr ${activeSprint?.id === s.id ? "bg-purple-50" : "hover:bg-gray-50"}`}
-                onClick={() => { onSelect(s); setOpen(false); }}>
-                <span className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className={`text-xs truncate ${activeSprint?.id === s.id ? "text-purple-700 font-semibold" : "text-gray-700"}`}>{s.name}</p>
-                  {(s.startDate || s.endDate) && <p className="text-[10px] text-gray-400 mt-0.5 truncate">{s.startDate||"?"} → {s.endDate||"?"}</p>}
+            : sprints.map(s => {
+              const st = getSprintStatus(s);
+              return (
+                <div key={s.id}
+                  className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition group/spr ${activeSprint?.id === s.id ? "bg-purple-50" : "hover:bg-gray-50"}`}
+                  onClick={() => { onSelect(s); setOpen(false); }}>
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: st.color }} />
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-xs truncate ${activeSprint?.id === s.id ? "text-purple-700 font-semibold" : "text-gray-700"}`}>{s.name}</p>
+                    {(s.startDate || s.endDate) && <p className="text-[10px] text-gray-400 mt-0.5 truncate">{s.startDate || "?"} → {s.endDate || "?"}</p>}
+                  </div>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: st.bg, color: st.color }}>{st.label}</span>
+                  {activeSprint?.id === s.id && <span className="text-purple-500 text-[10px] shrink-0">✓</span>}
+                  <button onClick={e => { e.stopPropagation(); onDelete(s); setOpen(false); }}
+                    className="opacity-0 group-hover/spr:opacity-100 w-5 h-5 rounded flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 transition shrink-0 text-[11px]">✕</button>
                 </div>
-                {activeSprint?.id === s.id && <span className="text-purple-500 text-[10px] shrink-0">✓</span>}
-                <button onClick={e => { e.stopPropagation(); onDelete(s); setOpen(false); }}
-                  className="opacity-0 group-hover/spr:opacity-100 w-5 h-5 rounded flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 transition shrink-0 text-[11px]">✕</button>
-              </div>
-            ))}
+              );
+            })}
         </div>
       )}
     </div>
@@ -466,7 +488,7 @@ function AdminCalendar({ entries, viewMonth, year, month }: { entries: DailyEntr
 ═══════════════════════════════════════════ */
 export default function AdminProjectManagement({ user, projects, users }: { user: any; projects: any[]; users: any[] }) {
   const [activeProject, setActiveProject] = useState<Project|null>(null);
-  const [activeTask, setActiveTask] = useState<Task|null>(null);
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [activeSprint, setActiveSprint] = useState<Sprint|null>(null);
@@ -477,7 +499,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
   const [taskFiles, setTaskFiles] = useState<any[]>([]);
   const [subtasks, setSubtasks] = useState<any[]>([]);
   const [columns, setColumns] = useState<KanbanColumn[]>(DEFAULT_COLUMNS);
-  const [viewMode, setViewMode] = useState<"dashboard"|"kanban"|"list"|"timeline"|"workload"|"reports"|"gantt">("dashboard");
+  const [viewMode, setViewMode] = useState<"dashboard"|"kanban"|"list"|"timeline"|"workload"|"reports"|"gantt">("kanban");
   const [filterPriority, setFilterPriority] = useState("all");
   const [filterAssignee, setFilterAssignee] = useState("all");
   const [filterType, setFilterType] = useState("all");
@@ -493,8 +515,55 @@ export default function AdminProjectManagement({ user, projects, users }: { user
   const [uploading, setUploading] = useState(false);
   const [newSubtask, setNewSubtask] = useState("");
   const [projectsView, setProjectsView] = useState<"grid"|"list">("grid");
-  const [taskDetailTab, setTaskDetailTab] = useState<"details"|"subtasks"|"files"|"comments"|"logs">("details");
+  const [taskDetailTab, setTaskDetailTab] = useState<"details"|"subtasks"|"files"|"comments"|"logs"|"empsheet">("details");
   const [mainTab, setMainTab] = useState<"projects"|"dailysheet">("projects");
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [workDesc, setWorkDesc] = useState("");
+const [workHours, setWorkHours] = useState("");
+const [workStatus, setWorkStatus] = useState<"done" | "progress" | "blocked">("done");
+
+
+const handleAddWorkLog = async () => {
+  if (!workDesc || !workHours || !activeTask || !activeProject) return;
+  await addDoc(collection(db, "workLogs"), {
+    userId: user.uid,
+    userName: user.displayName || user.email?.split("@")[0] || "",
+    projectId: activeTask.projectId,
+    projectName: activeProject.name,
+    taskId: activeTask.id,
+    taskName: activeTask.title,
+    description: workDesc,
+    hoursWorked: Number(workHours),
+    hours: Number(workHours),
+    workStatus: workStatus === "done" ? "Completed" : workStatus === "progress" ? "In Progress" : "Blocked",
+    status: workStatus,
+    date: new Date().toISOString().split("T")[0],
+    createdAt: serverTimestamp(),
+  });
+  setWorkDesc("");
+  setWorkHours("");
+};
+
+useEffect(() => {
+  if (!activeTask) return;
+
+
+  const q = query(
+    collection(db, "workLogs"),
+    where("taskId", "==", activeTask.id)
+  );
+
+  const unsub = onSnapshot(q, (snap) => {
+   const logs = snap.docs.map(doc => ({
+  id: doc.id,
+  ...doc.data()
+})) as WorkLog[];
+
+    setWorkLogs(logs);
+  });
+
+  return () => unsub();
+}, [activeTask]);
 
   const [pf, setPf] = useState({
     name:"", clientName:"", description:"",
@@ -544,8 +613,8 @@ export default function AdminProjectManagement({ user, projects, users }: { user
   useEffect(() => {
     if (!activeProject) return;
     const tq = activeSprint
-      ? query(collection(db,"projectTasks"), where("projectId","==",activeProject.id), where("sprintId","==",activeSprint.id))
-      : query(collection(db,"projectTasks"), where("projectId","==",activeProject.id));
+  ? query(collection(db,"projectTasks"), where("projectId","==",activeProject.id), where("sprintId","==",activeSprint.id))
+  : query(collection(db,"projectTasks"), where("projectId","==",activeProject.id));
     const u1=onSnapshot(tq, s=>setTasks(s.docs.map(d=>({id:d.id,...d.data()} as Task))));
     const u2=onSnapshot(query(collection(db,"sprints"),where("projectId","==",activeProject.id),orderBy("createdAt","desc")),s=>setSprints(s.docs.map(d=>({id:d.id,...d.data()} as Sprint))));
     const u3=onSnapshot(query(collection(db,"projectActivities"),where("projectId","==",activeProject.id),orderBy("createdAt","desc")),s=>setActivities(s.docs.map(d=>({id:d.id,...d.data()}))));
@@ -569,6 +638,8 @@ export default function AdminProjectManagement({ user, projects, users }: { user
 
     return ()=>{ u1(); u2(); u3(); u4(); u5(); };
   },[activeProject,activeSprint]);
+
+  
 
   useEffect(() => {
     if (!activeTask) return;
@@ -668,12 +739,20 @@ export default function AdminProjectManagement({ user, projects, users }: { user
     setQuickTaskType(type);
     setShowTaskModal(true);
   };
-
+  
   const handleCreateTask = async (tf: any) => {
     if (!tf.title.trim() || !activeProject) return;
     const au = users.find((u:any) => u.uid === tf.assignedTo);
     const isStory = tf.ticketType === "story";
+    const snapshot = await getDocs(
+  query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id))
+);
+
+const count = snapshot.size + 1;
+
+const taskCode = `TSK-${count.toString().padStart(3, "0")}`;
     const taskRef = await addDoc(collection(db,"projectTasks"), {
+      taskCode,
       title: tf.title,
       description: tf.description,
       projectId: activeProject.id,
@@ -711,6 +790,37 @@ parentStoryId: (!isStory && tf.parentStoryId) ? tf.parentStoryId : null,
     setActiveTask(null);
   };
 
+const handleTaskSubmit = async (data: any) => {
+   if (!activeProject) return;  
+  if (editingTask) {
+    await updateDoc(doc(db, "projectTasks", editingTask.id), data);
+
+    // reopen updated task
+    setActiveTask({
+      ...editingTask,
+      ...data
+    });
+
+  } else {
+    const snapshot = await getDocs(
+      query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id))
+    );
+
+    const count = snapshot.size + 1;
+    const taskCode = `TSK-${count.toString().padStart(3, "0")}`;
+
+    await addDoc(collection(db, "projectTasks"), {
+      ...data,
+      taskCode,
+      projectId: activeProject.id,
+      createdAt: serverTimestamp(),
+    });
+  }
+
+  setShowTaskModal(false);
+  setEditingTask(null);
+};
+
   const handleAssignTask = async (taskId:string,userId:string) => {
     const au=users.find((u:any)=>u.uid===userId);
     await updateDoc(doc(db,"projectTasks",taskId),{assignedTo:userId,assignedToName:au?.email?.split("@")[0]});
@@ -724,6 +834,7 @@ parentStoryId: (!isStory && tf.parentStoryId) ? tf.parentStoryId : null,
       ...(newStatus==="inprogress"?{startedAt:serverTimestamp()}:{}),
       ...(newStatus==="done"?{completedAt:serverTimestamp()}:{})
     });
+
     await logActivity(activeProject!.id,"moved task",`→ ${columns.find(c=>c.id===newStatus)?.label||newStatus}`,taskId);
     const snap=await getDocs(query(collection(db,"projectTasks"),where("projectId","==",activeProject!.id)));
     const all=snap.docs.map(d=>d.data());
@@ -804,261 +915,436 @@ parentStoryId: (!isStory && tf.parentStoryId) ? tf.parentStoryId : null,
   const pmUsers = activeProject ? getProjectManagers(activeProject).map(uid => users.find((u:any)=>u.uid===uid)).filter(Boolean) : [];
 
   /* ══ TASK DETAIL PANEL ══ */
-  if (activeTask) {
-    const pc = PRIORITY_CONFIG[activeTask.priority];
-    const tm = TYPE_META[activeTask.ticketType || "task"] || TYPE_META.task;
-    const subtasksDone = subtasks.filter(s=>s.done).length;
-    const subtaskPct = subtasks.length ? Math.round((subtasksDone/subtasks.length)*100) : 0;
-    const parentStory = activeTask.parentStoryId ? tasks.find(t=>t.id===activeTask.parentStoryId) : null;
+if (activeTask) {
+  const pc = PRIORITY_CONFIG[activeTask.priority];
+  const tm = TYPE_META[activeTask.ticketType || "task"] || TYPE_META.task;
+  const subtasksDone = subtasks.filter(s => s.done).length;
+  const subtaskPct = subtasks.length ? Math.round((subtasksDone / subtasks.length) * 100) : 0;
+  const parentStory = activeTask.parentStoryId ? tasks.find(t => t.id === activeTask.parentStoryId) : null;
 
-    return (
-      <div className="fixed inset-0 z-50 flex items-stretch" style={{fontFamily:"'Inter', system-ui, sans-serif"}}>
-        <style>{`@keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}`}</style>
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={()=>setActiveTask(null)} />
-        <div className="relative ml-auto w-full max-w-3xl h-full bg-white shadow-2xl flex flex-col overflow-hidden">
-          <div className="shrink-0" style={{background:`linear-gradient(135deg,${activeProject?.color||"#6366f1"} 0%,${activeProject?.color||"#6366f1"}dd 100%)`}}>
-            <div className="p-5">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-semibold text-white/70 uppercase tracking-widest">{activeProject?.name}</span>
-                  <span className="text-white/40">•</span>
-                  <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-white/20 text-white">
-                    {tm.icon} {tm.label}
-                  </span>
-                  {parentStory && (
-                    <>
-                      <span className="text-white/40">→</span>
-                      <button onClick={()=>setActiveTask(parentStory)}
-                        className="text-xs text-white/80 hover:text-white underline underline-offset-2 transition">
-                        📘 {parentStory.title}
-                      </button>
-                    </>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {canManage && <button onClick={()=>handleDeleteTask(activeTask.id)} className="inline-flex items-center px-2.5 py-1 rounded-lg bg-white/10 hover:bg-red-500/30 text-white/70 hover:text-white transition text-xs">🗑️ Delete</button>}
-                  <button onClick={()=>setActiveTask(null)} className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition">✕</button>
-                </div>
+  return (
+    <div className="fixed inset-0 z-50 flex items-stretch" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <style>{`@keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}`}</style>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setActiveTask(null)} />
+      <div className="relative ml-auto w-full max-w-3xl h-full bg-white shadow-2xl flex flex-col overflow-hidden">
+
+        {/* ── Colored Header ── */}
+        <div className="shrink-0" style={{ background: `linear-gradient(135deg,${activeProject?.color || "#6366f1"} 0%,${activeProject?.color || "#6366f1"}dd 100%)` }}>
+          <div className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-semibold text-white/70 uppercase tracking-widest">{activeProject?.name}</span>
+                <span className="text-white/40">•</span>
+                <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-white/20 text-white">
+                  {tm.icon} {tm.label}
+                </span>
+                {parentStory && (
+                  <>
+                    <span className="text-white/40">→</span>
+                    <button onClick={() => setActiveTask(parentStory)}
+                      className="text-xs text-white/80 hover:text-white underline underline-offset-2 transition">
+                      📘 {parentStory.title}
+                    </button>
+                  </>
+                )}
               </div>
-              <h2 className="text-xl font-bold text-white leading-snug mb-3">{activeTask.title}</h2>
-              <div className="flex flex-wrap items-center gap-2">
-                {pc && <span className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-md" style={{background:pc.bg,color:pc.color}}>{pc.icon} {activeTask.priority}</span>}
-                {activeTask.tags?.map(tag=><span key={tag} className="text-xs px-2 py-0.5 rounded-md bg-white/20 text-white font-medium">#{tag}</span>)}
-                {activeTask.storyPoints&&<span className="text-xs px-2 py-0.5 rounded-md bg-white/20 text-white font-medium">🎯 {activeTask.storyPoints}pt</span>}
+              <div className="flex items-center gap-2">
+                {canManage && (
+                  <button
+                    onClick={() => { setEditingTask(activeTask); setActiveTask(null); setShowTaskModal(true); }}
+                    className="inline-flex items-center px-2.5 py-1 rounded-lg bg-white/10 hover:bg-blue-500/30 text-white text-xs"
+                  >✏️ Edit</button>
+                )}
+                {canManage && (
+                  <button onClick={() => handleDeleteTask(activeTask.id)}
+                    className="inline-flex items-center px-2.5 py-1 rounded-lg bg-white/10 hover:bg-red-500/30 text-white/70 hover:text-white transition text-xs">
+                    🗑️ Delete
+                  </button>
+                )}
+                <button onClick={() => setActiveTask(null)}
+                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition">✕</button>
               </div>
             </div>
-            <div className="flex border-t border-white/20">
-              {([["details","📋 Details"],["subtasks","✅ Subtasks"],["files","📎 Files"],["comments","💬 Comments"],["logs","⏱ Logs"]] as const).map(([t,l])=>(
-                <button key={t} onClick={()=>setTaskDetailTab(t)}
-                  className={`flex-1 py-2.5 text-xs font-semibold transition ${taskDetailTab===t?"bg-white/20 text-white border-b-2 border-white":"text-white/60 hover:text-white/80"}`}>
-                  {l}
-                  {t==="comments"&&comments.length>0&&<span className="ml-1 bg-white/30 text-white text-[10px] rounded-full px-1.5">{comments.length}</span>}
-                  {t==="subtasks"&&subtasks.length>0&&<span className="ml-1 bg-white/30 text-white text-[10px] rounded-full px-1.5">{subtasksDone}/{subtasks.length}</span>}
-                </button>
-              ))}
+            <p className="text-xs font-bold text-white/70 tracking-wider">{activeTask?.taskCode || "—"}</p>
+            <h2 className="text-xl font-bold text-white leading-snug mb-3">{activeTask.title}</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              {pc && <span className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-md" style={{ background: pc.bg, color: pc.color }}>{pc.icon} {activeTask.priority}</span>}
+              {activeTask.tags?.map(tag => <span key={tag} className="text-xs px-2 py-0.5 rounded-md bg-white/20 text-white font-medium">#{tag}</span>)}
+              {activeTask.storyPoints && <span className="text-xs px-2 py-0.5 rounded-md bg-white/20 text-white font-medium">🎯 {activeTask.storyPoints}pt</span>}
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-5 bg-gray-50">
-            {taskDetailTab==="details"&&(
-              <div className="space-y-4">
-                {activeTask.description&&<div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm"><h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Description</h3><p className="text-sm text-gray-700 leading-relaxed">{activeTask.description}</p></div>}
+          {/* ── Tabs ── */}
+          <div className="flex border-t border-white/20">
+            {([["details", "📋 Details"], ["subtasks", "✅ Subtasks"], ["files", "📎 Files"], ["comments", "💬 Comments"], ["logs", "⏱ Logs"], ["empsheet", "📝 My Work"]] as const).map(([t, l]) => (
+              <button key={t} onClick={() => setTaskDetailTab(t)}
+                className={`flex-1 py-2.5 text-xs font-semibold transition ${taskDetailTab === t ? "bg-white/20 text-white border-b-2 border-white" : "text-white/60 hover:text-white/80"}`}>
+                {l}
+                {t === "comments" && comments.length > 0 && <span className="ml-1 bg-white/30 text-white text-[10px] rounded-full px-1.5">{comments.length}</span>}
+                {t === "subtasks" && subtasks.length > 0 && <span className="ml-1 bg-white/30 text-white text-[10px] rounded-full px-1.5">{subtasksDone}/{subtasks.length}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
 
-                {activeTask.ticketType === "story" && (
-                  <div className="bg-indigo-50 rounded-xl border border-indigo-100 p-4">
-                    <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-2">Story Children</p>
-                    <div className="space-y-1">
-                      {tasks.filter(t => t.parentStoryId === activeTask.id).map(child => {
-                        const ctm = TYPE_META[child.ticketType||"task"];
-                        return (
-                          <button key={child.id} onClick={()=>setActiveTask(child)}
-                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-indigo-100 transition text-left">
-                            <span>{ctm.icon}</span>
-                            <span className="text-xs font-medium text-indigo-800 flex-1">{child.title}</span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded" style={{background:"white",color:ctm.color}}>{child.status}</span>
-                          </button>
-                        );
-                      })}
-                      {tasks.filter(t=>t.parentStoryId===activeTask.id).length===0&&<p className="text-xs text-indigo-400">No children yet — create a task/bug/defect and select this story as parent.</p>}
-                    </div>
-                  </div>
-                )}
+        {/* ── Scrollable Body ── */}
+        <div className="flex-1 overflow-y-auto bg-gray-50">
 
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    {label:"Status", content:(
-                      activeTask.ticketType==="story" ? <div className="text-xs font-bold px-2 py-1.5 text-indigo-700 bg-indigo-50 rounded-lg">Story (auto)</div>
-                      : canManage
-                        ? <select value={activeTask.status} onChange={async e=>{await handleTaskStatusChange(activeTask.id,e.target.value);setActiveTask({...activeTask,status:e.target.value});}} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none">{columns.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select>
-                        : <div className="text-xs font-semibold text-gray-700 px-2 py-1.5">{columns.find(c=>c.id===activeTask.status)?.label||activeTask.status}</div>
-                    )},
-                    {label:"Assignee", content:(
-                      canManage
-                        ? <select value={activeTask.assignedTo||""} onChange={e=>handleAssignTask(activeTask.id,e.target.value)} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"><option value="">Unassigned</option>{users.map((u:any)=><option key={u.uid} value={u.uid}>{u.displayName||u.name||u.email?.split("@")[0]||"Unknown"}</option>)}</select>
-                        : <div className="flex items-center gap-2 px-2 py-1"><Avatar name={activeTask.assignedToName||"?"} size="xs"/><span className="text-xs text-gray-700">{activeTask.assignedToName||"Unassigned"}</span></div>
-                    )},
-                    {label:"Priority", content:(
-                      canManage
-                        ? <select value={activeTask.priority} onChange={async e=>{await updateDoc(doc(db,"projectTasks",activeTask.id),{priority:e.target.value});setActiveTask({...activeTask,priority:e.target.value as any});}} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none">{["Low","Medium","High","Critical"].map(p=><option key={p}>{p}</option>)}</select>
-                        : <div className="text-xs font-semibold px-2 py-1.5" style={{color:PRIORITY_CONFIG[activeTask.priority]?.color}}>{activeTask.priority}</div>
-                    )},
-                    {label:"Due Date", content:(
-                      canManage
-                        ? <input type="date" defaultValue={activeTask.dueDate?.split("T")[0]||""} onChange={async e=>{await updateDoc(doc(db,"projectTasks",activeTask.id),{dueDate:e.target.value});}} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none" />
-                        : <div className="text-xs text-gray-700 px-2 py-1.5">{activeTask.dueDate||"—"}</div>
-                    )},
-                  ].map(({label,content})=>(
-                    <div key={label} className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm"><p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-2">{label}</p>{content}</div>
-                  ))}
+          {/* DETAILS */}
+          {taskDetailTab === "details" && (
+            <div className="p-5 space-y-4">
+              {activeTask.description && (
+                <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Description</h3>
+                  <p className="text-sm text-gray-700 leading-relaxed">{activeTask.description}</p>
                 </div>
-
-                {activeTask.ticketType!=="story"&&(
-                  <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-                    <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Time Tracking</h3>
-                    <div className="flex items-center gap-4">
-                      <ProgressRing pct={activeTask.estimatedHours?Math.min(((activeTask.actualHours||0)/activeTask.estimatedHours)*100,100):0} color={activeProject?.color||"#6366f1"} />
-                      <div className="flex-1">
-                        <div className="grid grid-cols-3 gap-2 text-center mb-2">
-                          <div><p className="text-lg font-black text-gray-900">{activeTask.estimatedHours||0}h</p><p className="text-xs text-gray-400">Estimated</p></div>
-                          <div><p className="text-lg font-black text-gray-900">{activeTask.actualHours||0}h</p><p className="text-xs text-gray-400">Logged</p></div>
-                          <div><p className="text-lg font-black" style={{color:activeProject?.color||"#6366f1"}}>{activeTask.storyPoints||0}</p><p className="text-xs text-gray-400">Points</p></div>
-                        </div>
-                        {canManage&&(
-                          <div className="flex gap-3">
-                            <div className="flex-1"><label className="text-xs text-gray-400">Est. Hours</label><input type="number" defaultValue={activeTask.estimatedHours||""} onChange={async e=>{await updateDoc(doc(db,"projectTasks",activeTask.id),{estimatedHours:Number(e.target.value)});}} className="w-full mt-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none" /></div>
-                            <div className="flex-1"><label className="text-xs text-gray-400">Actual Hours</label><input type="number" defaultValue={activeTask.actualHours||""} onChange={async e=>{await updateDoc(doc(db,"projectTasks",activeTask.id),{actualHours:Number(e.target.value)});}} className="w-full mt-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none" /></div>
-                          </div>
-                        )}
+              )}
+              {activeTask.ticketType === "story" && (
+                <div className="bg-indigo-50 rounded-xl border border-indigo-100 p-4">
+                  <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-2">Story Children</p>
+                  <div className="space-y-1">
+                    {tasks.filter(t => t.parentStoryId === activeTask.id).map(child => {
+                      const ctm = TYPE_META[child.ticketType || "task"];
+                      return (
+                        <button key={child.id} onClick={() => setActiveTask(child)}
+                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-indigo-100 transition text-left">
+                          <span>{ctm.icon}</span>
+                          <span className="text-xs font-medium text-indigo-800 flex-1">{child.title}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "white", color: ctm.color }}>{child.status}</span>
+                        </button>
+                      );
+                    })}
+                    {tasks.filter(t => t.parentStoryId === activeTask.id).length === 0 && (
+                      <p className="text-xs text-indigo-400">No children yet — create a task/bug/defect and select this story as parent.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  {
+                    label: "Status", content: (
+                      activeTask.ticketType === "story"
+                        ? <div className="text-xs font-bold px-2 py-1.5 text-indigo-700 bg-indigo-50 rounded-lg">Story (auto)</div>
+                        : canManage
+                          ? <select value={activeTask.status} onChange={async e => { await handleTaskStatusChange(activeTask.id, e.target.value); setActiveTask({ ...activeTask, status: e.target.value }); }} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none">{columns.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select>
+                          : <div className="text-xs font-semibold text-gray-700 px-2 py-1.5">{columns.find(c => c.id === activeTask.status)?.label || activeTask.status}</div>
+                    )
+                  },
+                  {
+                    label: "Assignee", content: (
+                      canManage
+                        ? <select value={activeTask.assignedTo || ""} onChange={e => handleAssignTask(activeTask.id, e.target.value)} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"><option value="">Unassigned</option>{users.map((u: any) => <option key={u.uid} value={u.uid}>{u.displayName || u.name || u.email?.split("@")[0] || "Unknown"}</option>)}</select>
+                        : <div className="flex items-center gap-2 px-2 py-1"><Avatar name={activeTask.assignedToName || "?"} size="xs" /><span className="text-xs text-gray-700">{activeTask.assignedToName || "Unassigned"}</span></div>
+                    )
+                  },
+                  {
+                    label: "Priority", content: (
+                      canManage
+                        ? <select value={activeTask.priority} onChange={async e => { await updateDoc(doc(db, "projectTasks", activeTask.id), { priority: e.target.value }); setActiveTask({ ...activeTask, priority: e.target.value as any }); }} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none">{["Low", "Medium", "High", "Critical"].map(p => <option key={p}>{p}</option>)}</select>
+                        : <div className="text-xs font-semibold px-2 py-1.5" style={{ color: PRIORITY_CONFIG[activeTask.priority]?.color }}>{activeTask.priority}</div>
+                    )
+                  },
+                  {
+                    label: "Due Date", content: (
+                      canManage
+                        ? <input type="date" defaultValue={activeTask.dueDate?.split("T")[0] || ""} onChange={async e => { await updateDoc(doc(db, "projectTasks", activeTask.id), { dueDate: e.target.value }); }} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none" />
+                        : <div className="text-xs text-gray-700 px-2 py-1.5">{activeTask.dueDate || "—"}</div>
+                    )
+                  },
+                ].map(({ label, content }) => (
+                  <div key={label} className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
+                    <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-2">{label}</p>
+                    {content}
+                  </div>
+                ))}
+              </div>
+              {activeTask.ticketType !== "story" && (
+                <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Time Tracking</h3>
+                  <div className="flex items-center gap-4">
+                    <ProgressRing pct={activeTask.estimatedHours ? Math.min(((activeTask.actualHours || 0) / activeTask.estimatedHours) * 100, 100) : 0} color={activeProject?.color || "#6366f1"} />
+                    <div className="flex-1">
+                      <div className="grid grid-cols-3 gap-2 text-center mb-2">
+                        <div><p className="text-lg font-black text-gray-900">{activeTask.estimatedHours || 0}h</p><p className="text-xs text-gray-400">Estimated</p></div>
+                        <div><p className="text-lg font-black text-gray-900">{activeTask.actualHours || 0}h</p><p className="text-xs text-gray-400">Logged</p></div>
+                        <div><p className="text-lg font-black" style={{ color: activeProject?.color || "#6366f1" }}>{activeTask.storyPoints || 0}</p><p className="text-xs text-gray-400">Points</p></div>
                       </div>
+                      {canManage && (
+                        <div className="flex gap-3">
+                          <div className="flex-1"><label className="text-xs text-gray-400">Est. Hours</label><input type="number" defaultValue={activeTask.estimatedHours || ""} onChange={async e => { await updateDoc(doc(db, "projectTasks", activeTask.id), { estimatedHours: Number(e.target.value) }); }} className="w-full mt-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none" /></div>
+                          <div className="flex-1"><label className="text-xs text-gray-400">Actual Hours</label><input type="number" defaultValue={activeTask.actualHours || ""} onChange={async e => { await updateDoc(doc(db, "projectTasks", activeTask.id), { actualHours: Number(e.target.value) }); }} className="w-full mt-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none" /></div>
+                        </div>
+                      )}
                     </div>
                   </div>
-                )}
-              </div>
-            )}
+                </div>
+              )}
+            </div>
+          )}
 
-            {taskDetailTab==="subtasks"&&(
+          {/* SUBTASKS */}
+          {taskDetailTab === "subtasks" && (
+            <div className="p-5">
               <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold text-gray-700">Subtasks</h3>
-                  <div className="flex items-center gap-2"><div className="w-24 bg-gray-200 rounded-full h-1.5"><div className="h-1.5 rounded-full transition-all" style={{width:`${subtaskPct}%`,background:activeProject?.color||"#6366f1"}} /></div><span className="text-xs font-bold text-gray-500">{subtasksDone}/{subtasks.length}</span></div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-24 bg-gray-200 rounded-full h-1.5"><div className="h-1.5 rounded-full transition-all" style={{ width: `${subtaskPct}%`, background: activeProject?.color || "#6366f1" }} /></div>
+                    <span className="text-xs font-bold text-gray-500">{subtasksDone}/{subtasks.length}</span>
+                  </div>
                 </div>
                 {!canManage && <div className="mb-3 text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">👁️ View-only access — only the Project Manager can manage subtasks.</div>}
                 <div className="space-y-2 mb-3">
-                  {subtasks.map((st:any)=>(
-                    <div key={st.id} onClick={()=>canManage&&toggleSubtask(st)} className={`flex items-center gap-3 p-2.5 rounded-lg transition hover:bg-gray-50 ${st.done?"opacity-60":""} ${canManage?"cursor-pointer":""}`}>
-                      <div className="w-5 h-5 rounded-md flex items-center justify-center border-2 shrink-0 transition" style={{background:st.done?(activeProject?.color||"#6366f1"):"transparent",borderColor:st.done?(activeProject?.color||"#6366f1"):"#d1d5db"}}>
-                        {st.done&&<span className="text-white text-xs font-bold">✓</span>}
+                  {subtasks.map((st: any) => (
+                    <div key={st.id} onClick={() => canManage && toggleSubtask(st)}
+                      className={`flex items-center gap-3 p-2.5 rounded-lg transition hover:bg-gray-50 ${st.done ? "opacity-60" : ""} ${canManage ? "cursor-pointer" : ""}`}>
+                      <div className="w-5 h-5 rounded-md flex items-center justify-center border-2 shrink-0 transition"
+                        style={{ background: st.done ? (activeProject?.color || "#6366f1") : "transparent", borderColor: st.done ? (activeProject?.color || "#6366f1") : "#d1d5db" }}>
+                        {st.done && <span className="text-white text-xs font-bold">✓</span>}
                       </div>
-                      <span className={`text-sm ${st.done?"line-through text-gray-400":"text-gray-700"}`}>{st.text}</span>
+                      <span className={`text-sm ${st.done ? "line-through text-gray-400" : "text-gray-700"}`}>{st.text}</span>
                     </div>
                   ))}
-                  {subtasks.length===0&&<p className="text-xs text-gray-400 text-center py-4">No subtasks yet</p>}
+                  {subtasks.length === 0 && <p className="text-xs text-gray-400 text-center py-4">No subtasks yet</p>}
                 </div>
-                {canManage&&(
+                {canManage && (
                   <div className="flex gap-2">
-                    <input value={newSubtask} onChange={e=>setNewSubtask(e.target.value)} placeholder="Add a subtask..." onKeyDown={e=>e.key==="Enter"&&handleAddSubtask()} className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none" />
-                    <button onClick={handleAddSubtask} className="inline-flex items-center px-3 py-2 text-white text-xs font-semibold rounded-lg" style={{background:activeProject?.color||"#6366f1"}}>Add</button>
+                    <input value={newSubtask} onChange={e => setNewSubtask(e.target.value)} placeholder="Add a subtask..."
+                      onKeyDown={e => e.key === "Enter" && handleAddSubtask()}
+                      className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none" />
+                    <button onClick={handleAddSubtask} className="inline-flex items-center px-3 py-2 text-white text-xs font-semibold rounded-lg" style={{ background: activeProject?.color || "#6366f1" }}>Add</button>
                   </div>
                 )}
               </div>
-            )}
+            </div>
+          )}
 
-            {taskDetailTab==="files"&&(
+          {/* FILES */}
+          {taskDetailTab === "files" && (
+            <div className="p-5">
               <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold text-gray-700">Attachments ({taskFiles.length})</h3>
-                  {canManage&&<label className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg text-white cursor-pointer ${uploading?"opacity-50":""}`} style={{background:activeProject?.color||"#6366f1"}}>{uploading?"⏳ Uploading...":"📤 Upload"}<input type="file" onChange={handleFileUpload} className="hidden" disabled={uploading} /></label>}
+                  {canManage && (
+                    <label className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg text-white cursor-pointer ${uploading ? "opacity-50" : ""}`} style={{ background: activeProject?.color || "#6366f1" }}>
+                      {uploading ? "⏳ Uploading..." : "📤 Upload"}
+                      <input type="file" onChange={handleFileUpload} className="hidden" disabled={uploading} />
+                    </label>
+                  )}
                 </div>
-                {taskFiles.length===0?<div className="text-center py-8 text-gray-400"><div className="text-4xl mb-2">📁</div><p className="text-sm">No files attached yet</p></div>
-                  :<div className="space-y-2">{taskFiles.map((f:any)=>(
-                    <a key={f.id} href={f.fileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 border border-gray-100 rounded-xl hover:bg-gray-50 transition">
-                      <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-xl shrink-0">{f.fileName.match(/\.(png|jpg|jpeg|gif|webp)$/i)?"🖼️":f.fileName.match(/\.pdf$/i)?"📕":"📄"}</div>
-                      <div className="flex-1 min-w-0"><p className="text-sm font-semibold text-gray-800 truncate">{f.fileName}</p><p className="text-xs text-gray-400">by {f.uploadedByName}</p></div>
-                      <span className="text-gray-300 text-sm">↗</span>
-                    </a>
-                  ))}</div>}
-              </div>
-            )}
-
-            {taskDetailTab==="comments"&&(
-              <div className="space-y-3">
-                {comments.map((c:any)=>(
-                  <div key={c.id} className={`flex gap-3 ${c.userId===user.uid?"flex-row-reverse":""}`}>
-                    <Avatar name={c.userName} size="sm" />
-                    <div className={`max-w-[75%] rounded-2xl p-3 shadow-sm ${c.userId===user.uid?"rounded-tr-sm text-white":"rounded-tl-sm bg-white border border-gray-100"}`} style={c.userId===user.uid?{background:activeProject?.color||"#6366f1"}:{}}>
-                      <p className={`text-xs font-semibold mb-1 ${c.userId===user.uid?"text-white/70":"text-gray-500"}`}>{c.userName} · {c.createdAt?.toDate().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</p>
-                      <p className={`text-sm leading-relaxed ${c.userId===user.uid?"text-white":"text-gray-700"}`}>{c.text}</p>
-                    </div>
+                {taskFiles.length === 0
+                  ? <div className="text-center py-8 text-gray-400"><div className="text-4xl mb-2">📁</div><p className="text-sm">No files attached yet</p></div>
+                  : <div className="space-y-2">
+                    {taskFiles.map((f: any) => (
+                      <a key={f.id} href={f.fileUrl} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-3 p-3 border border-gray-100 rounded-xl hover:bg-gray-50 transition">
+                        <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-xl shrink-0">
+                          {f.fileName.match(/\.(png|jpg|jpeg|gif|webp)$/i) ? "🖼️" : f.fileName.match(/\.pdf$/i) ? "📕" : "📄"}
+                        </div>
+                        <div className="flex-1 min-w-0"><p className="text-sm font-semibold text-gray-800 truncate">{f.fileName}</p><p className="text-xs text-gray-400">by {f.uploadedByName}</p></div>
+                        <span className="text-gray-300 text-sm">↗</span>
+                      </a>
+                    ))}
                   </div>
-                ))}
-                {comments.length===0&&<div className="text-center py-12 text-gray-400"><div className="text-5xl mb-3">💬</div><p className="text-sm font-medium">Start the conversation</p></div>}
-              </div>
-            )}
-
-            {taskDetailTab==="logs"&&(
-              <div className="space-y-3">
-                {workLogs.filter(l=>l.taskId===activeTask.id).length===0
-                  ?<div className="text-center py-12 text-gray-400"><div className="text-5xl mb-3">⏱</div><p className="text-sm">No work logged yet</p></div>
-                  :workLogs.filter(l=>l.taskId===activeTask.id).map(log=>(
-                    <div key={log.id} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-                      <div className="flex items-center justify-between mb-1"><span className="font-semibold text-sm text-gray-800">{log.userName}</span><span className="font-black text-lg" style={{color:activeProject?.color||"#6366f1"}}>{log.hoursWorked}h</span></div>
-                      <p className="text-sm text-gray-600">{log.description}</p>
-                      <div className="flex items-center gap-3 mt-2">
-                        <span className="text-xs text-gray-400">{log.date}</span>
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${log.workStatus==="Completed"?"bg-green-100 text-green-700":log.workStatus==="Blocked"?"bg-red-100 text-red-700":"bg-blue-100 text-blue-700"}`}>{log.workStatus}</span>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </div>
-
-          {taskDetailTab==="comments"&&(
-            <div className="shrink-0 p-4 bg-white border-t border-gray-100">
-              <div className="flex gap-2">
-                <Avatar name={user?.email?.split("@")[0]} size="sm" />
-                <input value={commentText} onChange={e=>setCommentText(e.target.value)} placeholder="Write a comment..." onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&handleAddComment()} className="flex-1 text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none" />
-                <button onClick={handleAddComment} disabled={!commentText.trim()} className="inline-flex items-center px-4 py-2 text-white text-xs font-semibold rounded-xl disabled:opacity-40" style={{background:activeProject?.color||"#6366f1"}}>Send</button>
+                }
               </div>
             </div>
           )}
+
+          {/* COMMENTS */}
+          {taskDetailTab === "comments" && (
+            <div className="flex flex-col h-full">
+              <div className="flex-1 p-5 space-y-3 overflow-y-auto">
+                {comments.map((c: any) => (
+                  <div key={c.id} className={`flex gap-3 ${c.userId === user.uid ? "flex-row-reverse" : ""}`}>
+                    <Avatar name={c.userName} size="sm" />
+                    <div className={`max-w-[75%] rounded-2xl p-3 shadow-sm ${c.userId === user.uid ? "rounded-tr-sm text-white" : "rounded-tl-sm bg-white border border-gray-100"}`}
+                      style={c.userId === user.uid ? { background: activeProject?.color || "#6366f1" } : {}}>
+                      <p className={`text-xs font-semibold mb-1 ${c.userId === user.uid ? "text-white/70" : "text-gray-500"}`}>
+                        {c.userName} · {c.createdAt?.toDate().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                      <p className={`text-sm leading-relaxed ${c.userId === user.uid ? "text-white" : "text-gray-700"}`}>{c.text}</p>
+                    </div>
+                  </div>
+                ))}
+                {comments.length === 0 && (
+                  <div className="text-center py-12 text-gray-400"><div className="text-5xl mb-3">💬</div><p className="text-sm font-medium">Start the conversation</p></div>
+                )}
+              </div>
+              {/* Comment input pinned to bottom */}
+              <div className="shrink-0 px-5 py-4 bg-white border-t border-gray-100">
+                <div className="flex gap-2">
+                  <Avatar name={user?.email?.split("@")[0]} size="sm" />
+                  <input value={commentText} onChange={e => setCommentText(e.target.value)}
+                    placeholder="Write a comment..."
+                    onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleAddComment()}
+                    className="flex-1 text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none" />
+                  <button onClick={handleAddComment} disabled={!commentText.trim()}
+                    className="inline-flex items-center px-4 py-2 text-white text-xs font-semibold rounded-xl disabled:opacity-40"
+                    style={{ background: activeProject?.color || "#6366f1" }}>Send</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* LOGS */}
+          {taskDetailTab === "logs" && (
+            <div className="p-5 space-y-3">
+              {workLogs.filter(l => l.taskId === activeTask.id).length === 0
+                ? <div className="text-center py-12 text-gray-400"><div className="text-5xl mb-3">⏱</div><p className="text-sm">No work logged yet</p></div>
+                : workLogs.filter(l => l.taskId === activeTask.id).map(log => (
+                  <div key={log.id} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-semibold text-sm text-gray-800">{log.userName}</span>
+                      <span className="font-black text-lg" style={{ color: activeProject?.color || "#6366f1" }}>{log.hoursWorked}h</span>
+                    </div>
+                    <p className="text-sm text-gray-600">{log.description}</p>
+                    <div className="flex items-center gap-3 mt-2">
+                      <span className="text-xs text-gray-400">{log.date}</span>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${log.workStatus === "Completed" ? "bg-green-100 text-green-700" : log.workStatus === "Blocked" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>{log.workStatus}</span>
+                    </div>
+                  </div>
+                ))
+              }
+            </div>
+          )}
+
+          {/* MY WORK / EMPSHEET */}
+          {taskDetailTab === "empsheet" && (
+            <div className="p-5 space-y-4">
+
+              {/* Add Work Card */}
+              <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                <div className="flex items-center gap-2 mb-4">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <rect x="2" y="2" width="12" height="12" rx="2" stroke="#534AB7" strokeWidth="1.2" />
+                    <path d="M5 6h6M5 9h4" stroke="#534AB7" strokeWidth="1.2" strokeLinecap="round" />
+                  </svg>
+                  <span className="text-sm font-medium text-gray-800">Add daily work</span>
+                </div>
+
+                <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+                  What did you work on?
+                </label>
+                <textarea
+                  placeholder="Describe what you completed today…"
+                  className="w-full min-h-18 resize-y text-sm border border-gray-200 rounded-lg px-3 py-2.5 bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-colors"
+                  value={workDesc}
+                  onChange={(e) => setWorkDesc(e.target.value)}
+                />
+
+                <div className="flex gap-3 mt-3">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Hours</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 2.5"
+                      className="w-20 text-sm border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-colors"
+                      value={workHours}
+                      onChange={(e) => setWorkHours(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 flex-1">
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</label>
+                    <div className="flex border border-gray-200 rounded-lg overflow-hidden text-sm">
+                      {(["done", "progress", "blocked"] as const).map((s, i) => (
+                        <button
+                          key={s}
+                          onClick={() => setWorkStatus(s)}
+                          className={`flex-1 py-2 px-2 font-medium transition-colors ${i < 2 ? "border-r border-gray-200" : ""}
+                            ${workStatus === s
+                              ? s === "done" ? "bg-green-50 text-green-800"
+                              : s === "progress" ? "bg-indigo-50 text-indigo-800"
+                              : "bg-red-50 text-red-800"
+                              : "bg-white text-gray-500 hover:bg-gray-50"
+                            }`}
+                        >
+                          {s === "done" ? "Completed" : s === "progress" ? "In progress" : "Blocked"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleAddWorkLog}
+                  className="mt-4 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.97] text-white text-sm font-medium px-4 py-2 rounded-lg transition-all"
+                >
+                  Submit work
+                </button>
+              </div>
+
+              {/* Work Logs List */}
+              {workLogs.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-6">No entries yet — add your first work log above.</p>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Recent entries</p>
+                  {workLogs.map((log) => (
+                    <div key={`${log.id}-${log.date}`} className="bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm">
+                      <p className="text-sm text-gray-800 leading-relaxed mb-2.5">{log.description}</p>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full border
+                          ${log.status === "done" ? "bg-green-50 text-green-800 border-green-200"
+                          : log.status === "progress" ? "bg-indigo-50 text-indigo-800 border-indigo-200"
+                          : "bg-red-50 text-red-800 border-red-200"}`}>
+                          {log.status === "done" ? "Completed" : log.status === "progress" ? "In progress" : "Blocked"}
+                        </span>
+                        <span className="w-1 h-1 rounded-full bg-gray-300" />
+                        <span className="text-xs font-medium text-gray-500">{log.hours}h</span>
+                        <span className="text-xs text-gray-400 ml-auto">{log.date}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
         </div>
+        {/* ── End Scrollable Body ── */}
+
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   /* ══ PROJECT VIEW ══ */
   if (activeProject) {
     return (
-      <div className="h-screen flex flex-col bg-gray-50 overflow-hidden" style={{fontFamily:"'Inter', system-ui, sans-serif"}}>
+       <div className="h-screen flex flex-col bg-gray-50 overflow-hidden" style={{fontFamily:"'Inter', system-ui, sans-serif"}}>
         <style>{`@keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}} .hide-sb::-webkit-scrollbar{display:none;}.hide-sb{scrollbar-width:none;}`}</style>
 
         <TaskModal
-          open={showTaskModal}
-          onClose={()=>{ setShowTaskModal(false); setQuickTaskStoryId(undefined); setQuickTaskType(undefined); }}
-          onSubmit={handleCreateTask}
-          users={users}
-          columns={columns}
-          projectColor={activeProject.color||"#6366f1"}
-          stories={stories}
-          defaultStoryId={quickTaskStoryId}
-          defaultTicketType={quickTaskType}
-        />
+  open={showTaskModal}
+  onClose={() => setShowTaskModal(false)}
+  onSubmit={handleTaskSubmit}
+  users={users}
+  columns={columns}
+  projectColor={activeProject?.color || "#6366f1"}
+  stories={stories}
+  defaultStoryId={quickTaskStoryId}
+  defaultTicketType={quickTaskType}
+  existingTasks={tasks}
+  editingTask={editingTask}   // ✅ KEEP THIS
+/>
 
         {/* Top header */}
-        <div className="shrink-0 bg-white border-b border-gray-200 shadow-sm">
-          <div className="px-6 py-3 flex items-center gap-4">
-            <button onClick={()=>{setActiveProject(null);setActiveSprint(null);setViewMode("dashboard");}}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 transition border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50">← Projects</button>
-            <div className="w-px h-5 bg-gray-200" />
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full" style={{background:activeProject.color||"#6366f1"}} />
-              <h1 className="font-bold text-gray-900 text-sm">{activeProject.name}</h1>
-              {activeProject.clientName&&<span className="text-xs text-gray-400">· {activeProject.clientName}</span>}
-            </div>
+<div className="shrink-0 bg-white border-b border-gray-200 shadow-sm">
+  <div className="px-4 py-2 flex items-center gap-3">   {/* was px-6 py-3 */}
+    <button onClick={()=>{setActiveProject(null);setActiveSprint(null);setViewMode("kanban");}}
+      className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-900 transition border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50">← Projects</button>
+    <div className="w-px h-4 bg-gray-200" />   {/* was h-5 */}
+    <div className="flex items-center gap-2">
+      <div className="w-2 h-2 rounded-full" style={{background:activeProject.color||"#6366f1"}} />  {/* was w-2.5 h-2.5 */}
+      <h1 className="font-bold text-gray-900 text-sm">{activeProject.name}</h1>
+      {activeProject.clientName&&<span className="text-xs text-gray-400">· {activeProject.clientName}</span>}
+    </div>
             <div className="flex items-center gap-3 ml-auto">
               {/* PM avatars */}
-              {pmUsers.length > 0 && (
+              {/* {pmUsers.length > 0 && (
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">PMs</span>
                   <div className="flex -space-x-1.5">
@@ -1079,12 +1365,12 @@ parentStoryId: (!isStory && tf.parentStoryId) ? tf.parentStoryId : null,
                 <span className="text-xs font-bold text-gray-500">{activeProject.progress}%</span>
               </div>
               {overdueTasks.length>0&&<span className="inline-flex items-center text-xs font-semibold bg-red-50 text-red-600 border border-red-100 px-2.5 py-1 rounded-full">⚠️ {overdueTasks.length} overdue</span>}
-              <div className="flex -space-x-2">{projectMembers.slice(0,5).map((u:any)=><Avatar key={u.uid} name={u.email} size="xs" />)}</div>
+              <div className="flex -space-x-2">{projectMembers.slice(0,5).map((u:any)=><Avatar key={u.uid} name={u.email} size="xs" />)}</div> */}
             </div>
           </div>
 
           {/* View tabs */}
-          <div className="px-4 flex items-center bg-white border-t border-gray-100" style={{borderBottom:"1px solid #f3f4f6"}}>
+          <div className="px-4 flex items-center bg-white" style={{borderBottom:"1px solid #f3f4f6"}}>
             <div className="flex items-center overflow-x-auto hide-sb">
               {([["dashboard","📊 Dashboard"],["kanban","⊞ Kanban"],["list","☰ List"],["timeline","📅 Timeline"],["workload","👥 Workload"],["reports","📊 Reports"],["gantt","📈 Gantt"]] as const).map(([m,label])=>(
                 <button key={m} onClick={()=>setViewMode(m as typeof viewMode)}
@@ -1095,7 +1381,7 @@ parentStoryId: (!isStory && tf.parentStoryId) ? tf.parentStoryId : null,
           </div>
 
           {/* Controls */}
-          <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-2 flex-wrap">
+          <div className="px-4 py-1.5 bg-gray-50 border-b border-gray-100 flex items-center gap-2 flex-wrap">
             {viewMode!=="dashboard"&&(
               <div className="flex items-center gap-2 flex-wrap flex-1">
                 <SprintPicker sprints={sprints} activeSprint={activeSprint} onSelect={setActiveSprint} onDelete={handleDeleteSprint} />
@@ -1156,81 +1442,276 @@ parentStoryId: (!isStory && tf.parentStoryId) ? tf.parentStoryId : null,
 
         {!canManage&&<div className="shrink-0 px-6 py-2 bg-amber-50 border-b border-amber-100 flex items-center gap-2"><span className="text-xs text-amber-700 font-medium">👁️ You have view-only access. Only Project Managers can edit tasks, columns, and settings.</span></div>}
 
-        <div className="flex-1 overflow-auto">
-          {/* DASHBOARD */}
-          {viewMode==="dashboard"&&(
-            <div className="p-5 space-y-5">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {(["story","task","bug","defect"] as const).map(t=>{
-                  const tm = TYPE_META[t];
-                  const cnt = tasks.filter(x=>x.ticketType===t).length;
-                  return (
-                    <div key={t} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm flex items-center gap-3">
-                      <span className="text-2xl">{tm.icon}</span>
-                      <div><p className="text-2xl font-black" style={{color:tm.color}}>{cnt}</p><p className="text-xs text-gray-400 capitalize">{tm.label}s</p></div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                {[
-                  {label:"Total Items",val:tasks.length,color:"#6366f1",bg:"#eef2ff"},
-                  {label:"Completed",val:nonStoryTasks.filter(t=>t.status===doneColId).length,color:"#16a34a",bg:"#f0fdf4"},
-                  {label:"In Progress",val:nonStoryTasks.filter(t=>t.status==="inprogress").length,color:"#2563eb",bg:"#eff6ff"},
-                  {label:"Overdue",val:overdueTasks.length,color:"#dc2626",bg:"#fef2f2"},
-                  {label:"Total Hours",val:`${totalHours}h`,color:"#7c3aed",bg:"#f5f3ff"},
-                  {label:"Progress",val:`${activeProject.progress}%`,color:activeProject.color||"#6366f1",bg:"#f9fafb"},
-                ].map(s=>(
-                  <div key={s.label} className="rounded-xl p-4 border" style={{background:s.bg,borderColor:s.color+"20"}}>
-                    <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{color:s.color}}>{s.label}</p>
-                    <p className="text-2xl font-black" style={{color:s.color}}>{s.val}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                  <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2"><span className="w-2 h-2 rounded-full" style={{background:activeProject.color||"#6366f1"}} />Story Overview</h3>
-                  <div className="space-y-3">
-                    {stories.length===0?<p className="text-xs text-gray-400 text-center py-4">No stories yet</p>
-                    :stories.map(story=>{
-                      const children = tasks.filter(t=>t.parentStoryId===story.id);
-                      const done = children.filter(t=>t.status===doneColId).length;
-                      const pct = children.length?Math.round((done/children.length)*100):0;
-                      return (
-                        <div key={story.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={()=>setActiveTask(story)}>
-                          <span>📘</span>
-                          <span className="text-xs font-semibold text-gray-700 flex-1 truncate">{story.title}</span>
-                          <div className="w-20 bg-gray-100 rounded-full h-1.5"><div className="h-1.5 rounded-full" style={{width:`${pct}%`,background:activeProject.color||"#6366f1"}} /></div>
-                          <span className="text-xs font-bold text-gray-500 w-10 text-right">{done}/{children.length}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                  <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-500" />Overdue Work Items {overdueTasks.length>0&&<span className="ml-auto text-[10px] font-bold bg-red-50 text-red-600 border border-red-100 px-2 py-0.5 rounded-full">{overdueTasks.length} overdue</span>}</h3>
-                  {overdueTasks.length===0?<div className="flex flex-col items-center justify-center h-32 text-gray-300"><div className="text-3xl mb-2">✅</div><p className="text-xs">No overdue tasks!</p></div>
-                  :<div className="space-y-1 max-h-48 overflow-y-auto">
-                    {overdueTasks.slice(0,8).map(t=>{
-                      const tm2=TYPE_META[t.ticketType||"task"];
-                      const daysLate=Math.floor((new Date().getTime()-new Date(t.dueDate!).getTime())/(1000*60*60*24));
-                      return(
-                        <div key={t.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                          <div className="flex items-center gap-2 min-w-0"><span>{tm2.icon}</span><span className="text-xs font-medium text-gray-700 truncate">{t.title}</span></div>
-                          <span className="text-[11px] font-semibold text-red-500 shrink-0 ml-2">late {daysLate}d</span>
-                        </div>
-                      );
-                    })}
-                  </div>}
-                </div>
-              </div>
-            </div>
-          )}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
+         {viewMode==="dashboard"&&(()=>{
+  const avatarColors = ["#6366f1","#8b5cf6","#ec4899","#f59e0b","#10b981","#3b82f6"];
+  const barColors = ["#6366f1","#10b981","#f59e0b","#3b82f6","#ec4899"];
+  const medals = ["🥇","🥈","🥉"];
+  const statusStyle: Record<string,{bg:string;color:string}> = {
+    Active:{bg:"#f0fdf4",color:"#16a34a"},
+    Blocked:{bg:"#fef2f2",color:"#dc2626"},
+    Done:{bg:"#eff6ff",color:"#2563eb"},
+    Idle:{bg:"#f1f5f9",color:"#64748b"},
+  };
+  const rankedMembers = [...projectMembers]
+    .map((u:any)=>{
+      const ut=nonStoryTasks.filter(t=>t.assignedTo===u.uid);
+      const done=ut.filter(t=>t.status===doneColId).length;
+      const hrs=workLogs.filter(l=>l.userId===u.uid).reduce((s,l)=>s+(l.hoursWorked||0),0);
+      const pct=ut.length?Math.round((done/ut.length)*100):0;
+      return {u,done,hrs,pct,total:ut.length};
+    })
+    .filter(x=>x.total>0)
+    .sort((a,b)=>b.pct-a.pct||b.done-a.done);
+  const membersWithHours=projectMembers
+    .map((u:any,i:number)=>({
+      u,i,
+      hrs:workLogs.filter(l=>l.userId===u.uid).reduce((s,l)=>s+(l.hoursWorked||0),0),
+      initials:(u.displayName||u.name||u.email?.split("@")[0]||"?").slice(0,2).toUpperCase(),
+    }))
+    .filter(x=>x.hrs>0);
+  const maxHrs=Math.max(...membersWithHours.map(x=>x.hrs),1);
+  return (
+    <div className="p-5 space-y-5 overflow-x-hidden">
 
+      {/* Row 1 — ticket type counts */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {(["story","task","bug","defect"] as const).map(t=>{
+          const tm=TYPE_META[t];
+          const cnt=tasks.filter(x=>x.ticketType===t).length;
+          return(
+            <div key={t} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm flex items-center gap-3">
+              <span className="text-2xl">{tm.icon}</span>
+              <div><p className="text-2xl font-black" style={{color:tm.color}}>{cnt}</p><p className="text-xs text-gray-400 capitalize">{tm.label}s</p></div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Row 2 — summary metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        {[
+          {label:"Total Items",val:tasks.length,color:"#6366f1",bg:"#eef2ff"},
+          {label:"Completed",val:nonStoryTasks.filter(t=>t.status===doneColId).length,color:"#16a34a",bg:"#f0fdf4"},
+          {label:"In Progress",val:nonStoryTasks.filter(t=>t.status==="inprogress").length,color:"#2563eb",bg:"#eff6ff"},
+          {label:"Overdue",val:overdueTasks.length,color:"#dc2626",bg:"#fef2f2"},
+          {label:"Total Hours",val:`${totalHours}h`,color:"#7c3aed",bg:"#f5f3ff"},
+          {label:"Progress",val:`${activeProject.progress}%`,color:activeProject.color||"#6366f1",bg:"#f9fafb"},
+        ].map(s=>(
+          <div key={s.label} className="rounded-xl p-4 border" style={{background:s.bg,borderColor:s.color+"20"}}>
+            <p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{color:s.color}}>{s.label}</p>
+            <p className="text-2xl font-black" style={{color:s.color}}>{s.val}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Row 3 — Top Performers + Team Members */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+        {/* Top Performers */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col" style={{minHeight:"320px"}}>
+          <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2 shrink-0">
+            <span>🏆</span> Top Performers
+            <span className="ml-auto text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-100 px-2 py-0.5 rounded-full">{rankedMembers.length} ranked</span>
+          </h3>
+          <div className="flex-1 overflow-y-auto space-y-1 pr-1" style={{maxHeight:"280px"}}>
+            {rankedMembers.length===0
+              ? <p className="text-xs text-gray-400 text-center py-8">No assigned tasks yet</p>
+              : rankedMembers.map(({u,done,hrs,pct,total},i)=>{
+                const name=u.displayName||u.name||u.email?.split("@")[0]||"?";
+                const initials=name.slice(0,2).toUpperCase();
+                return(
+                  <div key={u.uid} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 transition">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:avatarColors[i%avatarColors.length]}}>{initials}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-800 truncate">{name}</p>
+                      <p className="text-[10px] text-gray-400">{done}/{total} tasks · {hrs}h logged</p>
+                    </div>
+                    <div className="w-20 bg-gray-100 rounded-full h-1.5 shrink-0">
+                      <div className="h-1.5 rounded-full" style={{width:`${pct}%`,background:barColors[i%barColors.length]}} />
+                    </div>
+                    <span className="text-[11px] font-bold w-8 text-right shrink-0" style={{color:barColors[i%barColors.length]}}>{pct}%</span>
+                    {i<3&&<span className="text-base shrink-0">{medals[i]}</span>}
+                  </div>
+                );
+              })
+            }
+          </div>
+        </div>
+
+        {/* Team Members — fixed card, scrollable body */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col" style={{minHeight:"320px"}}>
+          <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2 shrink-0">
+            <span>👥</span> Team Members
+            <span className="ml-auto text-[10px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100 px-2 py-0.5 rounded-full">{projectMembers.length} members</span>
+          </h3>
+
+          {/* Fixed table header */}
+          <div className="grid gap-0 shrink-0" style={{gridTemplateColumns:"minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 56px"}}>
+            {["Member","Done","Active","Blocked","Hours","Status"].map(h=>(
+              <div key={h} className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2 py-2 border-b border-gray-100">{h}</div>
+            ))}
+          </div>
+
+          {/* Scrollable rows */}
+          <div className="flex-1 overflow-y-auto" style={{maxHeight:"260px"}}>
+            {projectMembers.length===0
+              ? <p className="text-xs text-gray-400 text-center py-8">No members yet</p>
+              : projectMembers.map((u:any,i:number)=>{
+                const name=u.displayName||u.name||u.email?.split("@")[0]||"?";
+                const initials=name.slice(0,2).toUpperCase();
+                const ut=nonStoryTasks.filter(t=>t.assignedTo===u.uid);
+                const done=ut.filter(t=>t.status===doneColId).length;
+                const inProg=ut.filter(t=>t.status==="inprogress").length;
+                const blocked=ut.filter(t=>t.status==="blocked").length;
+                const hrs=workLogs.filter(l=>l.userId===u.uid).reduce((s,l)=>s+(l.hoursWorked||0),0);
+                const isPM=getProjectManagers(activeProject).includes(u.uid);
+                const statusLabel=blocked>0?"Blocked":inProg>0?"Active":done>0?"Done":"Idle";
+                const ss=statusStyle[statusLabel];
+                return(
+                  <div key={u.uid} className="grid items-center hover:bg-gray-50 transition border-b border-gray-50 last:border-0" style={{gridTemplateColumns:"minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 56px"}}>
+                    <div className="flex items-center gap-2 px-2 py-2.5 min-w-0">
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0" style={{background:avatarColors[i%avatarColors.length]}}>{initials}</div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1">
+                          <p className="text-xs font-semibold text-gray-800 truncate">{name}</p>
+                          {isPM&&<span className="text-[8px] font-bold px-1 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 shrink-0">👑</span>}
+                        </div>
+                        <p className="text-[10px] text-gray-400 truncate">{u.email}</p>
+                      </div>
+                    </div>
+                    <div className="px-2 py-2.5 text-xs font-bold text-green-600">{done}</div>
+                    <div className="px-2 py-2.5 text-xs font-bold text-blue-600">{inProg}</div>
+                    <div className="px-2 py-2.5 text-xs font-bold text-red-500">{blocked}</div>
+                    <div className="px-2 py-2.5 text-xs font-bold text-violet-600">{hrs}h</div>
+                    <div className="px-2 py-2.5">
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{background:ss.bg,color:ss.color}}>{statusLabel}</span>
+                    </div>
+                  </div>
+                );
+              })
+            }
+          </div>
+        </div>
+      </div>
+
+      {/* Row 4 — Story Overview + Type Breakdown + Hours per Member */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+        {/* Story Overview */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col" style={{minHeight:"260px"}}>
+          <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2 shrink-0">
+            <span className="w-2 h-2 rounded-full" style={{background:activeProject.color||"#6366f1"}} />Story Overview
+          </h3>
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+            {stories.length===0
+              ? <p className="text-xs text-gray-400 text-center py-4">No stories yet</p>
+              : stories.map(story=>{
+                const children=tasks.filter(t=>t.parentStoryId===story.id);
+                const done=children.filter(t=>t.status===doneColId).length;
+                const pct=children.length?Math.round((done/children.length)*100):0;
+                return(
+                  <div key={story.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={()=>setActiveTask(story)}>
+                    <span>📘</span>
+                    <span className="text-xs font-semibold text-gray-700 flex-1 truncate">{story.title}</span>
+                    <div className="w-16 bg-gray-100 rounded-full h-1.5 shrink-0">
+                      <div className="h-1.5 rounded-full" style={{width:`${pct}%`,background:activeProject.color||"#6366f1"}} />
+                    </div>
+                    <span className="text-xs font-bold text-gray-500 w-10 text-right shrink-0">{done}/{children.length}</span>
+                  </div>
+                );
+              })
+            }
+          </div>
+        </div>
+
+        {/* Type Breakdown */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5" style={{minHeight:"260px"}}>
+          <h3 className="text-sm font-bold text-gray-800 mb-4">📊 Type Breakdown</h3>
+          <div className="space-y-3">
+            {(["story","task","bug","defect"] as const).map(t=>{
+              const tm2=TYPE_META[t];
+              const cnt=tasks.filter(x=>x.ticketType===t).length;
+              const pct=tasks.length?Math.round((cnt/tasks.length)*100):0;
+              return(
+                <div key={t} className="flex items-center gap-3">
+                  <span className="text-base">{tm2.icon}</span>
+                  <span className="text-xs font-semibold text-gray-500 w-12">{tm2.label}</span>
+                  <div className="flex-1 bg-gray-100 rounded-full h-2">
+                    <div className="h-2 rounded-full" style={{width:`${pct}%`,background:tm2.color}} />
+                  </div>
+                  <span className="text-xs font-bold text-gray-600 w-6 text-right">{cnt}</span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-5 pt-4 border-t border-gray-50">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs text-gray-400">Overall completion</span>
+              <span className="text-xs font-bold" style={{color:activeProject.color||"#6366f1"}}>{activeProject.progress}%</span>
+            </div>
+            <div className="w-full bg-gray-100 rounded-full h-2">
+              <div className="h-2 rounded-full" style={{width:`${activeProject.progress}%`,background:activeProject.color||"#6366f1"}} />
+            </div>
+          </div>
+        </div>
+
+        {/* Hours per Member */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col" style={{minHeight:"260px"}}>
+          <h3 className="text-sm font-bold text-gray-800 mb-4 shrink-0">⏱ Hours per Member</h3>
+          <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+            {membersWithHours.length===0
+              ? <div className="flex flex-col items-center justify-center h-full text-gray-300"><p className="text-xs">No hours logged yet</p></div>
+              : membersWithHours.map(({u,i,hrs,initials})=>(
+                <div key={u.uid} className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0" style={{background:avatarColors[i%avatarColors.length]}}>{initials}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-gray-500 truncate mb-1">{u.displayName||u.name||u.email?.split("@")[0]||"?"}</p>
+                    <div className="w-full bg-gray-100 rounded-full h-1.5">
+                      <div className="h-1.5 rounded-full" style={{width:`${Math.round((hrs/maxHrs)*100)}%`,background:avatarColors[i%avatarColors.length]}} />
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold shrink-0" style={{color:avatarColors[i%avatarColors.length]}}>{hrs}h</span>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+})()}
           {/* KANBAN */}
           {viewMode==="kanban"&&(
-            <div className="h-full border border-gray-200 rounded-xl m-4 overflow-hidden bg-white shadow-sm flex flex-col">
-              <KanbanBoard
+  <div className="h-full flex flex-col m-4 gap-0">
+    {activeSprint && (
+      <div className="shrink-0 flex items-center gap-3 px-4 py-2 rounded-t-xl border border-b-0 border-gray-200 bg-white"
+        style={{ borderBottom: "1px solid #f3f4f6" }}>
+        <span className="w-2 h-2 rounded-full bg-purple-500" />
+        <span className="text-xs font-bold text-purple-700">{activeSprint.name}</span>
+        {activeSprint.startDate && <span className="text-[10px] text-gray-400">{activeSprint.startDate} → {activeSprint.endDate || "ongoing"}</span>}
+        {(() => {
+          const now = new Date();
+          const isCompleted = activeSprint.status === "completed";
+          const isEnded = activeSprint.endDate && new Date(activeSprint.endDate) < now;
+          const label = isCompleted ? "Completed" : isEnded ? "Ended" : "Active";
+          const color = isCompleted || isEnded ? "#16a34a" : "#2563eb";
+          const bg = isCompleted || isEnded ? "#f0fdf4" : "#eff6ff";
+          return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: bg, color }}>{label}</span>;
+        })()}
+        <span className="ml-auto text-[10px] text-gray-400">{tasks.filter(t => t.sprintId === activeSprint.id && t.ticketType !== "story").length} tasks</span>
+      </div>
+    )}
+    {!activeSprint && (
+      <div className="shrink-0 flex items-center gap-2 px-4 py-2 rounded-t-xl border border-b-0 border-gray-200 bg-gray-50">
+        <span className="w-2 h-2 rounded-full bg-gray-400" />
+        <span className="text-xs font-semibold text-gray-500">All Sprints — showing all tasks</span>
+        <span className="ml-auto text-[10px] text-gray-400">{tasks.filter(t => t.ticketType !== "story").length} tasks</span>
+      </div>
+    )}
+    <div className="flex-1 border border-gray-200 rounded-b-xl overflow-hidden bg-white shadow-sm flex flex-col">
+      <KanbanBoard
                 tasks={filteredTasks}
                 columns={columns}
                 setColumns={setColumns}
@@ -1242,11 +1723,12 @@ parentStoryId: (!isStory && tf.parentStoryId) ? tf.parentStoryId : null,
                 onCreateTask={canManage ? handleKanbanCreateTask : undefined}
               />
             </div>
+             </div>
           )}
 
           {/* LIST */}
           {viewMode==="list"&&(
-            <div className="p-6">
+            <div className="px-4 py-2">
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <table className="w-full">
                   <thead><tr className="border-b border-gray-100 bg-gray-50">{["Type","Title","Status","Priority","Assignee","Est.","Due Date","Tags"].map(h=><th key={h} className="px-4 py-3 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">{h}</th>)}</tr></thead>
@@ -1494,7 +1976,7 @@ parentStoryId: (!isStory && tf.parentStoryId) ? tf.parentStoryId : null,
                 const pms = getProjectManagers(project);
                 const isPM=pms.includes(user.uid)||project.createdBy===user.uid;
                 return(
-                  <div key={project.id} className="proj-card bg-white rounded-xl overflow-hidden cursor-pointer group" style={{border:"1px solid #e5e7eb",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}} onClick={()=>{setActiveProject(project);setViewMode("dashboard");}}>
+                  <div key={project.id} className="proj-card bg-white rounded-xl overflow-hidden cursor-pointer group" style={{border:"1px solid #e5e7eb",boxShadow:"0 1px 4px rgba(0,0,0,0.05)"}} onClick={()=>{setActiveProject(project);setViewMode("kanban");}}>
                     <div className="p-4">
                       <div className="flex items-start justify-between gap-2 mb-3">
                         <div className="flex items-center gap-2.5 min-w-0">
@@ -1514,7 +1996,7 @@ parentStoryId: (!isStory && tf.parentStoryId) ? tf.parentStoryId : null,
                         {pms.length > 1 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-500 border border-indigo-100">👑 {pms.length} PMs</span>}
                         {project.endDate&&<span className="text-[10px] text-gray-400 ml-auto">Due {project.endDate}</span>}
                       </div>
-                      <div className="mb-3">
+                      <div className="mb-2">
                         <div className="flex justify-between items-center mb-1"><span className="text-[10px] text-gray-400">Progress</span><span className="text-[10px] font-semibold" style={{color:accentColor}}>{project.progress||0}%</span></div>
                         <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden"><div className="h-full rounded-full transition-all duration-500" style={{width:`${project.progress||0}%`,background:accentColor}} /></div>
                       </div>
@@ -1546,7 +2028,7 @@ parentStoryId: (!isStory && tf.parentStoryId) ? tf.parentStoryId : null,
                     const pms = getProjectManagers(project).map(uid => users.find((u:any)=>u.uid===uid)).filter(Boolean);
                     const isPM=getProjectManagers(project).includes(user.uid)||project.createdBy===user.uid;
                     return(
-                      <tr key={project.id} onClick={()=>{setActiveProject(project);setViewMode("dashboard");}} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition group">
+                      <tr key={project.id} onClick={()=>{setActiveProject(project);setViewMode("kanban");}} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition group">
                         <td className="px-4 py-3"><div className="flex items-center gap-2.5"><div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:project.color||"#4f46e5"}}>{project.name[0]?.toUpperCase()}</div><div><p className="text-sm font-medium text-gray-800">{project.name}</p>{project.clientName&&<p className="text-[11px] text-gray-400">{project.clientName}</p>}</div></div></td>
                         <td className="px-4 py-3"><span className="text-[11px] font-medium px-2 py-0.5 rounded" style={{background:sc?.bg,color:sc?.color}}>{project.status}</span></td>
                         <td className="px-4 py-3"><span className="text-[11px] font-medium px-2 py-0.5 rounded border" style={{background:pc?.bg,color:pc?.color,borderColor:pc?.color+"30"}}>{project.priority}</span></td>
