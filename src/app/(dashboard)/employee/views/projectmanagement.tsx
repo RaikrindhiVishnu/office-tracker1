@@ -106,31 +106,34 @@ function getPermissions(user: any, project: any) {
   const designation: string = user?.designation || "";
 
   const isDevEngineer = [
-    "Software Engineer", "Senior Software Engineer", "Frontend Engineer",
-    "Backend Engineer", "Full Stack Engineer", "Android Developer",
-    "Mobile App Developer", "DevOps Engineer",
-  ].some(d => designation.toLowerCase().includes(d.toLowerCase()));
+  "Software Engineer", "Senior Software Engineer", "Frontend Engineer",
+  "Backend Engineer", "Full Stack Engineer", "Android Developer",
+  "Mobile App Developer", "DevOps Engineer",
+].some(d => designation.toLowerCase().includes(d.toLowerCase()));
 
-  const isQA = designation.toLowerCase().includes("qa");
-  const isPMDesignation =
-    designation.toLowerCase().includes("project manager") ||
-    designation.toLowerCase().includes("manager") ||
-    designation.toLowerCase().includes("director");
+const isFrontendEngineer = designation.toLowerCase().includes("frontend engineer");
 
-  let canCreateTypes: TicketType[] = ["task"];
-  if (fullControl || isPMDesignation) canCreateTypes = ["story", "task", "bug", "defect"];
-  else if (isDevEngineer) canCreateTypes = ["task", "bug"];
-  else if (isQA) canCreateTypes = ["bug", "defect"];
+const isQA = designation.toLowerCase().includes("qa");
+const isPMDesignation =
+  designation.toLowerCase().includes("project manager") ||
+  designation.toLowerCase().includes("manager") ||
+  designation.toLowerCase().includes("director");
 
-  return {
-    isPM,
-    isAdmin,
-    fullControl,
-    canCreateTypes,
-    canEdit: fullControl,
-    canDelete: fullControl,
-    canAssign: fullControl,
-  };
+let canCreateTypes: TicketType[] = ["task"];
+if (fullControl || isPMDesignation) canCreateTypes = ["story", "task", "bug", "defect"];
+else if (isFrontendEngineer) canCreateTypes = ["story", "task"];
+else if (isDevEngineer) canCreateTypes = ["task"];
+else if (isQA) canCreateTypes = ["bug", "defect"];
+
+ return {
+  isPM,
+  isAdmin,
+  fullControl,
+  canCreateTypes,
+  canEdit: fullControl,
+  canDelete: fullControl,
+  canAssign: fullControl,
+};
 }
 
 /* ─── TICKET TYPE CONFIG ─── */
@@ -656,7 +659,7 @@ function TaskDetailModal({
 }: {
   task: Task; onClose: () => void; columns: Column[]; projectColor: string; projectName: string;
   currentUserId: string; isProjectManager: boolean; canDelete: boolean; users: any[];
-  onStatusChange: (taskId: string, newStatus: string) => void
+  onStatusChange: (taskId: string, newStatus: string) => void;
   onSave: (updated: Task) => Promise<void>;
   db: any; storage: any; user: any;
 }) {
@@ -781,21 +784,14 @@ function TaskDetailModal({
   const totalLoggedHours = taskWorklogs.reduce((s, l) => s + l.hoursWorked, 0);
   const totalEmpHours = taskEmpEntries.reduce((s, e) => s + (e.hoursWorked || 0), 0);
 
-type TabItem = {
-  id: string;
-  icon: string;
-  label: string;
-  badge?: string | null; // ✅ FIX
-};
-
-const TABS: TabItem[] = [
-  { id: "details",  icon: "📋", label: "Details", badge: null },
-  { id: "subtasks", icon: "✅", label: "Subtasks", badge: subtasks.length > 0 ? `${subtasksDone}/${subtasks.length}` : null },
-  { id: "files",    icon: "📎", label: "Files", badge: taskFiles.length > 0 ? String(taskFiles.length) : null },
-  { id: "comments", icon: "💬", label: "Comments", badge: comments.length > 0 ? String(comments.length) : null },
-  { id: "worklogs", icon: "⏱", label: "Logs", badge: taskWorklogs.length > 0 ? `${totalLoggedHours}h` : null },
-  { id: "empsheet", icon: "📝", label: "My Work", badge: taskEmpEntries.length > 0 ? `${totalEmpHours}h` : null },
-];
+  const TABS = [
+    { id: "details",  icon: "📋", label: "Details",  badge: null },
+    { id: "subtasks", icon: "✅", label: "Subtasks", badge: subtasks.length > 0 ? `${subtasksDone}/${subtasks.length}` : null },
+    { id: "files",    icon: "📎", label: "Files",    badge: taskFiles.length > 0 ? String(taskFiles.length) : null },
+    { id: "comments", icon: "💬", label: "Comments", badge: comments.length > 0 ? String(comments.length) : null },
+    { id: "worklogs", icon: "⏱", label: "Logs",     badge: taskWorklogs.length > 0 ? `${totalLoggedHours}h` : null },
+    { id: "empsheet", icon: "📝", label: "My Work",  badge: taskEmpEntries.length > 0 ? `${totalEmpHours}h` : null },
+  ] as const;
 
   return (
     <div className="fixed inset-0 z-50 flex items-stretch" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
@@ -1181,19 +1177,19 @@ const TABS: TabItem[] = [
 ═══════════════════════════════════════════ */
 function KanbanBoard({
   tasks, columns, projectColor, currentUserId, isProjectManager,
-  onTaskClick, onStatusChange, onUpdateColumns, onAddChildToStory, onToast,user,          
-  activeProject 
+  onTaskClick, onStatusChange, onUpdateColumns, onAddChildToStory, onToast,
+  user, activeProject,
 }: {
   tasks: Task[]; columns: Column[]; projectColor: string; currentUserId: string;
   isProjectManager: boolean; onTaskClick: (t: Task) => void;
-  onStatusChange: (taskId: string, newStatus: string) => void | Promise<void>;
+  onStatusChange: (taskId: string, newStatus: string) => void;
   onUpdateColumns: (cols: Column[]) => Promise<void>;
   onAddChildToStory: (story: Task, ticketType: TicketType) => void;
-  onToast: (msg: string) => void;user: any;   allowedChildTypes?: TicketType[];            
-  activeProject: any; 
- 
+  onToast: (msg: string) => void;
+  user: any;
+  activeProject: any;
 }) {
-   const permissions = getPermissions(user, activeProject);
+  const permissions = getPermissions(user, activeProject);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [localTasks, setLocalTasks] = useState<Task[]>(tasks);
@@ -1377,7 +1373,7 @@ function KanbanBoard({
                               <div className="absolute right-0 top-8 z-50 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden w-44 py-1">
                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider px-3 py-2 border-b border-gray-50">Add to Story</p>
                                 {(["task","bug","defect"] as TicketType[])
-.filter(type => isProjectManager || permissions.canCreateTypes.includes(type))
+  .filter(type => isProjectManager || permissions.canCreateTypes.includes(type))
   .map(type => {
     const cfg = TICKET_TYPES[type];
     return (
@@ -1390,10 +1386,8 @@ function KanbanBoard({
     );
   })
 }
-
 {(["task","bug","defect"] as TicketType[])
-
-.filter(type => !isProjectManager && !permissions.canCreateTypes.includes(type))
+  .filter(type => !isProjectManager && !permissions.canCreateTypes.includes(type))
   .map(type => {
     const cfg = TICKET_TYPES[type];
     return (
@@ -1834,10 +1828,38 @@ export default function ProjectManagement({ user, projects, users }: any) {
 
   const permissions      = getPermissions(user, activeProject);
   const isProjectManager = permissions.fullControl;
+  const { isPM } = getPermissions(user, activeProject);
   const stories = tasks.filter(t => t.ticketType === "story");
 
   const showToast = (msg: string) => setToastMsg(msg);
   const handleAddChildToStory = (story: Task, ticketType: TicketType) => setQuickAddStory({ story, ticketType });
+
+  // Add:
+const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+const [showTaskDetail, setShowTaskDetail] = useState(false);
+
+const handleTaskClick = (task: Task) => {
+  setSelectedTask(task);
+  setShowTaskDetail(true);
+};
+
+const handleAddChild = async (story: Task, ticketType: TicketType) => {
+  try {
+    await addDoc(collection(db, "projectTasks"), {
+      title: "",
+      description: "",
+      projectId: story.projectId,
+      parentStoryId: story.id,
+      parentStoryTitle: story.title,
+      ticketType: ticketType,
+      status: "todo",
+      priority: "Medium",
+      createdAt: serverTimestamp(),
+    });
+  } catch (err) {
+    console.error("Error adding child task:", err);
+  }
+};
 
   useEffect(() => {
     if (!activeProject?.id) return;
@@ -1899,23 +1921,6 @@ export default function ProjectManagement({ user, projects, users }: any) {
     const all = snap.docs.map(d => d.data());
     if (all.length) await updateDoc(doc(db, "projects", activeProject.id), { progress: Math.round((all.filter(t => t.status === "done").length / all.length) * 100) });
   };
-  const handleAddChild = async (story: Task, ticketType: TicketType) => {
-  try {
-    await addDoc(collection(db, "projectTasks"), {
-      title: "",
-      description: "",
-      projectId: story.projectId,
-      parentStoryId: story.id,
-      parentStoryTitle: story.title,
-      ticketType: ticketType,
-      status: "todo",
-      priority: "Medium",
-      createdAt: serverTimestamp(),
-    });
-  } catch (err) {
-    console.error("Error adding child task:", err);
-  }
-};
 
   const handleCreateTask = async (data: Partial<Task> & { childTickets?: Partial<Task>[] }) => {
     const { childTickets: children, ...taskData } = data as any;
@@ -1962,9 +1967,6 @@ export default function ProjectManagement({ user, projects, users }: any) {
   const todayLogs    = myWorkLogs.filter(l => l.date === todayStr);
   const todayHours   = todayLogs.reduce((s, l) => s + l.hoursWorked, 0);
   const totalHoursAll = myWorkLogs.reduce((s, l) => s + l.hoursWorked, 0);
-  const { isPM } = getPermissions(user, activeProject);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [showTaskDetail, setShowTaskDetail] = useState(false);
 
   const sprintFilteredTasks = activeSprint ? tasks.filter(t => t.sprintId === activeSprint.id) : tasks;
   const filteredTasks = sprintFilteredTasks.filter(t =>
@@ -1972,11 +1974,6 @@ export default function ProjectManagement({ user, projects, users }: any) {
     (filterTicketType === "all" || t.ticketType === filterTicketType) &&
     (!search || t.title.toLowerCase().includes(search.toLowerCase()))
   );
-
-  const handleTaskClick = (task: Task) => {
-  setSelectedTask(task);
-  setShowTaskDetail(true);
-};
 
   const handleSubmitWorkLog = async () => {
     if (!wl.description.trim() || !wl.hoursWorked || !activeProject) return;
@@ -2018,10 +2015,14 @@ export default function ProjectManagement({ user, projects, users }: any) {
               )}
             </div>
             <div className="flex items-center gap-4 ml-auto">
-              <div className="flex items-center gap-2"><ProgressRing pct={myProgress} size={32} stroke={3} color={projectColor} /><div><p className="text-xs font-bold text-gray-700">{myProgress}%</p><p className="text-[10px] text-gray-400">My tasks</p></div></div>
-              {overdueTasks.length > 0 && <span className="text-xs font-semibold bg-red-50 text-red-600 border border-red-100 px-2.5 py-1 rounded-full">⚠️ {overdueTasks.length} overdue</span>}
-              <TeamButton users={users} activeProject={activeProject} user={user} projectColor={projectColor} />
-            </div>
+  <div className="flex items-center gap-2">
+    <ProgressRing pct={myProgress} size={32} stroke={3} color={projectColor} />
+    <div><p className="text-xs font-bold text-gray-700">{myProgress}%</p>
+    <p className="text-[10px] text-gray-400">My tasks</p></div>
+  </div>
+  {overdueTasks.length > 0 && <span className="text-xs font-semibold bg-red-50 text-red-600 border border-red-100 px-2.5 py-1 rounded-full">⚠️ {overdueTasks.length} overdue</span>}
+  <TeamButton users={users} activeProject={activeProject} user={user} projectColor={projectColor} />
+</div>
           </div>
 
           {/* Toolbar */}
@@ -2093,27 +2094,23 @@ export default function ProjectManagement({ user, projects, users }: any) {
           </div>
         </div>
 
-        {/* Team members strip */}
-
         {/* Main content */}
         <div className="flex-1 overflow-auto">
           {viewMode === "kanban" && (
             <div className="h-full border border-gray-200 rounded-xl m-4 overflow-hidden bg-white shadow-sm">
-             <KanbanBoard
-  tasks={tasks}
+              <KanbanBoard
+  tasks={filteredTasks}
   columns={columns}
-  projectColor={activeProject?.color || "#6366f1"}
-  currentUserId={user?.uid || ""}
-  isProjectManager={isPM}
-  onTaskClick={handleTaskClick}
+  projectColor={projectColor}
+  currentUserId={user?.uid}
+  isProjectManager={isProjectManager}
+  onTaskClick={t => setViewingTask(t)}
   onStatusChange={handleStatusChange}
   onUpdateColumns={handleUpdateColumns}
-  onAddChildToStory={handleAddChild}
+  onAddChildToStory={handleAddChildToStory}
+  onToast={showToast}
   user={user}
   activeProject={activeProject}
-
-  // ✅ ADD THIS
-  onToast={(msg) => alert(msg)} // simple fix
 />
             </div>
           )}
@@ -2231,7 +2228,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
             open={!!quickAddStory}
             onClose={() => setQuickAddStory(null)}
             onSubmit={handleCreateTask}
-            users={users || []}
+            users={users}
             columns={columns}
             projectColor={projectColor}
             initialData={{
