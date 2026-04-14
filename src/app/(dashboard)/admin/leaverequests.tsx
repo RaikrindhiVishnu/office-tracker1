@@ -1095,7 +1095,7 @@ export default function AdminLeaveRequests() {
                   ) : selectedBalance ? (
                     <LeaveBalanceBadges balance={selectedBalance} />
                   ) : (
-                    <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 6 }}>Balance not found in Firestore.</div>
+                    <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 6 }}></div>
                   )}
                   {selectedBalance && getLeaveCfg(selected.leaveType).balanceKey && (
                     <div style={{ fontSize: 11, color: "#64748b", marginTop: 8, padding: "6px 10px", background: "#fff", borderRadius: 7, border: "1px solid #e2e8f0" }}>
