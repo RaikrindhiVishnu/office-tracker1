@@ -1691,6 +1691,7 @@ function KanbanBoard({
   const [addingCol, setAddingCol] = useState(false);
   const [newColLabel, setNewColLabel] = useState("");
   const [collapsedStories, setCollapsedStories] = useState<Set<string>>(new Set());
+// key format: "storyId::columnId"
   const [storyPopup, setStoryPopup] = useState<{ storyId: string } | null>(null);
   const draggingTaskRef = useRef<Task | null>(null);
 
@@ -1698,9 +1699,14 @@ function KanbanBoard({
 
   const isMyTask = (task: Task) => !!(task.assignedTo && task.assignedTo === currentUserId);
   const canDrag = (task: Task) => canMoveTask(user, task, activeProject);
-  const toggleStory = (id: string) => {
-    setCollapsedStories(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
-  };
+  const toggleStory = (storyId: string, colId: string) => {
+  const key = `${storyId}::${colId}`;
+  setCollapsedStories(prev => {
+    const s = new Set(prev);
+    s.has(key) ? s.delete(key) : s.add(key);
+    return s;
+  });
+};
 
 const handleDragStart = useCallback((e: React.DragEvent, task: Task) => {
   if (!canMoveTask(user, task, activeProject)) {
@@ -1779,13 +1785,19 @@ const handleRenameCol = async (colId: string) => {
         const colTaskList = colTasks(col.id);
         const isOver = dragOverCol === col.id;
         // ✅ NEW — story appears in any column where it has children
+// ✅ FIXED colStories
 const colStories = localTasks
   .filter(t => t.ticketType === "story")
-  .filter(story =>
-    localTasks.some(
+  .filter(story => {
+    const hasChildrenHere = localTasks.some(
       t => t.parentStoryId === story.id && t.status === col.id
-    )
-  );
+    );
+    if (hasChildrenHere) return true;
+
+    // No tasks at all → show only in the first column
+    const hasAnyChildren = localTasks.some(t => t.parentStoryId === story.id);
+    return !hasAnyChildren && col.id === columns[0]?.id;
+  });
 // Orphans = non-story tasks in this column that either have no parent,
 // OR whose parent story is NOT in this same column
 // ✅ NEW — orphan = non-story task with no parent, OR parent story has no children in THIS column
@@ -1914,7 +1926,7 @@ const colOrphans = colTaskList.filter(t =>
   )
 );
 
-                const isCollapsed = collapsedStories.has(story.id);
+                const isCollapsed = collapsedStories.has(`${story.id}::${col.id}`);
                 const mine = isMyTask(story);
                 const draggable = canDrag(story);
                 const pc = PRIORITY_CONFIG[story.priority];
@@ -1927,7 +1939,7 @@ const colOrphans = colTaskList.filter(t =>
                       className={`group transition-all select-none cursor-pointer ${draggingId === story.id ? "opacity-40" : "hover:bg-indigo-50/50"}`}
                       style={{ borderLeftWidth: "3px", borderLeftColor: mine ? projectColor : "#a5b4fc" }}>
                       <div className="grid px-3 py-2.5 items-center gap-2" style={{ gridTemplateColumns: "auto auto 1fr auto auto auto auto" }}>
-                        <button onClick={e => { e.stopPropagation(); toggleStory(story.id); }}
+                        <button onClick={e => { e.stopPropagation(); toggleStory(story.id, col.id); }}
                           className="w-4 h-4 flex items-center justify-center text-indigo-400 hover:text-indigo-600 transition text-[10px] shrink-0">
                           {isCollapsed ? "▶" : "▼"}
                         </button>
