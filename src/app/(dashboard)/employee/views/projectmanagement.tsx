@@ -877,23 +877,44 @@ function TaskModal({
     ...initialData,
   });
   const [tagsInput, setTagsInput] = useState((initialData?.tags || []).join(", "));
-  const [saving, setSaving] = useState(false);
-  const [childTickets, setChildTickets] = useState<Partial<Task>[]>([]);
-  const [newChild, setNewChild] = useState({ title: "", ticketType: "task" as TicketType, priority: "Medium" });
+const [saving, setSaving] = useState(false);
+const [childTickets, setChildTickets] = useState<Partial<Task>[]>([]);
+const [newChild, setNewChild] = useState({ title: "", ticketType: "task" as TicketType, priority: "Medium" });
+const [previewCode, setPreviewCode] = useState<string>("");
 
   useEffect(() => {
-    setForm({
-      title: "", description: "", priority: "Medium",
-      status: columns[0]?.id || "todo",
-      estimatedHours: 0, storyPoints: 0, tags: [],
-      ticketType: allowed[0] || "task",
-      parentStoryId: "", parentStoryTitle: "",
-      ...initialData,
-    });
-    setTagsInput((initialData?.tags || []).join(", "));
-    setChildTickets([]);
-    setNewChild({ title: "", ticketType: "task", priority: "Medium" });
-  }, [initialData?.id, open]);
+  const ticketType = initialData?.ticketType || allowed[0] || "task";
+  setForm({
+    title: "", description: "", priority: "Medium",
+    status: columns[0]?.id || "todo",
+    estimatedHours: 0, storyPoints: 0, tags: [],
+    ticketType,
+    parentStoryId: "", parentStoryTitle: "",
+    ...initialData,
+  });
+  setTagsInput((initialData?.tags || []).join(", "));
+  setChildTickets([]);
+  setNewChild({ title: "", ticketType: "task", priority: "Medium" });
+
+  // ✅ Auto-generate preview code when modal opens
+ // ✅ Auto-generate preview code when modal opens
+  if (!isEdit) {
+    const type = initialData?.ticketType || allowed[0] || "task";
+    const projectId = initialData?.projectId;
+    const prefixMap: Record<string, string> = { story: "STR", task: "TSK", bug: "BUG", defect: "DEF" };
+    if (projectId) {
+      getDocs(query(collection(db, "projectTasks"),
+        where("projectId", "==", projectId),
+        where("ticketType", "==", type)
+      )).then(snap => {
+        const code = `${prefixMap[type]}-${String(snap.size + 1).padStart(3, "0")}`;
+        setPreviewCode(code);
+      });
+    } else {
+      setPreviewCode(`${prefixMap[type]}-???`);
+    }
+  }
+}, [initialData?.id, open]);
 
   if (!open) return null;
 
@@ -943,7 +964,20 @@ function TaskModal({
                 const isAllowed = isProjectManager || allowed.includes(type);
                 return (
                   <button key={type}
-                    onClick={() => { if (!isAllowed) return; setForm(f => ({ ...f, ticketType: type, taskCode: generateTaskCode(type, Date.now() % 1000) })); }}
+                    onClick={() => {
+  if (!isAllowed) return;
+  setForm(f => ({ ...f, ticketType: type }));
+  if (initialData?.projectId) {
+    const prefixMap: Record<string, string> = { story: "STR", task: "TSK", bug: "BUG", defect: "DEF" };
+    getDocs(query(collection(db, "projectTasks"),
+      where("projectId", "==", initialData.projectId),
+      where("ticketType", "==", type)
+    )).then(snap => {
+      const code = `${prefixMap[type]}-${String(snap.size + 1).padStart(3, "0")}`;
+      setPreviewCode(code);
+    });
+  }
+}}
                     disabled={!isAllowed}
                     className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border-2 transition-all relative"
                     style={{ borderColor: selected ? cfg.color : "#e5e7eb", background: selected ? cfg.bg : isAllowed ? "white" : "#f9fafb", boxShadow: selected ? `0 0 0 3px ${cfg.color}20` : "none", opacity: isAllowed ? 1 : 0.45, cursor: isAllowed ? "pointer" : "not-allowed" }}>
@@ -971,9 +1005,11 @@ function TaskModal({
           )}
           <div>
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Task ID</label>
-            <input value={form.taskCode || ""} onChange={e => setForm(f => ({ ...f, taskCode: e.target.value }))}
-              placeholder="Auto-generated (e.g. TSK-001)"
-              className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 font-mono" />
+            <input
+  value={isEdit ? (form.taskCode || "") : previewCode}
+  readOnly
+  className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 font-mono bg-gray-50 text-gray-500 cursor-default"
+/>
           </div>
           <div>
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Title <span className="text-red-400">*</span></label>
@@ -2596,30 +2632,30 @@ export default function ProjectManagement({ user, projects, users }: any) {
   const handleCreateTask = async (data: Partial<Task> & { childTickets?: Partial<Task>[] }) => {
   const { childTickets: children, ...taskData } = data as any;
 
-  const runBackfill = async () => {
-  if (!activeProject?.id) return;
-  if (!confirm("Backfill task codes for all existing tasks in this project? Run once only.")) return;
+//   const runBackfill = async () => {
+//   if (!activeProject?.id) return;
+//   if (!confirm("Backfill task codes for all existing tasks in this project? Run once only.")) return;
 
-  const snap = await getDocs(
-    query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id))
-  );
+//   const snap = await getDocs(
+//     query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id))
+//   );
 
-  const allTasks = snap.docs
-    .map(d => ({ id: d.id, ...d.data() } as Task))
-    .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+//   const allTasks = snap.docs
+//     .map(d => ({ id: d.id, ...d.data() } as Task))
+//     .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
 
-  const counters: Record<string, number> = { story: 0, task: 0, bug: 0, defect: 0 };
-  const prefixMap: Record<string, string> = { story: "STR", task: "TSK", bug: "BUG", defect: "DEF" };
+//   const counters: Record<string, number> = { story: 0, task: 0, bug: 0, defect: 0 };
+//   const prefixMap: Record<string, string> = { story: "STR", task: "TSK", bug: "BUG", defect: "DEF" };
 
-  for (const t of allTasks) {
-    const type = t.ticketType || "task";
-    counters[type] = (counters[type] || 0) + 1;
-    const newCode = `${prefixMap[type]}-${String(counters[type]).padStart(3, "0")}`;
-    await updateDoc(doc(db, "projectTasks", t.id), { taskCode: newCode });
-  }
+//   for (const t of allTasks) {
+//     const type = t.ticketType || "task";
+//     counters[type] = (counters[type] || 0) + 1;
+//     const newCode = `${prefixMap[type]}-${String(counters[type]).padStart(3, "0")}`;
+//     await updateDoc(doc(db, "projectTasks", t.id), { taskCode: newCode });
+//   }
 
-  alert(`✅ Done! Updated ${allTasks.length} tasks.`);
-};
+//   alert(`✅ Done! Updated ${allTasks.length} tasks.`);
+// };
 
   const taskCode = await generateUniqueTaskCode(activeProject.id, taskData.ticketType || "task");
 
@@ -2731,30 +2767,30 @@ export default function ProjectManagement({ user, projects, users }: any) {
     if (activeSprint?.id === sprint.id) setActiveSprint(null);
   };
 
-  const runBackfill = async () => {
-  if (!activeProject?.id) return;
-  if (!confirm("Backfill task codes for all existing tasks in this project? Run once only.")) return;
+//   const runBackfill = async () => {
+//   if (!activeProject?.id) return;
+//   if (!confirm("Backfill task codes for all existing tasks in this project? Run once only.")) return;
 
-  const snap = await getDocs(
-    query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id))
-  );
+//   const snap = await getDocs(
+//     query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id))
+//   );
 
-  const allTasks = snap.docs
-    .map(d => ({ id: d.id, ...d.data() } as Task))
-    .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+//   const allTasks = snap.docs
+//     .map(d => ({ id: d.id, ...d.data() } as Task))
+//     .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
 
-  const counters: Record<string, number> = { story: 0, task: 0, bug: 0, defect: 0 };
-  const prefixMap: Record<string, string> = { story: "STR", task: "TSK", bug: "BUG", defect: "DEF" };
+//   const counters: Record<string, number> = { story: 0, task: 0, bug: 0, defect: 0 };
+//   const prefixMap: Record<string, string> = { story: "STR", task: "TSK", bug: "BUG", defect: "DEF" };
 
-  for (const t of allTasks) {
-    const type = t.ticketType || "task";
-    counters[type] = (counters[type] || 0) + 1;
-    const newCode = `${prefixMap[type]}-${String(counters[type]).padStart(3, "0")}`;
-    await updateDoc(doc(db, "projectTasks", t.id), { taskCode: newCode });
-  }
+//   for (const t of allTasks) {
+//     const type = t.ticketType || "task";
+//     counters[type] = (counters[type] || 0) + 1;
+//     const newCode = `${prefixMap[type]}-${String(counters[type]).padStart(3, "0")}`;
+//     await updateDoc(doc(db, "projectTasks", t.id), { taskCode: newCode });
+//   }
 
-  alert(`✅ Done! Updated ${allTasks.length} tasks.`);
-};
+//   alert(`✅ Done! Updated ${allTasks.length} tasks.`);
+// };
 
   const handleSubmitWorkLog = async () => {
     if (!wl.description.trim() || !wl.hoursWorked || !activeProject) return;
@@ -2866,14 +2902,14 @@ export default function ProjectManagement({ user, projects, users }: any) {
             )}
 
             <div className="flex-1" />
-{isProjectManager && (
+{/* {isProjectManager && (
   <button
     onClick={runBackfill}
     className="flex items-center gap-1.5 text-xs font-bold px-4 py-1.5 rounded-lg text-white shadow-sm"
     style={{ background: "#f59e0b" }}>
     🔧 Backfill IDs
   </button>
-)}
+)} */}
             {viewMode !== "reports" && (
               <>
                 <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-1.5 text-xs font-bold px-4 py-1.5 rounded-lg text-white shadow-sm transition" style={{ background: projectColor }}>+ New Ticket</button>
@@ -3083,7 +3119,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
             users={users}
             columns={columns}
             projectColor={projectColor}
-            initialData={{ status: columns[0]?.id || "todo" }}
+            initialData={{ status: columns[0]?.id || "todo", projectId: activeProject.id }}
             stories={stories}
             currentUserId={user?.uid}
             isProjectManager={isProjectManager}
@@ -3100,12 +3136,12 @@ export default function ProjectManagement({ user, projects, users }: any) {
             columns={columns}
             projectColor={projectColor}
             initialData={{
-              ticketType: quickAddStory.ticketType,
-              parentStoryId: quickAddStory.story.id,
-              parentStoryTitle: quickAddStory.story.title,
-              status: columns[0]?.id || "todo",
-              taskCode: generateTaskCode(quickAddStory.ticketType, Date.now() % 1000),
-            }}
+      ticketType: quickAddStory.ticketType,
+      parentStoryId: quickAddStory.story.id,
+      parentStoryTitle: quickAddStory.story.title,
+      status: columns[0]?.id || "todo",
+      projectId: activeProject.id,
+    }}
             stories={stories}
             currentUserId={user?.uid}
             isProjectManager={isProjectManager}

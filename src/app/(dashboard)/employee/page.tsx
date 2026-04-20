@@ -369,7 +369,25 @@ export default function ZohoStyleEmployeeDashboard() {
   const [showCalendar,           setShowCalendar]           = useState(false);
   const [totalSeconds,           setTotalSeconds]           = useState<number>(0);
   const [users,                  setUsers]                  = useState<any[]>([]);
-  const [activeView,             setActiveView]             = useState<ViewType>("dashboard");
+  const [activeView, setActiveView] = useState<ViewType>("dashboard");
+
+useEffect(() => {
+  const saved = localStorage.getItem("activeView") as ViewType | null;
+  const validViews: ViewType[] = [
+    "dashboard", "work-update", "attendance", "notifications",
+    "calendar", "holidays", "leave-history", "leave-request",
+    "profile", "help", "projects", "meet", "tasks", "team",
+    "reports", "settings", "payslips"
+  ];
+  if (saved && validViews.includes(saved)) {
+    setActiveView(saved);
+  }
+}, []);
+
+const changeView = (view: ViewType) => {
+  setActiveView(view);
+  localStorage.setItem("activeView", view);
+};
   const [attendance,             setAttendance]             = useState<any>(null);
   const [busy,                   setBusy]                   = useState(false);
   const [task,                   setTask]                   = useState("");
@@ -708,7 +726,7 @@ export default function ZohoStyleEmployeeDashboard() {
           {sidebarItems.map(([id, label, icon]) => (
             <button
               key={id}
-              onClick={() => { setActiveView(id); setMobileMenuOpen(false); }}
+              onClick={() => { changeView(id); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 relative group
                 ${activeView === id
                   ? "bg-white/15 text-white shadow-sm border border-white/10"
@@ -833,7 +851,7 @@ export default function ZohoStyleEmployeeDashboard() {
                     markChatRead={markChatNotificationAsRead}
                     markAllRead={markAllNotificationsRead}
                     onClose={() => setShowNotifDropdown(false)}
-                    onGoToChat={(_chatId) => { setActiveView("meet"); setShowNotifDropdown(false); }}
+                    onGoToChat={(_chatId) => { changeView("meet"); setShowNotifDropdown(false); }}
                   />
                 )}
               </div>
@@ -870,8 +888,8 @@ export default function ZohoStyleEmployeeDashboard() {
                         </div>
                       </div>
                       <div className="py-1">
-                        <button onClick={() => { setActiveView("profile");  setShowUserMenu(false); }} className="w-full text-left px-3 py-2.5 text-gray-700 hover:bg-blue-50 flex items-center gap-2.5 group text-sm"><span className="text-lg group-hover:scale-110 transition-transform">👤</span><span className="font-medium">Profile</span></button>
-                        <button onClick={() => { setActiveView("settings"); setShowUserMenu(false); }} className="w-full text-left px-3 py-2.5 text-gray-700 hover:bg-blue-50 flex items-center gap-2.5 group text-sm"><span className="text-lg group-hover:scale-110 transition-transform">⚙️</span><span className="font-medium">Settings</span></button>
+                        <button onClick={() => { changeView("profile");  setShowUserMenu(false); }} className="w-full text-left px-3 py-2.5 text-gray-700 hover:bg-blue-50 flex items-center gap-2.5 group text-sm"><span className="text-lg group-hover:scale-110 transition-transform">👤</span><span className="font-medium">Profile</span></button>
+                        <button onClick={() => { changeView("settings"); setShowUserMenu(false); }} className="w-full text-left px-3 py-2.5 text-gray-700 hover:bg-blue-50 flex items-center gap-2.5 group text-sm"><span className="text-lg group-hover:scale-110 transition-transform">⚙️</span><span className="font-medium">Settings</span></button>
                         <hr className="my-1 border-gray-200" />
                         <button onClick={async () => { await signOut(auth); router.push("/login"); }} className="w-full text-left px-3 py-2.5 text-red-600 hover:bg-red-50 flex items-center gap-2.5 group text-sm"><span className="text-lg group-hover:scale-110 transition-transform">🚪</span><span className="font-medium">Logout</span></button>
                       </div>
@@ -917,7 +935,7 @@ export default function ZohoStyleEmployeeDashboard() {
                       markChatRead={markChatNotificationAsRead}
                       markAllRead={markAllNotificationsRead}
                       onClose={() => setShowNotifDropdown(false)}
-                      onGoToChat={(_chatId) => { setActiveView("meet"); setShowNotifDropdown(false); }}
+                      onGoToChat={(_chatId) => { changeView("meet"); setShowNotifDropdown(false); }}
                     />
                   )}
                 </div>
@@ -998,7 +1016,7 @@ export default function ZohoStyleEmployeeDashboard() {
                 submitting={submitting}
                 leaveMsg={leaveMsg}
                 totalSeconds={totalSeconds}
-                onGoToChat={(_chatId) => setActiveView("meet")}
+                onGoToChat={(_chatId) => changeView("meet")}
               />
             )}
 
@@ -1012,7 +1030,7 @@ export default function ZohoStyleEmployeeDashboard() {
                 markNotificationAsRead={markNotificationAsRead}
                 queryNotifications={queryNotifications}
                 markQueryNotificationAsRead={markQueryNotificationAsRead}
-                onClose={() => setActiveView("dashboard")}
+                onClose={() => changeView("dashboard")}
               />
             )}
 
