@@ -12,6 +12,16 @@ export interface KanbanColumn {
   border?: string;  // e.g. "#c7d2fe"
 }
 
+export function canDragTask(user: any, task: Task, project: any): boolean {
+  if (!user) return false;
+  const isAdmin = user?.accountType === "ADMIN";
+  const isPM =
+    project?.projectManager === user?.uid ||
+    (Array.isArray(project?.projectManagers) && project.projectManagers.includes(user?.uid));
+  const isAssignee = task.assignedTo === user?.uid;
+  return isAdmin || isPM || isAssignee;
+}
+
 export interface Task {
   id: string; title: string; description?: string; projectId: string;
   sprintId?: string | null; assignedTo?: string | null; assignedToName?: string | null;
@@ -35,6 +45,8 @@ interface KanbanBoardProps {
   canManage: boolean;
   onSaveColumns: (c: KanbanColumn[]) => void;
   onCreateTask?: (storyId: string, ticketType: string) => void;
+   currentUser?: any;     // ✅ ADD
+  activeProject?: any;   // ✅ ADD
 }
 
 /* ─── PRIORITY CONFIG ─── */
@@ -327,17 +339,27 @@ useEffect(() => {
  const submit = () => {
   if (!f.title.trim()) return;
 
-const data = {
-  ...f,
-  estimatedHours: f.estimatedHours ? Number(f.estimatedHours) : undefined,
-  storyPoints: f.storyPoints ? Number(f.storyPoints) : undefined,
-  tags: f.tags.split(",").map((t: string) => t.trim()).filter(Boolean),
-};
+  // ✅ Resolve assignedToName from uid at submit time
+  const assignedUser = f.assignedTo
+    ? users.find((u: any) => u.uid === f.assignedTo)
+    : null;
+  const assignedToName = assignedUser
+    ? (assignedUser.displayName || assignedUser.name || assignedUser.email?.split("@")[0] || "")
+    : null;
+
+  const data = {
+    ...f,
+    assignedTo: f.assignedTo || null,
+    assignedToName: assignedToName,
+    estimatedHours: f.estimatedHours ? Number(f.estimatedHours) : undefined,
+    storyPoints: f.storyPoints ? Number(f.storyPoints) : undefined,
+    tags: f.tags.split(",").map((t: string) => t.trim()).filter(Boolean),
+  };
 
   if (editingTask) {
-    onSubmit(data, editingTask); // ✅ UPDATE MODE
+    onSubmit(data, editingTask);
   } else {
-    onSubmit(data); // ✅ CREATE MODE
+    onSubmit(data);
   }
 
   onClose();
@@ -523,6 +545,7 @@ const FloatingMenu = ({ position, onClose, onCreate }: {
 export function KanbanBoard({
   tasks, columns, setColumns, projectColor,
   onTaskClick, onStatusChange, canManage, onSaveColumns, onCreateTask,
+  currentUser, activeProject,
 }: KanbanBoardProps) {
   const [dragTask, setDragTask] = useState<Task | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
@@ -638,12 +661,15 @@ export function KanbanBoard({
     setDragTask(null); setDragOver(null);
   };
   const handleTaskDrop = (e: React.DragEvent, colId: string) => {
-    e.preventDefault();
-    if (dragTask && dragTask.status !== colId && dragTask.ticketType !== "story") {
-      onStatusChange(dragTask.id, colId);
+  e.preventDefault();
+  if (dragTask && dragTask.status !== colId && dragTask.ticketType !== "story") {
+    if (!canDragTask(currentUser, dragTask, activeProject)) {
+      setDragTask(null); setDragOver(null); return;
     }
-    setDragTask(null); setDragOver(null);
-  };
+    onStatusChange(dragTask.id, colId);
+  }
+  setDragTask(null); setDragOver(null);
+};
 
   /* ── STORY CARD ── */
   const StoryCard = ({ story, colIdx }: { story: Task; colIdx: number }) => {
@@ -665,12 +691,16 @@ export function KanbanBoard({
         }}>
         {/* Story Header — full card */}
         <div
-          draggable={canManage}
-          onDragStart={e => handleTaskDragStart(e, story)}
-          onDragEnd={handleTaskDragEnd}
-          className="p-3 cursor-pointer"
-          onClick={() => onTaskClick(story)}
-        >
+  draggable={canDragTask(currentUser, story, activeProject)}
+  onDragStart={e => {
+    if (!canDragTask(currentUser, story, activeProject)) { e.preventDefault(); return; }
+    handleTaskDragStart(e, story);
+  }}
+  onDragEnd={handleTaskDragEnd}
+  className="p-3"
+  onClick={() => onTaskClick(story)}
+  style={{ cursor: canDragTask(currentUser, story, activeProject) ? "grab" : "default" }}
+>
           {/* Top row */}
           <div className="flex items-center gap-2 mb-2">
             {/* Checkbox */}
@@ -781,21 +811,25 @@ export function KanbanBoard({
 
     return (
       <div
-        draggable={canManage}
-        onDragStart={e => handleTaskDragStart(e, task)}
-        onDragEnd={handleTaskDragEnd}
+        draggable={canDragTask(currentUser, task, activeProject)}
+onDragStart={e => {
+  if (!canDragTask(currentUser, task, activeProject)) { e.preventDefault(); return; }
+  handleTaskDragStart(e, task);
+}}
+onDragEnd={handleTaskDragEnd}
         onClick={() => onTaskClick(task)}
         className={`rounded-xl border cursor-pointer group/card transition-all duration-150 ${isChild ? "mx-2 my-1.5" : "mx-2 my-2"}`}
         style={{
-          background: isSelected ? "#eff6ff" : "#fff",
-          borderColor: isSelected ? "#6366f1" : isOverdue ? "#fca5a5" : "#e5e7eb",
-          borderWidth: isSelected ? "2px" : "1px",
-          boxShadow: isDragging ? "0 16px 40px rgba(0,0,0,0.2)" : "0 1px 4px rgba(0,0,0,0.06)",
-          transform: isDragging ? "scale(1.04) rotate(1deg)" : "scale(1)",
-          borderLeft: isChild ? `3px solid ${tm.color}` : `3px solid ${tm.color}`,
-          opacity: isDragging ? 0.5 : 1,
-          paddingLeft: isChild ? "6px" : undefined,
-        }}
+  background: isSelected ? "#eff6ff" : "#fff",
+  borderColor: isSelected ? "#6366f1" : isOverdue ? "#fca5a5" : "#e5e7eb",
+  borderWidth: isSelected ? "2px" : "1px",
+  boxShadow: isDragging ? "0 16px 40px rgba(0,0,0,0.2)" : "0 1px 4px rgba(0,0,0,0.06)",
+  transform: isDragging ? "scale(1.04) rotate(1deg)" : "scale(1)",
+  borderLeft: isChild ? `3px solid ${tm.color}` : `3px solid ${tm.color}`,
+  opacity: isDragging ? 0.5 : 1,
+  paddingLeft: isChild ? "6px" : undefined,
+  cursor: canDragTask(currentUser, task, activeProject) ? "grab" : "default",
+}}
       >
         <div className="px-3 pt-3 pb-2">
           {/* Top row */}

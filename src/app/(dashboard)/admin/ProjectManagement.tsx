@@ -641,9 +641,29 @@ export default function AdminProjectManagement({ user, projects, users }: { user
   const handleTaskSubmit = async (data: any) => {
     if (!activeProject) return;
     if (editingTask) {
-      await updateDoc(doc(db,"projectTasks",editingTask.id), data);
-      setActiveTask({ ...editingTask, ...data });
-      await logActivity(activeProject.id,"updated task",`Updated "${data.title}"`,editingTask.id);
+      // ✅ Resolve assignedToName from assignedTo uid
+      const assignedUser = data.assignedTo
+        ? users.find((u: any) => u.uid === data.assignedTo)
+        : null;
+      const assignedToName = assignedUser
+        ? (assignedUser.displayName || assignedUser.name || assignedUser.email?.split("@")[0] || "")
+        : null;
+
+      const updatedData = {
+        ...data,
+        assignedTo: data.assignedTo || null,
+        assignedToName: assignedToName,
+      };
+
+      await updateDoc(doc(db, "projectTasks", editingTask.id), updatedData);
+      setActiveTask({ ...editingTask, ...updatedData });
+
+      // ✅ Also update local tasks list so kanban reflects immediately
+      setTasks(prev =>
+        prev.map(t => t.id === editingTask.id ? { ...t, ...updatedData } : t)
+      );
+
+      await logActivity(activeProject.id, "updated task", `Updated "${data.title}"`, editingTask.id);
     } else {
       const snapshot = await getDocs(query(collection(db,"projectTasks"), where("projectId","==",activeProject.id)));
       const count = snapshot.size + 1;
@@ -679,28 +699,60 @@ const taskRef = await addDoc(collection(db,"projectTasks"), cleanData);
     setActiveTask(null);
   };
 
-  const handleAssignTask = async (taskId:string,userId:string) => {
-    const au=users.find((u:any)=>u.uid===userId);
-    await updateDoc(doc(db,"projectTasks",taskId),{assignedToName: au?.email?.split("@")[0] || null});
-    if (userId&&activeProject) await sendNotification(userId,"task_assigned","Task Assigned",`A task was assigned in ${activeProject.name}`,activeProject.id,taskId);
-    await logActivity(activeProject!.id,"assigned task",`Assigned to ${au?.email?.split("@")[0]||"user"}`,taskId);
-  };
+const handleAssignTask = async (taskId: string, userId: string) => {
+  const au = users.find((u: any) => u.uid === userId);
+  const assignedToName = au
+    ? (au.displayName || au.name || au.email?.split("@")[0] || "")
+    : null;
 
-  const handleTaskStatusChange = async (taskId:string,newStatus:string) => {
-    if (newStatus === "__DELETE__") { await deleteDoc(doc(db,"projectTasks",taskId)); return; }
-    const oldTask = tasks.find(t => t.id === taskId);
-    await updateDoc(doc(db,"projectTasks",taskId),{ status:newStatus, ...(newStatus==="inprogress"?{startedAt:serverTimestamp()}:{}), ...(newStatus==="done"?{completedAt:serverTimestamp()}:{}) });
-    await logActivity(activeProject!.id,"status_changed",`→ ${columns.find(c=>c.id===newStatus)?.label||newStatus}`,taskId);
-    // Also log to activityLogs with from/to
-    await addDoc(collection(db,"activityLogs"),{projectId:activeProject!.id,taskId,userId:user.uid,userName:user.email?.split("@")[0]??"",action:"status_changed",from:{status:oldTask?.status},to:{status:newStatus},description:`Status changed to ${columns.find(c=>c.id===newStatus)?.label||newStatus}`,createdAt:serverTimestamp()});
-    const snap=await getDocs(query(collection(db,"projectTasks"),where("projectId","==",activeProject!.id)));
-    const all=snap.docs.map(d=>d.data());
-    const nonStory=all.filter(t=>t.ticketType!=="story");
-    const doneColId=columns.find(c=>c.label.toLowerCase()==="done")?.id||"done";
-    if (nonStory.length) await updateDoc(doc(db,"projects",activeProject!.id),{progress:Math.round((nonStory.filter(t=>t.status===doneColId).length/nonStory.length)*100)});
-  };
+  // ✅ Save BOTH assignedTo and assignedToName
+  await updateDoc(doc(db, "projectTasks", taskId), {
+    assignedTo: userId || null,
+    assignedToName: assignedToName,
+  });
 
-  const handleDeleteSprint = async (sprint:Sprint) => {
+  // ✅ Update local state immediately so UI reflects change
+  setTasks(prev =>
+    prev.map(t => t.id === taskId ? { ...t, assignedTo: userId || null, assignedToName } : t)
+  );
+  if (activeTask?.id === taskId) {
+    setActiveTask(prev => prev ? { ...prev, assignedTo: userId || null, assignedToName } : prev);
+  }
+
+  if (userId && activeProject) {
+    await sendNotification(userId, "task_assigned", "Task Assigned", `A task was assigned in ${activeProject.name}`, activeProject.id, taskId);
+  }
+  await logActivity(activeProject!.id, "assigned task", `Assigned to ${assignedToName || "user"}`, taskId);
+};
+  const handleTaskStatusChange = async (taskId: string, newStatus: string) => {
+  if (newStatus === "__DELETE__") { await deleteDoc(doc(db, "projectTasks", taskId)); return; }
+  const oldTask = tasks.find(t => t.id === taskId);
+  if (!oldTask) return;
+
+  // ✅ FIXED: use oldTask not task
+  const isAdmin = user?.accountType === "ADMIN";
+  const isPM = activeProject ? getProjectManagers(activeProject).includes(user.uid) : false;
+  const isAssignee = oldTask.assignedTo === user?.uid;
+  if (!isAdmin && !isPM && !isAssignee) return;
+
+  await updateDoc(doc(db, "projectTasks", taskId), {
+    status: newStatus,
+    ...(newStatus === "inprogress" ? { startedAt: serverTimestamp() } : {}),
+    ...(newStatus === "done" ? { completedAt: serverTimestamp() } : {}),
+  });
+  await logActivity(activeProject!.id, "status_changed", `→ ${columns.find(c => c.id === newStatus)?.label || newStatus}`, taskId);
+  await addDoc(collection(db, "activityLogs"), { projectId: activeProject!.id, taskId, userId: user.uid, userName: user.email?.split("@")[0] ?? "", action: "status_changed", from: { status: oldTask?.status }, to: { status: newStatus }, description: `Status changed to ${columns.find(c => c.id === newStatus)?.label || newStatus}`, createdAt: serverTimestamp() });
+  const snap = await getDocs(query(collection(db, "projectTasks"), where("projectId", "==", activeProject!.id)));
+  const all = snap.docs.map(d => d.data());
+  const nonStory = all.filter(t => t.ticketType !== "story");
+  const doneColIdLocal = columns.find(c => c.label.toLowerCase() === "done")?.id || "done";
+  const progress = nonStory.length
+    ? Math.round((nonStory.filter(t => t.status === doneColIdLocal).length / nonStory.length) * 100)
+    : 0;
+  await updateDoc(doc(db, "projects", activeProject!.id), { progress });
+};  // ← closes handleTaskStatusChange
+
+const handleDeleteSprint = async (sprint: Sprint) => {
     if (!confirm(`Delete sprint "${sprint.name}"?`)) return;
     await deleteDoc(doc(db,"sprints",sprint.id));
     if (activeSprint?.id===sprint.id) setActiveSprint(null);
@@ -1358,6 +1410,8 @@ const taskRef = await addDoc(collection(db,"projectTasks"), cleanData);
   canManage={canManage}
   onSaveColumns={handleSaveColumns}
   onCreateTask={canManage ? handleKanbanCreateTask : undefined}
+   currentUser={user}       
+  activeProject={activeProject}
 />
               </div>
             </div>

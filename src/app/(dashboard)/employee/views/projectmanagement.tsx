@@ -159,6 +159,14 @@ function getPermissions(user: any, project: any) {
     canAssign: fullControl,
   };
 }
+function canMoveTask(user: any, task: Task, project: any) {
+  const isAdmin = user?.accountType === "ADMIN";
+  const isPM =
+    project?.projectManager === user?.uid ||
+    (Array.isArray(project?.projectManagers) && project.projectManagers.includes(user?.uid));
+  const isAssignee = task.assignedTo === user?.uid;
+  return isAdmin || isPM || isAssignee;
+}
 
 /* ─── TICKET TYPE CONFIG ─── */
 const TICKET_TYPES: Record<TicketType, { label: string; icon: string; color: string; bg: string; border: string; description: string }> = {
@@ -987,24 +995,38 @@ function TaskModal({
               <input type="date" value={form.dueDate || ""} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))}
                 className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
             </div>
-            {isProjectManager ? (
-              <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Assignee</label>
-                <select value={form.assignedTo || ""}
-                  onChange={e => { const u = users?.find((u: any) => u.uid === e.target.value); setForm(f => ({ ...f, assignedTo: e.target.value, assignedToName: u ? (u.displayName || u.email?.split("@")[0]) : "" })); }}
-                  className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
-                  <option value="">Unassigned</option>
-                  {users?.map((u: any) => <option key={u.uid} value={u.uid}>{u.displayName || u.email?.split("@")[0]}</option>)}
-                </select>
-              </div>
-            ) : (
-              <div>
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Assignee 🔒</label>
-                <div className="w-full text-sm border border-gray-100 rounded-xl px-3 py-2.5 bg-gray-50 text-gray-400 flex items-center gap-2">
-                  <span>🔒</span><span>Only PM can assign tasks</span>
-                </div>
-              </div>
-            )}
+            <div>
+  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Assignee</label>
+  <select
+    value={form.assignedTo || ""}
+    onChange={e => {
+      const u = users?.find((u: any) => u.uid === e.target.value);
+      setForm(f => ({
+        ...f,
+        assignedTo: e.target.value,
+        assignedToName: u ? (u.displayName || u.email?.split("@")[0]) : "",
+      }));
+    }}
+    className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
+    <option value="">Unassigned</option>
+    {/* Self-assign option always first */}
+    {!isProjectManager && currentUserId && (
+      <option value={currentUserId}>
+        {users?.find((u: any) => u.uid === currentUserId)?.displayName ||
+         users?.find((u: any) => u.uid === currentUserId)?.email?.split("@")[0] ||
+         "Assign to me"}
+      </option>
+    )}
+    {/* PM sees all members; employee sees all project members too */}
+    {users
+      ?.filter((u: any) => isProjectManager || u.uid !== currentUserId) // avoid duplicate self entry
+      .map((u: any) => (
+        <option key={u.uid} value={u.uid}>
+          {u.displayName || u.email?.split("@")[0]}
+        </option>
+      ))}
+  </select>
+</div>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
@@ -1675,20 +1697,39 @@ function KanbanBoard({
   useEffect(() => { setLocalTasks(tasks); }, [tasks]);
 
   const isMyTask = (task: Task) => !!(task.assignedTo && task.assignedTo === currentUserId);
-  const canDrag  = (task: Task) => isProjectManager || isMyTask(task);
+  const canDrag = (task: Task) => canMoveTask(user, task, activeProject);
   const toggleStory = (id: string) => {
     setCollapsedStories(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
   };
 
-  const handleDragStart = useCallback((e: React.DragEvent, task: Task) => {
-    if (!canDrag(task)) { e.preventDefault(); onToast("You can only move your own tasks"); return; }
-    draggingTaskRef.current = task;
-    setDraggingId(task.id);
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", task.id);
-    const el = e.currentTarget as HTMLElement;
-    requestAnimationFrame(() => { el.style.opacity = "0.4"; });
-  }, [isProjectManager, currentUserId]);
+const handleDragStart = useCallback((e: React.DragEvent, task: Task) => {
+  if (!canDrag(task)) {
+    e.preventDefault();
+    onToast("You can only move your own tasks");
+    return;
+  }
+  draggingTaskRef.current = task;
+  setDraggingId(task.id);
+  e.dataTransfer.effectAllowed = "move";
+  e.dataTransfer.setData("text/plain", task.id);
+
+  // ✅ Zoho-style: custom drag image so card "floats" with cursor
+  const el = e.currentTarget as HTMLElement;
+  const clone = el.cloneNode(true) as HTMLElement;
+  clone.style.cssText = `
+    position: fixed; top: -9999px; left: -9999px;
+    width: ${el.offsetWidth}px; opacity: 0.92;
+    pointer-events: none; border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+    background: white; transform: rotate(1.5deg) scale(1.03);
+  `;
+  document.body.appendChild(clone);
+  e.dataTransfer.setDragImage(clone, el.offsetWidth / 2, 30);
+  requestAnimationFrame(() => {
+    document.body.removeChild(clone);
+    el.style.opacity = "0.35";
+  });
+}, [isProjectManager, currentUserId]);
 
   const handleDragEnd = useCallback((e: React.DragEvent) => {
     (e.currentTarget as HTMLElement).style.opacity = "1";
@@ -1905,8 +1946,8 @@ function KanbanBoard({
                 return (
                   <div key={task.id} draggable={draggable} onDragStart={e => handleDragStart(e, task)} onDragEnd={handleDragEnd}
                     onClick={() => !isDragging && onTaskClick(task)}
-                    className={`group border-b transition-all cursor-pointer select-none ${isDragging ? "opacity-40" : "hover:bg-gray-50/70"}`}
-                    style={{ borderColor: "#f3f4f6", borderLeftWidth: "3px", borderLeftColor: mine ? projectColor : "transparent", opacity: isDragging ? 0.4 : (mine || isProjectManager) ? 1 : 0.55 }}>
+                    className={`group border-b transition-all cursor-pointer select-none ${isDragging ? "opacity-40" : "hover:bg-gray-50/70"} cursor: canDrag(task) ? "grab" : "default",`}
+                    style={{ borderColor: "#f3f4f6", borderLeftWidth: "3px", borderLeftColor: mine ? projectColor : "transparent", cursor: draggable ? "grab" : "default", opacity: isDragging ? 0.4 : (mine || isProjectManager) ? 1 : 0.55 }}>
                     <div className="grid px-3 py-2.5 items-center gap-2" style={{ gridTemplateColumns: "auto 1fr auto auto auto" }}>
                       <span className="text-sm shrink-0">{tc.icon}</span>
                       <div className="min-w-0">
