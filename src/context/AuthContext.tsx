@@ -46,12 +46,13 @@ export function normalizeRole(accountType?: string): UserRole | null {
     case "BUSINESSOWNER":
     case "BUSINESS_OWNER": return "admin"; // routes to /admin — add "businessowner" to UserRole if you need a separate dashboard
     case "HR":             return "hr";
-    case "FINANCE":        return "finance";
-    case "SALES":          return "sales";
-    case "IT":             return "it";
-    case "OPERATIONS":     return "operations";
-    case "MARKETING":      return "marketing";
-    case "EXECUTIVE":      return "executive";
+    case "FINANCE":
+case "SALES":
+case "IT":
+case "OPERATIONS":
+case "MARKETING":
+case "EXECUTIVE":
+  return "employee";
     case "EMPLOYEE":       return "employee";
     default:               return null;
   }

@@ -57,7 +57,7 @@ if (!role) {
 
 const authorized = allowedRoles
   ? allowedRoles.includes(role as UserRole)
- : isRoleAuthorized(role as UserRole, pathname || "");
+  : true;
 
 if (!authorized) {
   router.replace(getRoleRedirect(role as UserRole));
