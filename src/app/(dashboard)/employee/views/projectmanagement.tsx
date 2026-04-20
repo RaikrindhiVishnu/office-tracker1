@@ -1778,17 +1778,26 @@ const handleRenameCol = async (colId: string) => {
         const cfg = getColStyle(col.id, colIndex);
         const colTaskList = colTasks(col.id);
         const isOver = dragOverCol === col.id;
-        const colStories = colTaskList.filter(t => t.ticketType === "story");
+        // ✅ NEW — story appears in any column where it has children
+const colStories = localTasks
+  .filter(t => t.ticketType === "story")
+  .filter(story =>
+    localTasks.some(
+      t => t.parentStoryId === story.id && t.status === col.id
+    )
+  );
 // Orphans = non-story tasks in this column that either have no parent,
 // OR whose parent story is NOT in this same column
+// ✅ NEW — orphan = non-story task with no parent, OR parent story has no children in THIS column
 const colOrphans = colTaskList.filter(t => {
   if (t.ticketType === "story") return false;
-  if (!t.parentStoryId) return true; // regular task, no parent
-  // has a parent — only hide it if parent story is ALSO in this column
-  const parentInThisCol = localTasks.find(
-    s => s.id === t.parentStoryId && s.status === col.id
+  if (!t.parentStoryId) return true;
+  // Has a parent story — show as orphan only if that story is NOT being rendered in this column
+  // (i.e. the story has no other children in this column)
+  return !localTasks.some(
+    s => s.id === t.parentStoryId && s.ticketType === "story" &&
+         localTasks.some(c => c.parentStoryId === s.id && c.status === col.id)
   );
-  return !parentInThisCol; // show as orphan if parent is in a different column
 });
 // ✅ Child tasks that have been moved OUT of their story's column
 const colDisplacedChildren = colTaskList.filter(t => 
@@ -1893,10 +1902,9 @@ const colDisplacedChildren = colTaskList.filter(t =>
               {/* STORIES */}
               {colStories.map(story => {
                 // Only show children that are in THE SAME column as the story
-const storyChildren = localTasks.filter(t => 
-  t.parentStoryId === story.id && 
-  t.ticketType !== "story" &&
-  t.status === col.id  // only show children in same column as story
+// ✅ Only show children IN THIS COLUMN under this story
+const storyChildren = localTasks.filter(
+  t => t.parentStoryId === story.id && t.status === col.id
 );
 const colOrphans = colTaskList.filter(t => 
   t.ticketType !== "story" && 
