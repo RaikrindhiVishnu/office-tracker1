@@ -1703,7 +1703,7 @@ function KanbanBoard({
   };
 
 const handleDragStart = useCallback((e: React.DragEvent, task: Task) => {
-  if (!canDrag(task)) {
+  if (!canMoveTask(user, task, activeProject)) {
     e.preventDefault();
     onToast("You can only move your own tasks");
     return;
@@ -1713,7 +1713,6 @@ const handleDragStart = useCallback((e: React.DragEvent, task: Task) => {
   e.dataTransfer.effectAllowed = "move";
   e.dataTransfer.setData("text/plain", task.id);
 
-  // ✅ Zoho-style: custom drag image so card "floats" with cursor
   const el = e.currentTarget as HTMLElement;
   const clone = el.cloneNode(true) as HTMLElement;
   clone.style.cssText = `
@@ -1729,34 +1728,40 @@ const handleDragStart = useCallback((e: React.DragEvent, task: Task) => {
     document.body.removeChild(clone);
     el.style.opacity = "0.35";
   });
-}, [isProjectManager, currentUserId]);
+}, [user, activeProject]);
 
-  const handleDragEnd = useCallback((e: React.DragEvent) => {
-    (e.currentTarget as HTMLElement).style.opacity = "1";
-    setDraggingId(null); setDragOverCol(null); draggingTaskRef.current = null;
-  }, []);
+const handleDragEnd = useCallback((e: React.DragEvent) => {
+  (e.currentTarget as HTMLElement).style.opacity = "1";
+  setDraggingId(null);
+  setDragOverCol(null);
+  draggingTaskRef.current = null;
+}, []);
 
-  const handleDragOver = useCallback((e: React.DragEvent, colId: string) => {
-    e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverCol(colId);
-  }, []);
+const handleDragOver = useCallback((e: React.DragEvent, colId: string) => {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "move";
+  setDragOverCol(colId);
+}, []);
 
-  const handleDrop = useCallback(async (e: React.DragEvent, colId: string) => {
-    e.preventDefault();
-    const taskId = e.dataTransfer.getData("text/plain");
-    const task = draggingTaskRef.current || localTasks.find(t => t.id === taskId);
-    if (!task) return;
-    if (!canDrag(task)) { onToast("Not allowed"); return; }
-    if (task.status === colId) return;
-    setLocalTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: colId } : t));
-    setDraggingId(null); setDragOverCol(null); draggingTaskRef.current = null;
-    onStatusChange(task.id, colId);
-  }, [localTasks, isProjectManager, currentUserId]);
+const handleDrop = useCallback(async (e: React.DragEvent, colId: string) => {
+  e.preventDefault();
+  const taskId = e.dataTransfer.getData("text/plain");
+  const task = draggingTaskRef.current || localTasks.find(t => t.id === taskId);
+  if (!task) return;
+  if (!canMoveTask(user, task, activeProject)) { onToast("Not allowed"); return; }
+  if (task.status === colId) return;
+  setLocalTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: colId } : t));
+  setDraggingId(null);
+  setDragOverCol(null);
+  draggingTaskRef.current = null;
+  onStatusChange(task.id, colId);
+}, [localTasks, user, activeProject]);
 
-  const handleRenameCol = async (colId: string) => {
-    if (!editingColLabel.trim()) { setEditingColId(null); return; }
-    await onUpdateColumns(columns.map(c => c.id === colId ? { ...c, label: editingColLabel.trim() } : c));
-    setEditingColId(null);
-  };
+const handleRenameCol = async (colId: string) => {
+  if (!editingColLabel.trim()) { setEditingColId(null); return; }
+  await onUpdateColumns(columns.map(c => c.id === colId ? { ...c, label: editingColLabel.trim() } : c));
+  setEditingColId(null);
+};
 
   const handleAddCol = async () => {
     if (!newColLabel.trim()) return;
@@ -1774,11 +1779,75 @@ const handleDragStart = useCallback((e: React.DragEvent, task: Task) => {
         const colTaskList = colTasks(col.id);
         const isOver = dragOverCol === col.id;
         const colStories = colTaskList.filter(t => t.ticketType === "story");
-        const colOrphans = colTaskList.filter(t => t.ticketType !== "story" && !t.parentStoryId);
+// Orphans = non-story tasks in this column that either have no parent,
+// OR whose parent story is NOT in this same column
+const colOrphans = colTaskList.filter(t => {
+  if (t.ticketType === "story") return false;
+  if (!t.parentStoryId) return true; // regular task, no parent
+  // has a parent — only hide it if parent story is ALSO in this column
+  const parentInThisCol = localTasks.find(
+    s => s.id === t.parentStoryId && s.status === col.id
+  );
+  return !parentInThisCol; // show as orphan if parent is in a different column
+});
+// ✅ Child tasks that have been moved OUT of their story's column
+const colDisplacedChildren = colTaskList.filter(t => 
+  t.ticketType !== "story" && 
+  t.parentStoryId && 
+  !localTasks.find(s => s.id === t.parentStoryId && s.status === col.id)
+);
 
+{/* DISPLACED CHILD TASKS — children moved to a different column than their story */}
+{colDisplacedChildren.map(task => {
+  const mine = isMyTask(task);
+  const draggable = canDrag(task);
+  const isDragging = draggingId === task.id;
+  const pc = PRIORITY_CONFIG[task.priority];
+  const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done";
+  const tc = TICKET_TYPES[task.ticketType || "task"];
+  const parentStory = localTasks.find(s => s.id === task.parentStoryId);
+  return (
+    <div key={task.id} draggable={draggable} onDragStart={e => handleDragStart(e, task)} onDragEnd={handleDragEnd}
+      onClick={() => !isDragging && onTaskClick(task)}
+      className={`group border-b transition-all cursor-pointer select-none ${isDragging ? "opacity-40" : "hover:bg-gray-50/70"}`}
+      style={{
+        borderColor: "#f3f4f6",
+        borderLeftWidth: "3px",
+        borderLeftColor: mine ? projectColor : "#a5b4fc",
+        cursor: draggable ? "grab" : "default",
+        opacity: isDragging ? 0.4 : 1,
+      }}>
+      <div className="grid px-3 py-2.5 items-center gap-2" style={{ gridTemplateColumns: "auto 1fr auto auto auto" }}>
+        <span className="text-sm shrink-0">{tc.icon}</span>
+        <div className="min-w-0">
+          {parentStory && (
+            <p className="text-[9px] font-bold text-indigo-300 truncate mb-0.5">📖 {parentStory.title}</p>
+          )}
+          <div className="flex items-center gap-1 mb-0.5">
+            <span className="text-[10px] font-mono font-bold text-gray-400">{task.taskCode || "TSK-000"}</span>
+            <p className="text-xs font-semibold text-gray-800 leading-tight truncate group-hover:text-indigo-700">{task.title}</p>
+            {mine && <span className="shrink-0 text-[9px] font-black px-1 rounded" style={{ background: projectColor + "20", color: projectColor }}>You</span>}
+          </div>
+          {task.estimatedHours ? (
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <div className="flex-1 max-w-14 h-0.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full rounded-full" style={{ width: `${Math.min(((task.actualHours || 0) / task.estimatedHours) * 100, 100)}%`, background: projectColor }} />
+              </div>
+              <span className="text-[9px] text-gray-400 tabular-nums">{task.actualHours || 0}/{task.estimatedHours}h</span>
+            </div>
+          ) : null}
+        </div>
+        <span className="text-[10px] font-bold px-1 py-0.5 rounded shrink-0" style={{ background: pc?.bg || "#f1f5f9", color: pc?.color || "#64748b" }}>{pc?.icon || "•"}</span>
+        <span className="text-[10px] font-medium tabular-nums shrink-0 whitespace-nowrap" style={{ color: isOverdue ? "#dc2626" : "#94a3b8" }}>{task.dueDate ? task.dueDate.slice(5) : "—"}{isOverdue && "⚠"}</span>
+        <div className="shrink-0">{task.assignedToName ? <Avatar name={task.assignedToName} size="xs" highlight={mine} /> : <div className="w-6 h-6 rounded-full border-2 border-dashed border-gray-200" />}</div>
+      </div>
+      {/* {draggable && <p className="text-[9px] text-gray-300 px-3 pb-1.5">↕ drag to move</p>} */}
+    </div>
+  );
+})}
         return (
           <div key={col.id}
-            className="flex flex-col shrink-0 w-72 border-r last:border-r-0 transition-colors duration-150"
+            className="flex flex-col shrink-0 w-80 border-r last:border-r-0 transition-colors duration-150"
             style={{ borderColor: isOver ? cfg.color + "50" : "#e5e7eb", background: isOver ? cfg.bg : "white" }}
             onDragOver={e => handleDragOver(e, col.id)}
             onDrop={e => handleDrop(e, col.id)}
@@ -1807,11 +1876,11 @@ const handleDragStart = useCallback((e: React.DragEvent, task: Task) => {
               </div>
               <div className="grid px-4 py-1 border-t text-[10px] font-bold text-gray-400 uppercase tracking-wider gap-2"
                 style={{ gridTemplateColumns: "auto 1fr auto auto auto", borderColor: cfg.border + "60" }}>
-                <span>Type</span><span>Task</span><span>Pri</span><span>Due</span><span>Who</span>
+                {/* <span>Type</span><span>Task</span><span>Pri</span><span>Due</span><span>Who</span> */}
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto" style={{ padding: "10px 10px 0" }}>
               {colTaskList.length === 0 && !isOver && (
                 <div className="flex flex-col items-center justify-center h-24 mt-4 text-gray-200">
                   <div className="w-8 h-8 rounded-lg border-2 border-dashed flex items-center justify-center mb-1" style={{ borderColor: cfg.color + "30" }}>
@@ -1823,7 +1892,20 @@ const handleDragStart = useCallback((e: React.DragEvent, task: Task) => {
 
               {/* STORIES */}
               {colStories.map(story => {
-                const storyChildren = localTasks.filter(t => t.parentStoryId === story.id && t.ticketType !== "story");
+                // Only show children that are in THE SAME column as the story
+const storyChildren = localTasks.filter(t => 
+  t.parentStoryId === story.id && 
+  t.ticketType !== "story" &&
+  t.status === col.id  // only show children in same column as story
+);
+const colOrphans = colTaskList.filter(t => 
+  t.ticketType !== "story" && 
+  (
+    !t.parentStoryId || 
+    !localTasks.find(s => s.id === t.parentStoryId && s.status === col.id)
+  )
+);
+
                 const isCollapsed = collapsedStories.has(story.id);
                 const mine = isMyTask(story);
                 const draggable = canDrag(story);
@@ -1887,7 +1969,7 @@ const handleDragStart = useCallback((e: React.DragEvent, task: Task) => {
                         <span className="text-[10px] font-medium tabular-nums shrink-0 whitespace-nowrap" style={{ color: isOverdue ? "#dc2626" : "#94a3b8" }}>{story.dueDate ? story.dueDate.slice(5) : "—"}</span>
                         <div className="shrink-0">{story.assignedToName ? <Avatar name={story.assignedToName} size="xs" highlight={mine} /> : <div className="w-6 h-6 rounded-full border-2 border-dashed border-gray-200" />}</div>
                       </div>
-                      {draggable && <p className="text-[9px] text-gray-300 px-3 pb-1.5">↕ drag to move</p>}
+                      {/* {draggable && <p className="text-[9px] text-gray-300 px-3 pb-1.5">↕ drag to move</p>} */}
                     </div>
 
                     {!isCollapsed && (
@@ -1903,7 +1985,13 @@ const handleDragStart = useCallback((e: React.DragEvent, task: Task) => {
                             <div key={childTask.id} draggable={tdraggable} onDragStart={e => handleDragStart(e, childTask)} onDragEnd={handleDragEnd}
                               onClick={() => onTaskClick(childTask)}
                               className={`group border-b cursor-pointer select-none transition-all ${draggingId === childTask.id ? "opacity-40" : "hover:bg-white/80"}`}
-                              style={{ borderColor: "#ede9fe", borderLeftWidth: "3px", borderLeftColor: tmine ? projectColor : "transparent", paddingLeft: "10px", opacity: draggingId === childTask.id ? 0.4 : (tmine || isProjectManager) ? 1 : 0.55 }}>
+                              style={{ 
+  borderColor: "#ede9fe", 
+  borderLeftWidth: "3px", 
+  borderLeftColor: tmine ? projectColor : "transparent", 
+  paddingLeft: "10px", 
+  opacity: draggingId === childTask.id ? 0.4 : 1  // ✅ always 1 unless actively dragging
+}}>
                               <div className="grid px-3 py-2 items-center gap-2" style={{ gridTemplateColumns: "auto 1fr auto auto auto" }}>
                                 <span className="text-xs shrink-0">{ttc.icon}</span>
                                 <div className="min-w-0">
@@ -1947,7 +2035,13 @@ const handleDragStart = useCallback((e: React.DragEvent, task: Task) => {
                   <div key={task.id} draggable={draggable} onDragStart={e => handleDragStart(e, task)} onDragEnd={handleDragEnd}
                     onClick={() => !isDragging && onTaskClick(task)}
                     className={`group border-b transition-all cursor-pointer select-none ${isDragging ? "opacity-40" : "hover:bg-gray-50/70"} cursor: canDrag(task) ? "grab" : "default",`}
-                    style={{ borderColor: "#f3f4f6", borderLeftWidth: "3px", borderLeftColor: mine ? projectColor : "transparent", cursor: draggable ? "grab" : "default", opacity: isDragging ? 0.4 : (mine || isProjectManager) ? 1 : 0.55 }}>
+                    style={{ 
+  borderColor: "#f3f4f6", 
+  borderLeftWidth: "3px", 
+  borderLeftColor: mine ? projectColor : "transparent", 
+  cursor: draggable ? "grab" : "default", 
+  opacity: isDragging ? 0.4 : 1  // ✅ always visible
+}}>
                     <div className="grid px-3 py-2.5 items-center gap-2" style={{ gridTemplateColumns: "auto 1fr auto auto auto" }}>
                       <span className="text-sm shrink-0">{tc.icon}</span>
                       <div className="min-w-0">
