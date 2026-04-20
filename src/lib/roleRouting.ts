@@ -1,4 +1,10 @@
-export function getRoleRedirect(
+export type UserRole =
+  | "superadmin"
+  | "admin"
+  | "hr"
+  | "employee";
+  
+  export function getRoleRedirect(
   role: string | null | undefined,
   department?: string | null
 ): string {
