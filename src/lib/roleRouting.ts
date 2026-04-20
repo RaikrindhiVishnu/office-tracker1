@@ -41,3 +41,11 @@ export function getRoleRedirect(
 
   return "/login";
 }
+
+export function isRoleAuthorized(
+  userRole: string | null | undefined,
+  allowedRoles: string[]
+): boolean {
+  if (!userRole) return false;
+  return allowedRoles.includes(userRole.toLowerCase());
+}
