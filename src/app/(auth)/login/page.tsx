@@ -13,7 +13,7 @@ import {
 import { auth, db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { isInsideOffice } from "@/lib/location";
-import { normalizeRole } from "@/context/AuthContext"; // ← reuse the same mapping
+// ← reuse the same mapping
 import { getRoleRedirect } from "@/lib/roleRouting";
 
 // ── Extract Firestore index URL from error message ────────────────────────
@@ -132,7 +132,8 @@ export default function LoginPage() {
       if (!userSnap.exists()) throw new Error("PROFILE_NOT_FOUND");
 
       const userData    = userSnap.data();
-      const accountType = (userData?.accountType ?? "").toString().trim().toUpperCase();
+      const role = (userData?.role ?? userData?.accountType ?? "").toString().trim().toUpperCase();
+const department = (userData?.department ?? "").toString().trim().toUpperCase();
 
       // STEP 3: Force password change if flagged
       if (userData?.mustChangePassword === true) {
@@ -141,7 +142,7 @@ export default function LoginPage() {
       }
 
       // STEP 4: Location check (employees only, no WFH approval)
-      if (accountType === "EMPLOYEE") {
+      if (role === "EMPLOYEE") {
         setStep("Checking work-from-home status...");
         const wfhResult = await checkWFHApproved(cred.user.uid);
 
@@ -184,8 +185,7 @@ export default function LoginPage() {
 
       // STEP 5: Route by role using the same normalizeRole mapping as AuthContext
       setStep("Redirecting...");
-      const role        = normalizeRole(accountType);
-      const destination = getRoleRedirect(role);
+      const destination = getRoleRedirect(role, department);
 
       if (!role) throw new Error("INVALID_ROLE");
 

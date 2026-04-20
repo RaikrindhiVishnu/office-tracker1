@@ -1313,22 +1313,33 @@ export function MoveToSprintModal({
   open,
 }: MoveToSprintProps) {
   const [selected, setSelected] = useState<string>(currentSprintId || "");
+  useEffect(() => {
+  setSelected(currentSprintId || "");
+}, [currentSprintId, task]);
   const [saving, setSaving] = useState(false);
 
   if (!open) return null;
 
-  const handleMove = async () => {
-    setSaving(true);
-    try {
-      await updateDoc(doc(db, "projectTasks", task.id), {
-        sprintId: selected || null,
-      });
-      onMoved?.();
-      onClose();
-    } finally {
-      setSaving(false);
-    }
-  };
+const handleMove = async () => {
+  if (!task?.id) {
+    console.error("❌ Task missing:", task);
+    return;
+  }
+
+  setSaving(true);
+  try {
+    await updateDoc(doc(db, "projectTasks", task.id), {
+      sprintId: selected || null,
+    });
+
+    onMoved?.();
+    onClose();
+  } catch (err) {
+    console.error("Move failed:", err);
+  } finally {
+    setSaving(false);
+  }
+};
 
   
    return createPortal(
@@ -1341,7 +1352,7 @@ export function MoveToSprintModal({
           <div>
             <h3 className="font-bold text-gray-900 text-sm">Move to Sprint</h3>
             <p className="text-xs text-gray-400 mt-0.5 truncate max-w-55">
-              {task.title}
+             {task?.title || "No task selected"}
             </p>
           </div>
           <button
@@ -1875,6 +1886,49 @@ function BacklogSection({
           </p>
         )}
       </div>
+    </div>
+  );
+}
+export function SprintPicker({
+  sprints,
+  activeSprint,
+  onSelect,
+  onDelete,
+  onEdit,
+}: any) {
+  return (
+    <div className="flex gap-2 mb-3 flex-wrap">
+      <button
+        onClick={() => onSelect(null)}
+        className={`px-3 py-1 rounded ${
+          !activeSprint ? "bg-blue-600 text-white" : "bg-gray-100"
+        }`}
+      >
+        All
+      </button>
+
+      {sprints.map((s: any) => (
+        <div key={s.id} className="flex items-center gap-1">
+          <button
+            onClick={() => onSelect(s)}
+            className={`px-3 py-1 rounded ${
+              activeSprint?.id === s.id
+                ? "bg-blue-600 text-white"
+                : "bg-gray-100"
+            }`}
+          >
+            {s.name}
+          </button>
+
+          {onEdit && (
+            <button onClick={() => onEdit(s)}>✏️</button>
+          )}
+
+          {onDelete && (
+            <button onClick={() => onDelete(s)}>🗑️</button>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

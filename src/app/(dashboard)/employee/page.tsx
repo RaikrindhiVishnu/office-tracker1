@@ -13,6 +13,7 @@ import { useAuth } from "@/context/AuthContext";
 import { auth, db, storage } from "@/lib/firebase";
 import { checkIn, checkOut, getTodayAttendance } from "@/lib/attendance";
 import { saveDailyUpdate } from "@/lib/dailyUpdates";
+import EmployeeAttendanceView from "./views/EmployeeAttendanceView";
 
 import CallHistory from "@/components/CallHistory";
 import MeetPanel from "@/components/MeetPanel";
@@ -20,7 +21,6 @@ import IncomingCallListener from "@/components/IncomingCallListener";
 import MeetView from "@/components/MeetView";
 import ApplyLeaveForm from "@/components/leave/ApplyLeaveForm";
 
-// ── NEW: Break tracking imports ────────────────────────────
 import BreakPanel from "@/components/BreakPanel";
 import {
   getActiveBreak,
@@ -104,41 +104,19 @@ const isHoliday = (dateStr: string): { title: string } | null => {
   return holiday ? { title: holiday.title } : null;
 };
 
-const sidebarGroups = [
-  // 🔥 Dashboard without group (direct item)
-  // { items: [["dashboard","Dashboard","📊"]] },
-
-  { title: "WORK", items: [
-    ["work-update","Work Update","📝"],
-    ["attendance","Attendance","⏰"],
-    ["projects","Projects","📁"]
-  ]},
-
-  // { title: "PROJECT MANAGEMENT", items: [
-  //   ["projects","Projects","📁"]
-  // ]},
-
-  { title: "LEAVE & HOLIDAYS", items: [
-    ["leave-request","Apply Leave","📋"],
-    ["leave-history","Leave History","📜"],
-    ["holidays","Holidays","🎉"]
-  ]},
-
-  { title: "COMMUNICATION", items: [
-    ["notifications","Notifications","🔔"]
-  ]},
-
-  { title: "ACCOUNT", items: [
-    ["profile","Profile","👤"],
-    ["help","Help","❓"]
-  ]},
-
-  { title: "PAYSLIPS", items: [
-    ["payslips","Payslips","💰"]
-  ]}
+// ── Flat sidebar nav items ─────────────────────────────────
+const sidebarItems: [ViewType, string, string][] = [
+  ["dashboard",     "Dashboard",     "📊"],
+  ["work-update",   "Work Update",   "📝"],
+  ["attendance",    "Attendance",    "⏰"],
+  ["projects",      "Projects",      "📁"],
+  ["payslips",      "Payslips",      "💰"],
+  ["leave-request", "Apply Leave",   "📋"],
+  // ["leave-history", "Leave History", "📜"],
+  // ["holidays",      "Holidays",      "🎉"],
+  ["profile",       "Profile",       "👤"],
+  ["help",          "Help",          "❓"],
 ];
-
-
 
 // ── Announcement Bar ──────────────────────────────────────
 function AnnouncementBar({ messages }: { messages: string[] }) {
@@ -155,8 +133,8 @@ function AnnouncementBar({ messages }: { messages: string[] }) {
 
   return (
     <>
-      <div className={`bg-linear-to-r from-[#ae9c62] to-[#2d4a7c] text-white overflow-hidden shadow-lg transition-all duration-500 ease-in-out relative ${
-        isCollapsed ? "h-0 opacity-0" : "h-9 opacity-100"
+      <div className={`bg-linear-to-r from-[#d6a70d] to-[#2d4a7c] text-white overflow-hidden shadow-lg transition-all duration-500 ease-in-out relative ${
+        isCollapsed ? "h-0 opacity-0" : "h-9 opacity-100"   
       }`}>
         <div className="absolute inset-0 opacity-10">
           <div className="absolute inset-0 bg-linear-to-r from-transparent via-white to-transparent animate-shimmer" />
@@ -401,7 +379,6 @@ export default function ZohoStyleEmployeeDashboard() {
   const [messages,               setMessages]               = useState<string[]>([]);
   const [leaveRequests,          setLeaveRequests]          = useState<LeaveRequest[]>([]);
   const [leaveType,              setLeaveType]              = useState<LeaveType>("casual");
-  const [openGroup,              setOpenGroup]              = useState<string | null>("WORKSPACE");
   const [fromDate,               setFromDate]               = useState("");
   const [toDate,                 setToDate]                 = useState("");
   const [leaveReason,            setLeaveReason]            = useState("");
@@ -423,8 +400,6 @@ export default function ZohoStyleEmployeeDashboard() {
   const [dismissedAnnouncements, setDismissedAnnouncements] = useState<Set<string>>(new Set());
   const [showNotifDropdown,      setShowNotifDropdown]      = useState(false);
   const [chatNotifications,      setChatNotifications]      = useState<ChatNotif[]>([]);
-
-  // ── NEW: Break state ──────────────────────────────────────
   const [todayBreaks,            setTodayBreaks]            = useState<Break[]>([]);
 
   const notifDropdownRef = useRef<HTMLDivElement>(null);
@@ -469,7 +444,6 @@ export default function ZohoStyleEmployeeDashboard() {
 
   useEffect(() => { if (!loading && user) loadAttendance(); }, [loading, user]);
 
-  // ── NEW: Real-time listener for today's breaks ────────────
   useEffect(() => {
     if (!user) return;
     const dateStr = getTodayDateStr();
@@ -483,7 +457,10 @@ export default function ZohoStyleEmployeeDashboard() {
     });
   }, [user]);
 
- useEffect(() => {
+  // Active break derived state (must be before useEffect that uses it)
+  const activeBreak = getActiveBreak(todayBreaks);
+
+  useEffect(() => {
     if (!attendance?.sessions?.length) return;
     const calc = () => {
       let s = 0;
@@ -499,23 +476,21 @@ export default function ZohoStyleEmployeeDashboard() {
           ? sess.checkOut.toDate().getTime()
           : Math.min(now.getTime(), shiftEnd.getTime());
 
-        // 🛑 Freeze work timer at break start if break is active
-       if (activeBreak?.startTime && !sess.checkOut) {
-  co = activeBreak.startTime.toDate().getTime();
-}
+        if (activeBreak?.startTime && !sess.checkOut) {
+          co = activeBreak.startTime.toDate().getTime();
+        }
 
         if (co > ci) {
           let sessionSeconds = Math.floor((co - ci) / 1000);
 
-          // ➖ Subtract all break durations from this session
           const totalBreakSeconds = todayBreaks.reduce((acc: number, b: Break) => {
             if (!b.startTime) return acc;
             const start = b.startTime.toDate().getTime();
             const end = b.endTime
               ? b.endTime.toDate().getTime()
               : activeBreak?.startTime
-  ? activeBreak.startTime.toDate().getTime()
-  : start;
+                ? activeBreak.startTime.toDate().getTime()
+                : start;
             return acc + Math.max(0, Math.floor((end - start) / 1000));
           }, 0);
 
@@ -531,7 +506,8 @@ export default function ZohoStyleEmployeeDashboard() {
       const iv = setInterval(calc, 1000);
       return () => clearInterval(iv);
     }
-  }, [attendance, todayBreaks]);
+  }, [attendance, todayBreaks, activeBreak]);
+
   useEffect(() => {
     return onSnapshot(query(collection(db, "messages"), orderBy("createdAt", "desc")),
       snap => setMessages(snap.docs.map(d => (d.data() as any).text)));
@@ -571,9 +547,6 @@ export default function ZohoStyleEmployeeDashboard() {
         snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((d: any) => d.employeeUnread === true)
       ));
   }, [user]);
-
- // ── Active break derived state (must be before useEffect) ─
-  const activeBreak = getActiveBreak(todayBreaks);
 
   if (loading || !user) return null;
 
@@ -684,13 +657,17 @@ export default function ZohoStyleEmployeeDashboard() {
         sidebarCollapsed ? "w-16" : "w-64"
       } ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
 
+        {/* Logo + collapse toggle */}
         <div className="p-3 flex items-center justify-between border-b border-white/10">
           {!sidebarCollapsed && (
             <div className="flex items-center gap-2 ml-2">
               <Image src="/logo.svg" alt="TGY CRM Logo" width={90} height={70} className="object-contain" />
             </div>
           )}
-          <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="hidden lg:block p-2 hover:bg-white/10 rounded-lg transition">
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="hidden lg:block p-2 hover:bg-white/10 rounded-lg transition"
+          >
             <svg className={`w-5 h-5 transition-transform ${sidebarCollapsed ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
             </svg>
@@ -698,6 +675,7 @@ export default function ZohoStyleEmployeeDashboard() {
           <button onClick={() => setMobileMenuOpen(false)} className="lg:hidden p-2 hover:bg-white/10 rounded-lg">×</button>
         </div>
 
+        {/* User profile strip */}
         {!sidebarCollapsed && (
           <div className="px-3 py-2.5 border-b border-white/10">
             <div className="flex items-center gap-3">
@@ -712,7 +690,6 @@ export default function ZohoStyleEmployeeDashboard() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate text-sm">{user.email?.split("@")[0]}</p>
-                {/* ── NEW: Show break status under name ── */}
                 {activeBreak ? (
                   <p className="text-xs text-amber-400 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse inline-block" />
@@ -726,125 +703,80 @@ export default function ZohoStyleEmployeeDashboard() {
           </div>
         )}
 
-        <nav className="flex-1 px-2 py-3 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20">
-
-  {/*DIRECT BUTTON */}
-  {/* DASHBOARD */}
-<button
-  onClick={() => { setActiveView("dashboard"); setMobileMenuOpen(false); }}
-  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition
-    ${activeView === "dashboard" ? "bg-white/10" : "hover:bg-white/5"}`}
->
-  {!sidebarCollapsed && <span className="text-sm font-medium">📊 DASHBOARD</span>}
-</button>
-
-{/* PROJECTS */}
-<button
-  onClick={() => { setActiveView("projects"); setMobileMenuOpen(false); }}
-  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition
-    ${activeView === "projects" ? "bg-white/10" : "hover:bg-white/5"}`}
->
-  {!sidebarCollapsed && <span className="text-sm font-medium">📁 PROJECTS</span>}
-</button>
-
-{/* PAYSLIPS */}
-<button
-  onClick={() => { setActiveView("payslips"); setMobileMenuOpen(false); }}
-  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition
-    ${activeView === "payslips" ? "bg-white/10" : "hover:bg-white/5"}`}
->
-  {!sidebarCollapsed && <span className="text-sm font-medium">💰 PAYSLIPS</span>}
-</button>
- 
-  {/* 🔥 REST OF GROUPS */}
-  {sidebarCollapsed ? (
-    sidebarGroups
-      .filter(group => group.title !== "DASHBORD") // remove dashboard group
-      .flatMap(group =>
-        group.items.map(([id, label, icon]) => (
-          <button
-            key={`${group.title}-${id}`}
-            onClick={() => { setActiveView(id as ViewType); setMobileMenuOpen(false); }}
-            className={`w-full flex items-center justify-center p-2.5 rounded-lg transition relative group
-              ${activeView === id ? "bg-white/10" : "hover:bg-white/5"}`}
-            title={label}
-          >
-            <span className="text-xl">{icon}</span>
-
-            {id === "notifications" && totalNotifications > 0 && (
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-            )}
-
-            <div className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap">
-              {label}
-            </div>
-          </button>
-        ))
-      )
-  ) : (
-    sidebarGroups
-      .filter(group => group.title !== "DASHBORD") // remove dashboard group
-      .map(group => (
-        <div key={group.title} className="mb-2">
-
-          {/* GROUP HEADER */}
-          <button
-            onClick={() => setOpenGroup(openGroup === group.title ? null : group.title)}
-            className="w-full flex justify-between items-center px-2 py-1.5 text-xs font-bold text-white/60 hover:text-white transition"
-          >
-            {group.title}
-            <svg
-              className={`w-3.5 h-3.5 transition-transform ${openGroup === group.title ? "rotate-180" : ""}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+        {/* ── FLAT NAV ── */}
+        <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20">
+          {sidebarItems.map(([id, label, icon]) => (
+            <button
+              key={id}
+              onClick={() => { setActiveView(id); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 relative group
+                ${activeView === id
+                  ? "bg-white/15 text-white shadow-sm border border-white/10"
+                  : "text-white/75 hover:bg-white/8 hover:text-white"
+                }`}
+              title={sidebarCollapsed ? label : undefined}
             >
-              <path strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
+              {/* Active indicator bar */}
+              {activeView === id && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-amber-400 rounded-r-full" />
+              )}
 
-          {/* GROUP ITEMS */}
-          {openGroup === group.title && (
-            <div className="mt-0.5 space-y-0.5">
-              {group.items.map(([id, label, icon]) => (
-                <button
-                  key={id}
-                  onClick={() => { setActiveView(id as ViewType); setMobileMenuOpen(false); }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition relative
-                    ${activeView === id ? "bg-white/10" : "hover:bg-white/5"}`}
-                >
-                  <span className="text-base">{icon}</span>
-                  <span className="text-sm">{label}</span>
+              <span className={`text-base shrink-0 transition-transform duration-150 ${activeView === id ? "scale-110" : "group-hover:scale-105"}`}>
+                {icon}
+              </span>
 
-                  {id === "notifications" && totalNotifications > 0 && (
-                    <span className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full font-semibold">
-                      {totalNotifications}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      ))
-  )}
-</nav>
+              {!sidebarCollapsed && (
+                <span className="text-sm font-medium truncate">{label}</span>
+              )}
 
+              {/* Notification badge */}
+              {id === "notifications" && totalNotifications > 0 && (
+                sidebarCollapsed ? (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+                ) : (
+                  <span className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full font-semibold shrink-0">
+                    {totalNotifications}
+                  </span>
+                )
+              )}
+
+              {/* Tooltip when collapsed */}
+              {sidebarCollapsed && (
+                <div className="absolute left-full ml-2 px-2.5 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 shadow-lg">
+                  {label}
+                </div>
+              )}
+            </button>
+          ))}
+        </nav>
+
+        {/* Logout */}
         {!sidebarCollapsed ? (
-          <button onClick={async () => { await signOut(auth); router.push("/login"); }}
-            className="mx-3 mb-3 flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 rounded-lg hover:bg-white/20 transition text-sm">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+          <button
+            onClick={async () => { await signOut(auth); router.push("/login"); }}
+            className="mx-3 mb-3 flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 rounded-lg hover:bg-white/20 transition text-sm"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
             <span className="font-medium">Logout</span>
           </button>
         ) : (
-          <button onClick={async () => { await signOut(auth); router.push("/login"); }}
-            className="mx-2 mb-3 p-2.5 bg-white/10 rounded-lg hover:bg-white/20 transition flex items-center justify-center" title="Logout">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+          <button
+            onClick={async () => { await signOut(auth); router.push("/login"); }}
+            className="mx-2 mb-3 p-2.5 bg-white/10 rounded-lg hover:bg-white/20 transition flex items-center justify-center"
+            title="Logout"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
           </button>
         )}
       </aside>
 
-      {mobileMenuOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setMobileMenuOpen(false)} />}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setMobileMenuOpen(false)} />
+      )}
 
       {/* ── RIGHT PANEL ── */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -856,7 +788,7 @@ export default function ZohoStyleEmployeeDashboard() {
           <div className="hidden lg:flex items-center justify-between px-4 py-2.5">
             <div className="flex items-center min-w-0 shrink-0">
               <h1 className="text-lg font-bold capitalize flex items-center gap-2 whitespace-nowrap">
-                📊 <span>{activeView.replace("-", " ")}</span>
+                📊 <span>{activeView.replace(/-/g, " ")}</span>
               </h1>
             </div>
             <div className="flex items-center gap-2">
@@ -866,16 +798,8 @@ export default function ZohoStyleEmployeeDashboard() {
                   <span>⏱</span><span className="tabular-nums">{formatTimer(totalSeconds)}</span>
                 </div>
               </div>
-<NavbarBreakStatus uid={user.uid} isCheckedIn={!!isCheckedIn} />
-              {/* ── NEW: Active break indicator in header ── */}
-              {/* {activeBreak && (
-                <div className="flex items-center gap-2 bg-amber-500/20 px-3 py-1.5 rounded-lg border border-amber-400/30">
-                  <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
-                  <span className="text-xs font-bold text-amber-200">
-                    {activeBreak.type === "MORNING" ? "☕" : activeBreak.type === "LUNCH" ? "🍽️" : "🌇"} On Break
-                  </span>
-                </div>
-              )} */}
+
+              <NavbarBreakStatus uid={user.uid} isCheckedIn={!!isCheckedIn} />
 
               <button disabled={busy || !!isCheckedIn}  onClick={doCheckIn}  className="px-4 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-lg hover:shadow-xl hover:scale-105 active:scale-95">Check In</button>
               <button disabled={busy || !isCheckedIn} onClick={doCheckOut} className="px-4 py-1.5 bg-red-600   text-white rounded-lg hover:bg-red-700   disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-lg hover:shadow-xl hover:scale-105 active:scale-95">Check Out</button>
@@ -968,7 +892,7 @@ export default function ZohoStyleEmployeeDashboard() {
                 <button onClick={() => setMobileMenuOpen(true)} className="p-1.5 hover:bg-white/10 rounded-lg transition-all" aria-label="Open menu">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
                 </button>
-                <h1 className="text-sm font-bold capitalize truncate max-w-36">📊 {activeView.replace("-", " ")}</h1>
+                <h1 className="text-sm font-bold capitalize truncate max-w-36">📊 {activeView.replace(/-/g, " ")}</h1>
               </div>
               <div className="flex items-center gap-1">
                 <div className="relative" ref={notifDropdownRef}>
@@ -1027,16 +951,6 @@ export default function ZohoStyleEmployeeDashboard() {
 
             <div className="flex items-center gap-1.5">
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg px-2.5 py-1.5 border border-white/20 flex-1 min-w-0">
-                {/* ── NEW: show break or checkin status on mobile ── */}
-                {/* {activeBreak ? (
-                  <span className="px-1.5 py-0.5 rounded text-xs font-semibold whitespace-nowrap bg-amber-500 text-white animate-pulse">
-                     Break
-                  </span>
-                ) : (
-                  <span className={`px-1.5 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${isCheckedIn ? "bg-green-500 text-white" : "bg-white/20 text-white/70"}`}>
-                    {isCheckedIn ? "🟢 In" : "⚪ Out"}
-                  </span>
-                )} */}
                 <span className="font-mono font-bold text-xs text-amber-300 whitespace-nowrap">⏱ {formatTimer(totalSeconds)}</span>
               </div>
               <button disabled={busy || !!isCheckedIn}  onClick={doCheckIn}  className="px-2.5 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-xs whitespace-nowrap">Check In</button>
@@ -1088,14 +1002,9 @@ export default function ZohoStyleEmployeeDashboard() {
               />
             )}
 
-            {/* ── NEW: BreakPanel shown on Dashboard ── */}
-          
-
-            {activeView === "work-update" && <WorkUpdateView />}
-            {activeView === "projects"    && <ProjectManagement user={user} projects={projects} users={users} />}
-
-            {/* AttendanceView already has BreakPanel embedded inside it */}
-            {activeView === "attendance"  && <AttendanceView sessions={sessions} formatTime={formatTime} />}
+            {activeView === "attendance"    && <EmployeeAttendanceView />}
+            {activeView === "work-update"   && <WorkUpdateView />}
+            {activeView === "projects"      && <ProjectManagement user={user} projects={projects} users={users} />}
 
             {activeView === "notifications" && (
               <NotificationsView
@@ -1119,14 +1028,14 @@ export default function ZohoStyleEmployeeDashboard() {
                 handleSubmitLeave={handleSubmitLeave} submitting={submitting} leaveMsg={leaveMsg}
               />
             )}
-{/* <ApplyLeaveForm /> */}
-            {activeView === "profile"  && <ProfileView />}
-            {activeView === "help"     && <HelpView />}
-            {activeView === "meet"     && <MeetView users={users.filter((u: any) => u.uid !== user.uid)} />}
-            {activeView === "tasks"    && <TasksView user={user} />}
-            {activeView === "reports"  && <ReportsView user={user} attendance={attendance} />}
-            {activeView === "settings" && <SettingsView user={user} />}
-            {activeView === "payslips" && <Payslips />}
+
+            {activeView === "profile"   && <ProfileView />}
+            {activeView === "help"      && <HelpView />}
+            {activeView === "meet"      && <MeetView users={users.filter((u: any) => u.uid !== user.uid)} />}
+            {activeView === "tasks"     && <TasksView user={user} />}
+            {activeView === "reports"   && <ReportsView user={user} attendance={attendance} />}
+            {activeView === "settings"  && <SettingsView user={user} />}
+            {activeView === "payslips"  && <Payslips />}
           </div>
         </main>
       </div>
@@ -1155,8 +1064,8 @@ export default function ZohoStyleEmployeeDashboard() {
             <p className="text-slate-600 mb-4 text-sm">{calendarDate.toLocaleDateString("en-IN", { month: "long", year: "numeric" })}</p>
             <div className="space-y-3">
               {[
-                { label: "Present Days", value: monthlyStats.present,         bg: "bg-green-50",  border: "border-green-200",  clr: "text-green-700",  iconBg: "bg-green-500",  icon: "✓"  },
-                { label: "Absent Days",  value: monthlyStats.absent,          bg: "bg-red-50",    border: "border-red-200",    clr: "text-red-700",    iconBg: "bg-red-500",    icon: "×"  },
+                { label: "Present Days", value: monthlyStats.present,          bg: "bg-green-50",  border: "border-green-200",  clr: "text-green-700",  iconBg: "bg-green-500",  icon: "✓"  },
+                { label: "Absent Days",  value: monthlyStats.absent,           bg: "bg-red-50",    border: "border-red-200",    clr: "text-red-700",    iconBg: "bg-red-500",    icon: "×"  },
                 { label: "Attendance %", value: `${monthlyStats.percentage}%`, bg: "bg-indigo-50", border: "border-indigo-200", clr: "text-indigo-700", iconBg: "bg-indigo-500", icon: "📈" },
               ].map(s => (
                 <div key={s.label} className={`flex justify-between items-center p-3.5 ${s.bg} rounded-xl border-2 ${s.border}`}>

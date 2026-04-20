@@ -28,7 +28,6 @@ interface EmployeesViewProps {
   formatTotal: (minutes?: number) => string;
 }
 
-
 const EmployeesView: React.FC<EmployeesViewProps> = ({
   view,
   setView,
@@ -52,6 +51,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
   formatTime,
   formatTotal,
 }) => {
+  const [department, setDepartment] = useState("SALES");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"ALL" | "EMPLOYEE" | "ADMIN">("ALL");
   const [currentPage, setCurrentPage] = useState(1);
@@ -69,8 +69,10 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
         uEmail.toLowerCase().includes(search) ||
         uDesignation.toLowerCase().includes(search);
 
-      const matchesFilter =
-        filterType === "ALL" || u.accountType === filterType;
+      const userRole = (u as any).role || u.accountType;
+
+const matchesFilter =
+  filterType === "ALL" || userRole === filterType;
 
       return matchesSearch && matchesFilter;
     });
@@ -481,15 +483,31 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
 <option>Android Developer</option>
 <option>Mobile App Developer</option>
 </select>
+{/* ACCOUNT TYPE */}
 <select
   value={accountType}
   onChange={(e) =>
     setAccountType(e.target.value as "EMPLOYEE" | "ADMIN")
   }
+  className="w-full border border-gray-300 rounded-lg px-4 py-2.5"
 >
-                <option value="EMPLOYEE">Employee</option>
-                <option value="ADMIN">Admin</option>
-              </select>
+  <option value="EMPLOYEE">Employee</option>
+  <option value="ADMIN">Admin</option>
+</select>
+
+{/* DEPARTMENT */}
+<select
+  value={department}
+  onChange={(e) => setDepartment(e.target.value)}
+  className="w-full border border-gray-300 rounded-lg px-4 py-2.5"
+>
+  <option value="SALES">Sales</option>
+  <option value="FINANCE">Finance</option>
+  <option value="MARKETING">Marketing</option>
+  <option value="EXECUTIVE">Executive</option>
+  <option value="OPERATIONS">Operations</option>
+  <option value="CUSTOMER_SUPPORT">Customer Support</option>
+</select>
 
               {/* Info Box */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">

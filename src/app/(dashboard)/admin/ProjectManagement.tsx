@@ -488,7 +488,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
   const [quickTaskType, setQuickTaskType] = useState<string|undefined>();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const handleTaskClick = (t: Task) => {
-  setEditingTask(t);
+  setActiveTask(t);
 };
 
   // ─── Sprint modal state ───
@@ -648,7 +648,23 @@ export default function AdminProjectManagement({ user, projects, users }: { user
       const snapshot = await getDocs(query(collection(db,"projectTasks"), where("projectId","==",activeProject.id)));
       const count = snapshot.size + 1;
       const taskCode = `TSK-${count.toString().padStart(3,"0")}`;
-      const taskRef = await addDoc(collection(db,"projectTasks"), { ...data, taskCode, projectId:activeProject.id, sprintId:activeSprint?.id||null, createdBy:user.uid, createdAt:serverTimestamp() });
+      const cleanData: any = {
+  ...data,
+  taskCode,
+  projectId: activeProject.id,
+  sprintId: activeSprint?.id || null,
+  createdBy: user.uid,
+  createdAt: serverTimestamp(),
+};
+
+// 🔥 REMOVE undefined values
+Object.keys(cleanData).forEach(key => {
+  if (cleanData[key] === undefined) {
+    delete cleanData[key];
+  }
+});
+
+const taskRef = await addDoc(collection(db,"projectTasks"), cleanData);
       if (data.assignedTo) await sendNotification(data.assignedTo,"task_assigned","Task Assigned",`"${data.title}" assigned in ${activeProject.name}`,activeProject.id,taskRef.id);
       await logActivity(activeProject.id,"created task",`Created "${data.title}"`,taskRef.id);
     }
@@ -665,7 +681,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
 
   const handleAssignTask = async (taskId:string,userId:string) => {
     const au=users.find((u:any)=>u.uid===userId);
-    await updateDoc(doc(db,"projectTasks",taskId),{assignedTo:userId,assignedToName:au?.email?.split("@")[0]});
+    await updateDoc(doc(db,"projectTasks",taskId),{assignedToName: au?.email?.split("@")[0] || null});
     if (userId&&activeProject) await sendNotification(userId,"task_assigned","Task Assigned",`A task was assigned in ${activeProject.name}`,activeProject.id,taskId);
     await logActivity(activeProject!.id,"assigned task",`Assigned to ${au?.email?.split("@")[0]||"user"}`,taskId);
   };

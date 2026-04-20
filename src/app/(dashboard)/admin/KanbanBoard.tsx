@@ -21,7 +21,7 @@ export interface Task {
   ticketType?: "story" | "task" | "bug" | "defect";
   parentStoryId?: string | null;
   parentStoryTitle?: string;
-  taskCode?: string;
+  taskCode?: string;  
   createdBy: string; createdAt: any;
 }
 

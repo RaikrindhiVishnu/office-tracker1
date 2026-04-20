@@ -240,7 +240,7 @@ function MiniCalendar({
           return (
             <button key={idx} disabled={!hasData || isFuture} onClick={() => hasData && onSelectDate(key)}
               className={`relative mx-auto w-9 h-9 rounded-xl text-sm font-medium flex items-center justify-center transition-all
-                ${isSelected ? "bg-gradient-to-br from-indigo-600 to-purple-600 text-white shadow-md scale-105" : ""}
+                ${isSelected ? "bg-linear-to-br from-indigo-600 to-purple-600 text-white shadow-md scale-105" : ""}
                 ${!isSelected && hasData ? "bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:scale-105 cursor-pointer font-semibold" : ""}
                 ${!isSelected && !hasData && !isFuture ? "text-slate-400 cursor-default" : ""}
                 ${isFuture ? "text-slate-300 cursor-not-allowed" : ""}
@@ -257,7 +257,7 @@ function MiniCalendar({
           <span className="w-3 h-3 rounded bg-indigo-50 border border-indigo-200 inline-block"/>Has data
         </div>
         <div className="flex items-center gap-1.5 text-xs text-slate-500">
-          <span className="w-3 h-3 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 inline-block"/>Selected
+          <span className="w-3 h-3 rounded-full bg-linear-to-br from-indigo-600 to-purple-600 inline-block"/>Selected
         </div>
         <div className="flex items-center gap-1.5 text-xs text-slate-500">
           <span className="w-3 h-3 rounded ring-2 ring-indigo-400 inline-block"/>Today
@@ -282,7 +282,7 @@ function StatCard({ title, value, icon, gradient }: StatCardProps) {
           <p className="text-sm font-medium text-slate-600 mb-1">{title}</p>
           <h3 className="text-3xl font-bold text-slate-900 mb-2">{value}</h3>
         </div>
-        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white shadow-lg`}>
+        <div className={`w-12 h-12 rounded-xl bg-linear-to-br ${gradient} flex items-center justify-center text-white shadow-lg`}>
           {icon}
         </div>
       </div>
@@ -514,8 +514,8 @@ export default function Dashboard({
                 className={`px-4 py-2 rounded-xl font-medium transition-all ${
                   filterStatus === s
                     ? s==="ALL" ? "bg-[#4245ca38] text-black shadow-lg"
-                      : s==="ONLINE" ? "bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-lg"
-                      : "bg-gradient-to-r from-slate-600 to-slate-700 text-white shadow-lg"
+                      : s==="ONLINE" ? "bg-linear-to-r from-emerald-600 to-green-600 text-white shadow-lg"
+                      : "bg-linear-to-r from-slate-600 to-slate-700 text-white shadow-lg"
                     : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                 }`}>
                 {s==="ALL" ? `All (${totalEmployees})` : s==="ONLINE" ? `Online (${onlineEmployees})` : `Offline (${offlineEmployees})`}
@@ -537,7 +537,7 @@ export default function Dashboard({
             const wu         = workUpdatesMap[r.uid] ?? null;
             const scfg       = wu ? (WU_STATUS_CFG[wu.status] ?? WU_STATUS_CFG["In Progress"]) : null;
             return (
-              <div key={r.uid} className="bg-gradient-to-br from-white to-slate-50 rounded-xl shadow-md border border-slate-200 p-4 hover:shadow-xl transition-all duration-300">
+              <div key={r.uid} className="bg-linear-to-br from-white to-slate-50 rounded-xl shadow-md border border-slate-200 p-4 hover:shadow-xl transition-all duration-300">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className="w-12 h-12 rounded-xl overflow-hidden shadow-lg">
@@ -597,7 +597,7 @@ export default function Dashboard({
         {/* ── Desktop Table ── */}
         <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200">
           <table className="w-full">
-            <thead className="bg-gradient-to-r from-slate-50 to-slate-100">
+            <thead className="bg-linear-to-r from-slate-50 to-slate-100">
               <tr>
                 {["Employee","Status","Check-in","Total Work","Total Break","Current Task","Actions"].map((h) => (
                   <th key={h} className="px-5 py-4 text-left text-xs font-bold text-slate-700 uppercase tracking-wider whitespace-nowrap">{h}</th>
@@ -679,7 +679,7 @@ export default function Dashboard({
               </button>
               {getPageNumbers(currentPage,totalPages).map((page,i)=>(
                 <button key={i} onClick={()=>typeof page==="number"&&setCurrentPage(page)} disabled={page==="..."}
-                  className={`min-w-[2.5rem] px-3 py-2 rounded-lg font-medium transition-all ${page===currentPage?"bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-lg":page==="..."?"text-slate-400 cursor-default":"bg-white border-2 border-slate-200 text-slate-700 hover:bg-slate-50"}`}>
+                  className={`min-w-10 px-3 py-2 rounded-lg font-medium transition-all ${page===currentPage?"bg-linear-to-r from-indigo-600 to-blue-600 text-white shadow-lg":page==="..."?"text-slate-400 cursor-default":"bg-white border-2 border-slate-200 text-slate-700 hover:bg-slate-50"}`}>
                   {page}
                 </button>
               ))}
@@ -698,7 +698,7 @@ export default function Dashboard({
         <button onClick={()=>setShowHistory(v=>!v)}
           className="w-full flex items-center justify-between px-6 py-4 hover:bg-slate-50 transition-colors">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow">
+            <div className="w-9 h-9 rounded-xl bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
             </div>
             <div className="text-left">
@@ -750,7 +750,7 @@ export default function Dashboard({
                     <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
                       <div className="flex justify-between text-sm font-semibold text-slate-700 mb-2"><span>Attendance Rate</span><span>{attendanceRate}%</span></div>
                       <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all duration-700" style={{width:`${attendanceRate}%`}}/>
+                        <div className="h-full bg-linear-to-r from-emerald-400 to-emerald-600 rounded-full transition-all duration-700" style={{width:`${attendanceRate}%`}}/>
                       </div>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-3">
@@ -771,7 +771,7 @@ export default function Dashboard({
                     </div>
                     <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200">
                       <table className="w-full">
-                        <thead className="bg-gradient-to-r from-slate-50 to-slate-100">
+                        <thead className="bg-linear-to-r from-slate-50 to-slate-100">
                           <tr>{["Employee","Status","Check-in","Total Work","Task"].map(h=>(
                             <th key={h} className="px-5 py-3 text-left text-xs font-bold text-slate-700 uppercase tracking-wider">{h}</th>
                           ))}</tr>
@@ -832,7 +832,7 @@ export default function Dashboard({
                         </button>
                         {getPageNumbers(historyPage,historyTotalPages).map((p,i)=>(
                           <button key={i} onClick={()=>typeof p==="number"&&setHistoryPage(p)} disabled={p==="..."}
-                            className={`min-w-[2.25rem] px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${p===historyPage?"bg-indigo-600 text-white shadow":p==="..."?"text-slate-400 cursor-default":"border-2 border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+                            className={`min-w-9 px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${p===historyPage?"bg-indigo-600 text-white shadow":p==="..."?"text-slate-400 cursor-default":"border-2 border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
                             {p}
                           </button>
                         ))}
