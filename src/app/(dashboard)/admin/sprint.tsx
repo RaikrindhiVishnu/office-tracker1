@@ -1564,6 +1564,7 @@ interface SprintReportsProps {
   columns: KanbanColumn[];
   projectColor: string;
   onTaskClick: (t: Task) => void;
+  onClose?: () => void; // ✅ ADD THIS
 }
 
 export function SprintReports({
@@ -1572,6 +1573,7 @@ export function SprintReports({
   columns,
   projectColor,
   onTaskClick,
+   onClose, 
 }: SprintReportsProps) {
   const doneColId =
     columns.find((c) => c.label.toLowerCase() === "done")?.id || "done";
@@ -1591,6 +1593,18 @@ export function SprintReports({
 
   return (
     <div className="p-6 space-y-6">
+       <div className="flex items-center justify-between mb-4">
+      <h2 className="text-lg font-bold">Sprint Reports</h2>
+
+      {onClose && (
+        <button
+          onClick={onClose}
+          className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded"
+        >
+          ← Back
+        </button>
+      )}
+    </div>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {sprints.map((sprint) => {
           const sprintTasks = nonStoryTasks.filter(

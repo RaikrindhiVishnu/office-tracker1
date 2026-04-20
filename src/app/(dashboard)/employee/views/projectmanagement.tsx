@@ -67,6 +67,9 @@ interface Task {
   parentStoryId?: string;
   parentStoryTitle?: string;
   taskCode?: string;
+   // ✅ ADD THESE
+  createdBy: string;
+  createdAt: any; // or Date
 }
 
 interface WorkLog {
@@ -520,7 +523,7 @@ const TicketBadge = ({ type, size = "sm" }: { type?: TicketType; size?: "xs"|"sm
 function PermissionToast({ message, onHide }: { message: string; onHide: () => void }) {
   useEffect(() => { const t = setTimeout(onHide, 2500); return () => clearTimeout(t); }, []);
   return (
-    <div className="fixed bottom-6 right-6 z-[9999] bg-gray-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-xl flex items-center gap-2">
+    <div className="fixed bottom-6 right-6 z-9999 bg-gray-900 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-xl flex items-center gap-2">
       🔒 {message}
     </div>
   );
@@ -2779,11 +2782,15 @@ export default function ProjectManagement({ user, projects, users }: any) {
           {viewMode === "reports" && (
             <div className="p-6">
               <SprintReports
-                sprints={sprints}
-                tasks={tasks}
-                columns={columns}
-                onClose={() => setViewMode("kanban")}
-              />
+  sprints={sprints}
+  tasks={tasks}
+  columns={columns}
+  projectColor="#7c3aed" // ✅ ADD
+  onTaskClick={(task) => { // ✅ ADD
+    console.log(task);
+  }}
+  onClose={() => setViewMode("kanban")}
+/>
             </div>
           )}
         </div>
