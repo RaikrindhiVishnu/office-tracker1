@@ -640,31 +640,58 @@ export default function AdminProjectManagement({ user, projects, users }: { user
 
   const handleTaskSubmit = async (data: any) => {
     if (!activeProject) return;
-    if (editingTask) {
-      // ✅ Resolve assignedToName from assignedTo uid
-      const assignedUser = data.assignedTo
-        ? users.find((u: any) => u.uid === data.assignedTo)
-        : null;
-      const assignedToName = assignedUser
-        ? (assignedUser.displayName || assignedUser.name || assignedUser.email?.split("@")[0] || "")
-        : null;
+   if (editingTask) {
+  // Resolve assignedToName from assignedTo uid
+  const assignedUser = data.assignedTo
+    ? users.find((u: any) => u.uid === data.assignedTo)
+    : null;
+  const assignedToName = assignedUser
+    ? (assignedUser.displayName || assignedUser.name || assignedUser.email?.split("@")[0] || "")
+    : null;
 
-      const updatedData = {
-        ...data,
-        assignedTo: data.assignedTo || null,
-        assignedToName: assignedToName,
-      };
+  const updatedData: any = {
+    ...data,
+    assignedTo: data.assignedTo || null,
+    assignedToName: assignedToName || null,
+  };
 
-      await updateDoc(doc(db, "projectTasks", editingTask.id), updatedData);
-      setActiveTask({ ...editingTask, ...updatedData });
+  // Remove undefined values to avoid Firestore errors
+  Object.keys(updatedData).forEach(key => {
+    if (updatedData[key] === undefined) {
+      delete updatedData[key];
+    }
+  });
 
-      // ✅ Also update local tasks list so kanban reflects immediately
-      setTasks(prev =>
-        prev.map(t => t.id === editingTask.id ? { ...t, ...updatedData } : t)
-      );
+  await updateDoc(doc(db, "projectTasks", editingTask.id), updatedData);
 
-      await logActivity(activeProject.id, "updated task", `Updated "${data.title}"`, editingTask.id);
-    } else {
+  // Update local tasks list so kanban reflects immediately
+  setTasks(prev =>
+    prev.map(t => t.id === editingTask.id ? { ...t, ...updatedData } : t)
+  );
+
+  // If task detail panel is open for this task, update it too
+  if (activeTask?.id === editingTask.id) {
+    setActiveTask(prev => prev ? { ...prev, ...updatedData } : prev);
+  }
+
+  // Send notification if assignee changed
+  if (
+    data.assignedTo &&
+    data.assignedTo !== editingTask.assignedTo &&
+    activeProject
+  ) {
+    await sendNotification(
+      data.assignedTo,
+      "task_assigned",
+      "Task Assigned",
+      `"${data.title}" was assigned to you in ${activeProject.name}`,
+      activeProject.id,
+      editingTask.id
+    );
+  }
+
+  await logActivity(activeProject.id, "updated task", `Updated "${data.title}"`, editingTask.id);
+} else {
       const snapshot = await getDocs(query(collection(db,"projectTasks"), where("projectId","==",activeProject.id)));
       const count = snapshot.size + 1;
       const taskCode = `TSK-${count.toString().padStart(3,"0")}`;

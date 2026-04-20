@@ -2504,12 +2504,47 @@ export default function ProjectManagement({ user, projects, users }: any) {
     setEditingTask(task);
   };
 
-  const handleSaveEditedTask = async (data: Partial<Task>) => {
-    if (!editingTask?.id) return;
-    await updateDoc(doc(db, "projectTasks", editingTask.id), { ...data });
-    await logActivity(activeProject.id, "edited task", `"${data.title || editingTask.title}"`, editingTask.id);
-    setEditingTask(null);
+  const handleSaveEditedTask = async (data: Partial<Task> & { childTickets?: any }) => {
+  if (!editingTask?.id) return;
+
+  // Resolve assignedToName from assignedTo uid
+  const assignedUser = data.assignedTo
+    ? users?.find((u: any) => u.uid === data.assignedTo)
+    : null;
+  const assignedToName = assignedUser
+    ? (assignedUser.displayName || assignedUser.name || assignedUser.email?.split("@")[0] || "")
+    : null;
+
+  // Build clean update payload — strip undefined & childTickets
+  const { childTickets, ...rest } = data;
+  const updatePayload: Record<string, any> = {
+    ...rest,
+    assignedTo: data.assignedTo || null,
+    assignedToName: assignedToName || null,
   };
+
+  // Remove any remaining undefined values
+  Object.keys(updatePayload).forEach(key => {
+    if (updatePayload[key] === undefined) {
+      delete updatePayload[key];
+    }
+  });
+
+  await updateDoc(doc(db, "projectTasks", editingTask.id), updatePayload);
+
+  // Update local tasks list so kanban/list reflects immediately
+  setTasks(prev =>
+    prev.map(t => t.id === editingTask.id ? { ...t, ...updatePayload } : t)
+  );
+
+  await logActivity(
+    activeProject.id,
+    "edited task",
+    `"${data.title || editingTask.title}"`,
+    editingTask.id
+  );
+  setEditingTask(null);
+};
 
   const handleMoveToSprint = async (task: Task, sprintId: string | null) => {
     if (!isProjectManager) { showToast("Only PMs can move tasks between sprints"); return; }
