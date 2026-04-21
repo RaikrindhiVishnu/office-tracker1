@@ -56,11 +56,13 @@ interface UserSummaryItem { user: any; totalH: number; days: number; byProject: 
 
 /* ─── CONSTANTS ─── */
 const DEFAULT_COLUMNS: KanbanColumn[] = [
-  { id: "todo", label: "To Do" },
-  { id: "inprogress", label: "In Progress" },
-  { id: "review", label: "Review" },
+  { id: "new_discussions", label: "New Discussions" },
+  { id: "dev_in_progress", label: "Dev In Progress" },
+  { id: "unit_testing", label: "Unit Testing" },
+  { id: "ready_for_qa", label: "Ready for QA" },
+  { id: "testing_in_progress", label: "Testing In Progress" },
   { id: "done", label: "Done" },
-  { id: "blocked", label: "Blocked" },
+  { id: "reopened", label: "Reopened" },
 ];
 
 const PROJECT_COLORS = ["#6366f1","#8b5cf6","#ec4899","#f59e0b","#10b981","#3b82f6","#ef4444","#14b8a6"];

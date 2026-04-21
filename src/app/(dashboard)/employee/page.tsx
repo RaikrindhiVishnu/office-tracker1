@@ -20,6 +20,7 @@ import MeetPanel from "@/components/MeetPanel";
 import IncomingCallListener from "@/components/IncomingCallListener";
 import MeetView from "@/components/MeetView";
 import ApplyLeaveForm from "@/components/leave/ApplyLeaveForm";
+import { createPortal } from "react-dom";
 
 import BreakPanel from "@/components/BreakPanel";
 import {
@@ -215,7 +216,7 @@ function NotificationDropdown({
   const hasNone = total === 0;
 
   return (
-    <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 z-200 flex flex-col overflow-hidden"
+    <div className="absolute top-full right-0 mt-2 w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 flex flex-col overflow-hidden"
       style={{ maxHeight: "80vh" }}>
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50 shrink-0">
         <div className="flex items-center gap-2">
@@ -800,7 +801,7 @@ const changeView = (view: ViewType) => {
       <div className="flex-1 flex flex-col overflow-hidden">
 
         {/* ── HEADER ── */}
-        <header className="bg-linear-to-r from-[#ae9c62] to-[#2d4a7c] text-white shadow-xl relative z-10">
+        <header className="bg-linear-to-r from-[#ae9c62] to-[#2d4a7c] text-white shadow-xl relative z-30">
 
           {/* Desktop row */}
           <div className="hidden lg:flex items-center justify-between px-4 py-2.5">

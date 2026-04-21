@@ -280,21 +280,29 @@ function EditProjectModal({ open, onClose, project, onSaved }: {
   if (!open) return null;
 
   const handleSave = async () => {
-    if (!form.name.trim()) return;
-    setSaving(true);
-    try {
-      await updateDoc(doc(db, "projects", project.id), {
-        ...form,
-        updatedAt: serverTimestamp(),
-      });
-      onSaved?.({ ...project, ...form });
-      onClose();
-    } catch (err: any) {
-      alert("Failed to update project: " + err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
+  if (!form.name.trim()) return;
+  setSaving(true);
+  try {
+    // Re-fetch admins to ensure they stay as PMs
+    const adminSnap = await getDocs(
+      query(collection(db, "users"), where("accountType", "==", "ADMIN"))
+    );
+    const adminUids = adminSnap.docs.map(d => d.id);
+
+    await updateDoc(doc(db, "projects", project.id), {
+      ...form,
+      projectManagers: adminUids.length > 0 ? adminUids : project.projectManagers,
+      projectManager:  adminUids[0] || project.projectManager,
+      updatedAt: serverTimestamp(),
+    });
+    onSaved?.({ ...project, ...form });
+    onClose();
+  } catch (err: any) {
+    alert("Failed to update project: " + err.message);
+  } finally {
+    setSaving(false);
+  }
+};
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -402,27 +410,37 @@ function ProjectModal({ open, onClose, user, onCreated }: {
   if (!open) return null;
 
   const handleCreate = async () => {
-    if (!form.name.trim()) return;
-    setSaving(true);
-    try {
-      const docRef = await addDoc(collection(db, "projects"), {
-        ...form,
-        members: [user.uid],
-        projectManagers: [user.uid],
-        projectManager: user.uid,
-        progress: 0,
-        createdBy: user.uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-      onCreated?.({ id: docRef.id, ...form, members: [user.uid] });
-      onClose();
-    } catch (err: any) {
-      alert("Failed to create project: " + err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
+  if (!form.name.trim()) return;
+  setSaving(true);
+  try {
+    // Fetch all admin UIDs dynamically from Firestore
+    const adminSnap = await getDocs(
+      query(collection(db, "users"), where("accountType", "==", "ADMIN"))
+    );
+    const adminUids = adminSnap.docs.map(d => d.id);
+
+    // Combined members: creator + all admins (deduplicated)
+    const allMembers = Array.from(new Set([user.uid, ...adminUids]));
+
+    const docRef = await addDoc(collection(db, "projects"), {
+      ...form,
+      members: allMembers,
+      projectManagers: adminUids.length > 0 ? adminUids : [user.uid],
+      projectManager:  adminUids[0] || user.uid,
+      progress: 0,
+      createdBy: user.uid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    onCreated?.({ id: docRef.id, ...form, members: allMembers });
+    onClose();
+  } catch (err: any) {
+    alert("Failed to create project: " + err.message);
+  } finally {
+    setSaving(false);
+  }
+};
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -897,7 +915,6 @@ const [previewCode, setPreviewCode] = useState<string>("");
   setNewChild({ title: "", ticketType: "task", priority: "Medium" });
 
   // ✅ Auto-generate preview code when modal opens
- // ✅ Auto-generate preview code when modal opens
   if (!isEdit) {
     const type = initialData?.ticketType || allowed[0] || "task";
     const projectId = initialData?.projectId;
@@ -2312,7 +2329,8 @@ function EmployeeDailySheet({ user, projects }: { user: any; projects: any[] }) 
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100"><tr>{["Date","Project","Task","Category","Status","Hours"].map(h => <th key={h} className="px-5 py-3.5 text-left text-[11px] font-black text-gray-400 uppercase tracking-wider">{h}</th>)}</tr></thead>
             <tbody>
-              {entries.flatMap(entry => entry.tasks.map((task, ti) => {
+                {entries.flatMap(entry =>
+    (entry.tasks || []).map((task, ti) => {
                 const d = new Date(entry.date + "T12:00:00");
                 return (
                   <tr key={`${entry.id}-${ti}`} className="border-b border-gray-50 hover:bg-indigo-50/20 transition">
@@ -2403,8 +2421,8 @@ function EmployeeDailySheet({ user, projects }: { user: any; projects: any[] }) 
                 </div>
                 {entry ? (
                   <div className="flex-1 overflow-hidden space-y-0.5">
-                    {entry.tasks.slice(0, 3).map((t, ti) => (<div key={ti} className="flex items-center gap-1 min-w-0"><div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: t.workStatus === "Completed" ? "#22c55e" : t.workStatus === "Blocked" ? "#ef4444" : "#3b82f6" }} /><p className="text-[9px] text-gray-600 truncate font-medium">{t.taskTitle}</p></div>))}
-                    {entry.tasks.length > 3 && <p className="text-[9px] font-bold text-indigo-400">+{entry.tasks.length - 3} more</p>}
+                    {(entry.tasks || []).slice(0, 3).map((t, ti) => (<div key={ti} className="flex items-center gap-1 min-w-0"><div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: t.workStatus === "Completed" ? "#22c55e" : t.workStatus === "Blocked" ? "#ef4444" : "#3b82f6" }} /><p className="text-[9px] text-gray-600 truncate font-medium">{t.taskTitle}</p></div>))}
+                    {(entry.tasks || []).length > 3 && <p className="text-[9px] font-bold text-indigo-400">+{entry.tasks.length - 3} more</p>}
                   </div>
                 ) : !isFuture ? (
                   <div className="flex-1 flex items-center justify-center"><p className="text-[10px] text-gray-300 font-semibold">{isToday ? "Log today" : "+ Add"}</p></div>
@@ -3205,7 +3223,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
     <div className="min-h-screen bg-gray-50" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap');`}</style>
 
-      <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-40">
+      <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Avatar name={userName} size="md" highlight />
