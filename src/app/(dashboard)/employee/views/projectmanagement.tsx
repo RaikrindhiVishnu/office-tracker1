@@ -2650,30 +2650,30 @@ export default function ProjectManagement({ user, projects, users }: any) {
   const handleCreateTask = async (data: Partial<Task> & { childTickets?: Partial<Task>[] }) => {
   const { childTickets: children, ...taskData } = data as any;
 
-//   const runBackfill = async () => {
-//   if (!activeProject?.id) return;
-//   if (!confirm("Backfill task codes for all existing tasks in this project? Run once only.")) return;
+  const runBackfill = async () => {
+  if (!activeProject?.id) return;
+  if (!confirm("Backfill task codes for all existing tasks in this project? Run once only.")) return;
 
-//   const snap = await getDocs(
-//     query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id))
-//   );
+  const snap = await getDocs(
+    query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id))
+  );
 
-//   const allTasks = snap.docs
-//     .map(d => ({ id: d.id, ...d.data() } as Task))
-//     .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+  const allTasks = snap.docs
+    .map(d => ({ id: d.id, ...d.data() } as Task))
+    .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
 
-//   const counters: Record<string, number> = { story: 0, task: 0, bug: 0, defect: 0 };
-//   const prefixMap: Record<string, string> = { story: "STR", task: "TSK", bug: "BUG", defect: "DEF" };
+  const counters: Record<string, number> = { story: 0, task: 0, bug: 0, defect: 0 };
+  const prefixMap: Record<string, string> = { story: "STR", task: "TSK", bug: "BUG", defect: "DEF" };
 
-//   for (const t of allTasks) {
-//     const type = t.ticketType || "task";
-//     counters[type] = (counters[type] || 0) + 1;
-//     const newCode = `${prefixMap[type]}-${String(counters[type]).padStart(3, "0")}`;
-//     await updateDoc(doc(db, "projectTasks", t.id), { taskCode: newCode });
-//   }
+  for (const t of allTasks) {
+    const type = t.ticketType || "task";
+    counters[type] = (counters[type] || 0) + 1;
+    const newCode = `${prefixMap[type]}-${String(counters[type]).padStart(3, "0")}`;
+    await updateDoc(doc(db, "projectTasks", t.id), { taskCode: newCode });
+  }
 
-//   alert(`✅ Done! Updated ${allTasks.length} tasks.`);
-// };
+  alert(`✅ Done! Updated ${allTasks.length} tasks.`);
+};
 
   const taskCode = await generateUniqueTaskCode(activeProject.id, taskData.ticketType || "task");
 
@@ -2785,30 +2785,30 @@ export default function ProjectManagement({ user, projects, users }: any) {
     if (activeSprint?.id === sprint.id) setActiveSprint(null);
   };
 
-//   const runBackfill = async () => {
-//   if (!activeProject?.id) return;
-//   if (!confirm("Backfill task codes for all existing tasks in this project? Run once only.")) return;
+  const runBackfill = async () => {
+  if (!activeProject?.id) return;
+  if (!confirm("Backfill task codes for all existing tasks in this project? Run once only.")) return;
 
-//   const snap = await getDocs(
-//     query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id))
-//   );
+  const snap = await getDocs(
+    query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id))
+  );
 
-//   const allTasks = snap.docs
-//     .map(d => ({ id: d.id, ...d.data() } as Task))
-//     .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+  const allTasks = snap.docs
+    .map(d => ({ id: d.id, ...d.data() } as Task))
+    .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
 
-//   const counters: Record<string, number> = { story: 0, task: 0, bug: 0, defect: 0 };
-//   const prefixMap: Record<string, string> = { story: "STR", task: "TSK", bug: "BUG", defect: "DEF" };
+  const counters: Record<string, number> = { story: 0, task: 0, bug: 0, defect: 0 };
+  const prefixMap: Record<string, string> = { story: "STR", task: "TSK", bug: "BUG", defect: "DEF" };
 
-//   for (const t of allTasks) {
-//     const type = t.ticketType || "task";
-//     counters[type] = (counters[type] || 0) + 1;
-//     const newCode = `${prefixMap[type]}-${String(counters[type]).padStart(3, "0")}`;
-//     await updateDoc(doc(db, "projectTasks", t.id), { taskCode: newCode });
-//   }
+  for (const t of allTasks) {
+    const type = t.ticketType || "task";
+    counters[type] = (counters[type] || 0) + 1;
+    const newCode = `${prefixMap[type]}-${String(counters[type]).padStart(3, "0")}`;
+    await updateDoc(doc(db, "projectTasks", t.id), { taskCode: newCode });
+  }
 
-//   alert(`✅ Done! Updated ${allTasks.length} tasks.`);
-// };
+  alert(`✅ Done! Updated ${allTasks.length} tasks.`);
+};
 
   const handleSubmitWorkLog = async () => {
     if (!wl.description.trim() || !wl.hoursWorked || !activeProject) return;
@@ -2920,14 +2920,14 @@ export default function ProjectManagement({ user, projects, users }: any) {
             )}
 
             <div className="flex-1" />
-{/* {isProjectManager && (
+{isProjectManager && (
   <button
     onClick={runBackfill}
     className="flex items-center gap-1.5 text-xs font-bold px-4 py-1.5 rounded-lg text-white shadow-sm"
     style={{ background: "#f59e0b" }}>
     🔧 Backfill IDs
   </button>
-)} */}
+)}
             {viewMode !== "reports" && (
               <>
                 <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-1.5 text-xs font-bold px-4 py-1.5 rounded-lg text-white shadow-sm transition" style={{ background: projectColor }}>+ New Ticket</button>
