@@ -2920,14 +2920,14 @@ export default function ProjectManagement({ user, projects, users }: any) {
             )}
 
             <div className="flex-1" />
-{isProjectManager && (
+{/* {isProjectManager && (
   <button
     onClick={runBackfill}
     className="flex items-center gap-1.5 text-xs font-bold px-4 py-1.5 rounded-lg text-white shadow-sm"
     style={{ background: "#f59e0b" }}>
     🔧 Backfill IDs
   </button>
-)}
+)} */}
             {viewMode !== "reports" && (
               <>
                 <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-1.5 text-xs font-bold px-4 py-1.5 rounded-lg text-white shadow-sm transition" style={{ background: projectColor }}>+ New Ticket</button>
