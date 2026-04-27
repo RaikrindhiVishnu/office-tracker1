@@ -51,7 +51,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
   formatTime,
   formatTotal,
 }) => {
-  const [department, setDepartment] = useState("SALES");
+  const [department, setDepartment] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"ALL" | "EMPLOYEE" | "ADMIN">("ALL");
   const [currentPage, setCurrentPage] = useState(1);
@@ -462,6 +462,7 @@ const matchesFilter =
 <option>UI/UX Designer</option>
 <option>Data Analyst</option>
 <option>Project Manager</option>
+<option>Product Manager</option>
 <option>HR Executive</option>
 <option>Graphic Designer</option>
 <option>3D Artist</option>
@@ -482,7 +483,16 @@ const matchesFilter =
 <option>Compositing Artist</option>
 <option>Android Developer</option>
 <option>Mobile App Developer</option>
+<option value="OTHER">+ Add Custom Role</option>
 </select>
+{designation === "OTHER" && (
+  <input
+    type="text"
+    placeholder="Enter custom role..."
+    onChange={(e) => setDesignation(e.target.value)}
+    className="w-full mt-2 border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-indigo-400 outline-none"
+  />
+)}
 {/* ACCOUNT TYPE */}
 <select
   value={accountType}
@@ -501,6 +511,8 @@ const matchesFilter =
   onChange={(e) => setDepartment(e.target.value)}
   className="w-full border border-gray-300 rounded-lg px-4 py-2.5"
 >
+  <option value="">No Department</option>  {/* ✅ added */}
+
   <option value="SALES">Sales</option>
   <option value="FINANCE">Finance</option>
   <option value="MARKETING">Marketing</option>

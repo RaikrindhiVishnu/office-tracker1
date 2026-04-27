@@ -51,7 +51,14 @@ interface WorkLog {
 interface Milestone { id: string; projectId: string; title: string; dueDate?: string; status: "pending" | "completed"; createdAt: any; }
 interface DailyTask { id: string; projectId: string; projectName: string; taskTitle: string; description: string; hoursWorked: number; workStatus: "Completed" | "In Progress" | "Blocked" | "Review"; category: string; }
 interface DailyEntry { id: string; userId: string; userName: string; userEmail: string; date: string; month: string; tasks: DailyTask[]; totalHours: number; status: "submitted" | "draft"; submittedAt?: any; createdAt: any; }
-interface WorkloadItem { user: any; total: number; done: number; inProgress: number; blocked: number; }
+interface WorkloadItem {
+  user: any;
+  total: number;
+  done: number;
+  inProgress: number;
+  blocked: number;
+  autoHours?: number; // ✅ NEW
+}
 interface UserSummaryItem { user: any; totalH: number; days: number; byProject: Record<string, number>; byStatus: Record<string, number>; }
 
 /* ─── CONSTANTS ─── */
@@ -268,6 +275,28 @@ function SprintPicker({ sprints, activeSprint, onSelect, onDelete, onEdit }: {
   );
 }
 
+function calculateAutoHours(task: Task): number {
+  if (!task.assignedDate) return task.estimatedHours || 0;
+
+  const start = new Date(task.assignedDate).getTime();
+  if (isNaN(start)) return task.estimatedHours || 0;
+
+  // Use completedAtISO string for completed tasks, otherwise use now
+  const endStr = (task as any).completedAtISO ||
+    (typeof (task as any).completedAt === "string" ? (task as any).completedAt : null);
+  const end = endStr ? new Date(endStr).getTime() : Date.now();
+
+  if (isNaN(end) || end <= start) return task.estimatedHours || 0;
+
+  const diffHours = (end - start) / (1000 * 60 * 60);
+
+  // Safety cap: max 2x estimated hours to prevent stale data blowup
+  const cap = (task.estimatedHours || 0) * 2;
+  if (cap > 0 && diffHours > cap) return cap;
+
+  return Math.round(diffHours * 10) / 10;
+}
+
 /* ═══════════════════════════════════════════
    ADMIN DAILY SHEET
 ═══════════════════════════════════════════ */
@@ -474,6 +503,18 @@ export default function AdminProjectManagement({ user, projects, users }: { user
   const [taskFiles, setTaskFiles] = useState<any[]>([]);
   const [subtasks, setSubtasks] = useState<any[]>([]);
   const [columns, setColumns] = useState<KanbanColumn[]>(DEFAULT_COLUMNS);
+  const doneColId =
+  columns.find(c => c.label.toLowerCase().includes("done"))?.id || "done";
+  const [allProjectTasks, setAllProjectTasks] = useState<Task[]>([]);
+
+  useEffect(() => {
+  const q = query(collection(db, "projectTasks"));
+  return onSnapshot(q, snap => {
+    setAllProjectTasks(snap.docs.map(d => ({ id: d.id, ...d.data() } as Task)));
+  });
+}, []);
+
+
 
   // ─── View & filter state ───
   const [viewMode, setViewMode] = useState<"dashboard"|"kanban"|"list"|"timeline"|"workload"|"reports"|"gantt"|"sprint_reports">("kanban");
@@ -648,8 +689,8 @@ export default function AdminProjectManagement({ user, projects, users }: { user
     ? users.find((u: any) => u.uid === data.assignedTo)
     : null;
   const assignedToName = assignedUser
-    ? (assignedUser.displayName || assignedUser.name || assignedUser.email?.split("@")[0] || "")
-    : null;
+  ? (assignedUser.displayName?.trim() || assignedUser.name?.trim() || null)
+  : null;
 
   const updatedData: any = {
     ...data,
@@ -702,6 +743,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
   taskCode,
   projectId: activeProject.id,
   sprintId: activeSprint?.id || null,
+  assignedDate: data.assignedTo ? new Date().toISOString() : null,
   createdBy: user.uid,
   createdAt: serverTimestamp(),
 };
@@ -731,13 +773,14 @@ const taskRef = await addDoc(collection(db,"projectTasks"), cleanData);
 const handleAssignTask = async (taskId: string, userId: string) => {
   const au = users.find((u: any) => u.uid === userId);
   const assignedToName = au
-    ? (au.displayName || au.name || au.email?.split("@")[0] || "")
-    : null;
+  ? (au.displayName?.trim() || au.name?.trim() || null)
+  : null;
 
   // ✅ Save BOTH assignedTo and assignedToName
   await updateDoc(doc(db, "projectTasks", taskId), {
     assignedTo: userId || null,
     assignedToName: assignedToName,
+    assignedDate: userId ? new Date().toISOString() : null,
   });
 
   // ✅ Update local state immediately so UI reflects change
@@ -767,7 +810,10 @@ const handleAssignTask = async (taskId: string, userId: string) => {
   await updateDoc(doc(db, "projectTasks", taskId), {
     status: newStatus,
     ...(newStatus === "inprogress" ? { startedAt: serverTimestamp() } : {}),
-    ...(newStatus === "done" ? { completedAt: serverTimestamp() } : {}),
+     ...(newStatus === "done" ? {
+      completedAt: serverTimestamp(),
+      completedAtISO: new Date().toISOString(),
+    } : {}),
   });
   await logActivity(activeProject!.id, "status_changed", `→ ${columns.find(c => c.id === newStatus)?.label || newStatus}`, taskId);
   await addDoc(collection(db, "activityLogs"), { projectId: activeProject!.id, taskId, userId: user.uid, userName: user.email?.split("@")[0] ?? "", action: "status_changed", from: { status: oldTask?.status }, to: { status: newStatus }, description: `Status changed to ${columns.find(c => c.id === newStatus)?.label || newStatus}`, createdAt: serverTimestamp() });
@@ -855,11 +901,22 @@ const handleDeleteSprint = async (sprint: Sprint) => {
   const totalHours = workLogs.reduce((s,l)=>s+(l.hoursWorked||0),0);
   const nonStoryTasks = tasks.filter(t => t.ticketType !== "story");
   const allTags = [...new Set(tasks.flatMap(t => t.tags || []))];
-  const workloadData: WorkloadItem[] = projectMembers.map((u:any) => {
-    const ut = nonStoryTasks.filter(t => t.assignedTo===u.uid);
-    return { user:u, total:ut.length, done:ut.filter(t=>t.status==="done").length, inProgress:ut.filter(t=>t.status==="inprogress").length, blocked:ut.filter(t=>t.status==="blocked").length };
-  });
-  const doneColId = columns.find(c=>c.label.toLowerCase()==="done")?.id||"done";
+  const workloadData: WorkloadItem[] = projectMembers.map((u: any) => {
+  const ut = nonStoryTasks.filter(t => t.assignedTo === u.uid);
+  // ✅ CHANGE 3: Auto-calculate hours from assignedDate → completedAtISO (or now)
+  const autoHours = Math.round(
+    ut.reduce((sum, task) => sum + calculateAutoHours(task), 0) * 10
+  ) / 10;
+
+  return {
+    user: u,
+    total: ut.length,
+    done: ut.filter(t => t.status === doneColId).length,
+    inProgress: ut.filter(t => t.status !== doneColId && t.status !== "blocked").length,
+    blocked: ut.filter(t => t.status === "blocked").length,
+    autoHours,
+  };
+});
   const overdueTasks = nonStoryTasks.filter(t => t.dueDate && new Date(t.dueDate)<new Date() && t.status!==doneColId);
 
   /* ══════════════════════════════════════
@@ -1507,7 +1564,26 @@ const handleDeleteSprint = async (sprint: Sprint) => {
                   <div key={u.uid} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
                     <div className="flex items-center gap-3 mb-4"><Avatar name={u.email} size="md" /><div><p className="font-bold text-gray-800 text-sm">{u.displayName||u.name||u.email?.split("@")[0]||"Unknown"}</p><p className="text-xs text-gray-400">{total} tasks</p></div><div className="ml-auto"><ProgressRing pct={total>0?Math.round((done/total)*100):0} size={44} stroke={4} color={activeProject.color||"#6366f1"} /></div></div>
                     <div className="space-y-2">{[{label:"Done",val:done,color:"#16a34a"},{label:"In Progress",val:inProgress,color:"#2563eb"},{label:"Blocked",val:blocked,color:"#dc2626"},{label:"Todo",val:total-done-inProgress-blocked,color:"#94a3b8"}].map(s=>(<div key={s.label} className="flex items-center gap-2"><div className="w-2 h-2 rounded-full shrink-0" style={{background:s.color}} /><span className="text-xs text-gray-500 flex-1">{s.label}</span><div className="flex-1 bg-gray-100 rounded-full h-1"><div className="h-1 rounded-full" style={{width:total>0?`${(s.val/total)*100}%`:"0%",background:s.color}} /></div><span className="text-xs font-bold text-gray-700 w-5 text-right">{s.val}</span></div>))}</div>
-                    <div className="mt-4 pt-4 border-t border-gray-50"><p className="text-xs text-gray-400 mb-1">Hours logged</p><p className="text-2xl font-black" style={{color:activeProject.color||"#6366f1"}}>{workLogs.filter(l=>l.userId===u.uid).reduce((s,l)=>s+l.hoursWorked,0)}h</p></div>
+                    <div className="mt-4 pt-4 border-t border-gray-50">
+  <p className="text-xs text-gray-400 mb-1">Hours tracked</p>
+  <div className="flex items-end gap-3">
+    <div>
+      <p className="text-2xl font-black" style={{color:activeProject.color||"#6366f1"}}>
+        {/* ✅ CHANGE 3: Show auto-calculated hours */}
+        {workloadData.find((w: WorkloadItem) => w.user.uid === u.uid)?.autoHours || 0}h
+      </p>
+      <p className="text-[10px] text-gray-400">auto-tracked</p>
+    </div>
+    {workLogs.filter(l=>l.userId===u.uid).reduce((s,l)=>s+l.hoursWorked,0) > 0 && (
+      <div className="text-right">
+        <p className="text-sm font-bold text-gray-500">
+          +{workLogs.filter(l=>l.userId===u.uid).reduce((s,l)=>s+l.hoursWorked,0)}h
+        </p>
+        <p className="text-[10px] text-gray-400">manual logs</p>
+      </div>
+    )}
+  </div>
+</div>
                   </div>
                 ))}
               </div>
@@ -1660,7 +1736,48 @@ const handleDeleteSprint = async (sprint: Sprint) => {
                       <div className="flex items-start justify-between gap-2 mb-3"><div className="flex items-center gap-2.5 min-w-0"><div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold shrink-0" style={{background:accentColor}}>{project.name[0]?.toUpperCase()}</div><div className="min-w-0"><h3 className="text-sm font-semibold text-gray-900 truncate leading-tight group-hover:text-indigo-700 transition">{project.name}</h3>{project.clientName&&<p className="text-[11px] text-gray-400 truncate mt-0.5">{project.clientName}</p>}</div></div><div className="flex items-center gap-1.5 shrink-0">{isPM&&<span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100">👑 PM</span>}<span className="text-[10px] font-medium px-2 py-0.5 rounded" style={{background:sc?.bg,color:sc?.color}}>{project.status}</span></div></div>
                       <p className="text-xs text-gray-400 line-clamp-1 mb-3">{project.description||"No description."}</p>
                       <div className="flex flex-wrap gap-1 mb-3">{project.projectType==="Billing"&&<span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-100">Billing</span>}{project.billingType&&<span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-50 text-gray-500 border border-gray-200">{project.billingType}</span>}<span className="text-[10px] px-1.5 py-0.5 rounded border" style={{background:pc?.bg,color:pc?.color,borderColor:pc?.color+"30"}}>{project.priority}</span>{pms.length>1&&<span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-500 border border-indigo-100">👑 {pms.length} PMs</span>}{project.endDate&&<span className="text-[10px] text-gray-400 ml-auto">Due {project.endDate}</span>}</div>
-                      <div className="mb-2"><div className="flex justify-between items-center mb-1"><span className="text-[10px] text-gray-400">Progress</span><span className="text-[10px] font-semibold" style={{color:accentColor}}>{project.progress||0}%</span></div><div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden"><div className="h-full rounded-full transition-all duration-500" style={{width:`${project.progress||0}%`,background:accentColor}} /></div></div>
+                      <>
+  {/* ✅ CHANGE 2: Task / Story / Bug counts above progress bar */}
+  {(() => {
+    const doneColIdLocal = "done"; // or derive from columns
+    const pt = allProjectTasks.filter(t => t.projectId === project.id);
+    const stats = [
+      { type: "story",  icon: "📘", bg: "#eef2ff", color: "#3730a3", border: "#c7d2fe" },
+      { type: "task",   icon: "🧩", bg: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
+      { type: "bug",    icon: "🐞", bg: "#fef2f2", color: "#b91c1c", border: "#fecaca" },
+      { type: "defect", icon: "🎯", bg: "#fffbeb", color: "#b45309", border: "#fde68a" },
+    ].map(s => ({
+      ...s,
+      total: pt.filter(t => t.ticketType === s.type).length,
+      done:  pt.filter(t => t.ticketType === s.type && t.status === doneColIdLocal).length,
+    })).filter(s => s.total > 0);
+
+    return stats.length > 0 ? (
+      <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+        {stats.map(s => (
+          <span key={s.type}
+            className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md border"
+            style={{ background: s.bg, color: s.color, borderColor: s.border }}>
+            {s.icon} {s.done}/{s.total}
+          </span>
+        ))}
+      </div>
+    ) : null;
+  })()}
+
+  {/* Existing progress bar — keep exactly as-is */}
+  <div className="mb-2">
+    <div className="flex justify-between items-center mb-1">
+      <span className="text-[10px] text-gray-400">Progress</span>
+      <span className="text-[10px] font-semibold" style={{color:accentColor}}>{project.progress||0}%</span>
+    </div>
+    <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+      <div className="h-full rounded-full transition-all duration-500"
+        style={{width:`${project.progress||0}%`,background:accentColor}} />
+    </div>
+  </div>
+</>
+
                       <div className="flex items-center justify-between"><div className="flex -space-x-1.5">{memberList?.map((u:any,i:number)=><div key={i} title={u?.email?.split("@")[0]} className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-white text-[9px] font-semibold" style={{background:["#6366f1","#7c3aed","#db2777","#d97706","#059669"][i%5]}}>{u?.email?.[0]?.toUpperCase()}</div>)}{project.members?.length>5&&<span className="text-[10px] text-gray-400 pl-2">+{project.members.length-5}</span>}</div>{isPM&&<div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all"><button onClick={e=>{e.stopPropagation();handleEditProject(project);}} className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 transition text-xs">✏️</button><button onClick={e=>{e.stopPropagation();handleDeleteProject(project.id);}} className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition text-xs">🗑️</button></div>}</div>
                     </div>
                   </div>

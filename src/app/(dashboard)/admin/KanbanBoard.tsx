@@ -7,9 +7,9 @@ import { createPortal } from "react-dom";
 export interface KanbanColumn {
   id: string;
   label: string;
-  color?: string;   // e.g. "#6366f1"
-  bg?: string;      // e.g. "#eef2ff"
-  border?: string;  // e.g. "#c7d2fe"
+  color?: string;
+  bg?: string;
+  border?: string;
 }
 
 export function canDragTask(user: any, task: Task, project: any): boolean {
@@ -31,7 +31,8 @@ export interface Task {
   ticketType?: "story" | "task" | "bug" | "defect";
   parentStoryId?: string | null;
   parentStoryTitle?: string;
-  taskCode?: string;  
+  taskCode?: string;
+  completedAt?: string; // ✅ NEW: for auto hour calculation
   createdBy: string; createdAt: any;
 }
 
@@ -45,8 +46,8 @@ interface KanbanBoardProps {
   canManage: boolean;
   onSaveColumns: (c: KanbanColumn[]) => void;
   onCreateTask?: (storyId: string, ticketType: string) => void;
-   currentUser?: any;     // ✅ ADD
-  activeProject?: any;   // ✅ ADD
+  currentUser?: any;
+  activeProject?: any;
 }
 
 /* ─── PRIORITY CONFIG ─── */
@@ -77,6 +78,23 @@ export function generateTaskCode(ticketType: string, existingTasks: Task[]): str
 
 const AVATAR_COLORS = ["#6366f1","#7c3aed","#db2777","#d97706","#059669","#0891b2","#e11d48","#0284c7"];
 const avatarColor = (name: string) => AVATAR_COLORS[(name?.charCodeAt(0) || 0) % AVATAR_COLORS.length];
+
+/** Returns the first letter of the name, never an @ or dot */
+const avatarInitial = (name: string): string => {
+  if (!name || name.includes("@")) return "U"; // User fallback
+
+  return name.trim()[0].toUpperCase();
+};
+
+/** Strip email domain if the stored name accidentally contains one */
+const cleanDisplayName = (name: string | null | undefined): string => {
+  if (!name) return "User";
+
+  // ❌ if it's email → DO NOT USE IT
+  if (name.includes("@")) return "User";
+
+  return name;
+};
 
 const DEFAULT_COL_COLORS = [
   { color: "#64748b", bg: "#f8fafc", border: "#e2e8f0" },
@@ -163,14 +181,12 @@ function BulkActionBar({
   const [showMove, setShowMove] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
   const [showPriority, setShowPriority] = useState(false);
-  const [showMoveToSprint, setShowMoveToSprint] = useState(false);
 
   return (
     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-2xl shadow-2xl border border-white/20"
       style={{ background: projectColor, backdropFilter: "blur(8px)" }}>
       <span className="text-white text-xs font-bold mr-2 bg-white/20 px-2 py-0.5 rounded-full">{count} selected</span>
 
-      {/* Move */}
       <div className="relative">
         <button onClick={() => { setShowMove(!showMove); setShowAssign(false); setShowPriority(false); }}
           className="flex items-center gap-1 text-white text-xs font-semibold bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition">
@@ -186,7 +202,6 @@ function BulkActionBar({
         )}
       </div>
 
-      {/* Assign */}
       <div className="relative">
         <button onClick={() => { setShowAssign(!showAssign); setShowMove(false); setShowPriority(false); }}
           className="flex items-center gap-1 text-white text-xs font-semibold bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition">
@@ -199,14 +214,13 @@ function BulkActionBar({
             {users.map((u: any) => (
               <button key={u.uid} onClick={() => { onAssign(u.uid); setShowAssign(false); }}
                 className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 text-gray-700">
-                {u.displayName || u.name || u.email?.split("@")[0]}
+                {u.displayName || u.name || u.displayName || u.name || "User"}
               </button>
             ))}
           </div>
         )}
       </div>
 
-      {/* Priority */}
       <div className="relative">
         <button onClick={() => { setShowPriority(!showPriority); setShowMove(false); setShowAssign(false); }}
           className="flex items-center gap-1 text-white text-xs font-semibold bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg transition">
@@ -247,7 +261,7 @@ export function TaskModal({
   defaultStoryId,
   defaultTicketType,
   existingTasks = [],
-  editingTask, // ✅ ADD HERE
+  editingTask,
 }: {
   open: boolean;
   onClose: () => void;
@@ -259,8 +273,7 @@ export function TaskModal({
   defaultStoryId?: string;
   defaultTicketType?: string;
   existingTasks?: Task[];
-
-  editingTask?: Task | null; // ✅ ADD HERE
+  editingTask?: Task | null;
 }) {
   const getAutoCode = (ticketType: string) => generateTaskCode(ticketType, existingTasks);
 
@@ -273,38 +286,37 @@ export function TaskModal({
   });
 
   useEffect(() => {
-  if (editingTask) {
-    setF({
-      title: editingTask.title || "",
-      description: editingTask.description || "",
-      assignedTo: editingTask.assignedTo || "",
-      dueDate: editingTask.dueDate || "",
-      priority: editingTask.priority || "Medium",
-      status: editingTask.status || columns[0]?.id,
-      estimatedHours: editingTask.estimatedHours?.toString() || "",
-      storyPoints: editingTask.storyPoints?.toString() || "3",
-      tags: editingTask.tags?.join(",") || "",
-      ticketType: editingTask.ticketType || "task",
-      parentStoryId: editingTask.parentStoryId || "",
-      taskCode: editingTask.taskCode || "",
-    });
-  }
-}, [editingTask]);
+    if (editingTask) {
+      setF({
+        title: editingTask.title || "",
+        description: editingTask.description || "",
+        assignedTo: editingTask.assignedTo || "",
+        dueDate: editingTask.dueDate || "",
+        priority: editingTask.priority || "Medium",
+        status: editingTask.status || columns[0]?.id,
+        estimatedHours: editingTask.estimatedHours?.toString() || "",
+        storyPoints: editingTask.storyPoints?.toString() || "3",
+        tags: editingTask.tags?.join(",") || "",
+        ticketType: editingTask.ticketType || "task",
+        parentStoryId: editingTask.parentStoryId || "",
+        taskCode: editingTask.taskCode || "",
+      });
+    }
+  }, [editingTask]);
 
   const [taskCodeManual, setTaskCodeManual] = useState(false);
 
-useEffect(() => {
-  if (editingTask) return; // ✅ IMPORTANT FIX
-
-  const t = defaultTicketType || "task";
-  setF(prev => ({
-    ...prev,
-    ticketType: t,
-    parentStoryId: defaultStoryId || "",
-    status: columns[0]?.id || "todo",
-    taskCode: taskCodeManual ? prev.taskCode : getAutoCode(t),
-  }));
-}, [open, defaultTicketType, defaultStoryId, columns, editingTask]);
+  useEffect(() => {
+    if (editingTask) return;
+    const t = defaultTicketType || "task";
+    setF(prev => ({
+      ...prev,
+      ticketType: t,
+      parentStoryId: defaultStoryId || "",
+      status: columns[0]?.id || "todo",
+      taskCode: taskCodeManual ? prev.taskCode : getAutoCode(t),
+    }));
+  }, [open, defaultTicketType, defaultStoryId, columns, editingTask]);
 
   const handleTypeChange = (t: string) => {
     setF(prev => ({
@@ -314,56 +326,45 @@ useEffect(() => {
     }));
   };
 
-  useEffect(() => {
-  if (editingTask) {
-    setF({
-      title: editingTask.title || "",
-      description: editingTask.description || "",
-      assignedTo: editingTask.assignedTo || "",
-      dueDate: editingTask.dueDate || "",
-      priority: editingTask.priority || "Medium",
-      status: editingTask.status || columns[0]?.id,
-      estimatedHours: editingTask.estimatedHours?.toString() || "",
-      storyPoints: editingTask.storyPoints?.toString() || "3",
-      tags: editingTask.tags?.join(",") || "",
-      ticketType: editingTask.ticketType || "task",
-      parentStoryId: editingTask.parentStoryId || "",
-      taskCode: editingTask.taskCode || "",
-    });
-  }
-}, [editingTask]);
-
   if (!open) return null;
   const isStory = f.ticketType === "story";
 
- const submit = () => {
-  if (!f.title.trim()) return;
+  // ✅ Resolves a clean display name — never falls back to raw email
+  const resolveDisplayName = (u: any): string => {
+  if (!u) return "";
 
-  // ✅ Resolve assignedToName from uid at submit time
-  const assignedUser = f.assignedTo
-    ? users.find((u: any) => u.uid === f.assignedTo)
-    : null;
-  const assignedToName = assignedUser
-    ? (assignedUser.displayName || assignedUser.name || assignedUser.email?.split("@")[0] || "")
-    : null;
+  // ✅ STRICT: only allow name fields
+  if (u.displayName && u.displayName.trim()) return u.displayName.trim();
+  if (u.name && u.name.trim()) return u.name.trim();
 
-  const data = {
-    ...f,
-    assignedTo: f.assignedTo || null,
-    assignedToName: assignedToName,
-    estimatedHours: f.estimatedHours ? Number(f.estimatedHours) : undefined,
-    storyPoints: f.storyPoints ? Number(f.storyPoints) : undefined,
-    tags: f.tags.split(",").map((t: string) => t.trim()).filter(Boolean),
-  };
-
-  if (editingTask) {
-    onSubmit(data, editingTask);
-  } else {
-    onSubmit(data);
-  }
-
-  onClose();
+  // ❌ DO NOT fallback to email anymore
+  return "User";
 };
+
+  const submit = () => {
+    if (!f.title.trim()) return;
+    const assignedUser = f.assignedTo
+      ? users.find((u: any) => u.uid === f.assignedTo)
+      : null;
+    const assignedToName = assignedUser ? resolveDisplayName(assignedUser) : null;
+
+    const data = {
+      ...f,
+      assignedTo: f.assignedTo || null,
+      assignedToName: assignedToName,
+      estimatedHours: f.estimatedHours ? Number(f.estimatedHours) : undefined,
+      storyPoints: f.storyPoints ? Number(f.storyPoints) : undefined,
+      tags: f.tags.split(",").map((t: string) => t.trim()).filter(Boolean),
+    };
+
+    if (editingTask) {
+      onSubmit(data, editingTask);
+    } else {
+      onSubmit(data);
+    }
+
+    onClose();
+  };
 
   return (
     <div className="fixed inset-0 z-55 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)" }}>
@@ -379,7 +380,6 @@ useEffect(() => {
         </div>
 
         <div className="p-5 space-y-3 max-h-[72vh] overflow-y-auto">
-          {/* Type Selector */}
           <div className="flex gap-2">
             {(["story", "task", "bug", "defect"] as const).map(t => {
               const tm = TYPE_META[t];
@@ -395,7 +395,6 @@ useEffect(() => {
             })}
           </div>
 
-          {/* Task ID */}
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-mono font-bold pointer-events-none"
               style={{ color: TYPE_META[f.ticketType]?.color || "#64748b" }}>
@@ -413,7 +412,6 @@ useEffect(() => {
               style={{ borderColor: taskCodeManual ? "#6366f1" : "#e5e7eb" }} />
           </div>
 
-          {/* Parent Story */}
           {!isStory && stories && stories.length > 0 && (
             <div>
               <label className="text-xs font-medium text-gray-500 block mb-1">Parent Story <span className="text-gray-300">(optional)</span></label>
@@ -425,7 +423,6 @@ useEffect(() => {
             </div>
           )}
 
-          {/* Title */}
           <div>
             <label className="text-xs font-medium text-gray-500 block mb-1">Title <span className="text-red-400">*</span></label>
             <input value={f.title} onChange={e => setF({ ...f, title: e.target.value })}
@@ -433,7 +430,6 @@ useEffect(() => {
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200" />
           </div>
 
-          {/* Description */}
           <textarea value={f.description} onChange={e => setF({ ...f, description: e.target.value })} rows={2}
             placeholder="Description..."
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none resize-none" />
@@ -444,7 +440,11 @@ useEffect(() => {
               <select value={f.assignedTo} onChange={e => setF({ ...f, assignedTo: e.target.value })}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none">
                 <option value="">Unassigned</option>
-                {users.map((u: any) => <option key={u.uid} value={u.uid}>{u.displayName || u.name || u.email?.split("@")[0] || "Unknown"}</option>)}
+                {users.map((u: any) => (
+  <option key={u.uid} value={u.uid}>
+    {u.displayName || u.name || "Unknown"}
+  </option>
+))}
               </select>
             </div>
             <div>
@@ -472,25 +472,21 @@ useEffect(() => {
               <div>
                 <label className="text-xs font-medium text-gray-500 block mb-1">Est. Hours</label>
                 <input
-  type="number"
-  value={f.estimatedHours || ""}
-  onChange={e =>
-    setF({
-      ...f,
-      estimatedHours: e.target.value
-    })
-  }
-  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
-/>
+                  type="number"
+                  value={f.estimatedHours || ""}
+                  onChange={e => setF({ ...f, estimatedHours: e.target.value })}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+                />
               </div>
             )}
             <div>
               <label className="text-xs font-medium text-gray-500 block mb-1">Story Points</label>
               <input
-  type="number"
-  value={f.storyPoints || ""}
-  onChange={e => setF({ ...f, storyPoints: e.target.value })}
-/>
+                type="number"
+                value={f.storyPoints || ""}
+                onChange={e => setF({ ...f, storyPoints: e.target.value })}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none"
+              />
             </div>
           </div>
 
@@ -506,10 +502,7 @@ useEffect(() => {
           <button onClick={submit} disabled={!f.title.trim()}
             className="px-5 py-2 text-sm font-semibold text-white rounded-lg disabled:opacity-40 transition hover:opacity-90"
             style={{ background: `linear-gradient(135deg, ${projectColor}, ${projectColor}cc)` }}>
-            {editingTask
-  ? "Update Task"
-  : `Create ${TYPE_META[f.ticketType]?.label || "Task"}`
-}
+            {editingTask ? "Update Task" : `Create ${TYPE_META[f.ticketType]?.label || "Task"}`}
           </button>
         </div>
       </div>
@@ -549,7 +542,7 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   const [dragTask, setDragTask] = useState<Task | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
-  const [dragColId, setDragColId] = useState<string | null>(null); // column being dragged
+  const [dragColId, setDragColId] = useState<string | null>(null);
   const [dragColOverId, setDragColOverId] = useState<string | null>(null);
   const [collapsedStories, setCollapsedStories] = useState<Set<string>>(new Set());
   const [collapsedCols, setCollapsedCols] = useState<Set<string>>(new Set());
@@ -564,7 +557,6 @@ export function KanbanBoard({
 
   const boardRef = useRef<HTMLDivElement>(null);
 
-  /* ── Helpers ── */
   const stories = tasks.filter(t => t.ticketType === "story");
   const orphans = tasks.filter(t => t.ticketType !== "story" && !t.parentStoryId);
 
@@ -590,7 +582,6 @@ export function KanbanBoard({
     return `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}`;
   };
 
-  /* ── Column ops ── */
   const handleDeleteColumn = (colIdx: number) => {
     const colToDelete = columns[colIdx];
     const adjacent = columns[colIdx - 1] || columns[colIdx + 1];
@@ -613,25 +604,17 @@ export function KanbanBoard({
     setColumns(updated); onSaveColumns(updated);
   };
 
-  /* ── Bulk actions ── */
   const handleBulkMove = (colId: string) => {
     selectedTasks.forEach(id => onStatusChange(id, colId));
     clearSelection();
   };
   const handleBulkDelete = () => {
-    // signal parent to delete (parent handles Firestore)
     selectedTasks.forEach(id => onStatusChange(id, "__DELETE__"));
     clearSelection(); setConfirmDelete(null);
   };
-  const handleBulkAssign = (uid: string) => {
-    // parent handles; we just signal via status trick — better: call onBulkAssign if provided
-    clearSelection();
-  };
-  const handleBulkPriority = (priority: string) => {
-    clearSelection();
-  };
+  const handleBulkAssign = (uid: string) => { clearSelection(); };
+  const handleBulkPriority = (priority: string) => { clearSelection(); };
 
-  /* ── Column drag ── */
   const handleColDragStart = (e: React.DragEvent, colId: string) => {
     if (!canManage) { e.preventDefault(); return; }
     setDragColId(colId);
@@ -649,7 +632,6 @@ export function KanbanBoard({
     setDragColId(null); setDragColOverId(null);
   };
 
-  /* ── Task drag ── */
   const handleTaskDragStart = (e: React.DragEvent, task: Task) => {
     setDragTask(task);
     e.dataTransfer.effectAllowed = "move";
@@ -661,15 +643,15 @@ export function KanbanBoard({
     setDragTask(null); setDragOver(null);
   };
   const handleTaskDrop = (e: React.DragEvent, colId: string) => {
-  e.preventDefault();
-  if (dragTask && dragTask.status !== colId && dragTask.ticketType !== "story") {
-    if (!canDragTask(currentUser, dragTask, activeProject)) {
-      setDragTask(null); setDragOver(null); return;
+    e.preventDefault();
+    if (dragTask && dragTask.status !== colId && dragTask.ticketType !== "story") {
+      if (!canDragTask(currentUser, dragTask, activeProject)) {
+        setDragTask(null); setDragOver(null); return;
+      }
+      onStatusChange(dragTask.id, colId);
     }
-    onStatusChange(dragTask.id, colId);
-  }
-  setDragTask(null); setDragOver(null);
-};
+    setDragTask(null); setDragOver(null);
+  };
 
   /* ── STORY CARD ── */
   const StoryCard = ({ story, colIdx }: { story: Task; colIdx: number }) => {
@@ -689,21 +671,19 @@ export function KanbanBoard({
           border: `2px solid ${isSelected ? "#6366f1" : "#c4b5fd"}`,
           boxShadow: "0 2px 8px rgba(99,102,241,0.10)",
         }}>
-        {/* Story Header — full card */}
         <div
-  draggable={canDragTask(currentUser, story, activeProject)}
-  onDragStart={e => {
-    if (!canDragTask(currentUser, story, activeProject)) { e.preventDefault(); return; }
-    handleTaskDragStart(e, story);
-  }}
-  onDragEnd={handleTaskDragEnd}
-  className="p-3"
-  onClick={() => onTaskClick(story)}
-  style={{ cursor: canDragTask(currentUser, story, activeProject) ? "grab" : "default" }}
->
+          draggable={canDragTask(currentUser, story, activeProject)}
+          onDragStart={e => {
+            if (!canDragTask(currentUser, story, activeProject)) { e.preventDefault(); return; }
+            handleTaskDragStart(e, story);
+          }}
+          onDragEnd={handleTaskDragEnd}
+          className="p-3"
+          onClick={() => onTaskClick(story)}
+          style={{ cursor: canDragTask(currentUser, story, activeProject) ? "grab" : "default" }}
+        >
           {/* Top row */}
           <div className="flex items-center gap-2 mb-2">
-            {/* Checkbox */}
             <div onClick={e => toggleSelect(story.id, e)}
               className={`w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center transition cursor-pointer ${isSelected ? "bg-indigo-600 border-indigo-600" : "border-indigo-300 bg-white"}`}>
               {isSelected && <span className="text-white text-[8px] font-bold leading-none">✓</span>}
@@ -714,7 +694,6 @@ export function KanbanBoard({
             <span className="text-xs">📘</span>
             <span className="text-[10px] font-bold text-indigo-400 bg-indigo-100 px-1.5 py-0.5 rounded-full">Story</span>
             <div className="flex-1" />
-            {/* Priority */}
             {pri && (
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: pri.bg, color: pri.text }}>
                 {pri.label}
@@ -746,31 +725,40 @@ export function KanbanBoard({
             </div>
           </div>
 
-          {/* Footer */}
+          {/* ✅ CHANGE 1: Footer with full assignee name shown */}
+     {/* Footer */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {/* Assignee */}
+            <div className="flex items-center gap-2 min-w-0 flex-1">
               {story.assignedToName ? (
-                <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
-                  style={{ background: avatarColor(story.assignedToName) }} title={story.assignedToName}>
-                  {story.assignedToName[0].toUpperCase()}
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <div
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0"
+                    style={{ background: avatarColor(cleanDisplayName(story.assignedToName)) }}
+                    title={cleanDisplayName(story.assignedToName)}
+                  >
+                    {avatarInitial(cleanDisplayName(story.assignedToName))}
+                  </div>
+                  <span className="text-[10px] font-semibold text-indigo-700 truncate" style={{ maxWidth: "90px" }}>
+                    {cleanDisplayName(story.assignedToName)}
+                  </span>
                 </div>
               ) : (
-                <div className="w-6 h-6 rounded-full border-2 border-dashed border-indigo-200 flex items-center justify-center text-indigo-300 text-[10px]">?</div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-5 h-5 rounded-full border-2 border-dashed border-indigo-200 flex items-center justify-center text-indigo-300 text-[9px]">?</div>
+                  <span className="text-[10px] text-indigo-300">Unassigned</span>
+                </div>
               )}
               {story.dueDate && (
-                <span className={`text-[10px] font-medium ${isOverdue ? "text-red-500" : "text-indigo-400"}`}>
+                <span className={`text-[10px] font-medium shrink-0 ${isOverdue ? "text-red-500" : "text-indigo-400"}`}>
                   {isOverdue ? "⚠️ " : ""}{formatDate(story.dueDate)}
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-1.5">
-              {/* Collapse/Expand */}
+            <div className="flex items-center gap-1.5 shrink-0">
               <button onClick={e => { e.stopPropagation(); toggleStory(story.id); }}
                 className="w-6 h-6 rounded-md bg-indigo-100 hover:bg-indigo-200 flex items-center justify-center text-indigo-600 transition text-[10px]">
                 {isCollapsed ? "▶" : "▼"}
               </button>
-              {/* Add child */}
               {canManage && onCreateTask && (
                 <button onClick={e => {
                   e.stopPropagation();
@@ -785,7 +773,7 @@ export function KanbanBoard({
           </div>
         </div>
 
-        {/* Children (collapsed/expanded) */}
+        {/* Children */}
         {!isCollapsed && (
           <div style={{ borderTop: "1px solid #ddd6fe", background: "#faf5ff" }}>
             {colChildren.map(child => (
@@ -812,29 +800,28 @@ export function KanbanBoard({
     return (
       <div
         draggable={canDragTask(currentUser, task, activeProject)}
-onDragStart={e => {
-  if (!canDragTask(currentUser, task, activeProject)) { e.preventDefault(); return; }
-  handleTaskDragStart(e, task);
-}}
-onDragEnd={handleTaskDragEnd}
+        onDragStart={e => {
+          if (!canDragTask(currentUser, task, activeProject)) { e.preventDefault(); return; }
+          handleTaskDragStart(e, task);
+        }}
+        onDragEnd={handleTaskDragEnd}
         onClick={() => onTaskClick(task)}
         className={`rounded-xl border cursor-pointer group/card transition-all duration-150 ${isChild ? "mx-2 my-1.5" : "mx-2 my-2"}`}
         style={{
-  background: isSelected ? "#eff6ff" : "#fff",
-  borderColor: isSelected ? "#6366f1" : isOverdue ? "#fca5a5" : "#e5e7eb",
-  borderWidth: isSelected ? "2px" : "1px",
-  boxShadow: isDragging ? "0 16px 40px rgba(0,0,0,0.2)" : "0 1px 4px rgba(0,0,0,0.06)",
-  transform: isDragging ? "scale(1.04) rotate(1deg)" : "scale(1)",
-  borderLeft: isChild ? `3px solid ${tm.color}` : `3px solid ${tm.color}`,
-  opacity: isDragging ? 0.5 : 1,
-  paddingLeft: isChild ? "6px" : undefined,
-  cursor: canDragTask(currentUser, task, activeProject) ? "grab" : "default",
-}}
+          background: isSelected ? "#eff6ff" : "#fff",
+          borderColor: isSelected ? "#6366f1" : isOverdue ? "#fca5a5" : "#e5e7eb",
+          borderWidth: isSelected ? "2px" : "1px",
+          boxShadow: isDragging ? "0 16px 40px rgba(0,0,0,0.2)" : "0 1px 4px rgba(0,0,0,0.06)",
+          transform: isDragging ? "scale(1.04) rotate(1deg)" : "scale(1)",
+          borderLeft: `3px solid ${tm.color}`,
+          opacity: isDragging ? 0.5 : 1,
+          paddingLeft: isChild ? "6px" : undefined,
+          cursor: canDragTask(currentUser, task, activeProject) ? "grab" : "default",
+        }}
       >
         <div className="px-3 pt-3 pb-2">
           {/* Top row */}
           <div className="flex items-center gap-1.5 mb-2">
-            {/* Checkbox */}
             <div onClick={e => toggleSelect(task.id, e)}
               className={`w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center transition cursor-pointer ${isSelected ? "bg-indigo-600 border-indigo-600" : "border-gray-300 bg-white"}`}>
               {isSelected && <span className="text-white text-[8px] font-bold leading-none">✓</span>}
@@ -871,25 +858,33 @@ onDragEnd={handleTaskDragEnd}
             </div>
           )}
 
-          {/* Footer */}
+          {/* ✅ CHANGE 1: Footer with full assignee name shown */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
               {task.assignedToName ? (
-                <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
-                  style={{ background: avatarColor(task.assignedToName) }} title={task.assignedToName}>
-                  {task.assignedToName[0].toUpperCase()}
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0"
+                    style={{ background: avatarColor(cleanDisplayName(task.assignedToName)) }} title={cleanDisplayName(task.assignedToName)}>
+                    {avatarInitial(cleanDisplayName(task.assignedToName))}
+                  </div>
+                  <span className="text-[10px] font-semibold text-gray-600 truncate" style={{ maxWidth: "90px" }}>
+                    {cleanDisplayName(task.assignedToName)}
+                  </span>
                 </div>
               ) : (
-                <div className="w-6 h-6 rounded-full border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-300 text-[10px]">?</div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-5 h-5 rounded-full border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-300 text-[9px]">?</div>
+                  <span className="text-[10px] text-gray-300">Unassigned</span>
+                </div>
               )}
               {dueFmt && (
-                <span className={`text-[10px] font-medium ${isOverdue ? "text-red-500 font-bold" : "text-gray-400"}`}>
+                <span className={`text-[10px] font-medium shrink-0 ${isOverdue ? "text-red-500 font-bold" : "text-gray-400"}`}>
                   {isOverdue ? "⚠️ " : ""}{dueFmt}
                 </span>
               )}
             </div>
             {task.estimatedHours ? (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 shrink-0">
                 <div className="w-12 bg-gray-100 rounded-full h-1 overflow-hidden">
                   <div className="h-1 rounded-full transition-all"
                     style={{ width: `${Math.min(((task.actualHours || 0) / task.estimatedHours) * 100, 100)}%`, background: "#6366f1" }} />
@@ -913,15 +908,14 @@ onDragEnd={handleTaskDragEnd}
     const showColorPicker = colorPickerColIdx === colIdx;
 
     const colTasks = tasks.filter(t => t.status === col.id);
-    const colStories = stories.filter(s => s.status === col.id || tasks.some(t => t.parentStoryId === s.id && t.status === col.id));
-    const colOrphans = orphans.filter(t => t.status === col.id);
     const taskCount = colTasks.filter(t => t.ticketType !== "story").length;
 
-    // Stories visible in this column: show story if it has children here, OR if it's placed in this col
     const visibleStories = stories.filter(story => {
       const childrenInCol = tasks.filter(t => t.parentStoryId === story.id && t.ticketType !== "story" && t.status === col.id);
       return childrenInCol.length > 0 || story.status === col.id;
     });
+
+    const colOrphans = orphans.filter(t => t.status === col.id);
 
     return (
       <div
@@ -997,7 +991,6 @@ onDragEnd={handleTaskDragEnd}
                 )}
               </div>
 
-              {/* Sub-header */}
               <div className="flex items-center px-3 py-1.5 text-[9px] font-bold text-gray-400 uppercase tracking-wider"
                 style={{ background: `${style.bg}cc`, borderTop: `1px solid ${style.border}50` }}>
                 <span className="flex-1">Task</span>
@@ -1007,7 +1000,6 @@ onDragEnd={handleTaskDragEnd}
             </>
           )}
 
-          {/* Color picker */}
           {showColorPicker && (
             <ColColorPicker
               color={col.color || style.color}
@@ -1022,17 +1014,14 @@ onDragEnd={handleTaskDragEnd}
           <div className="flex-1 overflow-y-auto py-1.5 transition-colors duration-150"
             style={{ background: isOver ? `${style.color}08` : "#f9fafb", minHeight: "200px" }}>
 
-            {/* Stories */}
             {visibleStories.map(story => (
               <StoryCard key={story.id} story={story} colIdx={colIdx} />
             ))}
 
-            {/* Orphan tasks */}
             {colOrphans.map(task => (
               <TaskCard key={task.id} task={task} colIdx={colIdx} />
             ))}
 
-            {/* Empty state */}
             {visibleStories.length === 0 && colOrphans.length === 0 && (
               <div className="flex flex-col items-center justify-center py-10 gap-2 text-gray-300">
                 <div className="w-12 h-12 rounded-2xl border-2 border-dashed flex items-center justify-center text-xl transition"
@@ -1045,7 +1034,6 @@ onDragEnd={handleTaskDragEnd}
               </div>
             )}
 
-            {/* Drop indicator */}
             {isOver && (visibleStories.length > 0 || colOrphans.length > 0) && (
               <div className="mx-3 mt-1 mb-2 h-1 rounded-full opacity-60"
                 style={{ background: `linear-gradient(90deg, ${style.color}, ${projectColor})` }} />
@@ -1058,7 +1046,6 @@ onDragEnd={handleTaskDragEnd}
 
   return (
     <div className="relative h-full w-full">
-      {/* Confirm dialogs */}
       {confirmDelete !== null && (
         <ConfirmDialog
           message={
@@ -1074,7 +1061,6 @@ onDragEnd={handleTaskDragEnd}
         />
       )}
 
-      {/* Floating child menu */}
       {floatingMenu && (
         <FloatingMenu
           position={{ top: floatingMenu.top, left: floatingMenu.left }}
@@ -1086,7 +1072,6 @@ onDragEnd={handleTaskDragEnd}
         />
       )}
 
-      {/* Board */}
       <div ref={boardRef}
         className="flex flex-row overflow-x-auto overflow-y-hidden h-full"
         style={{ scrollbarWidth: "thin", scrollbarColor: "#cbd5e1 transparent", contain: "strict" }}>
@@ -1095,7 +1080,6 @@ onDragEnd={handleTaskDragEnd}
           <KanbanCol key={col.id} col={col} colIdx={i} />
         ))}
 
-        {/* Add Column */}
         {canManage && (
           <div className="flex flex-col shrink-0 px-3 py-2" style={{ minWidth: "180px" }}>
             {addingCol ? (
@@ -1137,7 +1121,6 @@ onDragEnd={handleTaskDragEnd}
         )}
       </div>
 
-      {/* Bulk Action Toolbar */}
       {selectedTasks.size > 0 && (
         <BulkActionBar
           count={selectedTasks.size}
