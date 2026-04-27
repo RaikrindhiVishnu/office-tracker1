@@ -866,7 +866,6 @@ function SprintDropdown({
     </div>
   );
 }
-
 /* ═══════════════════════════════════════════
    TASK MODAL
 ═══════════════════════════════════════════ */
@@ -1868,71 +1867,74 @@ const colStories = localTasks
 // Orphans = non-story tasks in this column that either have no parent,
 // OR whose parent story is NOT in this same column
 // ✅ NEW — orphan = non-story task with no parent, OR parent story has no children in THIS column
+// Build a set of task IDs already rendered as story children in this column
+const renderedAsChildren = new Set<string>();
+colStories.forEach(story => {
+  localTasks
+    .filter(t => t.parentStoryId === story.id && t.status === col.id)
+    .forEach(t => renderedAsChildren.add(t.id));
+});
+
+// Orphans = every non-story task in this column NOT already shown under a story
 const colOrphans = colTaskList.filter(t => {
   if (t.ticketType === "story") return false;
-  if (!t.parentStoryId) return true;
-  // Has a parent story — show as orphan only if that story is NOT being rendered in this column
-  // (i.e. the story has no other children in this column)
-  return !localTasks.some(
-    s => s.id === t.parentStoryId && s.ticketType === "story" &&
-         localTasks.some(c => c.parentStoryId === s.id && c.status === col.id)
-  );
+  return !renderedAsChildren.has(t.id);
 });
 // ✅ Child tasks that have been moved OUT of their story's column
-const colDisplacedChildren = colTaskList.filter(t => 
-  t.ticketType !== "story" && 
-  t.parentStoryId && 
-  !localTasks.find(s => s.id === t.parentStoryId && s.status === col.id)
-);
+// const colDisplacedChildren = colTaskList.filter(t => 
+//   t.ticketType !== "story" && 
+//   t.parentStoryId && 
+//   !localTasks.find(s => s.id === t.parentStoryId && s.status === col.id)
+// );
 
-{/* DISPLACED CHILD TASKS — children moved to a different column than their story */}
-{colDisplacedChildren.map(task => {
-  const mine = isMyTask(task);
-  const draggable = canDrag(task);
-  const isDragging = draggingId === task.id;
-  const pc = PRIORITY_CONFIG[task.priority];
-  const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done";
-  const tc = TICKET_TYPES[task.ticketType || "task"];
-  const parentStory = localTasks.find(s => s.id === task.parentStoryId);
-  return (
-    <div key={task.id} draggable={draggable} onDragStart={e => handleDragStart(e, task)} onDragEnd={handleDragEnd}
-      onClick={() => !isDragging && onTaskClick(task)}
-      className={`group border-b transition-all cursor-pointer select-none ${isDragging ? "opacity-40" : "hover:bg-gray-50/70"}`}
-      style={{
-        borderColor: "#f3f4f6",
-        borderLeftWidth: "3px",
-        borderLeftColor: mine ? projectColor : "#a5b4fc",
-        cursor: draggable ? "grab" : "default",
-        opacity: isDragging ? 0.4 : 1,
-      }}>
-      <div className="grid px-3 py-2.5 items-center gap-2" style={{ gridTemplateColumns: "auto 1fr auto auto auto" }}>
-        <span className="text-sm shrink-0">{tc.icon}</span>
-        <div className="min-w-0">
-          {parentStory && (
-            <p className="text-[9px] font-bold text-indigo-300 truncate mb-0.5">📖 {parentStory.title}</p>
-          )}
-          <div className="flex items-center gap-1 mb-0.5">
-            <span className="text-[10px] font-mono font-bold text-gray-400">{task.taskCode || "TSK-000"}</span>
-            <p className="text-xs font-semibold text-gray-800 leading-tight truncate group-hover:text-indigo-700">{task.title}</p>
-            {mine && <span className="shrink-0 text-[9px] font-black px-1 rounded" style={{ background: projectColor + "20", color: projectColor }}>You</span>}
-          </div>
-          {task.estimatedHours ? (
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <div className="flex-1 max-w-14 h-0.5 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full rounded-full" style={{ width: `${Math.min(((task.actualHours || 0) / task.estimatedHours) * 100, 100)}%`, background: projectColor }} />
-              </div>
-              <span className="text-[9px] text-gray-400 tabular-nums">{task.actualHours || 0}/{task.estimatedHours}h</span>
-            </div>
-          ) : null}
-        </div>
-        <span className="text-[10px] font-bold px-1 py-0.5 rounded shrink-0" style={{ background: pc?.bg || "#f1f5f9", color: pc?.color || "#64748b" }}>{pc?.icon || "•"}</span>
-        <span className="text-[10px] font-medium tabular-nums shrink-0 whitespace-nowrap" style={{ color: isOverdue ? "#dc2626" : "#94a3b8" }}>{task.dueDate ? task.dueDate.slice(5) : "—"}{isOverdue && "⚠"}</span>
-        <div className="shrink-0">{task.assignedToName ? <Avatar name={task.assignedToName} size="xs" highlight={mine} /> : <div className="w-6 h-6 rounded-full border-2 border-dashed border-gray-200" />}</div>
-      </div>
-      {/* {draggable && <p className="text-[9px] text-gray-300 px-3 pb-1.5">↕ drag to move</p>} */}
-    </div>
-  );
-})}
+// {/* DISPLACED CHILD TASKS — children moved to a different column than their story */}
+// {colDisplacedChildren.map(task => {
+//   const mine = isMyTask(task);
+//   const draggable = canDrag(task);
+//   const isDragging = draggingId === task.id;
+//   const pc = PRIORITY_CONFIG[task.priority];
+//   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done";
+//   const tc = TICKET_TYPES[task.ticketType || "task"];
+//   const parentStory = localTasks.find(s => s.id === task.parentStoryId);
+//   return (
+//     <div key={task.id} draggable={draggable} onDragStart={e => handleDragStart(e, task)} onDragEnd={handleDragEnd}
+//       onClick={() => !isDragging && onTaskClick(task)}
+//       className={`group border-b transition-all cursor-pointer select-none ${isDragging ? "opacity-40" : "hover:bg-gray-50/70"}`}
+//       style={{
+//         borderColor: "#f3f4f6",
+//         borderLeftWidth: "3px",
+//         borderLeftColor: mine ? projectColor : "#a5b4fc",
+//         cursor: draggable ? "grab" : "default",
+//         opacity: isDragging ? 0.4 : 1,
+//       }}>
+//       <div className="grid px-3 py-2.5 items-center gap-2" style={{ gridTemplateColumns: "auto 1fr auto auto auto" }}>
+//         <span className="text-sm shrink-0">{tc.icon}</span>
+//         <div className="min-w-0">
+//           {parentStory && (
+//             <p className="text-[9px] font-bold text-indigo-300 truncate mb-0.5">📖 {parentStory.title}</p>
+//           )}
+//           <div className="flex items-center gap-1 mb-0.5">
+//             <span className="text-[10px] font-mono font-bold text-gray-400">{task.taskCode || "TSK-000"}</span>
+//             <p className="text-xs font-semibold text-gray-800 leading-tight truncate group-hover:text-indigo-700">{task.title}</p>
+//             {mine && <span className="shrink-0 text-[9px] font-black px-1 rounded" style={{ background: projectColor + "20", color: projectColor }}>You</span>}
+//           </div>
+//           {task.estimatedHours ? (
+//             <div className="flex items-center gap-1.5 mt-0.5">
+//               <div className="flex-1 max-w-14 h-0.5 bg-gray-100 rounded-full overflow-hidden">
+//                 <div className="h-full rounded-full" style={{ width: `${Math.min(((task.actualHours || 0) / task.estimatedHours) * 100, 100)}%`, background: projectColor }} />
+//               </div>
+//               <span className="text-[9px] text-gray-400 tabular-nums">{task.actualHours || 0}/{task.estimatedHours}h</span>
+//             </div>
+//           ) : null}
+//         </div>
+//         <span className="text-[10px] font-bold px-1 py-0.5 rounded shrink-0" style={{ background: pc?.bg || "#f1f5f9", color: pc?.color || "#64748b" }}>{pc?.icon || "•"}</span>
+//         <span className="text-[10px] font-medium tabular-nums shrink-0 whitespace-nowrap" style={{ color: isOverdue ? "#dc2626" : "#94a3b8" }}>{task.dueDate ? task.dueDate.slice(5) : "—"}{isOverdue && "⚠"}</span>
+//         <div className="shrink-0">{task.assignedToName ? <Avatar name={task.assignedToName} size="xs" highlight={mine} /> : <div className="w-6 h-6 rounded-full border-2 border-dashed border-gray-200" />}</div>
+//       </div>
+//       {/* {draggable && <p className="text-[9px] text-gray-300 px-3 pb-1.5">↕ drag to move</p>} */}
+//     </div>
+//   );
+// })}
         return (
           <div key={col.id}
             className="flex flex-col shrink-0 w-80 border-r last:border-r-0 transition-colors duration-150"
@@ -1985,13 +1987,13 @@ const colDisplacedChildren = colTaskList.filter(t =>
 const storyChildren = localTasks.filter(
   t => t.parentStoryId === story.id && t.status === col.id
 );
-const colOrphans = colTaskList.filter(t => 
-  t.ticketType !== "story" && 
-  (
-    !t.parentStoryId || 
-    !localTasks.find(s => s.id === t.parentStoryId && s.status === col.id)
-  )
-);
+// const colOrphans = colTaskList.filter(t => 
+//   t.ticketType !== "story" && 
+//   (
+//     !t.parentStoryId || 
+//     !localTasks.find(s => s.id === t.parentStoryId && s.status === col.id)
+//   )
+// );
 
                 const isCollapsed = collapsedStories.has(`${story.id}::${col.id}`);
                 const mine = isMyTask(story);
@@ -2564,6 +2566,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
 
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const showToast = (msg: string) => setToastMsg(msg);
+  const [showMyTasksOnly, setShowMyTasksOnly] = useState(false);
 
   const myProjects      = projects?.filter((p: any) => p.members?.includes(user?.uid)) || [];
   const userName        = user?.displayName || user?.email?.split("@")[0] || "";
@@ -2843,11 +2846,15 @@ export default function ProjectManagement({ user, projects, users }: any) {
   const totalHoursAll = myWorkLogs.reduce((s, l) => s + l.hoursWorked, 0);
 
   const sprintFilteredTasks = activeSprint ? tasks.filter(t => t.sprintId === activeSprint.id) : tasks;
-  const filteredTasks = sprintFilteredTasks.filter(t =>
-    (filterPriority === "all" || t.priority === filterPriority) &&
-    (filterTicketType === "all" || t.ticketType === filterTicketType) &&
-    (!search || t.title.toLowerCase().includes(search.toLowerCase()))
-  );
+const filteredTasks = sprintFilteredTasks.filter(t =>
+  (filterPriority === "all" || t.priority === filterPriority) &&
+  (filterTicketType === "all" || t.ticketType === filterTicketType) &&
+  (!search || t.title.toLowerCase().includes(search.toLowerCase())) &&
+  (!showMyTasksOnly || t.assignedTo === user?.uid || 
+   // also include stories that have children assigned to me
+   (t.ticketType === "story" && sprintFilteredTasks.some(c => c.parentStoryId === t.id && c.assignedTo === user?.uid))
+  )
+);
 
   /* ════════════════════════════════════════
      PROJECT VIEW
@@ -2999,6 +3006,18 @@ export default function ProjectManagement({ user, projects, users }: any) {
                   onDeleteSprint={handleDeleteSprint}
                   fullControl={fullControl}
                 />
+                  <button
+        onClick={() => setShowMyTasksOnly(o => !o)}
+        style={{
+          display: "inline-flex", alignItems: "center", gap: 6,
+          padding: "5px 12px", borderRadius: 8,
+          border: `0.5px solid ${showMyTasksOnly ? projectColor : "#d1d5db"}`,
+          background: showMyTasksOnly ? projectColor : "white",
+          color: showMyTasksOnly ? "#fff" : "#374151",
+          fontSize: 12, fontWeight: 600, cursor: "pointer",
+        }}>
+        👤 My Tasks
+      </button>
               </div>
 
               <KanbanBoard

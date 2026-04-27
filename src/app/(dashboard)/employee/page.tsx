@@ -29,19 +29,23 @@ import {
   type Break,
 } from "@/lib/breakTracking";
 
-import DashboardView   from "./views/DashboardView";
-import WorkUpdateView  from "./views/WorkUpdateView";
-import AttendanceView  from "./views/AttendanceView";
+import DashboardView    from "./views/DashboardView";
+import WorkUpdateView   from "./views/WorkUpdateView";
+import AttendanceView   from "./views/AttendanceView";
 import NotificationsView from "./views/NotificationsView";
-import CalendarModal   from "./views/CalendarView";
-import HolidaysView    from "./views/HolidaysView";
+import CalendarModal    from "./views/CalendarView";
+import HolidaysView     from "./views/HolidaysView";
 import LeaveHistoryView from "./views/LeaveHistoryView";
 import LeaveRequestView from "./views/LeaveRequestView";
-import ProfileView     from "./views/ProfileView";
-import HelpView        from "./views/HelpView";
+import ProfileView      from "./views/ProfileView";
+import HelpView         from "./views/HelpView";
 import ProjectManagement from "./views/projectmanagement";
 import { LeaveType } from "@/types/leave";
 import Payslips from "./views/Payslips";
+
+// ── IMPORT MeetChat overlay ──────────────────────────────
+// Change this path to wherever your MeetChatAppUpdated file lives
+import MeetChatAppUpdated from "@/components/MeetChatAppUpdated";
 
 // ── Types ─────────────────────────────────────────────────
 type ViewType =
@@ -105,7 +109,6 @@ const isHoliday = (dateStr: string): { title: string } | null => {
   return holiday ? { title: holiday.title } : null;
 };
 
-// ── Flat sidebar nav items ─────────────────────────────────
 const sidebarItems: [ViewType, string, string][] = [
   ["dashboard",     "Dashboard",     "📊"],
   ["work-update",   "Work Update",   "📝"],
@@ -113,8 +116,6 @@ const sidebarItems: [ViewType, string, string][] = [
   ["projects",      "Projects",      "📁"],
   ["payslips",      "Payslips",      "💰"],
   ["leave-request", "Apply Leave",   "📋"],
-  // ["leave-history", "Leave History", "📜"],
-  // ["holidays",      "Holidays",      "🎉"],
   ["profile",       "Profile",       "👤"],
   ["help",          "Help",          "❓"],
 ];
@@ -135,7 +136,7 @@ function AnnouncementBar({ messages }: { messages: string[] }) {
   return (
     <>
       <div className={`bg-linear-to-r from-[#d6a70d] to-[#2d4a7c] text-white overflow-hidden shadow-lg transition-all duration-500 ease-in-out relative ${
-        isCollapsed ? "h-0 opacity-0" : "h-9 opacity-100"   
+        isCollapsed ? "h-0 opacity-0" : "h-9 opacity-100"
       }`}>
         <div className="absolute inset-0 opacity-10">
           <div className="absolute inset-0 bg-linear-to-r from-transparent via-white to-transparent animate-shimmer" />
@@ -192,15 +193,8 @@ function AnnouncementBar({ messages }: { messages: string[] }) {
 
 // ── Notification Dropdown ─────────────────────────────────
 function NotificationDropdown({
-  leaveNotifications,
-  queryNotifications,
-  chatNotifications,
-  markLeaveRead,
-  markQueryRead,
-  markChatRead,
-  markAllRead,
-  onClose,
-  onGoToChat,
+  leaveNotifications, queryNotifications, chatNotifications,
+  markLeaveRead, markQueryRead, markChatRead, markAllRead, onClose, onGoToChat,
 }: {
   leaveNotifications: LeaveRequest[];
   queryNotifications: any[];
@@ -214,30 +208,20 @@ function NotificationDropdown({
 }) {
   const total = leaveNotifications.length + queryNotifications.length + chatNotifications.length;
   const hasNone = total === 0;
-
   return (
-    <div className="absolute top-full right-0 mt-2 w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 flex flex-col overflow-hidden"
-      style={{ maxHeight: "80vh" }}>
+    <div className="absolute top-full right-0 mt-2 w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 flex flex-col overflow-hidden" style={{ maxHeight: "80vh" }}>
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50 shrink-0">
         <div className="flex items-center gap-2">
           <span className="text-base">🔔</span>
           <span className="font-bold text-gray-800 text-sm">Notifications</span>
-          {total > 0 && (
-            <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{total}</span>
-          )}
+          {total > 0 && <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{total}</span>}
         </div>
         <div className="flex items-center gap-2">
           {!hasNone && (
-            <button onClick={markAllRead}
-              className="text-xs font-semibold text-blue-600 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors">
-              Mark all read
-            </button>
+            <button onClick={markAllRead} className="text-xs font-semibold text-blue-600 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors">Mark all read</button>
           )}
-          <button onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-200 transition-colors text-gray-500">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-200 transition-colors text-gray-500">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
       </div>
@@ -257,32 +241,17 @@ function NotificationDropdown({
             </div>
             <div className="space-y-2">
               {chatNotifications.map((n) => (
-                <div key={n.id}
-                  className="flex items-start gap-3 p-3 rounded-xl bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors">
-                  <button
-                    className="flex items-start gap-3 flex-1 min-w-0 text-left"
-                    onClick={() => { markChatRead(n.id); onGoToChat?.(n.chatId); onClose(); }}>
-                    <div className="w-9 h-9 rounded-full bg-linear-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm">
-                      {n.fromName.charAt(0).toUpperCase()}
-                    </div>
+                <div key={n.id} className="flex items-start gap-3 p-3 rounded-xl bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors">
+                  <button className="flex items-start gap-3 flex-1 min-w-0 text-left" onClick={() => { markChatRead(n.id); onGoToChat?.(n.chatId); onClose(); }}>
+                    <div className="w-9 h-9 rounded-full bg-linear-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm">{n.fromName.charAt(0).toUpperCase()}</div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 leading-tight">
-                        {n.fromName}
-                        <span className="font-normal text-blue-600 ml-1">sent you a message</span>
-                      </p>
+                      <p className="text-sm font-semibold text-gray-800 leading-tight">{n.fromName}<span className="font-normal text-blue-600 ml-1">sent you a message</span></p>
                       <p className="text-xs text-gray-600 mt-0.5 truncate italic">&ldquo;{n.message}&rdquo;</p>
-                      {n.timestamp && (
-                        <p className="text-[10px] text-gray-400 mt-1">
-                          🕐 {n.timestamp?.toDate?.()?.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
-                        </p>
-                      )}
+                      {n.timestamp && <p className="text-[10px] text-gray-400 mt-1">🕐 {n.timestamp?.toDate?.()?.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</p>}
                     </div>
                   </button>
-                  <button onClick={() => markChatRead(n.id)}
-                    className="w-6 h-6 flex items-center justify-center rounded-full bg-white hover:bg-blue-200 border border-blue-200 transition-colors text-gray-400 hover:text-blue-600 shrink-0 mt-0.5">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                  <button onClick={() => markChatRead(n.id)} className="w-6 h-6 flex items-center justify-center rounded-full bg-white hover:bg-blue-200 border border-blue-200 transition-colors text-gray-400 hover:text-blue-600 shrink-0 mt-0.5">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
                 </div>
               ))}
@@ -297,31 +266,14 @@ function NotificationDropdown({
             </div>
             <div className="space-y-2">
               {leaveNotifications.map((leave) => (
-                <div key={leave.id}
-                  className={`flex items-center gap-3 p-3 rounded-xl border ${
-                    leave.status === "Approved" ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
-                  }`}>
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-lg shrink-0 ${
-                    leave.status === "Approved" ? "bg-green-100" : "bg-red-100"
-                  }`}>
-                    {leave.status === "Approved" ? "✅" : "❌"}
-                  </div>
+                <div key={leave.id} className={`flex items-center gap-3 p-3 rounded-xl border ${leave.status === "Approved" ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-lg shrink-0 ${leave.status === "Approved" ? "bg-green-100" : "bg-red-100"}`}>{leave.status === "Approved" ? "✅" : "❌"}</div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 leading-tight">
-                      <strong>{leave.leaveType}</strong> leave{" "}
-                      <span className={leave.status === "Approved" ? "text-green-600" : "text-red-600"}>
-                        {leave.status}
-                      </span>
-                    </p>
-                    <p className="text-[10px] text-gray-500 mt-0.5">
-                      📅 {leave.fromDate} – {leave.toDate}
-                    </p>
+                    <p className="text-sm font-semibold text-gray-800 leading-tight"><strong>{leave.leaveType}</strong> leave <span className={leave.status === "Approved" ? "text-green-600" : "text-red-600"}>{leave.status}</span></p>
+                    <p className="text-[10px] text-gray-500 mt-0.5">📅 {leave.fromDate} – {leave.toDate}</p>
                   </div>
-                  <button onClick={() => markLeaveRead(leave.id)}
-                    className="w-6 h-6 flex items-center justify-center rounded-full bg-white hover:bg-red-100 border border-gray-200 transition-colors text-gray-400 hover:text-red-600 shrink-0">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                  <button onClick={() => markLeaveRead(leave.id)} className="w-6 h-6 flex items-center justify-center rounded-full bg-white hover:bg-red-100 border border-gray-200 transition-colors text-gray-400 hover:text-red-600 shrink-0">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
                 </div>
               ))}
@@ -336,21 +288,15 @@ function NotificationDropdown({
             </div>
             <div className="space-y-2">
               {queryNotifications.map((q: any) => (
-                <div key={q.id}
-                  className="flex items-start gap-3 p-3 rounded-xl bg-purple-50 border border-purple-200">
+                <div key={q.id} className="flex items-start gap-3 p-3 rounded-xl bg-purple-50 border border-purple-200">
                   <div className="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center text-lg shrink-0">💬</div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-800">Admin replied to your query</p>
                     <p className="text-xs text-purple-700 mt-0.5 truncate">Subject: {q.subject}</p>
-                    {q.adminReply && (
-                      <p className="text-xs text-gray-600 mt-1 italic line-clamp-2">&ldquo;{q.adminReply}&rdquo;</p>
-                    )}
+                    {q.adminReply && <p className="text-xs text-gray-600 mt-1 italic line-clamp-2">&ldquo;{q.adminReply}&rdquo;</p>}
                   </div>
-                  <button onClick={() => markQueryRead(q.id)}
-                    className="w-6 h-6 flex items-center justify-center rounded-full bg-white hover:bg-purple-100 border border-gray-200 transition-colors text-gray-400 hover:text-purple-600 shrink-0 mt-0.5">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                  <button onClick={() => markQueryRead(q.id)} className="w-6 h-6 flex items-center justify-center rounded-full bg-white hover:bg-purple-100 border border-gray-200 transition-colors text-gray-400 hover:text-purple-600 shrink-0 mt-0.5">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
                 </div>
               ))}
@@ -367,28 +313,30 @@ export default function ZohoStyleEmployeeDashboard() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
+  // ── ✅ NEW: MeetChat overlay state ──────────────────────
+  const [showMeetChat, setShowMeetChat] = useState(false);
+
   const [showCalendar,           setShowCalendar]           = useState(false);
   const [totalSeconds,           setTotalSeconds]           = useState<number>(0);
   const [users,                  setUsers]                  = useState<any[]>([]);
-  const [activeView, setActiveView] = useState<ViewType>("dashboard");
+  const [activeView,             setActiveView]             = useState<ViewType>("dashboard");
 
-useEffect(() => {
-  const saved = localStorage.getItem("activeView") as ViewType | null;
-  const validViews: ViewType[] = [
-    "dashboard", "work-update", "attendance", "notifications",
-    "calendar", "holidays", "leave-history", "leave-request",
-    "profile", "help", "projects", "meet", "tasks", "team",
-    "reports", "settings", "payslips"
-  ];
-  if (saved && validViews.includes(saved)) {
-    setActiveView(saved);
-  }
-}, []);
+  useEffect(() => {
+    const saved = localStorage.getItem("activeView") as ViewType | null;
+    const validViews: ViewType[] = [
+      "dashboard", "work-update", "attendance", "notifications",
+      "calendar", "holidays", "leave-history", "leave-request",
+      "profile", "help", "projects", "meet", "tasks", "team",
+      "reports", "settings", "payslips"
+    ];
+    if (saved && validViews.includes(saved)) setActiveView(saved);
+  }, []);
 
-const changeView = (view: ViewType) => {
-  setActiveView(view);
-  localStorage.setItem("activeView", view);
-};
+  const changeView = (view: ViewType) => {
+    setActiveView(view);
+    localStorage.setItem("activeView", view);
+  };
+
   const [attendance,             setAttendance]             = useState<any>(null);
   const [busy,                   setBusy]                   = useState(false);
   const [task,                   setTask]                   = useState("");
@@ -422,15 +370,13 @@ const changeView = (view: ViewType) => {
   const [todayBreaks,            setTodayBreaks]            = useState<Break[]>([]);
 
   const notifDropdownRef = useRef<HTMLDivElement>(null);
-
   const year  = calendarDate.getFullYear();
   const month = calendarDate.getMonth();
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (notifDropdownRef.current && !notifDropdownRef.current.contains(e.target as Node)) {
+      if (notifDropdownRef.current && !notifDropdownRef.current.contains(e.target as Node))
         setShowNotifDropdown(false);
-      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -439,12 +385,7 @@ const changeView = (view: ViewType) => {
   useEffect(() => {
     if (!user) return;
     return onSnapshot(
-      query(
-        collection(db, "notifications"),
-        where("toUid", "==", user.uid),
-        where("read", "==", false),
-        orderBy("timestamp", "desc")
-      ),
+      query(collection(db, "notifications"), where("toUid", "==", user.uid), where("read", "==", false), orderBy("timestamp", "desc")),
       snap => setChatNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as ChatNotif)))
     );
   }, [user]);
@@ -468,15 +409,11 @@ const changeView = (view: ViewType) => {
     const dateStr = getTodayDateStr();
     const attRef  = doc(db, "attendance", `${user.uid}_${dateStr}`);
     return onSnapshot(attRef, (snap) => {
-      if (snap.exists()) {
-        setTodayBreaks(snap.data().breaks || []);
-      } else {
-        setTodayBreaks([]);
-      }
+      if (snap.exists()) setTodayBreaks(snap.data().breaks || []);
+      else               setTodayBreaks([]);
     });
   }, [user]);
 
-  // Active break derived state (must be before useEffect that uses it)
   const activeBreak = getActiveBreak(todayBreaks);
 
   useEffect(() => {
@@ -486,33 +423,18 @@ const changeView = (view: ViewType) => {
       attendance.sessions.forEach((sess: any) => {
         const ci = sess.checkIn?.toDate()?.getTime();
         if (!ci) return;
-
         const now = new Date();
-        const shiftEnd = new Date();
-        shiftEnd.setHours(19, 0, 0, 0);
-
-        let co = sess.checkOut
-          ? sess.checkOut.toDate().getTime()
-          : Math.min(now.getTime(), shiftEnd.getTime());
-
-        if (activeBreak?.startTime && !sess.checkOut) {
-          co = activeBreak.startTime.toDate().getTime();
-        }
-
+        const shiftEnd = new Date(); shiftEnd.setHours(19, 0, 0, 0);
+        let co = sess.checkOut ? sess.checkOut.toDate().getTime() : Math.min(now.getTime(), shiftEnd.getTime());
+        if (activeBreak?.startTime && !sess.checkOut) co = activeBreak.startTime.toDate().getTime();
         if (co > ci) {
           let sessionSeconds = Math.floor((co - ci) / 1000);
-
           const totalBreakSeconds = todayBreaks.reduce((acc: number, b: Break) => {
             if (!b.startTime) return acc;
             const start = b.startTime.toDate().getTime();
-            const end = b.endTime
-              ? b.endTime.toDate().getTime()
-              : activeBreak?.startTime
-                ? activeBreak.startTime.toDate().getTime()
-                : start;
+            const end = b.endTime ? b.endTime.toDate().getTime() : activeBreak?.startTime ? activeBreak.startTime.toDate().getTime() : start;
             return acc + Math.max(0, Math.floor((end - start) / 1000));
           }, 0);
-
           sessionSeconds -= totalBreakSeconds;
           s += Math.max(0, sessionSeconds);
         }
@@ -576,7 +498,6 @@ const changeView = (view: ViewType) => {
   const leaveNotifications = leaveRequests.filter(
     l => (l.status === "Approved" || l.status === "Rejected") && !l.notificationRead
   );
-
   const totalNotifications = leaveNotifications.length + queryNotifications.length + chatNotifications.length;
 
   const getMonthlyAttendanceSummary = () => {
@@ -607,8 +528,7 @@ const changeView = (view: ViewType) => {
       await addDoc(collection(db, "leaveRequests"), {
         uid: user.uid, userName: user.email?.split("@")[0] || "Unknown",
         userEmail: user.email || "", userPhoto: profilePhoto || "",
-        leaveType, fromDate, toDate,
-        reason: leaveReason.trim(),
+        leaveType, fromDate, toDate, reason: leaveReason.trim(),
         status: "Pending", notificationRead: false, createdAt: serverTimestamp(),
       });
       setLeaveMsg("✅ Request submitted");
@@ -621,8 +541,8 @@ const changeView = (view: ViewType) => {
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024)       { alert("File size must be less than 5MB"); return; }
-    if (!file.type.startsWith("image/"))    { alert("Please select an image file"); return; }
+    if (file.size > 5 * 1024 * 1024)    { alert("File size must be less than 5MB"); return; }
+    if (!file.type.startsWith("image/")) { alert("Please select an image file"); return; }
     try {
       setUploading(true);
       const snap = await uploadBytes(ref(storage, `profilePhotos/${user.uid}/${Date.now()}_${file.name}`), file);
@@ -654,8 +574,8 @@ const changeView = (view: ViewType) => {
   const markAllNotificationsRead = async () => {
     const batch = writeBatch(db);
     leaveNotifications.forEach(l => batch.update(doc(db, "leaveRequests",   l.id), { notificationRead: true }));
-    queryNotifications.forEach(q => batch.update(doc(db, "employeeQueries", q.id), { employeeUnread: false }));
-    chatNotifications.forEach(c  => batch.update(doc(db, "notifications",   c.id), { read: true }));
+    queryNotifications.forEach(q  => batch.update(doc(db, "employeeQueries", q.id), { employeeUnread: false }));
+    chatNotifications.forEach(c   => batch.update(doc(db, "notifications",   c.id), { read: true }));
     await batch.commit();
   };
 
@@ -668,33 +588,30 @@ const changeView = (view: ViewType) => {
   const doCheckOut = async () => { setBusy(true); await checkOut(user.uid); await loadAttendance(); setBusy(false); };
   const handleSetLeaveType = (v: LeaveType) => setLeaveType(v);
 
+  // ── ✅ NEW: open MeetChat overlay (called from dashboard card + navbar button)
+  const openMeetChat = () => setShowMeetChat(true);
+  const closeMeetChat = () => setShowMeetChat(false);
+
   return (
     <div className="h-screen flex bg-gray-50 overflow-hidden">
 
-      {/* ── SIDEBAR ── */}
-      <aside className={`fixed lg:static inset-y-0 left-0 z-50 bg-[#0d2e4f] text-white flex flex-col transform transition-all duration-300 ${
+      {/* ── SIDEBAR ── (unchanged) */}
+      <aside className={`fixed lg:static inset-y-0 left-0 z-50 bg-[#192e44] text-white flex flex-col transform transition-all duration-300 ${
         sidebarCollapsed ? "w-16" : "w-64"
       } ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
-
-        {/* Logo + collapse toggle */}
         <div className="p-3 flex items-center justify-between border-b border-white/10">
           {!sidebarCollapsed && (
             <div className="flex items-center gap-2 ml-2">
               <Image src="/logo.svg" alt="TGY CRM Logo" width={90} height={70} className="object-contain" />
             </div>
           )}
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="hidden lg:block p-2 hover:bg-white/10 rounded-lg transition"
-          >
+          <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="hidden lg:block p-2 hover:bg-white/10 rounded-lg transition">
             <svg className={`w-5 h-5 transition-transform ${sidebarCollapsed ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
             </svg>
           </button>
           <button onClick={() => setMobileMenuOpen(false)} className="lg:hidden p-2 hover:bg-white/10 rounded-lg">×</button>
         </div>
-
-        {/* User profile strip */}
         {!sidebarCollapsed && (
           <div className="px-3 py-2.5 border-b border-white/10">
             <div className="flex items-center gap-3">
@@ -721,89 +638,47 @@ const changeView = (view: ViewType) => {
             </div>
           </div>
         )}
-
-        {/* ── FLAT NAV ── */}
         <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20">
           {sidebarItems.map(([id, label, icon]) => (
-            <button
-              key={id}
-              onClick={() => { changeView(id); setMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 relative group
-                ${activeView === id
-                  ? "bg-white/15 text-white shadow-sm border border-white/10"
-                  : "text-white/75 hover:bg-white/8 hover:text-white"
-                }`}
+            <button key={id} onClick={() => { changeView(id); setMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 relative group ${
+                activeView === id ? "bg-white/15 text-white shadow-sm border border-white/10" : "text-white/75 hover:bg-white/8 hover:text-white"
+              }`}
               title={sidebarCollapsed ? label : undefined}
             >
-              {/* Active indicator bar */}
-              {activeView === id && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-amber-400 rounded-r-full" />
-              )}
-
-              <span className={`text-base shrink-0 transition-transform duration-150 ${activeView === id ? "scale-110" : "group-hover:scale-105"}`}>
-                {icon}
-              </span>
-
-              {!sidebarCollapsed && (
-                <span className="text-sm font-medium truncate">{label}</span>
-              )}
-
-              {/* Notification badge */}
+              {activeView === id && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-amber-400 rounded-r-full" />}
+              <span className={`text-base shrink-0 transition-transform duration-150 ${activeView === id ? "scale-110" : "group-hover:scale-105"}`}>{icon}</span>
+              {!sidebarCollapsed && <span className="text-sm font-medium truncate">{label}</span>}
               {id === "notifications" && totalNotifications > 0 && (
-                sidebarCollapsed ? (
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-                ) : (
-                  <span className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full font-semibold shrink-0">
-                    {totalNotifications}
-                  </span>
-                )
+                sidebarCollapsed
+                  ? <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+                  : <span className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full font-semibold shrink-0">{totalNotifications}</span>
               )}
-
-              {/* Tooltip when collapsed */}
               {sidebarCollapsed && (
-                <div className="absolute left-full ml-2 px-2.5 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 shadow-lg">
-                  {label}
-                </div>
+                <div className="absolute left-full ml-2 px-2.5 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 shadow-lg">{label}</div>
               )}
             </button>
           ))}
         </nav>
-
-        {/* Logout */}
         {!sidebarCollapsed ? (
-          <button
-            onClick={async () => { await signOut(auth); router.push("/login"); }}
-            className="mx-3 mb-3 flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 rounded-lg hover:bg-white/20 transition text-sm"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
+          <button onClick={async () => { await signOut(auth); router.push("/login"); }} className="mx-3 mb-3 flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 rounded-lg hover:bg-white/20 transition text-sm">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
             <span className="font-medium">Logout</span>
           </button>
         ) : (
-          <button
-            onClick={async () => { await signOut(auth); router.push("/login"); }}
-            className="mx-2 mb-3 p-2.5 bg-white/10 rounded-lg hover:bg-white/20 transition flex items-center justify-center"
-            title="Logout"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
+          <button onClick={async () => { await signOut(auth); router.push("/login"); }} className="mx-2 mb-3 p-2.5 bg-white/10 rounded-lg hover:bg-white/20 transition flex items-center justify-center" title="Logout">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
           </button>
         )}
       </aside>
 
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setMobileMenuOpen(false)} />
-      )}
+      {mobileMenuOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setMobileMenuOpen(false)} />}
 
       {/* ── RIGHT PANEL ── */}
       <div className="flex-1 flex flex-col overflow-hidden">
 
         {/* ── HEADER ── */}
-        <header className="bg-linear-to-r from-[#ae9c62] to-[#2d4a7c] text-white shadow-xl relative z-30">
-
-          {/* Desktop row */}
+        <header className="bg-linear-to-r from-[#1b3359] to-[#2b404c] text-white shadow-xl relative z-30">
           <div className="hidden lg:flex items-center justify-between px-4 py-2.5">
             <div className="flex items-center min-w-0 shrink-0">
               <h1 className="text-lg font-bold capitalize flex items-center gap-2 whitespace-nowrap">
@@ -811,35 +686,24 @@ const changeView = (view: ViewType) => {
               </h1>
             </div>
             <div className="flex items-center gap-2">
-              {/* Timer */}
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg px-3 py-1.5 border border-white/20">
                 <div className="font-mono font-bold text-base text-amber-300 flex items-center gap-1">
                   <span>⏱</span><span className="tabular-nums">{formatTimer(totalSeconds)}</span>
                 </div>
               </div>
-
               <NavbarBreakStatus uid={user.uid} isCheckedIn={!!isCheckedIn} />
-
               <button disabled={busy || !!isCheckedIn}  onClick={doCheckIn}  className="px-4 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-lg hover:shadow-xl hover:scale-105 active:scale-95">Check In</button>
-              <button disabled={busy || !isCheckedIn} onClick={doCheckOut} className="px-4 py-1.5 bg-red-600   text-white rounded-lg hover:bg-red-700   disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-lg hover:shadow-xl hover:scale-105 active:scale-95">Check Out</button>
-
-              {/* Calendar */}
+              <button disabled={busy || !isCheckedIn}   onClick={doCheckOut} className="px-4 py-1.5 bg-red-600   text-white rounded-lg hover:bg-red-700   disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-lg hover:shadow-xl hover:scale-105 active:scale-95">Check Out</button>
               <button onClick={() => setShowCalendar(true)} className="p-2 hover:bg-white/10 rounded-lg transition-all group" title="Calendar">
                 <img src="https://cdn-icons-png.flaticon.com/128/668/668278.png" alt="Calendar" className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" />
               </button>
 
               {/* Notification bell */}
               <div className="relative" ref={notifDropdownRef}>
-                <button
-                  onClick={() => setShowNotifDropdown(prev => !prev)}
-                  className="relative p-2 hover:bg-white/10 rounded-lg transition-all group"
-                  title="Notifications"
-                >
+                <button onClick={() => setShowNotifDropdown(prev => !prev)} className="relative p-2 hover:bg-white/10 rounded-lg transition-all group" title="Notifications">
                   <img src="https://cdn-icons-png.flaticon.com/128/7184/7184217.png" alt="Notifications" className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" />
                   {totalNotifications > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-5 text-center shadow-lg animate-pulse">
-                      {totalNotifications}
-                    </span>
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-5 text-center shadow-lg animate-pulse">{totalNotifications}</span>
                   )}
                 </button>
                 {showNotifDropdown && (
@@ -852,13 +716,23 @@ const changeView = (view: ViewType) => {
                     markChatRead={markChatNotificationAsRead}
                     markAllRead={markAllNotificationsRead}
                     onClose={() => setShowNotifDropdown(false)}
-                    onGoToChat={(_chatId) => { changeView("meet"); setShowNotifDropdown(false); }}
+                    // ✅ clicking a chat notif opens the overlay, NOT changeView("meet")
+                    onGoToChat={(_chatId) => { openMeetChat(); setShowNotifDropdown(false); }}
                   />
                 )}
               </div>
 
-              <button onClick={() => window.open("/meet", "_blank")} className="p-2 hover:bg-white/10 rounded-lg transition-all group" title="Start Meeting">
-                <img src="https://cdn-icons-png.flaticon.com/128/18114/18114578.png" alt="Start Meeting" className="w-5 h-5 group-hover:scale-110 transition-transform" />
+              {/* ✅ MeetChat button — opens overlay instead of window.open */}
+              <button
+                onClick={openMeetChat}
+                className="p-2 hover:bg-white/10 rounded-lg transition-all group"
+                title="Open MeetChat"
+              >
+                <img
+                  src="https://cdn-icons-png.flaticon.com/128/18114/18114578.png"
+                  alt="MeetChat"
+                  className="w-5 h-5 group-hover:scale-110 transition-transform"
+                />
               </button>
 
               {/* User menu */}
@@ -901,10 +775,9 @@ const changeView = (view: ViewType) => {
             </div>
           </div>
 
-          {/* Announcement bar */}
           <AnnouncementBar messages={messages} />
 
-          {/* Mobile rows */}
+          {/* Mobile header */}
           <div className="lg:hidden px-3 py-2 space-y-1.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -916,11 +789,7 @@ const changeView = (view: ViewType) => {
               <div className="flex items-center gap-1">
                 <div className="relative" ref={notifDropdownRef}>
                   <NavbarBreakStatus uid={user.uid} isCheckedIn={!!isCheckedIn} />
-                  <button
-                    onClick={() => setShowNotifDropdown(prev => !prev)}
-                    className="relative p-1.5 hover:bg-white/10 rounded-lg transition-all"
-                    aria-label="Notifications"
-                  >
+                  <button onClick={() => setShowNotifDropdown(prev => !prev)} className="relative p-1.5 hover:bg-white/10 rounded-lg transition-all" aria-label="Notifications">
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
                     {totalNotifications > 0 && (
                       <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1 py-0.5 rounded-full min-w-[1.1rem] text-center animate-pulse">{totalNotifications}</span>
@@ -936,7 +805,7 @@ const changeView = (view: ViewType) => {
                       markChatRead={markChatNotificationAsRead}
                       markAllRead={markAllNotificationsRead}
                       onClose={() => setShowNotifDropdown(false)}
-                      onGoToChat={(_chatId) => { changeView("meet"); setShowNotifDropdown(false); }}
+                      onGoToChat={(_chatId) => { openMeetChat(); setShowNotifDropdown(false); }}
                     />
                   )}
                 </div>
@@ -949,7 +818,6 @@ const changeView = (view: ViewType) => {
                 </button>
               </div>
             </div>
-
             {showUserMenu && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
@@ -967,23 +835,27 @@ const changeView = (view: ViewType) => {
                 </div>
               </>
             )}
-
             <div className="flex items-center gap-1.5">
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg px-2.5 py-1.5 border border-white/20 flex-1 min-w-0">
                 <span className="font-mono font-bold text-xs text-amber-300 whitespace-nowrap">⏱ {formatTimer(totalSeconds)}</span>
               </div>
               <button disabled={busy || !!isCheckedIn}  onClick={doCheckIn}  className="px-2.5 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-xs whitespace-nowrap">Check In</button>
-              <button disabled={busy || !isCheckedIn} onClick={doCheckOut} className="px-2.5 py-1.5 bg-red-600   text-white rounded-lg hover:bg-red-700   disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-xs whitespace-nowrap">Check Out</button>
+              <button disabled={busy || !isCheckedIn}   onClick={doCheckOut} className="px-2.5 py-1.5 bg-red-600   text-white rounded-lg hover:bg-red-700   disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-xs whitespace-nowrap">Check Out</button>
             </div>
-
             <div className="flex items-center gap-1.5">
-              <button onClick={() => setShowCalendar(true)} className="flex items-center gap-1 px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-lg transition-all text-xs font-medium border border-white/20" aria-label="Calendar">
+              <button onClick={() => setShowCalendar(true)} className="flex items-center gap-1 px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-lg transition-all text-xs font-medium border border-white/20">
                 <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                 <span>Calendar</span>
               </button>
-              <button onClick={() => window.open("/meet", "_blank")} className="flex items-center gap-1 px-2.5 py-1 bg-blue-600 hover:bg-blue-700 rounded-lg transition-all text-xs font-medium" aria-label="Start Meeting">
-                <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                <span>Meet</span>
+              {/* ✅ Mobile MeetChat button — opens overlay */}
+              <button
+                onClick={openMeetChat}
+                className="flex items-center gap-1 px-2.5 py-1 bg-[#e8512a] hover:bg-[#d4431f] rounded-lg transition-all text-xs font-medium text-white"
+              >
+                <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <span>Chat</span>
               </button>
             </div>
           </div>
@@ -992,7 +864,6 @@ const changeView = (view: ViewType) => {
         {/* ── CONTENT ── */}
         <main className="flex-1 overflow-y-auto bg-gray-50">
           <div className="p-3 space-y-3">
-
             {activeView === "dashboard" && (
               <DashboardView
                 user={user}
@@ -1017,14 +888,14 @@ const changeView = (view: ViewType) => {
                 submitting={submitting}
                 leaveMsg={leaveMsg}
                 totalSeconds={totalSeconds}
-                onGoToChat={(_chatId) => changeView("meet")}
+                onGoToChat={(_chatId) => openMeetChat()}
+                // ✅ NEW: wired to open the overlay
+                onOpenMeetChat={openMeetChat}
               />
             )}
-
             {activeView === "attendance"    && <EmployeeAttendanceView />}
             {activeView === "work-update"   && <WorkUpdateView />}
             {activeView === "projects"      && <ProjectManagement user={user} projects={projects} users={users} />}
-
             {activeView === "notifications" && (
               <NotificationsView
                 leaveNotifications={leaveRequests.filter(l => (l.status === "Approved" || l.status === "Rejected") && !l.notificationRead)}
@@ -1034,7 +905,6 @@ const changeView = (view: ViewType) => {
                 onClose={() => changeView("dashboard")}
               />
             )}
-
             {activeView === "holidays"      && <HolidaysView holidays={holidays} />}
             {activeView === "leave-history" && <LeaveHistoryView leaveRequests={leaveRequests} />}
             {activeView === "leave-request" && (
@@ -1047,7 +917,6 @@ const changeView = (view: ViewType) => {
                 handleSubmitLeave={handleSubmitLeave} submitting={submitting} leaveMsg={leaveMsg}
               />
             )}
-
             {activeView === "profile"   && <ProfileView />}
             {activeView === "help"      && <HelpView />}
             {activeView === "meet"      && <MeetView users={users.filter((u: any) => u.uid !== user.uid)} />}
@@ -1099,6 +968,13 @@ const changeView = (view: ViewType) => {
           </div>
         </div>
       )}
+
+      {/* ✅ MeetChat OVERLAY — rendered at root level so it covers everything */}
+      <MeetChatAppUpdated
+        users={users}
+        isOpen={showMeetChat}
+        onClose={closeMeetChat}
+      />
 
       <style jsx>{`
         @keyframes marquee { 0% { transform: translateX(100vw); } 100% { transform: translateX(-100%); } }
