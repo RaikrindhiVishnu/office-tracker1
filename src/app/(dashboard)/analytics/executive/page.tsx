@@ -95,7 +95,7 @@ interface Expense {
 }
 
 interface Alert {
-  id?: string;
+  id: string;
   type: "warning" | "danger" | "info" | "success";
   title: string;
   msg: string;
@@ -1295,7 +1295,7 @@ export default function ExecutiveDashboard() {
                             {deptData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                           </Pie>
                           <Tooltip
-                            formatter={(v: number) => [`${v}%`, "Share"]}
+                            formatter={(v) => [`${v ?? 0}%`, "Share"]}
                             contentStyle={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 12 }}
                           />
                         </PieChart>
@@ -1400,7 +1400,7 @@ export default function ExecutiveDashboard() {
                             {expenseCategories.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                           </Pie>
                           <Tooltip
-                            formatter={(v: number) => [fmtMoney(v), "Amount"]}
+                            formatter={(v) => [`${v ?? 0}`, "Amount"]}
                             contentStyle={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 12 }}
                           />
                         </PieChart>
@@ -1579,7 +1579,7 @@ export default function ExecutiveDashboard() {
                             data={pieData}
                             cx="50%" cy="50%" outerRadius={70} paddingAngle={3}
                             dataKey="value"
-                            label={({ name, value }: { name: string; value: number }) => `${name}: ${value}`}
+                            label={(props) => `${props.name ?? ""}: ${props.value ?? 0}`}
                             labelLine={false}
                           >
                             {pieData.map((d, i) => <Cell key={i} fill={statusProps(d.name).color} />)}
