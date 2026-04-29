@@ -15,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { isInsideOffice } from "@/lib/location";
 // ← reuse the same mapping
 import { getRoleRedirect } from "@/lib/roleRouting";
+   import { Eye, EyeOff } from "lucide-react";
 
 // ── Extract Firestore index URL from error message ────────────────────────
 function extractIndexUrl(msg = ""): string | null {
@@ -101,7 +102,8 @@ export default function LoginPage() {
   const [success,    setSuccess]    = useState<string>("");
   const [indexUrl,   setIndexUrl]   = useState<string | null>(null);
   const [step,       setStep]       = useState<string>("");
-
+  // Add this state near the other useState declarations
+const [showPassword, setShowPassword] = useState<boolean>(false);
   // ── Sign In ─────────────────────────────────────────────────────────────
   const handleLogin = async (): Promise<void> => {
     if (!email.trim() || !password.trim()) {
@@ -375,6 +377,7 @@ const department = (userData?.department ?? "").toString().trim().toUpperCase();
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={loading}
+             autoComplete="email" 
             style={{
               padding      : "12px 16px", border: "1.5px solid #e2e8f0",
               borderRadius : 12, fontSize: 14, outline: "none",
@@ -383,19 +386,42 @@ const department = (userData?.department ?? "").toString().trim().toUpperCase();
             }}
           />
 
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={loading}
-            style={{
-              padding      : "12px 16px", border: "1.5px solid #e2e8f0",
-              borderRadius : 12, fontSize: 14, outline: "none",
-              color        : "#0f172a", background: loading ? "#f8fafc" : "#fff",
-              boxSizing    : "border-box", width: "100%",
-            }}
-          />
+         <div style={{ position: "relative" }}>
+  <input
+    type={showPassword ? "text" : "password"}
+    placeholder="Password"
+    value={password}
+    onChange={(e) => setPassword(e.target.value)}
+    disabled={loading}
+    autoComplete="current-password" 
+    style={{
+      padding      : "12px 44px 12px 16px",
+      border       : "1.5px solid #e2e8f0",
+      borderRadius : 12, fontSize: 14, outline: "none",
+      color        : "#0f172a", background: loading ? "#f8fafc" : "#fff",
+      boxSizing    : "border-box", width: "100%",
+    }}
+  />
+  {password && (
+  <button
+    type="button"
+    onClick={() => setShowPassword(p => !p)}
+    style={{
+      position: "absolute",
+      right: 12,
+      top: "50%",
+      transform: "translateY(-50%)",
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      color: "#94a3b8",
+    }}
+    tabIndex={-1}
+  >
+    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+  </button>
+)}
+</div>
 
           <button
             onClick={handleLogin}

@@ -486,7 +486,7 @@ export default function AdminPage() {
 
   /* ================= UI ================= */
   return (
-    <div className="min-h-screen flex bg-linear-to-br from-slate-50 via-slate-100 to-slate-50">
+    <div className="h-screen flex bg-linear-to-br from-slate-50 via-slate-100 to-slate-50 overflow-hidden">
 
       {/* MOBILE MENU BUTTON */}
       <button
@@ -596,19 +596,6 @@ export default function AdminPage() {
             onClick={() => { setView("queries"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
           />
 
-          {/* ── NEW: Break Monitor nav item ── */}
-          {/* <NavItem
-            icon={
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            }
-            label="Break Monitor" active={view === "breakMonitor"}
-            onClick={() => { setView("breakMonitor"); setSidebarOpen(false); }}
-            collapsed={sidebarCollapsed}
-          /> */}
-
           <NavItem
             icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-3.866 0-7 1.79-7 4v4h14v-4c0-2.21-3.134-4-7-4zm0-2a3 3 0 110-6 3 3 0 010 6z" /></svg>}
             label="Accounts" active={view === "accounts"}
@@ -631,7 +618,7 @@ export default function AdminPage() {
       </aside>
 
       {/* MAIN CONTENT */}
-      <div className={`${sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"} flex-1 flex flex-col min-h-screen transition-all duration-300`}>
+      <div className={`${sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"} flex-1 flex flex-col h-screen transition-all duration-300 overflow-hidden`}>
 
         {/* Top Bar */}
         <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-20 shadow-sm">
@@ -639,7 +626,6 @@ export default function AdminPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="pt-12 lg:pt-0">
                 <h2 className="text-2xl lg:text-3xl font-bold text-slate-900 capitalize">
-                  {/* ── label for break monitor ── */}
                   {view === "breakMonitor"
                     ? "Break Monitor"
                     : view === "Project Management"
@@ -703,7 +689,7 @@ export default function AdminPage() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
+        <main className={`flex-1 flex flex-col min-h-0 overflow-hidden bg-slate-50`}>
 
           {view === "dashboard" && (
             <Dashboard
@@ -798,26 +784,30 @@ export default function AdminPage() {
             </div>
           )}
 
-          <EmployeesView
-            view={view} setView={setView} selectedEmployee={selectedEmployee}
-            users={users} setSelectedUser={setSelectedEmployee} deleteUser={deleteUser}
-            showAddUser={showAddUser} setShowAddUser={setShowAddUser} msg={msg}
-            name={name} setName={setName} email={email} setEmail={setEmail}
-            designation={designation} setDesignation={setDesignation}
-            accountType={accountType} setAccountType={setAccountType}
-            handleAddUser={handleAddUser} creatingUser={creatingUser}
-            formatTime={formatTime} formatTotal={formatTotal}
-          />
+          {(view === "employees" || view === "profile") && (
+            <EmployeesView
+              view={view} setView={setView} selectedEmployee={selectedEmployee}
+              users={users} setSelectedUser={setSelectedEmployee} deleteUser={deleteUser}
+              showAddUser={showAddUser} setShowAddUser={setShowAddUser} msg={msg}
+              name={name} setName={setName} email={email} setEmail={setEmail}
+              designation={designation} setDesignation={setDesignation}
+              accountType={accountType} setAccountType={setAccountType}
+              handleAddUser={handleAddUser} creatingUser={creatingUser}
+              formatTime={formatTime} formatTotal={formatTotal}
+            />
+          )}
 
           {view === "employeeDetails" && selectedEmployee && (
             <EmployeeDetails selectedUser={selectedEmployee} setView={setView} setSelectedUser={setSelectedEmployee} />
           )}
 
-          <MessagesView
-            view={view} messages={messages} newMsg={newMsg}
-            setNewMsg={setNewMsg} sendMessage={sendMessage}
-            loadMessages={loadMessages} db={db}
-          />
+          {view === "messages" && (
+            <MessagesView
+              view={view} messages={messages} newMsg={newMsg}
+              setNewMsg={setNewMsg} sendMessage={sendMessage}
+              loadMessages={loadMessages} db={db}
+            />
+          )}
 
           {view === "monthlyReport" && (
             <MonthlyReport
@@ -865,7 +855,7 @@ export default function AdminPage() {
           )}
 
           {view === "Project Management" && (
-            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 lg:p-8">
+            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-0 overflow-hidden max-w-full flex-1 flex flex-col min-h-0">
               <ProjectManagement user={user} projects={projects} users={users} />
             </div>
           )}
@@ -879,18 +869,20 @@ export default function AdminPage() {
 
         </main>
 
-        <footer className="bg-white/80 backdrop-blur-md border-t border-slate-200 py-4 px-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-slate-600">
-            <span className="flex items-center gap-2">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
-                <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
-              </svg>
-              officetracker@gmail.com
-            </span>
-            <span>© 2026 Office Tracker. All rights reserved.</span>
-          </div>
-        </footer>
+        {view !== "Project Management" && (
+          <footer className="bg-white/80 backdrop-blur-md border-t border-slate-200 py-4 px-6 shrink-0">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-slate-600">
+              <span className="flex items-center gap-2">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                  <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                </svg>
+                officetracker@gmail.com
+              </span>
+              <span>© 2026 Office Tracker. All rights reserved.</span>
+            </div>
+          </footer>
+        )}
       </div>
 
       <style jsx>{`

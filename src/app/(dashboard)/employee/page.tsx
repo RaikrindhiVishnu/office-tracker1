@@ -193,34 +193,98 @@ function AnnouncementBar({ messages }: { messages: string[] }) {
 
 // ── Notification Dropdown ─────────────────────────────────
 function NotificationDropdown({
-  leaveNotifications, queryNotifications, chatNotifications,
-  markLeaveRead, markQueryRead, markChatRead, markAllRead, onClose, onGoToChat,
+  unread, read,
+  markLeaveRead, markQueryRead, markChatRead, markAnnouncementRead, markAllRead, onClose, onGoToChat,
 }: {
-  leaveNotifications: LeaveRequest[];
-  queryNotifications: any[];
-  chatNotifications: ChatNotif[];
+  unread: { leave: LeaveRequest[]; query: any[]; chat: ChatNotif[]; announcement: { id: string; text: string }[] };
+  read: { leave: LeaveRequest[]; query: any[]; chat: ChatNotif[]; announcement: { id: string; text: string }[] };
   markLeaveRead: (id: string) => void;
   markQueryRead: (id: string) => void;
   markChatRead: (id: string) => void;
+  markAnnouncementRead: (id: string) => void;
   markAllRead: () => void;
   onClose: () => void;
   onGoToChat?: (chatId: string) => void;
 }) {
-  const total = leaveNotifications.length + queryNotifications.length + chatNotifications.length;
-  const hasNone = total === 0;
+  const totalUnread = unread.leave.length + unread.query.length + unread.chat.length + unread.announcement.length;
+  const hasNone = totalUnread === 0 && read.leave.length === 0 && read.query.length === 0 && read.chat.length === 0 && read.announcement.length === 0;
+  
+  const renderChat = (n: any, isRead: boolean) => (
+    <div key={n.id} className={`flex items-start gap-3 p-3 rounded-xl border transition-colors ${isRead ? "bg-gray-50 border-gray-100 opacity-60" : "bg-blue-50 border-blue-200 hover:bg-blue-100"}`}>
+      <button className="flex items-start gap-3 flex-1 min-w-0 text-left" onClick={() => { if (!isRead) markChatRead(n.id); onGoToChat?.(n.chatId); onClose(); }}>
+        <div className={`w-9 h-9 rounded-full bg-linear-to-br flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm ${isRead ? "from-gray-300 to-gray-400" : "from-blue-400 to-indigo-500"}`}>{n.fromName.charAt(0).toUpperCase()}</div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-800 leading-tight">{n.fromName}<span className={`font-normal ml-1 ${isRead ? "text-gray-500" : "text-blue-600"}`}>sent you a message</span></p>
+          <p className="text-xs text-gray-600 mt-0.5 truncate italic">&ldquo;{n.message}&rdquo;</p>
+        </div>
+      </button>
+      {!isRead && (
+        <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); markChatRead(n.id); }} className="w-6 h-6 flex items-center justify-center rounded-full bg-white hover:bg-blue-200 border border-blue-200 transition-colors text-gray-400 hover:text-blue-600 shrink-0 mt-0.5">
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      )}
+    </div>
+  );
+
+  const renderLeave = (leave: any, isRead: boolean) => (
+    <div key={leave.id} className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${isRead ? "bg-gray-50 border-gray-100 opacity-60" : leave.status === "Approved" ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
+      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-lg shrink-0 ${isRead ? "bg-gray-200 grayscale" : leave.status === "Approved" ? "bg-green-100" : "bg-red-100"}`}>{leave.status === "Approved" ? "✅" : "❌"}</div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-gray-800 leading-tight"><strong>{leave.leaveType}</strong> leave <span className={isRead ? "text-gray-500" : leave.status === "Approved" ? "text-green-600" : "text-red-600"}>{leave.status}</span></p>
+        <p className="text-[10px] text-gray-500 mt-0.5">📅 {leave.fromDate} – {leave.toDate}</p>
+      </div>
+      {!isRead && (
+        <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); markLeaveRead(leave.id); }} className="w-6 h-6 flex items-center justify-center rounded-full bg-white hover:bg-red-100 border border-gray-200 transition-colors text-gray-400 hover:text-red-600 shrink-0">
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      )}
+    </div>
+  );
+
+  const renderQuery = (q: any, isRead: boolean) => (
+    <div key={q.id} className={`flex items-start gap-3 p-3 rounded-xl border transition-colors ${isRead ? "bg-gray-50 border-gray-100 opacity-60" : "bg-purple-50 border-purple-200"}`}>
+      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-lg shrink-0 ${isRead ? "bg-gray-200 grayscale" : "bg-purple-100"}`}>💬</div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-gray-800">Admin replied to your query</p>
+        <p className={`text-xs mt-0.5 truncate ${isRead ? "text-gray-500" : "text-purple-700"}`}>Subject: {q.subject}</p>
+        {q.adminReply && <p className="text-xs text-gray-600 mt-1 italic line-clamp-2">&ldquo;{q.adminReply}&rdquo;</p>}
+      </div>
+      {!isRead && (
+        <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); markQueryRead(q.id); }} className="w-6 h-6 flex items-center justify-center rounded-full bg-white hover:bg-purple-100 border border-gray-200 transition-colors text-gray-400 hover:text-purple-600 shrink-0 mt-0.5">
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      )}
+    </div>
+  );
+
+  const renderAnnouncement = (a: any, isRead: boolean) => (
+    <div key={a.id} className={`flex items-start gap-3 p-3 rounded-xl border transition-colors ${isRead ? "bg-gray-50 border-gray-100 opacity-60" : "bg-yellow-50 border-yellow-200 hover:bg-yellow-100"}`}>
+      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-lg shrink-0 shadow-sm ${isRead ? "bg-gray-300" : "bg-yellow-400"}`}>📣</div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-gray-800 leading-tight">New Announcement</p>
+        <p className="text-xs text-gray-600 mt-0.5 italic">&ldquo;{a.text}&rdquo;</p>
+      </div>
+      {!isRead && (
+        <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); markAnnouncementRead(a.id); }} className="w-6 h-6 flex items-center justify-center rounded-full bg-white hover:bg-yellow-200 border border-yellow-200 transition-colors text-gray-400 hover:text-yellow-600 shrink-0 mt-0.5">
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <div className="absolute top-full right-0 mt-2 w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 flex flex-col overflow-hidden" style={{ maxHeight: "80vh" }}>
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50 shrink-0">
         <div className="flex items-center gap-2">
           <span className="text-base">🔔</span>
           <span className="font-bold text-gray-800 text-sm">Notifications</span>
-          {total > 0 && <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{total}</span>}
+          {totalUnread > 0 && <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{totalUnread}</span>}
         </div>
         <div className="flex items-center gap-2">
-          {!hasNone && (
-            <button onClick={markAllRead} className="text-xs font-semibold text-blue-600 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors">Mark all read</button>
+          {totalUnread > 0 && (
+            <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); markAllRead(); }} className="text-xs font-semibold text-blue-600 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors">Mark all read</button>
           )}
-          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-200 transition-colors text-gray-500">
+          <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClose(); }} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-200 transition-colors text-gray-500">
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
@@ -233,75 +297,46 @@ function NotificationDropdown({
             <p className="text-xs text-gray-400 mt-1">No new notifications</p>
           </div>
         )}
-        {chatNotifications.length > 0 && (
+        
+        {/* UNREAD SECTION */}
+        {unread.chat.length > 0 && (
           <section>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">New Messages</span>
-              <span className="bg-blue-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{chatNotifications.length}</span>
-            </div>
-            <div className="space-y-2">
-              {chatNotifications.map((n) => (
-                <div key={n.id} className="flex items-start gap-3 p-3 rounded-xl bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors">
-                  <button className="flex items-start gap-3 flex-1 min-w-0 text-left" onClick={() => { markChatRead(n.id); onGoToChat?.(n.chatId); onClose(); }}>
-                    <div className="w-9 h-9 rounded-full bg-linear-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm">{n.fromName.charAt(0).toUpperCase()}</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-gray-800 leading-tight">{n.fromName}<span className="font-normal text-blue-600 ml-1">sent you a message</span></p>
-                      <p className="text-xs text-gray-600 mt-0.5 truncate italic">&ldquo;{n.message}&rdquo;</p>
-                      {n.timestamp && <p className="text-[10px] text-gray-400 mt-1">🕐 {n.timestamp?.toDate?.()?.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</p>}
-                    </div>
-                  </button>
-                  <button onClick={() => markChatRead(n.id)} className="w-6 h-6 flex items-center justify-center rounded-full bg-white hover:bg-blue-200 border border-blue-200 transition-colors text-gray-400 hover:text-blue-600 shrink-0 mt-0.5">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
-                </div>
-              ))}
-            </div>
+            <div className="flex items-center gap-2 mb-2"><span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">New Messages</span><span className="bg-blue-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unread.chat.length}</span></div>
+            <div className="space-y-2">{unread.chat.map((n) => renderChat(n, false))}</div>
           </section>
         )}
-        {leaveNotifications.length > 0 && (
+        {unread.announcement.length > 0 && (
           <section>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Leave Updates</span>
-              <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{leaveNotifications.length}</span>
-            </div>
-            <div className="space-y-2">
-              {leaveNotifications.map((leave) => (
-                <div key={leave.id} className={`flex items-center gap-3 p-3 rounded-xl border ${leave.status === "Approved" ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-lg shrink-0 ${leave.status === "Approved" ? "bg-green-100" : "bg-red-100"}`}>{leave.status === "Approved" ? "✅" : "❌"}</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 leading-tight"><strong>{leave.leaveType}</strong> leave <span className={leave.status === "Approved" ? "text-green-600" : "text-red-600"}>{leave.status}</span></p>
-                    <p className="text-[10px] text-gray-500 mt-0.5">📅 {leave.fromDate} – {leave.toDate}</p>
-                  </div>
-                  <button onClick={() => markLeaveRead(leave.id)} className="w-6 h-6 flex items-center justify-center rounded-full bg-white hover:bg-red-100 border border-gray-200 transition-colors text-gray-400 hover:text-red-600 shrink-0">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
-                </div>
-              ))}
-            </div>
+            <div className="flex items-center gap-2 mb-2"><span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Announcements</span><span className="bg-yellow-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unread.announcement.length}</span></div>
+            <div className="space-y-2">{unread.announcement.map((a) => renderAnnouncement(a, false))}</div>
           </section>
         )}
-        {queryNotifications.length > 0 && (
+        {unread.leave.length > 0 && (
           <section>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Query Replies</span>
-              <span className="bg-purple-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{queryNotifications.length}</span>
+            <div className="flex items-center gap-2 mb-2"><span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Leave Updates</span><span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unread.leave.length}</span></div>
+            <div className="space-y-2">{unread.leave.map((l) => renderLeave(l, false))}</div>
+          </section>
+        )}
+        {unread.query.length > 0 && (
+          <section>
+            <div className="flex items-center gap-2 mb-2"><span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Query Replies</span><span className="bg-purple-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unread.query.length}</span></div>
+            <div className="space-y-2">{unread.query.map((q) => renderQuery(q, false))}</div>
+          </section>
+        )}
+
+        {/* ALREADY READ SECTION */}
+        {(read.chat.length > 0 || read.announcement.length > 0 || read.leave.length > 0 || read.query.length > 0) && (
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <div className="flex items-center gap-2 mb-3 px-1">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Already Read</span>
             </div>
             <div className="space-y-2">
-              {queryNotifications.map((q: any) => (
-                <div key={q.id} className="flex items-start gap-3 p-3 rounded-xl bg-purple-50 border border-purple-200">
-                  <div className="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center text-lg shrink-0">💬</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800">Admin replied to your query</p>
-                    <p className="text-xs text-purple-700 mt-0.5 truncate">Subject: {q.subject}</p>
-                    {q.adminReply && <p className="text-xs text-gray-600 mt-1 italic line-clamp-2">&ldquo;{q.adminReply}&rdquo;</p>}
-                  </div>
-                  <button onClick={() => markQueryRead(q.id)} className="w-6 h-6 flex items-center justify-center rounded-full bg-white hover:bg-purple-100 border border-gray-200 transition-colors text-gray-400 hover:text-purple-600 shrink-0 mt-0.5">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
-                </div>
-              ))}
+              {read.chat.map(n => renderChat(n, true))}
+              {read.announcement.map(a => renderAnnouncement(a, true))}
+              {read.leave.map(l => renderLeave(l, true))}
+              {read.query.map(q => renderQuery(q, true))}
             </div>
-          </section>
+          </div>
         )}
       </div>
     </div>
@@ -344,6 +379,7 @@ export default function ZohoStyleEmployeeDashboard() {
   const [saving,                 setSaving]                 = useState(false);
   const [msg,                    setMsg]                    = useState("");
   const [messages,               setMessages]               = useState<string[]>([]);
+  const [announcements,          setAnnouncements]          = useState<{ id: string; text: string }[]>([]);
   const [leaveRequests,          setLeaveRequests]          = useState<LeaveRequest[]>([]);
   const [leaveType,              setLeaveType]              = useState<LeaveType>("casual");
   const [fromDate,               setFromDate]               = useState("");
@@ -375,18 +411,27 @@ export default function ZohoStyleEmployeeDashboard() {
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
+      // Classic fix: if the element was removed from the DOM during the click (common in React),
+      // document.body.contains(e.target) will be false. We should NOT close the dropdown in this case.
+      if (e.target && !document.body.contains(e.target as Node)) return;
+
       if (notifDropdownRef.current && !notifDropdownRef.current.contains(e.target as Node))
         setShowNotifDropdown(false);
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    // Use capture phase (true) to ensure this runs before React event handlers might remove the target element
+    document.addEventListener("mousedown", handler, true);
+    return () => document.removeEventListener("mousedown", handler, true);
   }, []);
 
   useEffect(() => {
     if (!user) return;
     return onSnapshot(
-      query(collection(db, "notifications"), where("toUid", "==", user.uid), where("read", "==", false), orderBy("timestamp", "desc")),
-      snap => setChatNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as ChatNotif)))
+      query(collection(db, "notifications"), where("toUid", "==", user.uid)),
+      snap => {
+        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as ChatNotif));
+        docs.sort((a, b) => (b.timestamp?.toMillis?.() || 0) - (a.timestamp?.toMillis?.() || 0));
+        setChatNotifications(docs.slice(0, 50));
+      }
     );
   }, [user]);
 
@@ -451,7 +496,11 @@ export default function ZohoStyleEmployeeDashboard() {
 
   useEffect(() => {
     return onSnapshot(query(collection(db, "messages"), orderBy("createdAt", "desc")),
-      snap => setMessages(snap.docs.map(d => (d.data() as any).text)));
+      snap => {
+        const docs = snap.docs.map(d => ({ id: d.id, text: (d.data() as any).text || "" }));
+        setAnnouncements(docs);
+        setMessages(docs.map(d => d.text));
+      });
   }, []);
 
   useEffect(() => {
@@ -485,7 +534,7 @@ export default function ZohoStyleEmployeeDashboard() {
     return onSnapshot(
       query(collection(db, "employeeQueries"), where("employeeId", "==", user.uid), orderBy("createdAt", "desc")),
       snap => setQueryNotifications(
-        snap.docs.map(d => ({ id: d.id, ...d.data() })).filter((d: any) => d.employeeUnread === true)
+        snap.docs.map(d => ({ id: d.id, ...d.data() }))
       ));
   }, [user]);
 
@@ -495,10 +544,19 @@ export default function ZohoStyleEmployeeDashboard() {
   const lastSession = sessions.at(-1);
   const isCheckedIn = lastSession && !lastSession.checkOut;
 
-  const leaveNotifications = leaveRequests.filter(
-    l => (l.status === "Approved" || l.status === "Rejected") && !l.notificationRead
-  );
-  const totalNotifications = leaveNotifications.length + queryNotifications.length + chatNotifications.length;
+  const unreadLeave = leaveRequests.filter(l => (l.status === "Approved" || l.status === "Rejected") && !l.notificationRead);
+  const readLeave = leaveRequests.filter(l => (l.status === "Approved" || l.status === "Rejected") && l.notificationRead);
+
+  const unreadQuery = queryNotifications.filter(q => q.employeeUnread === true);
+  const readQuery = queryNotifications.filter(q => q.employeeUnread === false);
+
+  const unreadChat = chatNotifications.filter(c => !c.read);
+  const readChat = chatNotifications.filter(c => c.read);
+
+  const unreadAnnouncements = announcements.filter(a => !dismissedAnnouncements.has(a.id));
+  const readAnnouncements = announcements.filter(a => dismissedAnnouncements.has(a.id));
+
+  const totalNotifications = unreadLeave.length + unreadQuery.length + unreadChat.length + unreadAnnouncements.length;
 
   const getMonthlyAttendanceSummary = () => {
     if (!attendance?.history) return { present: 0, absent: 0, total: 0, percentage: 0 };
@@ -571,11 +629,24 @@ export default function ZohoStyleEmployeeDashboard() {
   const markQueryNotificationAsRead = async (id: string) => { try { await updateDoc(doc(db, "employeeQueries", id), { employeeUnread: false }); } catch (e) { console.error(e); } };
   const markChatNotificationAsRead  = async (id: string) => { try { await updateDoc(doc(db, "notifications",   id), { read: true });            } catch (e) { console.error(e); } };
 
+  const markAnnouncementRead = (id: string) => {
+    const newSet = new Set(dismissedAnnouncements);
+    newSet.add(id);
+    setDismissedAnnouncements(newSet);
+    localStorage.setItem("tgy_dismissed_announcements", JSON.stringify(Array.from(newSet)));
+  };
+
   const markAllNotificationsRead = async () => {
     const batch = writeBatch(db);
-    leaveNotifications.forEach(l => batch.update(doc(db, "leaveRequests",   l.id), { notificationRead: true }));
-    queryNotifications.forEach(q  => batch.update(doc(db, "employeeQueries", q.id), { employeeUnread: false }));
-    chatNotifications.forEach(c   => batch.update(doc(db, "notifications",   c.id), { read: true }));
+    unreadLeave.forEach(l => batch.update(doc(db, "leaveRequests",   l.id), { notificationRead: true }));
+    unreadQuery.forEach(q  => batch.update(doc(db, "employeeQueries", q.id), { employeeUnread: false }));
+    unreadChat.forEach(c   => batch.update(doc(db, "notifications",   c.id), { read: true }));
+    
+    const newSet = new Set(dismissedAnnouncements);
+    unreadAnnouncements.forEach(a => newSet.add(a.id));
+    setDismissedAnnouncements(newSet);
+    localStorage.setItem("tgy_dismissed_announcements", JSON.stringify(Array.from(newSet)));
+
     await batch.commit();
   };
 
@@ -708,12 +779,12 @@ export default function ZohoStyleEmployeeDashboard() {
                 </button>
                 {showNotifDropdown && (
                   <NotificationDropdown
-                    leaveNotifications={leaveNotifications}
-                    queryNotifications={queryNotifications}
-                    chatNotifications={chatNotifications}
+                    unread={{ leave: unreadLeave, query: unreadQuery, chat: unreadChat, announcement: unreadAnnouncements }}
+                    read={{ leave: readLeave, query: readQuery, chat: readChat, announcement: readAnnouncements }}
                     markLeaveRead={markNotificationAsRead}
                     markQueryRead={markQueryNotificationAsRead}
                     markChatRead={markChatNotificationAsRead}
+                    markAnnouncementRead={markAnnouncementRead}
                     markAllRead={markAllNotificationsRead}
                     onClose={() => setShowNotifDropdown(false)}
                     // ✅ clicking a chat notif opens the overlay, NOT changeView("meet")
@@ -797,12 +868,12 @@ export default function ZohoStyleEmployeeDashboard() {
                   </button>
                   {showNotifDropdown && (
                     <NotificationDropdown
-                      leaveNotifications={leaveNotifications}
-                      queryNotifications={queryNotifications}
-                      chatNotifications={chatNotifications}
+                      unread={{ leave: unreadLeave, query: unreadQuery, chat: unreadChat, announcement: unreadAnnouncements }}
+                      read={{ leave: readLeave, query: readQuery, chat: readChat, announcement: readAnnouncements }}
                       markLeaveRead={markNotificationAsRead}
                       markQueryRead={markQueryNotificationAsRead}
                       markChatRead={markChatNotificationAsRead}
+                      markAnnouncementRead={markAnnouncementRead}
                       markAllRead={markAllNotificationsRead}
                       onClose={() => setShowNotifDropdown(false)}
                       onGoToChat={(_chatId) => { openMeetChat(); setShowNotifDropdown(false); }}

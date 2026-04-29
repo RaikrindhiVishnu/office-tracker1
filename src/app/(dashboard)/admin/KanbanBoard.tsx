@@ -1,25 +1,20 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo, Fragment } from "react";
 import { createPortal } from "react-dom";
 
 /* ─── TYPES ─── */
+export type TicketType = "story" | "task" | "bug" | "defect";
+export type ViewMode = "board" | "swimlane";
+export type GroupBy = "assignee" | "priority" | "type";
+
 export interface KanbanColumn {
   id: string;
   label: string;
   color?: string;
   bg?: string;
   border?: string;
-}
-
-export function canDragTask(user: any, task: Task, project: any): boolean {
-  if (!user) return false;
-  const isAdmin = user?.accountType === "ADMIN";
-  const isPM =
-    project?.projectManager === user?.uid ||
-    (Array.isArray(project?.projectManagers) && project.projectManagers.includes(user?.uid));
-  const isAssignee = task.assignedTo === user?.uid;
-  return isAdmin || isPM || isAssignee;
+  wipLimit?: number;
 }
 
 export interface Task {
@@ -28,41 +23,50 @@ export interface Task {
   assignedDate?: string; dueDate?: string; priority: string; status: string;
   estimatedHours?: number; actualHours?: number; storyPoints?: number;
   tags?: string[];
-  ticketType?: "story" | "task" | "bug" | "defect";
+  ticketType?: TicketType;
   parentStoryId?: string | null;
   parentStoryTitle?: string;
   taskCode?: string;
-  completedAt?: string; // ✅ NEW: for auto hour calculation
+  completedAt?: string;
   createdBy: string; createdAt: any;
 }
 
-interface KanbanBoardProps {
-  tasks: Task[];
-  columns: KanbanColumn[];
-  setColumns: (c: KanbanColumn[]) => void;
-  projectColor: string;
-  onTaskClick: (t: Task) => void;
-  onStatusChange: (id: string, status: string) => void;
-  canManage: boolean;
-  onSaveColumns: (c: KanbanColumn[]) => void;
-  onCreateTask?: (storyId: string, ticketType: string) => void;
-  currentUser?: any;
-  activeProject?: any;
-}
-
-/* ─── PRIORITY CONFIG ─── */
-const PRI: Record<string, { dot: string; bg: string; text: string; label: string }> = {
-  Low:      { dot: "#22c55e", bg: "#f0fdf4", text: "#16a34a", label: "Low" },
-  Medium:   { dot: "#f59e0b", bg: "#fffbeb", text: "#d97706", label: "Medium" },
-  High:     { dot: "#f97316", bg: "#fff7ed", text: "#ea580c", label: "High" },
-  Critical: { dot: "#ef4444", bg: "#fef2f2", text: "#dc2626", label: "Critical" },
+/* ─── TICKET TYPE CONFIG ─── */
+export const TICKET_TYPES: Record<
+  TicketType,
+  { label: string; icon: string; color: string; bg: string; border: string; description: string }
+> = {
+  story: { label: "Story", icon: "📖", color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", description: "A user story" },
+  task: { label: "Task", icon: "✅", color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", description: "A unit of work" },
+  bug: { label: "Bug", icon: "🐞", color: "#dc2626", bg: "#fef2f2", border: "#fecaca", description: "Something broken" },
+  defect: { label: "Defect", icon: "⚠️", color: "#d97706", bg: "#fffbeb", border: "#fde68a", description: "A quality issue" },
 };
 
-const TYPE_META: Record<string, { icon: string; color: string; label: string; bg: string; border: string }> = {
-  story:  { icon: "📘", color: "#3730a3", label: "Story",  bg: "#eef2ff", border: "#c7d2fe" },
-  task:   { icon: "🧩", color: "#0369a1", label: "Task",   bg: "#eff6ff", border: "#bfdbfe" },
-  bug:    { icon: "🐞", color: "#b91c1c", label: "Bug",    bg: "#fef2f2", border: "#fecaca" },
-  defect: { icon: "🎯", color: "#b45309", label: "Defect", bg: "#fffbeb", border: "#fde68a" },
+/* ─── CONSTANTS ─── */
+const STATIC_COL_CONFIG: Record<string, { color: string; bg: string; border: string; headerBg: string; dot: string }> = {
+  todo: { color: "#64748b", bg: "#f8fafc", border: "#e2e8f0", headerBg: "#f1f5f9", dot: "#94a3b8" },
+  inprogress: { color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", headerBg: "#dbeafe", dot: "#3b82f6" },
+  review: { color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", headerBg: "#ede9fe", dot: "#8b5cf6" },
+  done: { color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0", headerBg: "#dcfce7", dot: "#22c55e" },
+  blocked: { color: "#dc2626", bg: "#fef2f2", border: "#fecaca", headerBg: "#fee2e2", dot: "#ef4444" },
+};
+
+const DYNAMIC_PALETTE = [
+  { color: "#64748b", bg: "#f8fafc", border: "#e2e8f0", headerBg: "#f1f5f9", dot: "#94a3b8" },
+  { color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", headerBg: "#dbeafe", dot: "#3b82f6" },
+  { color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", headerBg: "#ede9fe", dot: "#8b5cf6" },
+  { color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0", headerBg: "#dcfce7", dot: "#22c55e" },
+  { color: "#dc2626", bg: "#fef2f2", border: "#fecaca", headerBg: "#fee2e2", dot: "#ef4444" },
+  { color: "#0891b2", bg: "#ecfeff", border: "#a5f3fc", headerBg: "#cffafe", dot: "#06b6d4" },
+  { color: "#d97706", bg: "#fffbeb", border: "#fde68a", headerBg: "#fef3c7", dot: "#f59e0b" },
+  { color: "#be185d", bg: "#fdf2f8", border: "#fbcfe8", headerBg: "#fce7f3", dot: "#ec4899" },
+];
+
+const PRI_CONFIG: Record<string, { dot: string; bg: string; text: string; label: string }> = {
+  Low: { dot: "#22c55e", bg: "#f0fdf4", text: "#16a34a", label: "Low" },
+  Medium: { dot: "#f59e0b", bg: "#fffbeb", text: "#d97706", label: "Medium" },
+  High: { dot: "#f97316", bg: "#fff7ed", text: "#ea580c", label: "High" },
+  Critical: { dot: "#ef4444", bg: "#fef2f2", text: "#dc2626", label: "Critical" },
 };
 
 const TYPE_PREFIX: Record<string, string> = { story: "STR", task: "TSK", bug: "BUG", defect: "DEF" };
@@ -82,19 +86,18 @@ const avatarColor = (name: string) => AVATAR_COLORS[(name?.charCodeAt(0) || 0) %
 /** Returns the first letter of the name, never an @ or dot */
 const avatarInitial = (name: string): string => {
   if (!name || name.includes("@")) return "U"; // User fallback
-
   return name.trim()[0].toUpperCase();
 };
 
 /** Strip email domain if the stored name accidentally contains one */
 const cleanDisplayName = (name: string | null | undefined): string => {
   if (!name) return "User";
-
-  // ❌ if it's email → DO NOT USE IT
   if (name.includes("@")) return "User";
-
   return name;
 };
+
+const SWIMLANE_LABEL_WIDTH = 180;
+const SWIMLANE_COL_WIDTH = 280;
 
 const DEFAULT_COL_COLORS = [
   { color: "#64748b", bg: "#f8fafc", border: "#e2e8f0" },
@@ -107,13 +110,43 @@ const DEFAULT_COL_COLORS = [
   { color: "#db2777", bg: "#fdf2f8", border: "#fbcfe8" },
 ];
 
-function getColStyle(col: KanbanColumn, idx: number) {
-  const def = DEFAULT_COL_COLORS[idx % DEFAULT_COL_COLORS.length];
-  return {
-    color: col.color || def.color,
-    bg: col.bg || def.bg,
-    border: col.border || def.border,
-  };
+export function getColStyle(colId: string, index: number) {
+  return STATIC_COL_CONFIG[colId] ?? DYNAMIC_PALETTE[index % DYNAMIC_PALETTE.length];
+}
+
+/* ─── PERMISSIONS ─── */
+export function canDragTask(user: any, task: Task, project: any): boolean {
+  if (!user) return false;
+  const isAdmin = user?.accountType === "ADMIN";
+  const isPM =
+    project?.projectManager === user?.uid ||
+    (Array.isArray(project?.projectManagers) && project.projectManagers.includes(user?.uid));
+  const isAssignee = task.assignedTo === user?.uid;
+  return isAdmin || isPM || isAssignee;
+}
+
+interface KanbanBoardProps {
+  tasks: Task[];
+  columns: KanbanColumn[];
+  setColumns: (c: KanbanColumn[]) => void;
+  projectColor?: string;
+  onTaskClick: (t: Task) => void;
+  onStatusChange: (id: string, status: string) => void;
+  canManage: boolean;
+  onSaveColumns: (c: KanbanColumn[]) => void;
+  onCreateTask?: (storyId: string, ticketType: string) => void;
+  currentUser?: any;
+  activeProject?: any;
+}
+
+/* ─── FILTER STATE ─── */
+interface FilterState {
+  search: string;
+  mine: boolean;
+  overdue: boolean;
+  priority: string;
+  type: string;
+  assignee: string;
 }
 
 /* ─── CONFIRM DIALOG ─── */
@@ -555,10 +588,103 @@ export function KanbanBoard({
   const [addingCol, setAddingCol] = useState(false);
   const [newColLabel, setNewColLabel] = useState("");
 
-  const boardRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("board");
+  const [groupBy, setGroupBy] = useState<GroupBy>("assignee");
+  const [editingColId, setEditingColId] = useState<string | null>(null);
+  const [editingLabelValue, setEditingLabelValue] = useState("");
+  const [draggingColIdx, setDraggingColIdx] = useState<number | null>(null);
+  const [showColorPicker, setShowColorPicker] = useState<string | null>(null);
+  const [filters, setFilters] = useState<FilterState>({
+    search: "", mine: false, overdue: false, priority: "", type: "", assignee: ""
+  });
 
-  const stories = tasks.filter(t => t.ticketType === "story");
-  const orphans = tasks.filter(t => t.ticketType !== "story" && !t.parentStoryId);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const swimlaneHeaderRef = useRef<HTMLDivElement>(null);
+  const swimlaneRowsRef = useRef<HTMLDivElement>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => { setIsMounted(true); }, []);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key.toLowerCase() === "f") { e.preventDefault(); setIsFullscreen(prev => !prev); }
+      if (e.key.toLowerCase() === "s") { e.preventDefault(); searchRef.current?.focus(); }
+      if (e.key === "Escape") {
+        if (isFullscreen) setIsFullscreen(false);
+        else setFilters({ search: "", mine: false, overdue: false, priority: "", type: "", assignee: "" });
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [isFullscreen]);
+
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  const isOverdue = (dueDate?: string, status?: string) => {
+    return !!dueDate && new Date(dueDate) < new Date() && status !== "done";
+  };
+
+  const handleRenameColumn = (id: string) => {
+    if (!editingLabelValue.trim()) { setEditingColId(null); return; }
+    const newCols = columns.map(c => c.id === id ? { ...c, label: editingLabelValue.trim() } : c);
+    onSaveColumns(newCols);
+    setEditingColId(null);
+  };
+
+  const handleDeleteColumn = (id: string) => {
+    const col = columns.find(c => c.id === id);
+    const tasksInCol = tasks.filter(t => t.status === id);
+    if (tasksInCol.length > 0) {
+      alert(`Cannot delete column "${col?.label}" because it contains ${tasksInCol.length} tasks. Please move them first.`);
+      return;
+    }
+    if (confirm(`Are you sure you want to delete column "${col?.label}"?`)) {
+      onSaveColumns(columns.filter(c => c.id !== id));
+    }
+  };
+
+  const handleUpdateColColor = (id: string, colorStyle: any) => {
+    const newCols = columns.map(c => c.id === id ? { ...c, ...colorStyle } : c);
+    onSaveColumns(newCols);
+    setShowColorPicker(null);
+  };
+
+  const handleDragColumnStart = (e: React.DragEvent, index: number) => {
+    if (!canManage) return;
+    setDraggingColIdx(index);
+    e.dataTransfer.setData("colIndex", index.toString());
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleColumnDrop = (e: React.DragEvent, targetIndex: number) => {
+    if (!canManage || draggingColIdx === null) return;
+    const newCols = [...columns];
+    const [movedCol] = newCols.splice(draggingColIdx, 1);
+    newCols.splice(targetIndex, 0, movedCol);
+    onSaveColumns(newCols);
+    setDraggingColIdx(null);
+  };
+
+  const filteredTasks = useMemo(() => {
+    return tasks.filter(t => {
+      if (filters.mine && t.assignedTo !== currentUser?.uid) return false;
+      if (filters.overdue && !isOverdue(t.dueDate, t.status)) return false;
+      if (filters.priority && t.priority !== filters.priority) return false;
+      if (filters.type && t.ticketType !== filters.type) return false;
+      if (filters.assignee && t.assignedTo !== filters.assignee) return false;
+      if (filters.search) {
+        const s = filters.search.toLowerCase();
+        return t.title.toLowerCase().includes(s) || (t.description || "").toLowerCase().includes(s) || (t.taskCode || "").toLowerCase().includes(s);
+      }
+      return true;
+    });
+  }, [tasks, filters, currentUser]);
+
+  const stories = filteredTasks.filter(t => t.ticketType === "story");
+  const orphans = filteredTasks.filter(t => t.ticketType !== "story" && !t.parentStoryId);
 
   const toggleStory = (id: string) => setCollapsedStories(prev => {
     const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s;
@@ -582,27 +708,6 @@ export function KanbanBoard({
     return `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}`;
   };
 
-  const handleDeleteColumn = (colIdx: number) => {
-    const colToDelete = columns[colIdx];
-    const adjacent = columns[colIdx - 1] || columns[colIdx + 1];
-    if (adjacent) tasks.forEach(t => { if (t.status === colToDelete.id) onStatusChange(t.id, adjacent.id); });
-    onSaveColumns(columns.filter((_, i) => i !== colIdx));
-    setConfirmDelete(null);
-  };
-
-  const handleColLabelSave = (colIdx: number) => {
-    if (!editingColLabel.trim()) { setEditingColIdx(null); return; }
-    const updated = columns.map((c, i) => i === colIdx ? { ...c, label: editingColLabel } : c);
-    setColumns(updated); onSaveColumns(updated); setEditingColIdx(null);
-  };
-
-  const handleColColorChange = (colIdx: number, color: string) => {
-    const hsl = hexToHsl(color);
-    const bg = `hsl(${hsl.h},${Math.min(hsl.s, 60)}%,${Math.max(hsl.l, 90)}%)`;
-    const border = `hsl(${hsl.h},${Math.min(hsl.s, 50)}%,${Math.max(hsl.l, 75)}%)`;
-    const updated = columns.map((c, i) => i === colIdx ? { ...c, color, bg, border } : c);
-    setColumns(updated); onSaveColumns(updated);
-  };
 
   const handleBulkMove = (colId: string) => {
     selectedTasks.forEach(id => onStatusChange(id, colId));
@@ -656,13 +761,13 @@ export function KanbanBoard({
   /* ── STORY CARD ── */
   const StoryCard = ({ story, colIdx }: { story: Task; colIdx: number }) => {
     const isCollapsed = collapsedStories.has(story.id);
-    const allChildren = tasks.filter(t => t.parentStoryId === story.id && t.ticketType !== "story");
+    const allChildren = filteredTasks.filter(t => t.parentStoryId === story.id && t.ticketType !== "story");
     const colChildren = allChildren.filter(t => t.status === columns[colIdx]?.id);
     const doneCount = allChildren.filter(t => t.status === "done").length;
     const pct = allChildren.length ? Math.round((doneCount / allChildren.length) * 100) : 0;
-    const pri = PRI[story.priority];
+    const pri = PRI_CONFIG[story.priority];
     const isSelected = selectedTasks.has(story.id);
-    const isOverdue = story.dueDate && new Date(story.dueDate) < new Date();
+    const overdue = isOverdue(story.dueDate, story.status);
 
     return (
       <div className="mx-2 my-2 rounded-xl overflow-hidden transition-all duration-200"
@@ -725,8 +830,7 @@ export function KanbanBoard({
             </div>
           </div>
 
-          {/* ✅ CHANGE 1: Footer with full assignee name shown */}
-     {/* Footer */}
+          {/* Footer */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               {story.assignedToName ? (
@@ -749,8 +853,8 @@ export function KanbanBoard({
                 </div>
               )}
               {story.dueDate && (
-                <span className={`text-[10px] font-medium shrink-0 ${isOverdue ? "text-red-500" : "text-indigo-400"}`}>
-                  {isOverdue ? "⚠️ " : ""}{formatDate(story.dueDate)}
+                <span className={`text-[10px] font-medium shrink-0 ${overdue ? "text-red-500" : "text-indigo-400"}`}>
+                  {overdue ? "⚠️ " : ""}{formatDate(story.dueDate)}
                 </span>
               )}
             </div>
@@ -779,9 +883,6 @@ export function KanbanBoard({
             {colChildren.map(child => (
               <TaskCard key={child.id} task={child} colIdx={colIdx} isChild />
             ))}
-            {colChildren.length === 0 && (
-              <div className="py-3 text-center text-[10px] text-indigo-300 italic">No items in this column</div>
-            )}
           </div>
         )}
       </div>
@@ -790,11 +891,11 @@ export function KanbanBoard({
 
   /* ── TASK CARD ── */
   const TaskCard = ({ task, colIdx, isChild }: { task: Task; colIdx: number; isChild?: boolean }) => {
-    const tm = TYPE_META[task.ticketType || "task"] || TYPE_META.task;
-    const pri = PRI[task.priority];
+    const tm = TICKET_TYPES[task.ticketType || "task"] || TICKET_TYPES.task;
+    const pri = PRI_CONFIG[task.priority];
     const isSelected = selectedTasks.has(task.id);
     const isDragging = dragTask?.id === task.id;
-    const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done";
+    const overdue = isOverdue(task.dueDate, task.status);
     const dueFmt = formatDate(task.dueDate);
 
     return (
@@ -809,7 +910,7 @@ export function KanbanBoard({
         className={`rounded-xl border cursor-pointer group/card transition-all duration-150 ${isChild ? "mx-2 my-1.5" : "mx-2 my-2"}`}
         style={{
           background: isSelected ? "#eff6ff" : "#fff",
-          borderColor: isSelected ? "#6366f1" : isOverdue ? "#fca5a5" : "#e5e7eb",
+          borderColor: isSelected ? "#6366f1" : overdue ? "#fca5a5" : "#e5e7eb",
           borderWidth: isSelected ? "2px" : "1px",
           boxShadow: isDragging ? "0 16px 40px rgba(0,0,0,0.2)" : "0 1px 4px rgba(0,0,0,0.06)",
           transform: isDragging ? "scale(1.04) rotate(1deg)" : "scale(1)",
@@ -858,7 +959,7 @@ export function KanbanBoard({
             </div>
           )}
 
-          {/* ✅ CHANGE 1: Footer with full assignee name shown */}
+          {/* Footer */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               {task.assignedToName ? (
@@ -867,32 +968,159 @@ export function KanbanBoard({
                     style={{ background: avatarColor(cleanDisplayName(task.assignedToName)) }} title={cleanDisplayName(task.assignedToName)}>
                     {avatarInitial(cleanDisplayName(task.assignedToName))}
                   </div>
-                  <span className="text-[10px] font-semibold text-gray-600 truncate" style={{ maxWidth: "90px" }}>
+                  <span className="text-[10px] font-semibold text-gray-600 truncate" style={{ maxWidth: "80px" }}>
                     {cleanDisplayName(task.assignedToName)}
                   </span>
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5">
                   <div className="w-5 h-5 rounded-full border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-300 text-[9px]">?</div>
-                  <span className="text-[10px] text-gray-300">Unassigned</span>
+                  <span className="text-[10px] text-gray-400">Unassigned</span>
                 </div>
               )}
               {dueFmt && (
-                <span className={`text-[10px] font-medium shrink-0 ${isOverdue ? "text-red-500 font-bold" : "text-gray-400"}`}>
-                  {isOverdue ? "⚠️ " : ""}{dueFmt}
+                <span className={`text-[10px] font-medium shrink-0 ${overdue ? "text-red-500 font-bold" : "text-gray-400"}`}>
+                  {overdue ? "⚡ " : ""}{dueFmt}
                 </span>
               )}
             </div>
-            {task.estimatedHours ? (
-              <div className="flex items-center gap-1 shrink-0">
-                <div className="w-12 bg-gray-100 rounded-full h-1 overflow-hidden">
-                  <div className="h-1 rounded-full transition-all"
-                    style={{ width: `${Math.min(((task.actualHours || 0) / task.estimatedHours) * 100, 100)}%`, background: "#6366f1" }} />
-                </div>
-                <span className="text-[10px] text-gray-400">{task.actualHours || 0}h</span>
+            {task.estimatedHours && (
+              <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 ml-2 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">
+                <span>⏱</span>
+                {task.estimatedHours}h
               </div>
-            ) : null}
+            )}
           </div>
+        </div>
+      </div>
+    );
+  };
+
+  /* ── SWIMLANE VIEW ── */
+  const renderSwimlaneView = () => {
+    const totalWidth = SWIMLANE_LABEL_WIDTH + columns.length * SWIMLANE_COL_WIDTH;
+
+    // Grouping logic
+    let groups: { key: string; label: string; color?: string; tasks: Task[] }[] = [];
+    if (groupBy === "assignee") {
+      const map = new Map<string, { label: string; tasks: Task[] }>();
+      filteredTasks.forEach(t => {
+        const key = t.assignedTo || "unassigned";
+        if (!map.has(key)) map.set(key, { label: cleanDisplayName(t.assignedToName) || "Unassigned", tasks: [] });
+        map.get(key)!.tasks.push(t);
+      });
+      groups = Array.from(map.entries()).map(([key, g]) => ({ key, ...g }));
+    } else if (groupBy === "priority") {
+      groups = ["Critical", "High", "Medium", "Low"].map(p => ({
+        key: p, label: p, color: PRI_CONFIG[p].dot, tasks: filteredTasks.filter(t => t.priority === p)
+      })).filter(g => g.tasks.length > 0);
+    } else {
+      groups = (["story", "task", "bug", "defect"] as TicketType[]).map(tp => ({
+        key: tp, label: TICKET_TYPES[tp].label, color: TICKET_TYPES[tp].color, tasks: filteredTasks.filter(t => t.ticketType === tp)
+      })).filter(g => g.tasks.length > 0);
+    }
+
+    return (
+      <div className="flex-1 flex flex-col min-h-0 relative overflow-auto custom-scrollbar bg-gray-50/50">
+        <div style={{ minWidth: totalWidth + "px" }}>
+          
+          {/* Sticky Header Row */}
+          <div className="flex sticky top-0 z-30 bg-white border-b-2 border-gray-100" style={{ minWidth: totalWidth + "px" }}>
+            <div 
+              style={{ width: SWIMLANE_LABEL_WIDTH }} 
+              className="shrink-0 sticky left-0 z-40 bg-white border-r border-gray-100 px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-widest"
+            >
+              {groupBy === "assignee" ? "Assignee" : groupBy === "priority" ? "Priority" : "Type"}
+            </div>
+            {columns.map((col, i) => {
+              const cfg = getColStyle(col.id, i);
+              const count = filteredTasks.filter(t => t.status === col.id).length;
+              return (
+                <div 
+                  key={col.id} 
+                  style={{ width: SWIMLANE_COL_WIDTH, borderTop: `3px solid ${cfg.dot}`, background: cfg.headerBg }} 
+                  className="shrink-0 px-4 py-3 flex items-center justify-between border-r border-gray-100"
+                >
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: cfg.dot }} />
+                    <span className="text-[11px] font-extrabold truncate" style={{ color: cfg.color }}>{col.label}</span>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white border shadow-xs" style={{ color: cfg.color, borderColor: cfg.border }}>{count}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Swimlane Groups */}
+          {groups.map(group => {
+            const isCollapsed = collapsedGroups.has(group.key);
+            return (
+              <div key={group.key} className="border-b border-gray-100">
+                {/* Collapsible Group Header - Sticky Y */}
+                <div 
+                  onClick={() => {
+                    const next = new Set(collapsedGroups);
+                    if (next.has(group.key)) next.delete(group.key);
+                    else next.add(group.key);
+                    setCollapsedGroups(next);
+                  }}
+                  className="flex items-center gap-3 px-4 py-2 cursor-pointer bg-gray-50/80 hover:bg-gray-100 sticky top-[41px] z-20 border-b border-gray-100"
+                  style={{ minWidth: totalWidth + "px" }}
+                >
+                   {groupBy === "assignee" && (
+                    <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold" style={{ background: avatarColor(group.label) }}>
+                      {avatarInitial(group.label)}
+                    </div>
+                  )}
+                  {group.color && <div className="w-2 h-2 rounded-full" style={{ background: group.color }} />}
+                  <span className="text-xs font-bold text-gray-700">{group.label}</span>
+                  <span className="text-[10px] text-gray-400 font-bold uppercase">{group.tasks.length} items</span>
+                  <span className="ml-auto text-gray-400 text-[10px]">{isCollapsed ? "▶" : "▼"}</span>
+                </div>
+
+                {/* Group Content */}
+                {!isCollapsed && (
+                  <div className="flex" style={{ minWidth: totalWidth + "px" }}>
+                    <div 
+                      style={{ width: SWIMLANE_LABEL_WIDTH }} 
+                      className="shrink-0 sticky left-0 z-10 bg-gray-50/30 border-r border-gray-100" 
+                    />
+                    {columns.map((col, i) => {
+                      const colTasks = group.tasks.filter(t => t.status === col.id);
+                      return (
+                        <div 
+                          key={col.id} 
+                          style={{ width: SWIMLANE_COL_WIDTH }} 
+                          className="shrink-0 p-2 border-r border-gray-50 min-h-[100px] flex flex-col gap-2"
+                        >
+                          {colTasks.map(t => (
+                             <div key={t.id} onClick={() => onTaskClick(t)} className="bg-white rounded-lg border border-gray-200 p-2 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer group/card">
+                               <div className="flex items-center gap-2 mb-1.5">
+                                 <span className="text-[9px] font-mono font-bold px-1 py-0.5 rounded" style={{ background: TICKET_TYPES[t.ticketType || "task"].bg, color: TICKET_TYPES[t.ticketType || "task"].color }}>
+                                   {t.taskCode || "TSK"}
+                                 </span>
+                                 <div className="flex-1" />
+                                 {PRI_CONFIG[t.priority] && <div className="w-1.5 h-1.5 rounded-full" style={{ background: PRI_CONFIG[t.priority].dot }} />}
+                               </div>
+                               <p className="text-[11px] font-semibold text-gray-800 line-clamp-2 leading-snug group-hover/card:text-indigo-600 transition-colors">{t.title}</p>
+                               <div className="mt-2 flex items-center justify-between">
+                                  {t.assignedToName && (
+                                     <div className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[7px] font-bold" style={{ background: avatarColor(cleanDisplayName(t.assignedToName)) }}>
+                                       {avatarInitial(cleanDisplayName(t.assignedToName))}
+                                     </div>
+                                  )}
+                                  {t.dueDate && <span className={`text-[9px] font-bold ${isOverdue(t.dueDate, t.status) ? "text-red-500" : "text-gray-400"}`}>{formatDate(t.dueDate)}</span>}
+                               </div>
+                             </div>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -900,18 +1128,18 @@ export function KanbanBoard({
 
   /* ── COLUMN ── */
   const KanbanCol = ({ col, colIdx }: { col: KanbanColumn; colIdx: number }) => {
-    const style = getColStyle(col, colIdx);
+    const style = getColStyle(col.id, colIdx);
     const isOver = dragOver === col.id;
     const isColDragOver = dragColOverId === col.id;
     const isCollapsed = collapsedCols.has(col.id);
     const isEditingLabel = editingColIdx === colIdx;
     const showColorPicker = colorPickerColIdx === colIdx;
 
-    const colTasks = tasks.filter(t => t.status === col.id);
+    const colTasks = filteredTasks.filter(t => t.status === col.id);
     const taskCount = colTasks.filter(t => t.ticketType !== "story").length;
 
     const visibleStories = stories.filter(story => {
-      const childrenInCol = tasks.filter(t => t.parentStoryId === story.id && t.ticketType !== "story" && t.status === col.id);
+      const childrenInCol = filteredTasks.filter(t => t.parentStoryId === story.id && t.ticketType !== "story" && t.status === col.id);
       return childrenInCol.length > 0 || story.status === col.id;
     });
 
@@ -1044,14 +1272,276 @@ export function KanbanBoard({
     );
   };
 
-  return (
-    <div className="relative h-full w-full">
+  /* ── TOOLBAR ── */
+  const renderToolbar = () => (
+    <div className="sticky top-0 z-30 flex items-center gap-2 p-2 bg-white border-b border-gray-200 shrink-0 w-full overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-1.5 shrink-0 bg-gray-50 p-1 rounded-xl border border-gray-100">
+        <button
+          onClick={() => setFilters(f => ({ ...f, mine: !f.mine }))}
+          className={`h-8 px-2.5 rounded-lg text-[10px] font-bold transition-all border ${filters.mine ? "bg-indigo-600 border-indigo-600 text-white shadow-sm" : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"}`}
+        >
+          My Tasks
+        </button>
+        <button
+          onClick={() => setFilters(f => ({ ...f, overdue: !f.overdue }))}
+          className={`h-8 px-2.5 rounded-lg text-[10px] font-bold transition-all border ${filters.overdue ? "bg-red-500 border-red-500 text-white shadow-sm" : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"}`}
+        >
+          Overdue
+        </button>
+      </div>
+
+      <div className="h-6 w-[1px] bg-gray-200 mx-1 shrink-0" />
+
+      <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl shrink-0">
+        <button
+          onClick={() => setViewMode("board")}
+          className={`h-7 px-3 rounded-lg text-[10px] font-bold transition-all ${viewMode === "board" ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+        >
+          Board
+        </button>
+        <button
+          onClick={() => setViewMode("swimlane")}
+          className={`h-7 px-3 rounded-lg text-[10px] font-bold transition-all ${viewMode === "swimlane" ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+        >
+          Swimlanes
+        </button>
+      </div>
+
+      {viewMode === "swimlane" && (
+        <select
+          value={groupBy}
+          onChange={e => setGroupBy(e.target.value as GroupBy)}
+          className="h-8 pl-2 pr-1 text-[10px] font-bold bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-lg outline-none shrink-0"
+        >
+          <option value="assignee">Group: Assignee</option>
+          <option value="priority">Group: Priority</option>
+          <option value="type">Group: Type</option>
+        </select>
+      )}
+
+      <div className="flex-1" />
+
+      <div className="flex items-center gap-1.5 shrink-0">
+        <button
+          onClick={() => setIsFullscreen(!isFullscreen)}
+          className="h-8 px-3 flex items-center gap-2 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors border border-indigo-100 text-[10px] font-bold"
+        >
+          {isFullscreen ? "↙ Exit" : "↗ Fullscreen"} <span className="opacity-50 font-normal">(F)</span>
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderBoardContent = () => (
+    <div className="flex-1 flex flex-col min-h-0 bg-white w-full overflow-hidden">
+      <style jsx global>{`
+        .kanban-scroll-x { overflow-x: auto; overflow-y: hidden; }
+        .kanban-scroll-y { overflow-y: auto; overflow-x: hidden; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+      `}</style>
+
+      {renderToolbar()}
+
+      {/* Main Board Container - Scroll Horizontal */}
+      <div className="flex-1 kanban-scroll-x custom-scrollbar relative bg-white">
+        <div className="flex h-full min-w-max border-t border-gray-100">
+          {viewMode === "board" ? (
+            <>
+              {columns.map((col, i) => {
+                const style = getColStyle(col.id, i);
+                const isCollapsed = collapsedCols.has(col.id);
+                const colTasks = filteredTasks.filter(t => t.status === col.id);
+                const taskCount = colTasks.filter(t => t.ticketType !== "story").length;
+
+                return (
+                  <div 
+                    key={col.id} 
+                    draggable={canManage && !isCollapsed}
+                    onDragStart={e => handleDragColumnStart(e, i)}
+                    onDragOver={e => { 
+                      e.preventDefault(); 
+                      if (canManage) {
+                        e.currentTarget.style.borderLeft = draggingColIdx !== null && draggingColIdx > i ? "4px solid #6366f1" : "1px solid #e5e7eb";
+                        e.currentTarget.style.borderRight = draggingColIdx !== null && draggingColIdx < i ? "4px solid #6366f1" : "1px solid #e5e7eb";
+                      }
+                    }}
+                    onDragLeave={e => { 
+                      e.currentTarget.style.borderLeft = "1px solid #e5e7eb";
+                      e.currentTarget.style.borderRight = "1px solid #e5e7eb";
+                    }}
+                    onDrop={e => { 
+                      e.preventDefault(); 
+                      e.currentTarget.style.borderLeft = "1px solid #e5e7eb";
+                      e.currentTarget.style.borderRight = "1px solid #e5e7eb";
+                      handleColumnDrop(e, i); 
+                    }}
+                    className={`flex flex-col h-full shrink-0 transition-all duration-200 border-r border-gray-100 ${canManage && !isCollapsed ? "cursor-grab active:cursor-grabbing" : ""}`}
+                    style={{ 
+                      width: isCollapsed ? "48px" : "280px", 
+                      background: isCollapsed ? "#f8fafc" : "#fff",
+                    }}
+                  >
+                    {/* Column Header */}
+                    <div 
+                      className="shrink-0 px-3 py-2.5 border-b flex items-center justify-between group/header" 
+                      style={{ 
+                        background: style.headerBg, 
+                        borderTopWidth: "3px",
+                        borderTopStyle: "solid",
+                        borderTopColor: style.dot,
+                        borderBottomColor: style.border
+                      }}
+                    >
+                      <div className="flex items-center gap-2 overflow-hidden flex-1">
+                        {/* Round Color Button */}
+                        <div className="relative shrink-0 flex items-center">
+                          <button 
+                            type="button"
+                            draggable={false}
+                            onPointerDown={(e) => { 
+                              e.stopPropagation(); 
+                              setShowColorPicker(showColorPicker === col.id ? null : col.id); 
+                            }}
+                            onMouseDown={(e) => {
+                              e.stopPropagation();
+                            }}
+                            className="w-5 h-5 rounded-full hover:scale-110 active:scale-95 transition-all shadow-md border-2 border-white ring-1 ring-black/5 cursor-pointer bg-indigo-500"
+                            style={{ background: style.dot }}
+                            title="Click to change column color"
+                          />
+                          {showColorPicker === col.id && (
+                            <>
+                              <div className="fixed inset-0 z-[1000]" onPointerDown={(e) => { e.stopPropagation(); setShowColorPicker(null); }} onMouseDown={e => e.stopPropagation()} />
+                              <div className="absolute top-full left-0 mt-3 z-[1001] bg-white border border-gray-200 rounded-2xl shadow-2xl p-3 grid grid-cols-4 gap-2.5 w-44 animate-in fade-in slide-in-from-top-2 duration-200" onPointerDown={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
+                                <div className="col-span-4 mb-1 px-1">
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Select Theme</p>
+                                </div>
+                                {DYNAMIC_PALETTE.map((pal, pi) => (
+                                  <button 
+                                    key={pi} 
+                                    type="button"
+                                    draggable={false}
+                                    onPointerDown={(e) => { e.stopPropagation(); handleUpdateColColor(col.id, pal); }}
+                                    onMouseDown={(e) => { e.stopPropagation(); }}
+                                    className="w-8 h-8 rounded-full border-2 border-white hover:scale-110 active:scale-90 transition shadow-sm cursor-pointer ring-1 ring-black/5"
+                                    style={{ background: pal.dot }}
+                                  />
+                                ))}
+                              </div>
+                            </>
+                          )}
+                        </div>
+
+                        {!isCollapsed && (
+                          editingColId === col.id ? (
+                            <input 
+                              autoFocus
+                              className="text-[11px] font-extrabold uppercase tracking-widest bg-white/50 border border-indigo-200 rounded px-1 outline-none w-full"
+                              value={editingLabelValue}
+                              onChange={e => setEditingLabelValue(e.target.value)}
+                              onBlur={() => handleRenameColumn(col.id)}
+                              onKeyDown={e => e.key === "Enter" && handleRenameColumn(col.id)}
+                            />
+                          ) : (
+                            <span 
+                              className={`text-[11px] font-extrabold uppercase tracking-widest truncate ${canManage ? "cursor-pointer hover:text-indigo-600" : ""}`}
+                              style={{ color: style.color }}
+                              onClick={(e) => { e.stopPropagation(); if (canManage) { setEditingColId(col.id); setEditingLabelValue(col.label); } }}
+                            >
+                              {col.label}
+                            </span>
+                          )
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white border" style={{ color: style.color, borderColor: style.border }}>{taskCount}</span>
+                        {!isCollapsed && canManage && (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleDeleteColumn(col.id); }}
+                            className="flex w-5 h-5 items-center justify-center rounded-full hover:bg-red-50 text-red-400 hover:text-red-600 transition text-[10px] font-bold"
+                            title="Delete Column"
+                          >✕</button>
+                        )}
+                        <button onClick={(e) => { e.stopPropagation(); toggleCol(col.id); }} className="text-gray-400 hover:text-gray-600 transition ml-0.5">
+                          {isCollapsed ? "▶" : "◀"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Column Content - Scroll Vertical */}
+                    {!isCollapsed && (
+                      <div className="flex-1 kanban-scroll-y custom-scrollbar p-2 space-y-2 bg-gray-50/20">
+                        {colTasks.map(task => (
+                          <TaskCard key={task.id} task={task} colIdx={i} />
+                        ))}
+                        {colTasks.length === 0 && (
+                          <div className="flex-1 flex items-center justify-center py-12 opacity-20">
+                             {/* Empty column */}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Add Column Button */}
+              {canManage && (
+                <div className="shrink-0 w-[240px] p-4 bg-gray-50/30">
+                  {addingCol ? (
+                    <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-xl animate-in fade-in zoom-in duration-200">
+                      <input autoFocus value={newColLabel} onChange={e => setNewColLabel(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === "Enter" && newColLabel.trim()) {
+                            const newCol: KanbanColumn = { id: "col_" + Date.now(), label: newColLabel.trim() };
+                            onSaveColumns([...columns, newCol]);
+                            setNewColLabel(""); setAddingCol(false);
+                          }
+                          if (e.key === "Escape") { setAddingCol(false); setNewColLabel(""); }
+                        }}
+                        placeholder="Column name..."
+                        className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-2 focus:ring-2 focus:ring-indigo-100 outline-none mb-2" />
+                      <div className="flex gap-2">
+                        <button onClick={() => {
+                          if (newColLabel.trim()) {
+                            const newCol: KanbanColumn = { id: "col_" + Date.now(), label: newColLabel.trim() };
+                            onSaveColumns([...columns, newCol]);
+                            setNewColLabel(""); setAddingCol(false);
+                          }
+                        }} className="flex-1 py-1.5 text-xs font-bold text-white rounded-lg bg-indigo-600">Add</button>
+                        <button onClick={() => setAddingCol(false)} className="flex-1 py-1.5 text-xs font-bold text-gray-500 border border-gray-200 rounded-lg">✕</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => setAddingCol(true)} className="w-full h-12 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center gap-2 text-gray-400 hover:border-indigo-300 hover:text-indigo-600 hover:bg-white transition-all text-xs font-bold">
+                      <span>+</span> Add Column
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col min-h-0 w-full overflow-hidden">
+               {renderSwimlaneView()}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const content = (
+    <div className={`${isFullscreen ? "fixed inset-0 z-[9999] bg-white flex flex-col" : "relative h-full w-full flex flex-col"}`}>
       {confirmDelete !== null && (
         <ConfirmDialog
           message={
             confirmDelete.type === "bulk"
-              ? `Delete ${selectedTasks.size} selected task${selectedTasks.size > 1 ? "s" : ""}?`
-              : `Delete "${columns[(confirmDelete as any).colIdx]?.label}" column? Tasks will move to adjacent column.`
+              ? `Delete ${selectedTasks.size} selected items?`
+              : `Delete column? Tasks will move to adjacent column.`
           }
           onConfirm={() => {
             if (confirmDelete.type === "bulk") handleBulkDelete();
@@ -1072,61 +1562,14 @@ export function KanbanBoard({
         />
       )}
 
-      <div ref={boardRef}
-        className="flex flex-row overflow-x-auto overflow-y-hidden h-full"
-        style={{ scrollbarWidth: "thin", scrollbarColor: "#cbd5e1 transparent", contain: "strict" }}>
-
-        {columns.map((col, i) => (
-          <KanbanCol key={col.id} col={col} colIdx={i} />
-        ))}
-
-        {canManage && (
-          <div className="flex flex-col shrink-0 px-3 py-2" style={{ minWidth: "180px" }}>
-            {addingCol ? (
-              <div className="flex flex-col gap-2 mt-1">
-                <input autoFocus value={newColLabel} onChange={e => setNewColLabel(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === "Enter" && newColLabel.trim()) {
-                      const newCol: KanbanColumn = { id: "col_" + Date.now(), label: newColLabel.trim() };
-                      onSaveColumns([...columns, newCol]);
-                      setNewColLabel(""); setAddingCol(false);
-                    }
-                    if (e.key === "Escape") { setAddingCol(false); setNewColLabel(""); }
-                  }}
-                  placeholder="Column name..."
-                  className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-200 bg-white" />
-                <div className="flex gap-2">
-                  <button onClick={() => {
-                    if (newColLabel.trim()) {
-                      const newCol: KanbanColumn = { id: "col_" + Date.now(), label: newColLabel.trim() };
-                      onSaveColumns([...columns, newCol]);
-                      setNewColLabel(""); setAddingCol(false);
-                    }
-                  }} className="flex-1 py-1.5 text-xs font-bold text-white rounded-lg" style={{ background: "#6366f1" }}>
-                    Add
-                  </button>
-                  <button onClick={() => { setAddingCol(false); setNewColLabel(""); }}
-                    className="flex-1 py-1.5 text-xs font-semibold text-gray-500 rounded-lg border border-gray-200 hover:bg-gray-50">
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button onClick={() => setAddingCol(true)}
-                className="h-10 mt-1 rounded-xl border-2 border-dashed border-gray-300 text-gray-400 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all flex items-center gap-1.5 text-sm font-semibold px-4 whitespace-nowrap">
-                <span className="text-lg leading-none">+</span> Add Column
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+      {renderBoardContent()}
 
       {selectedTasks.size > 0 && (
         <BulkActionBar
           count={selectedTasks.size}
           columns={columns}
           users={[]}
-          projectColor={projectColor}
+          projectColor={activeProject?.color || "#6366f1"}
           onDelete={() => setConfirmDelete({ type: "bulk" })}
           onMove={handleBulkMove}
           onAssign={handleBulkAssign}
@@ -1134,8 +1577,13 @@ export function KanbanBoard({
           onClear={clearSelection}
         />
       )}
+
     </div>
   );
+
+  if (!isMounted) return null;
+
+  return isFullscreen ? createPortal(content, document.body) : content;
 }
 
 /* ─── HEX TO HSL UTILITY ─── */

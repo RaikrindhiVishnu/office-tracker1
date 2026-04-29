@@ -129,8 +129,8 @@ const matchesFilter =
   const adminCount = users.filter(u => u.accountType === "ADMIN").length;
 
   return (
-    <>
-      {/* ===================== EMPLOYEE PROFILE ===================== */}
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-gray-50">
+      <div className="flex-1 flex flex-col min-h-0 p-4 lg:p-8 overflow-hidden">
       {view === "profile" && selectedEmployee && (
         <div className="max-w-5xl mx-auto">
           <button
@@ -307,10 +307,10 @@ const matchesFilter =
           </div>
 
           {/* Desktop Table */}
-          <div className="hidden lg:block bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto">
+          <div className="hidden lg:flex flex-1 flex-col min-h-0 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mx-4 mb-4">
+            <div className="flex-1 overflow-auto custom-scrollbar">
               <table className="w-full">
-                <thead className="bg-slate-50">
+                <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase">Employee</th>
                     <th className="px-6 py-4 text-left text-xs font-bold text-slate-700 uppercase">Email</th>
@@ -371,7 +371,7 @@ const matchesFilter =
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="border-t border-slate-200 bg-slate-50 px-6 py-4">
+              <div className="border-t border-slate-200 bg-slate-50 px-6 py-4 shrink-0">
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                   <div className="text-sm text-slate-600">
                     Showing {startIndex + 1} - {Math.min(endIndex, filteredUsers.length)} of {filteredUsers.length} employees
@@ -539,7 +539,8 @@ const matchesFilter =
           </div>
         </div>
       )}
-    </>
+      </div>
+    </div>
   );
 };
 

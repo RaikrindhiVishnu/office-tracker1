@@ -1268,7 +1268,7 @@ const handleDeleteSprint = async (sprint: Sprint) => {
   ══════════════════════════════════════ */
   if (activeProject) {
     return (
-      <div className="h-screen flex flex-col bg-gray-50 overflow-hidden" style={{fontFamily:"'Inter', system-ui, sans-serif"}}>
+      <div className="flex-1 flex flex-col min-h-0 bg-gray-50 overflow-hidden" style={{fontFamily:"'Inter', system-ui, sans-serif"}}>
         <style>{`@keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}} .hide-sb::-webkit-scrollbar{display:none;}.hide-sb{scrollbar-width:none;}`}</style>
 
         {/* Task Modal */}
@@ -1434,8 +1434,8 @@ const handleDeleteSprint = async (sprint: Sprint) => {
 
         {!canManage&&<div className="shrink-0 px-6 py-2 bg-amber-50 border-b border-amber-100 flex items-center gap-2"><span className="text-xs text-amber-700 font-medium">👁️ You have view-only access. Only Project Managers can edit tasks, columns, and settings.</span></div>}
 
-        {/* Main content area */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden">
+        {/* Main content area - removed global overflow-y-auto to allow Kanban internal scroll */}
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
 
           {/* ─── DASHBOARD ─── */}
           {viewMode==="dashboard"&&(()=>{
@@ -1447,7 +1447,7 @@ const handleDeleteSprint = async (sprint: Sprint) => {
             const membersWithHours=projectMembers.map((u:any,i:number)=>({u,i,hrs:workLogs.filter(l=>l.userId===u.uid).reduce((s,l)=>s+(l.hoursWorked||0),0),initials:(u.displayName||u.name||u.email?.split("@")[0]||"?").slice(0,2).toUpperCase()})).filter(x=>x.hrs>0);
             const maxHrs=Math.max(...membersWithHours.map(x=>x.hrs),1);
             return (
-              <div className="p-5 space-y-5 overflow-x-hidden">
+              <div className="p-5 space-y-5 overflow-y-auto flex-1">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{(["story","task","bug","defect"] as const).map(t=>{const tm=TYPE_META[t];const cnt=tasks.filter(x=>x.ticketType===t).length;return(<div key={t} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm flex items-center gap-3"><span className="text-2xl">{tm.icon}</span><div><p className="text-2xl font-black" style={{color:tm.color}}>{cnt}</p><p className="text-xs text-gray-400 capitalize">{tm.label}s</p></div></div>);})}</div>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">{[{label:"Total Items",val:tasks.length,color:"#6366f1",bg:"#eef2ff"},{label:"Completed",val:nonStoryTasks.filter(t=>t.status===doneColId).length,color:"#16a34a",bg:"#f0fdf4"},{label:"In Progress",val:nonStoryTasks.filter(t=>t.status==="inprogress").length,color:"#2563eb",bg:"#eff6ff"},{label:"Overdue",val:overdueTasks.length,color:"#dc2626",bg:"#fef2f2"},{label:"Total Hours",val:`${totalHours}h`,color:"#7c3aed",bg:"#f5f3ff"},{label:"Progress",val:`${activeProject.progress}%`,color:activeProject.color||"#6366f1",bg:"#f9fafb"}].map(s=>(<div key={s.label} className="rounded-xl p-4 border" style={{background:s.bg,borderColor:s.color+"20"}}><p className="text-[10px] font-bold uppercase tracking-widest mb-2" style={{color:s.color}}>{s.label}</p><p className="text-2xl font-black" style={{color:s.color}}>{s.val}</p></div>))}</div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -1482,10 +1482,8 @@ const handleDeleteSprint = async (sprint: Sprint) => {
 
           {/* ─── KANBAN ─── */}
           {viewMode==="kanban"&&(
-            <div className="h-full flex flex-col m-4 gap-0">
-              {activeSprint&&(<div className="shrink-0 flex items-center gap-3 px-4 py-2 rounded-t-xl border border-b-0 border-gray-200 bg-white"><span className="w-2 h-2 rounded-full bg-purple-500" /><span className="text-xs font-bold text-purple-700">{activeSprint.name}</span>{activeSprint.startDate&&<span className="text-[10px] text-gray-400">{activeSprint.startDate} → {activeSprint.endDate||"ongoing"}</span>}{(()=>{const now=new Date();const isCompleted=activeSprint.status==="completed";const isEnded=activeSprint.endDate&&new Date(activeSprint.endDate)<now;const label=isCompleted?"Completed":isEnded?"Ended":"Active";const color=isCompleted||isEnded?"#16a34a":"#2563eb";const bg=isCompleted||isEnded?"#f0fdf4":"#eff6ff";return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:bg,color}}>{label}</span>;})()}<span className="ml-auto text-[10px] text-gray-400">{tasks.filter(t=>t.sprintId===activeSprint.id&&t.ticketType!=="story").length} tasks</span></div>)}
-              {!activeSprint&&(<div className="shrink-0 flex items-center gap-2 px-4 py-2 rounded-t-xl border border-b-0 border-gray-200 bg-gray-50"><span className="w-2 h-2 rounded-full bg-gray-400" /><span className="text-xs font-semibold text-gray-500">All Sprints — showing all tasks</span><span className="ml-auto text-[10px] text-gray-400">{tasks.filter(t=>t.ticketType!=="story").length} tasks</span></div>)}
-              <div className="flex-1 border border-gray-200 rounded-b-xl overflow-hidden bg-white shadow-sm flex flex-col">
+            <div className="flex-1 flex flex-col min-h-0 m-0 gap-0">
+              <div className="flex-1 border border-gray-200 overflow-hidden bg-white shadow-sm flex flex-col min-h-0">
                 <KanbanBoard
   tasks={filteredTasks}
   columns={columns}
@@ -1505,7 +1503,7 @@ const handleDeleteSprint = async (sprint: Sprint) => {
 
           {/* ─── LIST ─── */}
           {viewMode==="list"&&(
-            <div className="px-4 py-2">
+            <div className="flex-1 overflow-y-auto px-4 py-2">
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <table className="w-full">
                   <thead><tr className="border-b border-gray-100 bg-gray-50">{["Type","Code","Title","Status","Priority","Assignee","Est.","Due Date","Sprint","Tags"].map(h=><th key={h} className="px-4 py-3 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">{h}</th>)}</tr></thead>
@@ -1558,7 +1556,7 @@ const handleDeleteSprint = async (sprint: Sprint) => {
 
           {/* ─── WORKLOAD ─── */}
           {viewMode==="workload"&&(
-            <div className="p-6 space-y-5">
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {workloadData.map(({user:u,total,done,inProgress,blocked}:WorkloadItem)=>(
                   <div key={u.uid} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
@@ -1592,7 +1590,7 @@ const handleDeleteSprint = async (sprint: Sprint) => {
 
           {/* ─── REPORTS ─── */}
           {viewMode==="reports"&&(
-            <div className="p-6 space-y-5">
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[{label:"Total Tasks",val:nonStoryTasks.length,sub:"excl. stories",color:"#6366f1"},{label:"Completed",val:nonStoryTasks.filter(t=>t.status===doneColId).length,sub:`${nonStoryTasks.length?Math.round((nonStoryTasks.filter(t=>t.status===doneColId).length/nonStoryTasks.length)*100):0}%`,color:"#16a34a"},{label:"Bugs",val:tasks.filter(t=>t.ticketType==="bug").length,sub:"total bugs",color:"#dc2626"},{label:"Total Hours",val:`${totalHours}h`,sub:"all logged",color:"#7c3aed"}].map(s=>(<div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5"><p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-2">{s.label}</p><p className="text-3xl font-black" style={{color:s.color}}>{s.val}</p><p className="text-xs text-gray-400 mt-1">{s.sub}</p></div>))}
               </div>
@@ -1605,7 +1603,7 @@ const handleDeleteSprint = async (sprint: Sprint) => {
 
           {/* ─── GANTT ─── */}
           {viewMode==="gantt"&&(
-            <div className="p-6"><div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-6"><div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="p-5 border-b border-gray-50"><h3 className="font-bold text-gray-800">Task Timeline (Gantt)</h3></div>
               <div className="p-5">
                 {nonStoryTasks.filter(t=>t.dueDate).sort((a,b)=>new Date(a.dueDate!).getTime()-new Date(b.dueDate!).getTime()).map(task=>{
@@ -1641,7 +1639,8 @@ const handleDeleteSprint = async (sprint: Sprint) => {
   const billingP=projects?.filter((p:any)=>p.projectType==="Billing").length||0;
 
   return (
-    <div className="min-h-screen" style={{background:"#f5f6fa",fontFamily:"'Inter', system-ui, sans-serif"}}>
+    <div className="flex-1 flex flex-col min-h-0 bg-[#f5f6fa]" style={{fontFamily:"'Inter', system-ui, sans-serif"}}>
+      <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-8">
       <style>{`
         .proj-card{transition:box-shadow 0.18s ease,transform 0.18s ease;}
         .proj-card:hover{box-shadow:0 8px 32px rgba(0,0,0,0.10)!important;transform:translateY(-2px);}
@@ -1816,6 +1815,7 @@ const handleDeleteSprint = async (sprint: Sprint) => {
           )}
         </>}
       </div>
+    </div>
     </div>
   );
 }
