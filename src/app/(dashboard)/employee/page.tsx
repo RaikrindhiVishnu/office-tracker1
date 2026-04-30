@@ -29,16 +29,16 @@ import {
   type Break,
 } from "@/lib/breakTracking";
 
-import DashboardView    from "./views/DashboardView";
-import WorkUpdateView   from "./views/WorkUpdateView";
-import AttendanceView   from "./views/AttendanceView";
+import DashboardView from "./views/DashboardView";
+import WorkUpdateView from "./views/WorkUpdateView";
+import AttendanceView from "./views/AttendanceView";
 import NotificationsView from "./views/NotificationsView";
-import CalendarModal    from "./views/CalendarView";
-import HolidaysView     from "./views/HolidaysView";
+import CalendarModal from "./views/CalendarView";
+import HolidaysView from "./views/HolidaysView";
 import LeaveHistoryView from "./views/LeaveHistoryView";
 import LeaveRequestView from "./views/LeaveRequestView";
-import ProfileView      from "./views/ProfileView";
-import HelpView         from "./views/HelpView";
+import ProfileView from "./views/ProfileView";
+import HelpView from "./views/HelpView";
 import ProjectManagement from "./views/projectmanagement";
 import { LeaveType } from "@/types/leave";
 import Payslips from "./views/Payslips";
@@ -50,9 +50,9 @@ import MeetChatAppUpdated from "@/components/MeetChatAppUpdated";
 // ── Types ─────────────────────────────────────────────────
 type ViewType =
   | "dashboard" | "work-update" | "attendance" | "notifications"
-  | "calendar"  | "holidays"    | "leave-history" | "leave-request"
-  | "profile"   | "help"        | "projects" | "meet"
-  | "tasks"     | "team"        | "reports"  | "settings"  | "payslips";
+  | "calendar" | "holidays" | "leave-history" | "leave-request"
+  | "profile" | "help" | "projects" | "meet"
+  | "tasks" | "team" | "reports" | "settings" | "payslips";
 
 type LeaveRequest = {
   id: string;
@@ -86,58 +86,57 @@ const formatTotal = (min = 0) => {
 
 // ── Data ──────────────────────────────────────────────────
 const holidays = [
-  { date: "2026-01-01", title: "New Year"           },
-  { date: "2026-01-13", title: "Bhogi"              },
-  { date: "2026-01-14", title: "Pongal"             },
-  { date: "2026-03-04", title: "Holi"               },
-  { date: "2026-03-19", title: "Ugadi"              },
-  { date: "2026-08-15", title: "Independence Day"   },
-  { date: "2026-08-28", title: "Raksha Bandhan"     },
-  { date: "2026-09-14", title: "Ganesh Chaturthi"   },
-  { date: "2026-10-02", title: "Gandhi Jayanthi"    },
-  { date: "2026-10-20", title: "Dussehra"           },
-  { date: "2026-11-08", title: "Diwali"             },
-  { date: "2026-12-25", title: "Christmas"          },
+  { date: "2026-01-01", title: "New Year" },
+  { date: "2026-01-13", title: "Bhogi" },
+  { date: "2026-01-14", title: "Pongal" },
+  { date: "2026-03-04", title: "Holi" },
+  { date: "2026-03-19", title: "Ugadi" },
+  { date: "2026-08-15", title: "Independence Day" },
+  { date: "2026-08-28", title: "Raksha Bandhan" },
+  { date: "2026-09-14", title: "Ganesh Chaturthi" },
+  { date: "2026-10-02", title: "Gandhi Jayanthi" },
+  { date: "2026-10-20", title: "Dussehra" },
+  { date: "2026-11-08", title: "Diwali" },
+  { date: "2026-12-25", title: "Christmas" },
 ];
 
-const isSunday         = (y: number, m: number, d: number) => new Date(y, m, d).getDay() === 0;
-const isSecondSaturday = (y: number, m: number, d: number) => new Date(y, m, d).getDay() === 6 && d >= 8  && d <= 14;
+const isSunday = (y: number, m: number, d: number) => new Date(y, m, d).getDay() === 0;
+const isSecondSaturday = (y: number, m: number, d: number) => new Date(y, m, d).getDay() === 6 && d >= 8 && d <= 14;
 const isFourthSaturday = (y: number, m: number, d: number) => new Date(y, m, d).getDay() === 6 && d >= 22 && d <= 28;
-const isFifthSaturday  = (y: number, m: number, d: number) => new Date(y, m, d).getDay() === 6 && d >= 29;
+const isFifthSaturday = (y: number, m: number, d: number) => new Date(y, m, d).getDay() === 6 && d >= 29;
 const isHoliday = (dateStr: string): { title: string } | null => {
   const holiday = holidays.find(h => h.date === dateStr);
   return holiday ? { title: holiday.title } : null;
 };
 
 const sidebarItems: [ViewType, string, string][] = [
-  ["dashboard",     "Dashboard",     "📊"],
-  ["work-update",   "Work Update",   "📝"],
-  ["attendance",    "Attendance",    "⏰"],
-  ["projects",      "Projects",      "📁"],
-  ["payslips",      "Payslips",      "💰"],
-  ["leave-request", "Apply Leave",   "📋"],
-  ["profile",       "Profile",       "👤"],
-  ["help",          "Help",          "❓"],
+  ["dashboard", "Dashboard", "📊"],
+  ["work-update", "Work Update", "📝"],
+  ["attendance", "Attendance", "⏰"],
+  ["projects", "Projects", "📁"],
+  ["payslips", "Payslips", "💰"],
+  ["leave-request", "Apply Leave", "📋"],
+  ["profile", "Profile", "👤"],
+  ["help", "Help", "❓"],
 ];
 
 // ── Announcement Bar ──────────────────────────────────────
 function AnnouncementBar({ messages }: { messages: string[] }) {
-  const [isCollapsed,         setIsCollapsed]         = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [showNotificationDot, setShowNotificationDot] = useState(false);
 
-  useEffect(() => { if (messages.length > 0 && isCollapsed)  setShowNotificationDot(true); },  [messages, isCollapsed]);
-  useEffect(() => { if (!isCollapsed)                         setShowNotificationDot(false); }, [isCollapsed]);
+  useEffect(() => { if (messages.length > 0 && isCollapsed) setShowNotificationDot(true); }, [messages, isCollapsed]);
+  useEffect(() => { if (!isCollapsed) setShowNotificationDot(false); }, [isCollapsed]);
 
   if (messages.length === 0) return null;
 
-  const totalChars     = messages.reduce((sum, m) => sum + m.length, 0);
+  const totalChars = messages.reduce((sum, m) => sum + m.length, 0);
   const scrollDuration = Math.max(15, Math.ceil(totalChars * 0.065));
 
   return (
     <>
-      <div className={`bg-linear-to-r from-[#d6a70d] to-[#2d4a7c] text-white overflow-hidden shadow-lg transition-all duration-500 ease-in-out relative ${
-        isCollapsed ? "h-0 opacity-0" : "h-9 opacity-100"
-      }`}>
+      <div className={`bg-linear-to-r from-[#d6a70d] to-[#2d4a7c] text-white overflow-hidden shadow-lg transition-all duration-500 ease-in-out relative ${isCollapsed ? "h-0 opacity-0" : "h-9 opacity-100"
+        }`}>
         <div className="absolute inset-0 opacity-10">
           <div className="absolute inset-0 bg-linear-to-r from-transparent via-white to-transparent animate-shimmer" />
         </div>
@@ -208,7 +207,7 @@ function NotificationDropdown({
 }) {
   const totalUnread = unread.leave.length + unread.query.length + unread.chat.length + unread.announcement.length;
   const hasNone = totalUnread === 0 && read.leave.length === 0 && read.query.length === 0 && read.chat.length === 0 && read.announcement.length === 0;
-  
+
   const renderChat = (n: any, isRead: boolean) => (
     <div key={n.id} className={`flex items-start gap-3 p-3 rounded-xl border transition-colors ${isRead ? "bg-gray-50 border-gray-100 opacity-60" : "bg-blue-50 border-blue-200 hover:bg-blue-100"}`}>
       <button className="flex items-start gap-3 flex-1 min-w-0 text-left" onClick={() => { if (!isRead) markChatRead(n.id); onGoToChat?.(n.chatId); onClose(); }}>
@@ -297,7 +296,7 @@ function NotificationDropdown({
             <p className="text-xs text-gray-400 mt-1">No new notifications</p>
           </div>
         )}
-        
+
         {/* UNREAD SECTION */}
         {unread.chat.length > 0 && (
           <section>
@@ -351,10 +350,10 @@ export default function ZohoStyleEmployeeDashboard() {
   // ── ✅ NEW: MeetChat overlay state ──────────────────────
   const [showMeetChat, setShowMeetChat] = useState(false);
 
-  const [showCalendar,           setShowCalendar]           = useState(false);
-  const [totalSeconds,           setTotalSeconds]           = useState<number>(0);
-  const [users,                  setUsers]                  = useState<any[]>([]);
-  const [activeView,             setActiveView]             = useState<ViewType>("dashboard");
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [totalSeconds, setTotalSeconds] = useState<number>(0);
+  const [users, setUsers] = useState<any[]>([]);
+  const [activeView, setActiveView] = useState<ViewType>("dashboard");
 
   useEffect(() => {
     const saved = localStorage.getItem("activeView") as ViewType | null;
@@ -372,41 +371,41 @@ export default function ZohoStyleEmployeeDashboard() {
     localStorage.setItem("activeView", view);
   };
 
-  const [attendance,             setAttendance]             = useState<any>(null);
-  const [busy,                   setBusy]                   = useState(false);
-  const [task,                   setTask]                   = useState("");
-  const [notes,                  setNotes]                  = useState("");
-  const [saving,                 setSaving]                 = useState(false);
-  const [msg,                    setMsg]                    = useState("");
-  const [messages,               setMessages]               = useState<string[]>([]);
-  const [announcements,          setAnnouncements]          = useState<{ id: string; text: string }[]>([]);
-  const [leaveRequests,          setLeaveRequests]          = useState<LeaveRequest[]>([]);
-  const [leaveType,              setLeaveType]              = useState<LeaveType>("casual");
-  const [fromDate,               setFromDate]               = useState("");
-  const [toDate,                 setToDate]                 = useState("");
-  const [leaveReason,            setLeaveReason]            = useState("");
-  const [submitting,             setSubmitting]             = useState(false);
-  const [leaveMsg,               setLeaveMsg]               = useState("");
-  const [mobileMenuOpen,         setMobileMenuOpen]         = useState(false);
-  const [profilePhoto,           setProfilePhoto]           = useState<string>("");
-  const [uploading,              setUploading]              = useState(false);
-  const [querySubject,           setQuerySubject]           = useState("");
-  const [queryMessage,           setQueryMessage]           = useState("");
-  const [querySubmitting,        setQuerySubmitting]        = useState(false);
-  const [queryMsg,               setQueryMsg]               = useState("");
-  const [calendarDate,           setCalendarDate]           = useState(new Date());
-  const [showAttendanceSummary,  setShowAttendanceSummary]  = useState(false);
-  const [showUserMenu,           setShowUserMenu]           = useState(false);
-  const [projects,               setProjects]               = useState<any[]>([]);
-  const [sidebarCollapsed,       setSidebarCollapsed]       = useState(false);
-  const [queryNotifications,     setQueryNotifications]     = useState<any[]>([]);
+  const [attendance, setAttendance] = useState<any>(null);
+  const [busy, setBusy] = useState(false);
+  const [task, setTask] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [messages, setMessages] = useState<string[]>([]);
+  const [announcements, setAnnouncements] = useState<{ id: string; text: string }[]>([]);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
+  const [leaveType, setLeaveType] = useState<LeaveType>("casual");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [leaveReason, setLeaveReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [leaveMsg, setLeaveMsg] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profilePhoto, setProfilePhoto] = useState<string>("");
+  const [uploading, setUploading] = useState(false);
+  const [querySubject, setQuerySubject] = useState("");
+  const [queryMessage, setQueryMessage] = useState("");
+  const [querySubmitting, setQuerySubmitting] = useState(false);
+  const [queryMsg, setQueryMsg] = useState("");
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [showAttendanceSummary, setShowAttendanceSummary] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [queryNotifications, setQueryNotifications] = useState<any[]>([]);
   const [dismissedAnnouncements, setDismissedAnnouncements] = useState<Set<string>>(new Set());
-  const [showNotifDropdown,      setShowNotifDropdown]      = useState(false);
-  const [chatNotifications,      setChatNotifications]      = useState<ChatNotif[]>([]);
-  const [todayBreaks,            setTodayBreaks]            = useState<Break[]>([]);
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const [chatNotifications, setChatNotifications] = useState<ChatNotif[]>([]);
+  const [todayBreaks, setTodayBreaks] = useState<Break[]>([]);
 
   const notifDropdownRef = useRef<HTMLDivElement>(null);
-  const year  = calendarDate.getFullYear();
+  const year = calendarDate.getFullYear();
   const month = calendarDate.getMonth();
 
   useEffect(() => {
@@ -452,10 +451,10 @@ export default function ZohoStyleEmployeeDashboard() {
   useEffect(() => {
     if (!user) return;
     const dateStr = getTodayDateStr();
-    const attRef  = doc(db, "attendance", `${user.uid}_${dateStr}`);
+    const attRef = doc(db, "attendance", `${user.uid}_${dateStr}`);
     return onSnapshot(attRef, (snap) => {
       if (snap.exists()) setTodayBreaks(snap.data().breaks || []);
-      else               setTodayBreaks([]);
+      else setTodayBreaks([]);
     });
   }, [user]);
 
@@ -507,7 +506,7 @@ export default function ZohoStyleEmployeeDashboard() {
     try {
       const raw = localStorage.getItem("tgy_dismissed_announcements");
       if (raw) setDismissedAnnouncements(new Set(JSON.parse(raw)));
-    } catch {}
+    } catch { }
   }, []);
 
   useEffect(() => {
@@ -540,7 +539,7 @@ export default function ZohoStyleEmployeeDashboard() {
 
   if (loading || !user) return null;
 
-  const sessions    = attendance?.sessions || [];
+  const sessions = attendance?.sessions || [];
   const lastSession = sessions.at(-1);
   const isCheckedIn = lastSession && !lastSession.checkOut;
 
@@ -560,10 +559,10 @@ export default function ZohoStyleEmployeeDashboard() {
 
   const getMonthlyAttendanceSummary = () => {
     if (!attendance?.history) return { present: 0, absent: 0, total: 0, percentage: 0 };
-    const cm      = attendance.history.filter((d: any) => { const rd = new Date(d.date); return rd.getMonth() === month && rd.getFullYear() === year; });
+    const cm = attendance.history.filter((d: any) => { const rd = new Date(d.date); return rd.getMonth() === month && rd.getFullYear() === year; });
     const present = cm.filter((d: any) => d.status === "present").length;
-    const absent  = cm.filter((d: any) => d.status === "absent").length;
-    const total   = cm.length;
+    const absent = cm.filter((d: any) => d.status === "absent").length;
+    const total = cm.length;
     return { present, absent, total, percentage: total > 0 ? Math.round((present / total) * 100) : 0 };
   };
   const monthlyStats = getMonthlyAttendanceSummary();
@@ -575,12 +574,12 @@ export default function ZohoStyleEmployeeDashboard() {
       await saveDailyUpdate(user.uid, task, notes);
       setMsg("✅ Update saved"); setTask(""); setNotes("");
     } catch { setMsg("❌ Failed to save"); }
-    finally   { setSaving(false); }
+    finally { setSaving(false); }
   };
 
   const handleSubmitLeave = async () => {
     if (!fromDate || !toDate || !leaveReason.trim()) { setLeaveMsg("Please fill all fields"); return; }
-    if (new Date(fromDate) > new Date(toDate))        { setLeaveMsg("End date must be after start date"); return; }
+    if (new Date(fromDate) > new Date(toDate)) { setLeaveMsg("End date must be after start date"); return; }
     try {
       setSubmitting(true); setLeaveMsg("");
       await addDoc(collection(db, "leaveRequests"), {
@@ -593,22 +592,22 @@ export default function ZohoStyleEmployeeDashboard() {
       setFromDate(""); setToDate(""); setLeaveReason(""); setLeaveType("casual");
       setTimeout(() => setLeaveMsg(""), 2000);
     } catch (error: any) { setLeaveMsg(`❌ ${error.message}`); }
-    finally               { setSubmitting(false); }
+    finally { setSubmitting(false); }
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024)    { alert("File size must be less than 5MB"); return; }
+    if (file.size > 5 * 1024 * 1024) { alert("File size must be less than 5MB"); return; }
     if (!file.type.startsWith("image/")) { alert("Please select an image file"); return; }
     try {
       setUploading(true);
       const snap = await uploadBytes(ref(storage, `profilePhotos/${user.uid}/${Date.now()}_${file.name}`), file);
-      const url  = await getDownloadURL(snap.ref);
+      const url = await getDownloadURL(snap.ref);
       await setDoc(doc(db, "users", user.uid), { profilePhoto: url }, { merge: true });
       setProfilePhoto(url); alert("Profile photo updated successfully!");
     } catch (error) { console.error("Upload failed:", error); alert("Failed to upload photo. Please try again."); }
-    finally          { setUploading(false); }
+    finally { setUploading(false); }
   };
 
   const handleSubmitQuery = async () => {
@@ -622,12 +621,12 @@ export default function ZohoStyleEmployeeDashboard() {
       });
       setQueryMsg("✅ Query submitted successfully"); setQuerySubject(""); setQueryMessage("");
     } catch (error) { setQueryMsg("❌ Failed to submit query"); console.error(error); }
-    finally          { setQuerySubmitting(false); }
+    finally { setQuerySubmitting(false); }
   };
 
-  const markNotificationAsRead      = async (id: string) => { try { await updateDoc(doc(db, "leaveRequests",   id), { notificationRead: true });   } catch (e) { console.error(e); } };
+  const markNotificationAsRead = async (id: string) => { try { await updateDoc(doc(db, "leaveRequests", id), { notificationRead: true }); } catch (e) { console.error(e); } };
   const markQueryNotificationAsRead = async (id: string) => { try { await updateDoc(doc(db, "employeeQueries", id), { employeeUnread: false }); } catch (e) { console.error(e); } };
-  const markChatNotificationAsRead  = async (id: string) => { try { await updateDoc(doc(db, "notifications",   id), { read: true });            } catch (e) { console.error(e); } };
+  const markChatNotificationAsRead = async (id: string) => { try { await updateDoc(doc(db, "notifications", id), { read: true }); } catch (e) { console.error(e); } };
 
   const markAnnouncementRead = (id: string) => {
     const newSet = new Set(dismissedAnnouncements);
@@ -638,10 +637,10 @@ export default function ZohoStyleEmployeeDashboard() {
 
   const markAllNotificationsRead = async () => {
     const batch = writeBatch(db);
-    unreadLeave.forEach(l => batch.update(doc(db, "leaveRequests",   l.id), { notificationRead: true }));
-    unreadQuery.forEach(q  => batch.update(doc(db, "employeeQueries", q.id), { employeeUnread: false }));
-    unreadChat.forEach(c   => batch.update(doc(db, "notifications",   c.id), { read: true }));
-    
+    unreadLeave.forEach(l => batch.update(doc(db, "leaveRequests", l.id), { notificationRead: true }));
+    unreadQuery.forEach(q => batch.update(doc(db, "employeeQueries", q.id), { employeeUnread: false }));
+    unreadChat.forEach(c => batch.update(doc(db, "notifications", c.id), { read: true }));
+
     const newSet = new Set(dismissedAnnouncements);
     unreadAnnouncements.forEach(a => newSet.add(a.id));
     setDismissedAnnouncements(newSet);
@@ -652,10 +651,10 @@ export default function ZohoStyleEmployeeDashboard() {
 
   const formatTimer = (seconds: number) => {
     const h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60), s = seconds % 60;
-    return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   };
 
-  const doCheckIn  = async () => { setBusy(true); await checkIn(user.uid);  await loadAttendance(); setBusy(false); };
+  const doCheckIn = async () => { setBusy(true); await checkIn(user.uid); await loadAttendance(); setBusy(false); };
   const doCheckOut = async () => { setBusy(true); await checkOut(user.uid); await loadAttendance(); setBusy(false); };
   const handleSetLeaveType = (v: LeaveType) => setLeaveType(v);
 
@@ -667,9 +666,8 @@ export default function ZohoStyleEmployeeDashboard() {
     <div className="h-screen flex bg-gray-50 overflow-hidden">
 
       {/* ── SIDEBAR ── (unchanged) */}
-      <aside className={`fixed lg:static inset-y-0 left-0 z-50 bg-[#192e44] text-white flex flex-col transform transition-all duration-300 ${
-        sidebarCollapsed ? "w-16" : "w-64"
-      } ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+      <aside className={`fixed lg:static inset-y-0 left-0 z-50 bg-[#192e44] text-white flex flex-col transform transition-all duration-300 ${sidebarCollapsed ? "w-16" : "w-64"
+        } ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
         <div className="p-3 flex items-center justify-between border-b border-white/10">
           {!sidebarCollapsed && (
             <div className="flex items-center gap-2 ml-2">
@@ -712,9 +710,8 @@ export default function ZohoStyleEmployeeDashboard() {
         <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20">
           {sidebarItems.map(([id, label, icon]) => (
             <button key={id} onClick={() => { changeView(id); setMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 relative group ${
-                activeView === id ? "bg-white/15 text-white shadow-sm border border-white/10" : "text-white/75 hover:bg-white/8 hover:text-white"
-              }`}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 relative group ${activeView === id ? "bg-white/15 text-white shadow-sm border border-white/10" : "text-white/75 hover:bg-white/8 hover:text-white"
+                }`}
               title={sidebarCollapsed ? label : undefined}
             >
               {activeView === id && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-amber-400 rounded-r-full" />}
@@ -763,8 +760,8 @@ export default function ZohoStyleEmployeeDashboard() {
                 </div>
               </div>
               <NavbarBreakStatus uid={user.uid} isCheckedIn={!!isCheckedIn} />
-              <button disabled={busy || !!isCheckedIn}  onClick={doCheckIn}  className="px-4 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-lg hover:shadow-xl hover:scale-105 active:scale-95">Check In</button>
-              <button disabled={busy || !isCheckedIn}   onClick={doCheckOut} className="px-4 py-1.5 bg-red-600   text-white rounded-lg hover:bg-red-700   disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-lg hover:shadow-xl hover:scale-105 active:scale-95">Check Out</button>
+              <button disabled={busy || !!isCheckedIn} onClick={doCheckIn} className="px-4 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-lg hover:shadow-xl hover:scale-105 active:scale-95">Check In</button>
+              <button disabled={busy || !isCheckedIn} onClick={doCheckOut} className="px-4 py-1.5 bg-red-600   text-white rounded-lg hover:bg-red-700   disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-sm shadow-lg hover:shadow-xl hover:scale-105 active:scale-95">Check Out</button>
               <button onClick={() => setShowCalendar(true)} className="p-2 hover:bg-white/10 rounded-lg transition-all group" title="Calendar">
                 <img src="https://cdn-icons-png.flaticon.com/128/668/668278.png" alt="Calendar" className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" />
               </button>
@@ -834,7 +831,7 @@ export default function ZohoStyleEmployeeDashboard() {
                         </div>
                       </div>
                       <div className="py-1">
-                        <button onClick={() => { changeView("profile");  setShowUserMenu(false); }} className="w-full text-left px-3 py-2.5 text-gray-700 hover:bg-blue-50 flex items-center gap-2.5 group text-sm"><span className="text-lg group-hover:scale-110 transition-transform">👤</span><span className="font-medium">Profile</span></button>
+                        <button onClick={() => { changeView("profile"); setShowUserMenu(false); }} className="w-full text-left px-3 py-2.5 text-gray-700 hover:bg-blue-50 flex items-center gap-2.5 group text-sm"><span className="text-lg group-hover:scale-110 transition-transform">👤</span><span className="font-medium">Profile</span></button>
                         <button onClick={() => { changeView("settings"); setShowUserMenu(false); }} className="w-full text-left px-3 py-2.5 text-gray-700 hover:bg-blue-50 flex items-center gap-2.5 group text-sm"><span className="text-lg group-hover:scale-110 transition-transform">⚙️</span><span className="font-medium">Settings</span></button>
                         <hr className="my-1 border-gray-200" />
                         <button onClick={async () => { await signOut(auth); router.push("/login"); }} className="w-full text-left px-3 py-2.5 text-red-600 hover:bg-red-50 flex items-center gap-2.5 group text-sm"><span className="text-lg group-hover:scale-110 transition-transform">🚪</span><span className="font-medium">Logout</span></button>
@@ -898,7 +895,7 @@ export default function ZohoStyleEmployeeDashboard() {
                     <p className="text-xs text-gray-500 truncate">{user.email}</p>
                   </div>
                   <div className="py-1">
-                    <button onClick={() => { setActiveView("profile");  setShowUserMenu(false); }} className="w-full text-left px-3 py-2 text-gray-700 hover:bg-blue-50 flex items-center gap-2.5 text-sm"><span>👤</span><span>Profile</span></button>
+                    <button onClick={() => { setActiveView("profile"); setShowUserMenu(false); }} className="w-full text-left px-3 py-2 text-gray-700 hover:bg-blue-50 flex items-center gap-2.5 text-sm"><span>👤</span><span>Profile</span></button>
                     <button onClick={() => { setActiveView("settings"); setShowUserMenu(false); }} className="w-full text-left px-3 py-2 text-gray-700 hover:bg-blue-50 flex items-center gap-2.5 text-sm"><span>⚙️</span><span>Settings</span></button>
                     <hr className="my-1 border-gray-200" />
                     <button onClick={async () => { await signOut(auth); router.push("/login"); }} className="w-full text-left px-3 py-2 text-red-600 hover:bg-red-50 flex items-center gap-2.5 text-sm"><span>🚪</span><span>Logout</span></button>
@@ -910,8 +907,8 @@ export default function ZohoStyleEmployeeDashboard() {
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg px-2.5 py-1.5 border border-white/20 flex-1 min-w-0">
                 <span className="font-mono font-bold text-xs text-amber-300 whitespace-nowrap">⏱ {formatTimer(totalSeconds)}</span>
               </div>
-              <button disabled={busy || !!isCheckedIn}  onClick={doCheckIn}  className="px-2.5 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-xs whitespace-nowrap">Check In</button>
-              <button disabled={busy || !isCheckedIn}   onClick={doCheckOut} className="px-2.5 py-1.5 bg-red-600   text-white rounded-lg hover:bg-red-700   disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-xs whitespace-nowrap">Check Out</button>
+              <button disabled={busy || !!isCheckedIn} onClick={doCheckIn} className="px-2.5 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-xs whitespace-nowrap">Check In</button>
+              <button disabled={busy || !isCheckedIn} onClick={doCheckOut} className="px-2.5 py-1.5 bg-red-600   text-white rounded-lg hover:bg-red-700   disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold text-xs whitespace-nowrap">Check Out</button>
             </div>
             <div className="flex items-center gap-1.5">
               <button onClick={() => setShowCalendar(true)} className="flex items-center gap-1 px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-lg transition-all text-xs font-medium border border-white/20">
@@ -964,9 +961,9 @@ export default function ZohoStyleEmployeeDashboard() {
                 onOpenMeetChat={openMeetChat}
               />
             )}
-            {activeView === "attendance"    && <EmployeeAttendanceView />}
-            {activeView === "work-update"   && <WorkUpdateView />}
-            {activeView === "projects"      && <ProjectManagement user={user} projects={projects} users={users} />}
+            {activeView === "attendance" && <EmployeeAttendanceView />}
+            {activeView === "work-update" && <WorkUpdateView />}
+            {activeView === "projects" && <ProjectManagement user={user} projects={projects} users={users} />}
             {activeView === "notifications" && (
               <NotificationsView
                 leaveNotifications={leaveRequests.filter(l => (l.status === "Approved" || l.status === "Rejected") && !l.notificationRead)}
@@ -976,7 +973,7 @@ export default function ZohoStyleEmployeeDashboard() {
                 onClose={() => changeView("dashboard")}
               />
             )}
-            {activeView === "holidays"      && <HolidaysView holidays={holidays} />}
+            {activeView === "holidays" && <HolidaysView holidays={holidays} />}
             {activeView === "leave-history" && <LeaveHistoryView leaveRequests={leaveRequests} />}
             {activeView === "leave-request" && (
               <LeaveRequestView
@@ -988,13 +985,13 @@ export default function ZohoStyleEmployeeDashboard() {
                 handleSubmitLeave={handleSubmitLeave} submitting={submitting} leaveMsg={leaveMsg}
               />
             )}
-            {activeView === "profile"   && <ProfileView />}
-            {activeView === "help"      && <HelpView />}
-            {activeView === "meet"      && <MeetView users={users.filter((u: any) => u.uid !== user.uid)} />}
-            {activeView === "tasks"     && <TasksView user={user} />}
-            {activeView === "reports"   && <ReportsView user={user} attendance={attendance} />}
-            {activeView === "settings"  && <SettingsView user={user} />}
-            {activeView === "payslips"  && <Payslips />}
+            {activeView === "profile" && <ProfileView />}
+            {activeView === "help" && <HelpView />}
+            {activeView === "meet" && <MeetView users={users.filter((u: any) => u.uid !== user.uid)} />}
+            {activeView === "tasks" && <TasksView user={user} />}
+            {activeView === "reports" && <ReportsView user={user} attendance={attendance} />}
+            {activeView === "settings" && <SettingsView user={user} />}
+            {activeView === "payslips" && <Payslips />}
           </div>
         </main>
       </div>
@@ -1023,8 +1020,8 @@ export default function ZohoStyleEmployeeDashboard() {
             <p className="text-slate-600 mb-4 text-sm">{calendarDate.toLocaleDateString("en-IN", { month: "long", year: "numeric" })}</p>
             <div className="space-y-3">
               {[
-                { label: "Present Days", value: monthlyStats.present,          bg: "bg-green-50",  border: "border-green-200",  clr: "text-green-700",  iconBg: "bg-green-500",  icon: "✓"  },
-                { label: "Absent Days",  value: monthlyStats.absent,           bg: "bg-red-50",    border: "border-red-200",    clr: "text-red-700",    iconBg: "bg-red-500",    icon: "×"  },
+                { label: "Present Days", value: monthlyStats.present, bg: "bg-green-50", border: "border-green-200", clr: "text-green-700", iconBg: "bg-green-500", icon: "✓" },
+                { label: "Absent Days", value: monthlyStats.absent, bg: "bg-red-50", border: "border-red-200", clr: "text-red-700", iconBg: "bg-red-500", icon: "×" },
                 { label: "Attendance %", value: `${monthlyStats.percentage}%`, bg: "bg-indigo-50", border: "border-indigo-200", clr: "text-indigo-700", iconBg: "bg-indigo-500", icon: "📈" },
               ].map(s => (
                 <div key={s.label} className={`flex justify-between items-center p-3.5 ${s.bg} rounded-xl border-2 ${s.border}`}>
@@ -1089,9 +1086,9 @@ function ReportsView({ user, attendance }: any) {
         <h2 className="text-xl font-bold mb-3">Performance Reports</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[
-            { label: "Total Hours",     value: "156h", from: "from-blue-500",   to: "to-blue-600"   },
-            { label: "Tasks Completed", value: "42",   from: "from-green-500",  to: "to-green-600"  },
-            { label: "Attendance",      value: "95%",  from: "from-purple-500", to: "to-purple-600" },
+            { label: "Total Hours", value: "156h", from: "from-blue-500", to: "to-blue-600" },
+            { label: "Tasks Completed", value: "42", from: "from-green-500", to: "to-green-600" },
+            { label: "Attendance", value: "95%", from: "from-purple-500", to: "to-purple-600" },
           ].map(s => (
             <div key={s.label} className={`p-5 bg-linear-to-br ${s.from} ${s.to} rounded-xl text-white`}>
               <h3 className="text-xs font-medium mb-1">{s.label}</h3>

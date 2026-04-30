@@ -430,16 +430,16 @@ export function KanbanBoard({
         if (!map.has(key)) map.set(key, { label: cleanName(t.assignedToName), avatar: t.assignedToName, tasks: [] });
         map.get(key)!.tasks.push(t);
       });
-      return [...map.entries()].filter(([, g]) => g.tasks.length > 0).map(([key, g]) => ({ key, ...g }));
+      return [...map.entries()].filter(([, g]) => g.tasks.length > 0).map(([key, g]) => ({ key, label: g.label, avatar: g.avatar, tasks: g.tasks }));
     }
     if (groupBy === "priority") {
       return ["Critical", "High", "Medium", "Low"].map(p => ({
-        key: p, label: p, tasks: filteredTasks.filter(t => t.priority === p),
+        key: p, label: p, avatar: undefined, tasks: filteredTasks.filter(t => t.priority === p),
       })).filter(g => g.tasks.length > 0);
     }
     if (groupBy === "type") {
       return (["story", "task", "bug", "defect"] as TicketType[]).map(tp => ({
-        key: tp, label: TICKET_TYPES[tp].label, tasks: filteredTasks.filter(t => t.ticketType === tp),
+        key: tp, label: TICKET_TYPES[tp].label, avatar: undefined, tasks: filteredTasks.filter(t => t.ticketType === tp),
       })).filter(g => g.tasks.length > 0);
     }
     return [];
@@ -1256,7 +1256,7 @@ export function KanbanBoard({
         {toolbarPrefix}
 
         {/* Search */}
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "6px 10px", minWidth: "180px" }}>
+        {/* <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "6px 10px", minWidth: "180px" }}>
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#9ca3af" strokeWidth="2"><circle cx="7" cy="7" r="5" /><path d="m11 11 3 3" /></svg>
           <input
             ref={searchRef}
@@ -1268,11 +1268,10 @@ export function KanbanBoard({
           {filters.search && (
             <button onClick={() => setFilters(f => ({ ...f, search: "" }))} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: "12px", padding: 0 }}>✕</button>
           )}
-        </div>
+        </div> */}
 
         {/* Filters */}
         {[
-          { key: "mine", label: "My tasks" },
           { key: "overdue", label: "⚡ Overdue" },
         ].map(f => (
           <button key={f.key} onClick={() => setFilters(prev => ({ ...prev, [f.key]: !prev[f.key as keyof FilterState] }))}
@@ -1285,17 +1284,17 @@ export function KanbanBoard({
           >{f.label}</button>
         ))}
 
-        <select value={filters.priority} onChange={e => setFilters(f => ({ ...f, priority: e.target.value }))}
+        {/* <select value={filters.priority} onChange={e => setFilters(f => ({ ...f, priority: e.target.value }))}
           style={{ fontSize: "12px", padding: "6px 10px", borderRadius: "8px", border: `1px solid ${filters.priority ? projectColor : "#e5e7eb"}`, background: filters.priority ? projectColor + "10" : "#f9fafb", color: filters.priority ? projectColor : "#4b5563", cursor: "pointer", fontWeight: 600, outline: "none" }}>
           <option value="">All priorities</option>
           {["Critical", "High", "Medium", "Low"].map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
+        </select> */}
 
-        <select value={filters.type} onChange={e => setFilters(f => ({ ...f, type: e.target.value }))}
+        {/* <select value={filters.type} onChange={e => setFilters(f => ({ ...f, type: e.target.value }))}
           style={{ fontSize: "12px", padding: "6px 10px", borderRadius: "8px", border: `1px solid ${filters.type ? projectColor : "#e5e7eb"}`, background: filters.type ? projectColor + "10" : "#f9fafb", color: filters.type ? projectColor : "#4b5563", cursor: "pointer", fontWeight: 600, outline: "none" }}>
           <option value="">All types</option>
           {(["story", "task", "bug", "defect"] as TicketType[]).map(tp => <option key={tp} value={tp}>{TICKET_TYPES[tp].label}</option>)}
-        </select>
+        </select> */}
 
         {allAssignees.length > 0 && (
           <select value={filters.assignee} onChange={e => setFilters(f => ({ ...f, assignee: e.target.value }))}

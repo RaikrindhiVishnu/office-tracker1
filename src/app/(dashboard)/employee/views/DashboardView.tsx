@@ -44,46 +44,46 @@ type Props = {
 
 // ─── Holiday Fallback ─────────────────────────────────────────────────────────
 const CANONICAL_HOLIDAYS = [
-  { title: "New Year",         date: "2026-01-01", type: "National"  },
-  { title: "Bhogi",            date: "2026-01-13", type: "Festival"  },
-  { title: "Pongal",           date: "2026-01-14", type: "Festival"  },
-  { title: "Holi",             date: "2026-03-04", type: "Festival"  },
-  { title: "Ugadi",            date: "2026-03-19", type: "Festival"  },
-  { title: "Independence Day", date: "2026-08-15", type: "National"  },
-  { title: "Raksha Bandhan",   date: "2026-08-28", type: "Festival"  },
-  { title: "Ganesh Chaturthi", date: "2026-09-14", type: "Festival"  },
-  { title: "Gandhi Jayanthi",  date: "2026-10-02", type: "National"  },
-  { title: "Dussehra",         date: "2026-10-20", type: "Festival"  },
-  { title: "Diwali",           date: "2026-11-08", type: "Festival"  },
-  { title: "Christmas",        date: "2026-12-25", type: "National"  },
+  { title: "New Year", date: "2026-01-01", type: "National" },
+  { title: "Bhogi", date: "2026-01-13", type: "Festival" },
+  { title: "Pongal", date: "2026-01-14", type: "Festival" },
+  { title: "Holi", date: "2026-03-04", type: "Festival" },
+  { title: "Ugadi", date: "2026-03-19", type: "Festival" },
+  { title: "Independence Day", date: "2026-08-15", type: "National" },
+  { title: "Raksha Bandhan", date: "2026-08-28", type: "Festival" },
+  { title: "Ganesh Chaturthi", date: "2026-09-14", type: "Festival" },
+  { title: "Gandhi Jayanthi", date: "2026-10-02", type: "National" },
+  { title: "Dussehra", date: "2026-10-20", type: "Festival" },
+  { title: "Diwali", date: "2026-11-08", type: "Festival" },
+  { title: "Christmas", date: "2026-12-25", type: "National" },
 ];
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const T = {
-  bg:          "#F5F7FA",
-  card:        "#FFFFFF",
-  border:      "#E5E7EB",
+  bg: "#F5F7FA",
+  card: "#FFFFFF",
+  border: "#E5E7EB",
   borderLight: "#F3F4F6",
-  text:        "#111827",
-  textMid:     "#374151",
-  textMuted:   "#6B7280",
-  textFaint:   "#9CA3AF",
-  accent:      "#4F46E5",
+  text: "#111827",
+  textMid: "#374151",
+  textMuted: "#6B7280",
+  textFaint: "#9CA3AF",
+  accent: "#4F46E5",
   accentLight: "#EEF2FF",
-  accentMid:   "#C7D2FE",
-  success:     "#059669",
-  successLight:"#D1FAE5",
-  warning:     "#D97706",
-  warningLight:"#FEF3C7",
-  danger:      "#DC2626",
+  accentMid: "#C7D2FE",
+  success: "#059669",
+  successLight: "#D1FAE5",
+  warning: "#D97706",
+  warningLight: "#FEF3C7",
+  danger: "#DC2626",
   dangerLight: "#FEE2E2",
-  purple:      "#7C3AED",
+  purple: "#7C3AED",
   purpleLight: "#EDE9FE",
-  radius:      "12px",
-  radiusSm:    "8px",
-  shadow:      "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",
-  shadowMd:    "0 4px 16px rgba(0,0,0,0.08)",
-  font:        "'DM Sans', 'Inter', system-ui, sans-serif",
+  radius: "12px",
+  radiusSm: "8px",
+  shadow: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)",
+  shadowMd: "0 4px 16px rgba(0,0,0,0.08)",
+  font: "'DM Sans', 'Inter', system-ui, sans-serif",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -122,9 +122,9 @@ function Avatar({ name, size = 36, photo }: { name: string; size?: number; photo
 }
 
 const TYPE_BADGE: Record<string, { bg: string; color: string }> = {
-  National: { bg: T.accentLight,   color: T.accent  },
-  Festival: { bg: T.warningLight,  color: T.warning },
-  Optional: { bg: T.successLight,  color: T.success },
+  National: { bg: T.accentLight, color: T.accent },
+  Festival: { bg: T.warningLight, color: T.warning },
+  Optional: { bg: T.successLight, color: T.success },
 };
 
 // ─── Shared Styles ────────────────────────────────────────────────────────────
@@ -213,7 +213,7 @@ function WorkUpdateModal({ onClose }: { onClose: () => void }) {
   const [task, setTask] = useState(""); const [notes, setNotes] = useState("");
   const [status, setStatus] = useState("In Progress"); const [priority, setPri] = useState("Medium");
   const [saving, setSaving] = useState(false); const [done, setDone] = useState(false); const [error, setError] = useState("");
-  const STATUSES   = [{ label: "In Progress", color: T.accent, icon: "🔄" }, { label: "Completed", color: T.success, icon: "✅" }, { label: "In Review", color: T.warning, icon: "👀" }];
+  const STATUSES = [{ label: "In Progress", color: T.accent, icon: "🔄" }, { label: "Completed", color: T.success, icon: "✅" }, { label: "In Review", color: T.warning, icon: "👀" }];
   const PRIORITIES = [{ label: "Low", color: T.success }, { label: "Medium", color: T.warning }, { label: "High", color: T.danger }];
   useEffect(() => { if (done) { const t = setTimeout(onClose, 1200); return () => clearTimeout(t); } }, [done, onClose]);
   const handleSave = async () => {
@@ -296,9 +296,9 @@ function ApplyLeaveModal({ leaveType, setLeaveType, fromDate, setFromDate, toDat
   useEffect(() => { if (leaveMsg === "✅ Request submitted") { setSuccess(true); const t = setTimeout(onClose, 1500); return () => clearTimeout(t); } }, [leaveMsg, onClose]);
   const TYPES_RAW = [
     { key: "casual", label: "Casual", icon: "🌴", color: T.accent, unlimited: false },
-    { key: "sick",   label: "Sick",   icon: "🤒", color: T.danger, unlimited: false },
-    { key: "lop",    label: "LOP",    icon: "💸", color: "#DC2626", unlimited: true },
-    { key: "wfh",    label: "WFH",    icon: "🏠", color: T.success, unlimited: true },
+    { key: "sick", label: "Sick", icon: "🤒", color: T.danger, unlimited: false },
+    { key: "lop", label: "LOP", icon: "💸", color: "#DC2626", unlimited: true },
+    { key: "wfh", label: "WFH", icon: "🏠", color: T.success, unlimited: true },
   ];
   const TYPES = TYPES_RAW.filter(t => { if (t.unlimited) return true; return (leaveData?.[t.key]?.used ?? 0) < (leaveData?.[t.key]?.quota ?? 12); });
   const active = TYPES.find(t => t.label === leaveType) || TYPES[0];
@@ -366,8 +366,8 @@ function MyLeavesModal({ user, onClose }: { user: any; onClose: () => void }) {
   useEffect(() => { if (!user) return; return onSnapshot(query(collection(db, "leaveRequests"), where("uid", "==", user.uid), orderBy("createdAt", "desc")), s => { setLeaves(s.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); }); }, [user]);
   const S: Record<string, { bg: string; color: string; icon: string }> = {
     Approved: { bg: T.successLight, color: T.success, icon: "✓" },
-    Rejected: { bg: T.dangerLight,  color: T.danger,  icon: "✗" },
-    Pending:  { bg: T.warningLight, color: T.warning, icon: "⏳" },
+    Rejected: { bg: T.dangerLight, color: T.danger, icon: "✗" },
+    Pending: { bg: T.warningLight, color: T.warning, icon: "⏳" },
   };
   const counts = { Approved: leaves.filter(l => l.status === "Approved").length, Pending: leaves.filter(l => l.status === "Pending").length, Rejected: leaves.filter(l => l.status === "Rejected").length };
   return (
@@ -386,7 +386,8 @@ function MyLeavesModal({ user, onClose }: { user: any; onClose: () => void }) {
           : leaves.length === 0
             ? <div style={{ textAlign: "center", padding: "32px 0" }}><p style={{ fontSize: 32, marginBottom: 8 }}>🏖️</p><p style={{ fontSize: 13, color: T.textMuted }}>No leave requests yet</p></div>
             : <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {leaves.map(l => { const s = S[l.status] || S["Pending"]; return (
+              {leaves.map(l => {
+                const s = S[l.status] || S["Pending"]; return (
                   <div key={l.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderRadius: T.radiusSm, background: "#FAFAFA", border: `1px solid ${T.borderLight}` }}>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{l.leaveType} Leave</div>
@@ -395,8 +396,9 @@ function MyLeavesModal({ user, onClose }: { user: any; onClose: () => void }) {
                     </div>
                     <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 6, background: s.bg, color: s.color, flexShrink: 0 }}>{s.icon} {l.status}</span>
                   </div>
-                ); })}
-              </div>
+                );
+              })}
+            </div>
         }
       </div>
     </>
@@ -439,15 +441,15 @@ function HolidaysModal({ onClose }: { onClose: () => void }) {
 function EmployeeDetailsCard({ user }: { user: any }) {
   const [profile, setProfile] = useState<any>(null);
   useEffect(() => { if (!user?.uid) return; return onSnapshot(query(collection(db, "users"), where("uid", "==", user.uid)), snap => { if (!snap.empty) setProfile(snap.docs[0].data()); }); }, [user]);
-  const name  = profile?.name ?? profile?.displayName ?? user?.displayName ?? "Employee";
-  const role  = profile?.designation ?? profile?.role ?? "Employee";
-  const dept  = profile?.department ?? "";
+  const name = profile?.name ?? profile?.displayName ?? user?.displayName ?? "Employee";
+  const role = profile?.designation ?? profile?.role ?? "Employee";
+  const dept = profile?.department ?? "";
   const empId = profile?.employeeId ?? profile?.empId ?? "";
   const details = [
-    { icon: "📞", label: "Mobile",   value: profile?.phone ?? profile?.mobile ?? "—" },
-    { icon: "✉️",  label: "Email",    value: profile?.email ?? user?.email ?? "—" },
+    { icon: "📞", label: "Mobile", value: profile?.phone ?? profile?.mobile ?? "—" },
+    { icon: "✉️", label: "Email", value: profile?.email ?? user?.email ?? "—" },
     { icon: "📍", label: "Location", value: profile?.address ?? profile?.workLocation ?? "—" },
-    { icon: "🗓️", label: "Joined",   value: profile?.dateOfJoining ?? profile?.joinDate ?? "—" },
+    { icon: "🗓️", label: "Joined", value: profile?.dateOfJoining ?? profile?.joinDate ?? "—" },
   ];
   return (
     <div style={CARD_STYLE}>
@@ -459,7 +461,7 @@ function EmployeeDetailsCard({ user }: { user: any }) {
           <div style={{ fontSize: 12.5, color: T.accent, fontWeight: 600, marginTop: 3 }}>{role}</div>
           {(dept || empId) && (
             <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 6 }}>
-              {dept  && <span style={{ fontSize: 10.5, fontWeight: 600, color: T.textMuted, background: T.bg, border: `1px solid ${T.border}`, padding: "2px 8px", borderRadius: 5 }}>{dept}</span>}
+              {dept && <span style={{ fontSize: 10.5, fontWeight: 600, color: T.textMuted, background: T.bg, border: `1px solid ${T.border}`, padding: "2px 8px", borderRadius: 5 }}>{dept}</span>}
               {empId && <span style={{ fontSize: 10.5, fontWeight: 600, color: T.textMuted, background: T.bg, border: `1px solid ${T.border}`, padding: "2px 8px", borderRadius: 5 }}>{empId}</span>}
             </div>
           )}
@@ -485,7 +487,7 @@ function LeaveStatusCard({ user, onApplyLeave }: { user: any; onApplyLeave: () =
   const [leaveData, setLeaveData] = useState<any>(null);
   useEffect(() => { if (!user?.uid) return; return onSnapshot(query(collection(db, "leaveBalances"), where("uid", "==", user.uid)), snap => { if (!snap.empty) setLeaveData(snap.docs[0].data()); }); }, [user]);
   const rows = [
-    { type: "Sick Leave",   used: leaveData?.sick?.used   ?? 0, total: leaveData?.sick?.quota  ?? 12, color: T.accent },
+    { type: "Sick Leave", used: leaveData?.sick?.used ?? 0, total: leaveData?.sick?.quota ?? 12, color: T.accent },
     { type: "Casual Leave", used: leaveData?.casual?.used ?? 0, total: leaveData?.casual?.quota ?? 12, color: "#0EA5E9" },
   ];
   return (
@@ -526,8 +528,8 @@ function LeaveStatusCard({ user, onApplyLeave }: { user: any; onApplyLeave: () =
 
 function MyProjectsCard({ user }: { user: any }) {
   const [projects, setProjects] = useState<any[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [hovered,  setHovered]  = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [hovered, setHovered] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -537,7 +539,7 @@ function MyProjectsCard({ user }: { user: any }) {
         return onSnapshot(
           query(collection(db, "projects"), where(fieldName, "array-contains", value)),
           snap => { if (!unsubscribed) { setProjects(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); } },
-          () => {}
+          () => { }
         );
       } catch { return undefined; }
     };
@@ -545,8 +547,8 @@ function MyProjectsCard({ user }: { user: any }) {
     const timeout = setTimeout(async () => {
       if (!unsubscribed && loading) {
         for (const [field, val] of [["members", user.uid], ["assignedTo", user.email], ["uid", user.uid], ["assignedToEmail", user.email]] as [string, string][]) {
-          try { const snap = await getDocs(query(collection(db, "projects"), where(field, "array-contains", val))); if (!snap.empty && !unsubscribed) { setProjects(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); return; } } catch {}
-          try { const snap = await getDocs(query(collection(db, "projects"), where(field, "==", val))); if (!snap.empty && !unsubscribed) { setProjects(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); return; } } catch {}
+          try { const snap = await getDocs(query(collection(db, "projects"), where(field, "array-contains", val))); if (!snap.empty && !unsubscribed) { setProjects(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); return; } } catch { }
+          try { const snap = await getDocs(query(collection(db, "projects"), where(field, "==", val))); if (!snap.empty && !unsubscribed) { setProjects(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); return; } } catch { }
         }
         if (!unsubscribed) setLoading(false);
       }
@@ -555,15 +557,15 @@ function MyProjectsCard({ user }: { user: any }) {
   }, [user]);
 
   const STATUS_CONFIG: Record<string, { color: string; bg: string }> = {
-    "In Progress": { color: T.accent,   bg: T.accentLight  },
-    "Completed":   { color: T.success,  bg: T.successLight },
-    "On Track":    { color: T.success,  bg: T.successLight },
-    "Review":      { color: T.warning,  bg: T.warningLight },
-    "In Review":   { color: T.warning,  bg: T.warningLight },
-    "Blocked":     { color: T.danger,   bg: T.dangerLight  },
-    "Overdue":     { color: T.danger,   bg: T.dangerLight  },
-    "Planning":    { color: T.textMuted, bg: T.borderLight  },
-    "Not Started": { color: T.textMuted, bg: T.borderLight  },
+    "In Progress": { color: T.accent, bg: T.accentLight },
+    "Completed": { color: T.success, bg: T.successLight },
+    "On Track": { color: T.success, bg: T.successLight },
+    "Review": { color: T.warning, bg: T.warningLight },
+    "In Review": { color: T.warning, bg: T.warningLight },
+    "Blocked": { color: T.danger, bg: T.dangerLight },
+    "Overdue": { color: T.danger, bg: T.dangerLight },
+    "Planning": { color: T.textMuted, bg: T.borderLight },
+    "Not Started": { color: T.textMuted, bg: T.borderLight },
   };
 
   const fmtDue = (raw: any) => {
@@ -593,14 +595,14 @@ function MyProjectsCard({ user }: { user: any }) {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {projects.map(p => {
-            const id       = p.id;
-            const title    = p.name ?? p.title ?? p.projectName ?? "Untitled";
+            const id = p.id;
+            const title = p.name ?? p.title ?? p.projectName ?? "Untitled";
             const progress = Math.min(Number(p.progress ?? p.completion ?? p.percent ?? 0), 100);
-            const status   = p.status ?? p.projectStatus ?? "In Progress";
-            const cfg      = STATUS_CONFIG[status] ?? { color: T.accent, bg: T.accentLight };
-            const due      = fmtDue(p.dueDate ?? p.due ?? p.deadline ?? p.endDate);
+            const status = p.status ?? p.projectStatus ?? "In Progress";
+            const cfg = STATUS_CONFIG[status] ?? { color: T.accent, bg: T.accentLight };
+            const due = fmtDue(p.dueDate ?? p.due ?? p.deadline ?? p.endDate);
             const barColor = progress >= 100 ? T.success : T.accent;
-            const isHov    = hovered === id;
+            const isHov = hovered === id;
             return (
               <div key={id}
                 onMouseEnter={() => setHovered(id)}
@@ -717,13 +719,13 @@ function SessionsCard({ sessions, formatTime, formatTotal, totalWorked }: { sess
 // ─── HOLIDAYS CARD ─────────────────────────────────────────────────────────────
 function HolidaysCard({ onViewAll }: { onViewAll: () => void }) {
   const [holidays, setHolidays] = useState<any[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     getDocs(query(collection(db, "holidays"), orderBy("date", "asc")))
       .then(snap => { setHolidays(snap.empty ? CANONICAL_HOLIDAYS : snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); })
       .catch(() => { setHolidays(CANONICAL_HOLIDAYS); setLoading(false); });
   }, []);
-  const todayMs  = new Date().setHours(0, 0, 0, 0);
+  const todayMs = new Date().setHours(0, 0, 0, 0);
   const upcoming = holidays.filter(h => new Date(h.date + "T00:00:00").getTime() >= todayMs);
 
   return (
@@ -738,11 +740,11 @@ function HolidaysCard({ onViewAll }: { onViewAll: () => void }) {
       {loading ? <p style={{ color: T.textMuted, fontSize: 12, textAlign: "center", padding: "12px 0" }}>Loading…</p> : (
         <div>
           {upcoming.map((h, i) => {
-            const d        = new Date(h.date + "T00:00:00");
+            const d = new Date(h.date + "T00:00:00");
             const daysLeft = Math.ceil((d.getTime() - Date.now()) / 86400000);
-            const ts       = TYPE_BADGE[h.type] || TYPE_BADGE.National;
-            const isLast   = i === upcoming.length - 1;
-            const dateLabel= d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+            const ts = TYPE_BADGE[h.type] || TYPE_BADGE.National;
+            const isLast = i === upcoming.length - 1;
+            const dateLabel = d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
             return (
               <div key={h.id ?? i} style={{
                 display: "flex", alignItems: "center",
@@ -780,7 +782,7 @@ function MeetChatCard({
   user: any;
 }) {
   const [recentChats, setRecentChats] = useState<any[]>([]);
-  const [loading,     setLoading]     = useState(true);
+  const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
 
   // Open the MeetChat overlay — always use onOpenMeetChat, never window.open
@@ -830,7 +832,7 @@ function MeetChatCard({
       if (!d) return "";
       const now = new Date();
       const diff = now.getTime() - d.getTime();
-      if (diff < 60000)   return "now";
+      if (diff < 60000) return "now";
       if (diff < 3600000) return `${Math.floor(diff / 60000)}m`;
       if (diff < 86400000) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       return d.toLocaleDateString([], { day: "numeric", month: "short" });
@@ -838,7 +840,7 @@ function MeetChatCard({
   };
 
   const MEET_ORANGE = "#E8512A";
-  const MEET_LIGHT  = "#FFF3EF";
+  const MEET_LIGHT = "#FFF3EF";
   const MEET_BORDER = "#FDDDD4";
 
   return (
@@ -963,55 +965,55 @@ function MeetChatCard({
             ))}
           </div>
         ) : recentChats.length === 0 ? (
-       <div style={{ textAlign: "center", padding: "24px 0" }}>
-  <div style={{
-    width: 44,
-    height: 44,
-    borderRadius: "50%",
-    background: "#FFF3EF",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    margin: "0 auto 10px",
-    fontSize: 18,
-  }}>
-    💬
-  </div>
+          <div style={{ textAlign: "center", padding: "24px 0" }}>
+            <div style={{
+              width: 44,
+              height: 44,
+              borderRadius: "50%",
+              background: "#FFF3EF",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 10px",
+              fontSize: 18,
+            }}>
+              💬
+            </div>
 
-  <p style={{
-    fontSize: 12.5,
-    color: "#6B7280",
-    marginBottom: 12,
-    fontWeight: 500
-  }}>
-    No conversations yet
-  </p>
+            <p style={{
+              fontSize: 12.5,
+              color: "#6B7280",
+              marginBottom: 12,
+              fontWeight: 500
+            }}>
+              No conversations yet
+            </p>
 
-  <button
-    onClick={() => openChat()}
-    style={{
-      fontSize: 12.5,
-      fontWeight: 700,
-      padding: "7px 20px",
-      borderRadius: "8px",
-      background: "#E8512A",
-      color: "#fff",
-      border: "none",
-      cursor: "pointer",
-      fontFamily: T.font,
-      transition: "opacity 0.2s ease",
-    }}
-  >
-    Start Chat
-  </button>
-</div>
+            <button
+              onClick={() => openChat()}
+              style={{
+                fontSize: 12.5,
+                fontWeight: 700,
+                padding: "7px 20px",
+                borderRadius: "8px",
+                background: "#E8512A",
+                color: "#fff",
+                border: "none",
+                cursor: "pointer",
+                fontFamily: T.font,
+                transition: "opacity 0.2s ease",
+              }}
+            >
+              Start Chat
+            </button>
+          </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column" }}>
             {recentChats.map(chat => {
-              const name     = getOtherName(chat);
-              const lastMsg  = truncate(chat.lastMessage ?? "No messages yet");
-              const time     = fmtTime(chat.lastMessageAt);
-              const unread   = (chat.unreadCounts?.[user?.uid] ?? 0) > 0;
+              const name = getOtherName(chat);
+              const lastMsg = truncate(chat.lastMessage ?? "No messages yet");
+              const time = fmtTime(chat.lastMessageAt);
+              const unread = (chat.unreadCounts?.[user?.uid] ?? 0) > 0;
               return (
                 <div
                   key={chat.id}
@@ -1078,13 +1080,13 @@ function MeetChatCard({
 // ─── EMPLOYEE DIRECTORY CARD ──────────────────────────────────────────────────
 function EmployeeDirectoryCard() {
   const [employees, setEmployees] = useState<any[]>([]);
-  const [search,    setSearch]    = useState("");
-  const [selected,  setSelected]  = useState<any | null>(null);
-  const [loading,   setLoading]   = useState(true);
-  const [hovered,   setHovered]   = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [hovered, setHovered] = useState<string | null>(null);
 
   useEffect(() => { return onSnapshot(collection(db, "users"), snap => { setEmployees(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); }); }, []);
-  const filtered    = employees.filter(e => { const q = search.toLowerCase(); return (e.name ?? "").toLowerCase().includes(q) || (e.email ?? "").toLowerCase().includes(q) || (e.designation ?? "").toLowerCase().includes(q); });
+  const filtered = employees.filter(e => { const q = search.toLowerCase(); return (e.name ?? "").toLowerCase().includes(q) || (e.email ?? "").toLowerCase().includes(q) || (e.designation ?? "").toLowerCase().includes(q); });
   const onlineCount = employees.filter(e => e.status === "ONLINE").length;
 
   return (
@@ -1161,10 +1163,10 @@ function EmployeeDirectoryCard() {
             </div>
             <div style={{ padding: "14px 20px 20px" }}>
               {[
-                { icon: "✉️", label: "Email",    value: selected.email ?? "—" },
-                { icon: "📞", label: "Phone",    value: selected.phone ?? "—" },
-                { icon: "🏷️", label: "Role",     value: selected.accountType ?? "Employee" },
-                { icon: "📅", label: "Joined",   value: selected.dateOfJoining ?? selected.joinDate ?? "—" },
+                { icon: "✉️", label: "Email", value: selected.email ?? "—" },
+                { icon: "📞", label: "Phone", value: selected.phone ?? "—" },
+                { icon: "🏷️", label: "Role", value: selected.accountType ?? "Employee" },
+                { icon: "📅", label: "Joined", value: selected.dateOfJoining ?? selected.joinDate ?? "—" },
                 { icon: "📍", label: "Location", value: selected.workLocation ?? "—" },
               ].map(r => (
                 <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: `1px solid ${T.borderLight}` }}>
@@ -1189,18 +1191,18 @@ function EmployeeDirectoryCard() {
 export default function DashboardView({
   user, isCheckedIn, sessions,
   formatTotal = (min = 0) => { const m = min < 0 ? 0 : min; return `${Math.floor(m / 60)}h ${m % 60}m`; },
-  formatTime  = (ts: any) => { try { return ts?.toDate?.()?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) ?? "--"; } catch { return "--"; } },
+  formatTime = (ts: any) => { try { return ts?.toDate?.()?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) ?? "--"; } catch { return "--"; } },
   leaveType, setLeaveType, fromDate, setFromDate, toDate, setToDate,
   leaveReason, setLeaveReason, handleSubmitLeave, submitting, leaveMsg,
   totalSeconds = 0, onGoToChat, onOpenMeetChat,
 }: Props) {
-  const [activeModal,        setActiveModal]      = useState<string | null>(null);
-  const [leaveNotifications, setLeaveNotifs]      = useState<any[]>([]);
-  const [queryNotifications, setQueryNotifs]      = useState<any[]>([]);
-  const [chatNotifCount,     setChatNotifCount]   = useState(0);
-  const [employeeLeaveData,  setEmployeeLeaveData]= useState<any>(null);
-  const [now,                setNow]              = useState(new Date());
-  const [profile,            setProfile]          = useState<any>(null);
+  const [activeModal, setActiveModal] = useState<string | null>(null);
+  const [leaveNotifications, setLeaveNotifs] = useState<any[]>([]);
+  const [queryNotifications, setQueryNotifs] = useState<any[]>([]);
+  const [chatNotifCount, setChatNotifCount] = useState(0);
+  const [employeeLeaveData, setEmployeeLeaveData] = useState<any>(null);
+  const [now, setNow] = useState(new Date());
+  const [profile, setProfile] = useState<any>(null);
 
   const close = useCallback(() => setActiveModal(null), []);
 
@@ -1215,11 +1217,11 @@ export default function DashboardView({
   const markQueryNotifRead = (id: string) => updateDoc(doc(db, "employeeQueries", id), { employeeUnread: false });
 
   const totalWorked = Math.max(0, Math.floor(totalSeconds / 60));
-  const hour        = now.getHours();
-  const greeting    = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
-  const greetEmoji  = hour < 12 ? "🌤️" : hour < 17 ? "☀️" : "🌙";
-  const userName    = profile?.name ?? profile?.displayName ?? user?.displayName ?? "Employee";
-  const dateStr     = now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const hour = now.getHours();
+  const greeting = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
+  const greetEmoji = hour < 12 ? "🌤️" : hour < 17 ? "☀️" : "🌙";
+  const userName = profile?.name ?? profile?.displayName ?? user?.displayName ?? "Employee";
+  const dateStr = now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
     <div style={{ fontFamily: T.font, background: T.bg, minHeight: "100vh", padding: "28px 24px 56px" }}>
@@ -1237,12 +1239,12 @@ export default function DashboardView({
       `}</style>
 
       {/* ── MODALS ── */}
-      {activeModal === "workUpdate"    && <Modal onClose={close}><WorkUpdateModal onClose={close} /></Modal>}
-      {activeModal === "applyLeave"    && <Modal onClose={close} wide><ApplyLeaveModal leaveType={leaveType} setLeaveType={setLeaveType} fromDate={fromDate} setFromDate={setFromDate} toDate={toDate} setToDate={setToDate} leaveReason={leaveReason} setLeaveReason={setLeaveReason} handleSubmitLeave={handleSubmitLeave} submitting={submitting} leaveMsg={leaveMsg} onClose={close} leaveData={employeeLeaveData} /></Modal>}
-      {activeModal === "holidays"      && <Modal onClose={close}><HolidaysModal onClose={close} /></Modal>}
-      {activeModal === "myLeaves"      && <Modal onClose={close} wide><MyLeavesModal user={user} onClose={close} /></Modal>}
+      {activeModal === "workUpdate" && <Modal onClose={close}><WorkUpdateModal onClose={close} /></Modal>}
+      {activeModal === "applyLeave" && <Modal onClose={close} wide><ApplyLeaveModal leaveType={leaveType} setLeaveType={setLeaveType} fromDate={fromDate} setFromDate={setFromDate} toDate={toDate} setToDate={setToDate} leaveReason={leaveReason} setLeaveReason={setLeaveReason} handleSubmitLeave={handleSubmitLeave} submitting={submitting} leaveMsg={leaveMsg} onClose={close} leaveData={employeeLeaveData} /></Modal>}
+      {activeModal === "holidays" && <Modal onClose={close}><HolidaysModal onClose={close} /></Modal>}
+      {activeModal === "myLeaves" && <Modal onClose={close} wide><MyLeavesModal user={user} onClose={close} /></Modal>}
       {activeModal === "notifications" && <Modal onClose={close} wide><ModalHeader emoji="🔔" title="Notifications" subtitle="Stay up to date" onClose={close} /><NotificationsView leaveNotifications={leaveNotifications} markNotificationAsRead={markLeaveNotifRead} queryNotifications={queryNotifications} markQueryNotificationAsRead={markQueryNotifRead} onClose={close} hideHeader={true} onGoToChat={(chatId) => { close(); onGoToChat?.(chatId); }} /></Modal>}
-      {activeModal === "help"          && <Modal onClose={close} wide><ModalHeader emoji="💬" title="Help & Support" subtitle="Raise a ticket or browse FAQs" onClose={close} /><HelpView /></Modal>}
+      {activeModal === "help" && <Modal onClose={close} wide><ModalHeader emoji="💬" title="Help & Support" subtitle="Raise a ticket or browse FAQs" onClose={close} /><HelpView /></Modal>}
 
       {/* ── HEADER ── */}
       <div style={{ marginBottom: 28 }}>
