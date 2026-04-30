@@ -1,4 +1,5 @@
 "use client";
+// Triggering re-compile to resolve Turbopack error
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -110,8 +111,8 @@ const calculateTotalMinutes = (sessions: Session[]) => {
       : new Date(s.checkIn).getTime();
     const end = s.checkOut
       ? (s.checkOut?.toDate
-          ? s.checkOut.toDate().getTime()
-          : new Date(s.checkOut).getTime())
+        ? s.checkOut.toDate().getTime()
+        : new Date(s.checkOut).getTime())
       : Date.now();
     const diff = end - start;
     if (diff > 0) total += Math.floor(diff / 60000);
@@ -511,12 +512,11 @@ export default function AdminPage() {
 
       {/* SIDEBAR */}
       <aside
-        className={`${sidebarCollapsed ? "lg:w-20" : "lg:w-72"} w-72 bg-[#12334f] text-white fixed inset-y-0 z-40 transform transition-all duration-300 ease-out ${
-          sidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
-        } lg:translate-x-0 flex flex-col`}
+        className={`${sidebarCollapsed ? "lg:w-20" : "lg:w-64"} w-64 bg-[#12334f] text-white fixed inset-y-0 z-40 transform transition-all duration-300 ease-out ${sidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
+          } lg:translate-x-0 flex flex-col`}
       >
         {/* Logo */}
-        <div className="h-16 flex items-center justify-between border-b border-white/10 bg-[#12334f] px-4">
+        <div className="h-16 px-6 flex items-center justify-between border-b border-white/10 bg-[#12334f]">
           {!sidebarCollapsed ? (
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-[#184199] flex items-center justify-center shadow-lg">
@@ -550,7 +550,7 @@ export default function AdminPage() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar">
+        <nav className="flex-1 overflow-y-auto py-4 space-y-1 custom-scrollbar">
 
           <NavItem
             icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>}
@@ -607,7 +607,7 @@ export default function AdminPage() {
         {/* Logout */}
         <button
           onClick={handleLogout}
-          className="m-4 bg-gray-500 hover:bg-red-700 py-3 px-5 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 group text-white"
+          className="m-3 bg-gray-500 hover:bg-red-700 py-2.5 px-5 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 group text-white"
           title="Logout"
         >
           <svg className="w-5 h-5 group-hover:rotate-12 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -618,21 +618,21 @@ export default function AdminPage() {
       </aside>
 
       {/* MAIN CONTENT */}
-      <div className={`${sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"} flex-1 flex flex-col h-screen transition-all duration-300 overflow-hidden`}>
+      <div className={`${sidebarCollapsed ? "lg:ml-20" : "lg:ml-64"} flex-1 flex flex-col h-screen transition-all duration-300 overflow-hidden`}>
 
         {/* Top Bar */}
-        <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-20 shadow-sm">
-          <div className="px-4 sm:px-6 lg:px-8 py-0">
+        <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-20 shadow-sm h-16 flex items-center">
+          <div className="px-4 sm:px-6 lg:px-8 w-full">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="pt-12 lg:pt-0">
+              <div>
                 <h2 className="text-2xl lg:text-3xl font-bold text-slate-900 capitalize">
                   {view === "breakMonitor"
                     ? "Break Monitor"
                     : view === "Project Management"
-                    ? "Project Management"
-                    : view.replace(/([A-Z])/g, " $1").trim()}
+                      ? "Project Management"
+                      : view.replace(/([A-Z])/g, " $1").trim()}
                 </h2>
-                <p className="text-sm text-slate-600 mt-1">
+                <p className="text-xs text-slate-600 mt-0.5">
                   {new Date().toLocaleDateString("en-IN", {
                     weekday: "long", day: "numeric", month: "long", year: "numeric",
                   })}
@@ -665,19 +665,19 @@ export default function AdminPage() {
 
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full overflow-hidden shadow-lg">
-                   {typeof userData?.profilePhoto === "string" && userData.profilePhoto ? (
-  <Image
-    src={userData.profilePhoto}
-    alt="Admin"
-    width={40}
-    height={40}
-    className="w-full h-full object-cover"
-  />
-) : (
-  <div className="w-full h-full bg-[#193677] flex items-center justify-center text-white font-bold">
-    {user.email?.[0]?.toUpperCase()}
-  </div>
-)}
+                    {typeof userData?.profilePhoto === "string" && userData.profilePhoto ? (
+                      <Image
+                        src={userData.profilePhoto}
+                        alt="Admin"
+                        width={40}
+                        height={40}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-[#193677] flex items-center justify-center text-white font-bold">
+                        {user.email?.[0]?.toUpperCase()}
+                      </div>
+                    )}
                   </div>
                   <div className="hidden sm:block">
                     <p className="text-sm font-semibold text-slate-900">{user.email?.split("@")[0]}</p>
@@ -689,7 +689,9 @@ export default function AdminPage() {
           </div>
         </header>
 
-        <main className={`flex-1 flex flex-col min-h-0 overflow-hidden bg-slate-50`}>
+        <main className={`flex-1 overflow-auto bg-slate-50 px-4 pb-4 pt-2 lg:px-8 lg:pb-8 lg:pt-4 space-y-4`}>
+
+
 
           {view === "dashboard" && (
             <Dashboard
@@ -870,14 +872,14 @@ export default function AdminPage() {
         </main>
 
         {view !== "Project Management" && (
-          <footer className="bg-white/80 backdrop-blur-md border-t border-slate-200 py-4 px-6 shrink-0">
+          <footer className="bg-white/80 backdrop-blur-md border-t border-slate-200 py-2 px-6 shrink-0">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-slate-600">
               <span className="flex items-center gap-2">
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
                   <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
                 </svg>
-                officetracker@gmail.com
+                techgyinnovations@gmail.com
               </span>
               <span>© 2026 Office Tracker. All rights reserved.</span>
             </div>
@@ -900,9 +902,8 @@ function NavItem({ icon, label, active = false, onClick, badge, collapsed = fals
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 relative ${
-        active ? "bg-[#58576358] text-white shadow-md" : "text-slate-300 hover:bg-white/10 hover:text-white"
-      } ${collapsed ? "justify-center" : ""}`}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 relative ${active ? "bg-[#58576358] text-white shadow-md" : "text-slate-300 hover:bg-white/10 hover:text-white"
+        } ${collapsed ? "justify-center" : ""}`}
       title={collapsed ? label : ""}
     >
       <span className={collapsed ? "" : "shrink-0"}>{icon}</span>
@@ -918,22 +919,5 @@ function NavItem({ icon, label, active = false, onClick, badge, collapsed = fals
         <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full" />
       )}
     </button>
-  );
-}
-
-function StatCard({ title, value, icon, gradient, trend }: any) {
-  return (
-    <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 hover:shadow-xl transition-all duration-300 group">
-      <div className="flex items-start justify-between mb-4">
-        <div className={`w-14 h-14 rounded-xl bg-linear-to-br ${gradient} flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform`}>
-          {icon}
-        </div>
-        {trend && (
-          <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">{trend}</span>
-        )}
-      </div>
-      <p className="text-slate-600 text-sm font-medium mb-1">{title}</p>
-      <p className="text-3xl font-bold text-slate-900">{value}</p>
-    </div>
   );
 }

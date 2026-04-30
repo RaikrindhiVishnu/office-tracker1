@@ -274,7 +274,7 @@ interface StatCardProps {
   icon: React.ReactNode;
   gradient: string;
 }
-function StatCard({ title, value, icon, gradient }: StatCardProps) {
+function DashboardStatCard({ title, value, icon, gradient }: StatCardProps) {
   return (
     <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-4 hover:shadow-xl transition-all duration-300">
       <div className="flex items-start justify-between">
@@ -479,17 +479,18 @@ export default function Dashboard({
   return (
     <>
       {/* ── Quick Stats ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-        <StatCard title="Total Employees" value={totalEmployees} gradient="from-blue-500 to-cyan-500"
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+
+        <DashboardStatCard title="Total Employees" value={totalEmployees} gradient="from-blue-500 to-cyan-500"
           icon={<svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>}
         />
-        <StatCard title="Online Now" value={onlineEmployees} gradient="from-emerald-500 to-green-500"
+        <DashboardStatCard title="Online Now" value={onlineEmployees} gradient="from-emerald-500 to-green-500"
           icon={<svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>}
         />
-        <StatCard title="Offline" value={offlineEmployees} gradient="from-slate-500 to-slate-600"
+        <DashboardStatCard title="Offline" value={offlineEmployees} gradient="from-slate-500 to-slate-600"
           icon={<svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>}
         />
-        <StatCard title="Avg Work Time" value={formatTotal(avgWorkTime)} gradient="from-violet-500 to-purple-500"
+        <DashboardStatCard title="Avg Work Time" value={formatTotal(avgWorkTime)} gradient="from-violet-500 to-purple-500"
           icon={<svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>}
         />
       </div>

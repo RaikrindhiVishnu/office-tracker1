@@ -27,7 +27,7 @@ import { db } from "@/lib/firebase";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-type LeaveType   = "Casual" | "Sick" | "Work From Home" | "Annual";
+type LeaveType = "Casual" | "Sick" | "Work From Home" | "Annual";
 type LeaveStatus = "Pending" | "Approved" | "Rejected";
 type HolidayType = "national" | "optional";
 
@@ -61,16 +61,16 @@ interface StatusCfgEntry { bg: string; color: string; border: string; dot: strin
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 const LEAVE_CFG: Record<string, LeaveCfgEntry> = {
-  "Casual":         { bg: "#eff6ff", color: "#1d4ed8", dot: "#3b82f6", Icon: Palmtree,    balanceKey: "casual"  },
-  "Sick":           { bg: "#fff7ed", color: "#c2410c", dot: "#f97316", Icon: Stethoscope, balanceKey: "sick"    },
-  "Work From Home": { bg: "#f0fdf4", color: "#15803d", dot: "#22c55e", Icon: Home,        balanceKey: null      },
-  "Annual":         { bg: "#fdf4ff", color: "#7e22ce", dot: "#a855f7", Icon: TrendingUp,  balanceKey: "annual"  },
+  "Casual": { bg: "#eff6ff", color: "#1d4ed8", dot: "#3b82f6", Icon: Palmtree, balanceKey: "casual" },
+  "Sick": { bg: "#fff7ed", color: "#c2410c", dot: "#f97316", Icon: Stethoscope, balanceKey: "sick" },
+  "Work From Home": { bg: "#f0fdf4", color: "#15803d", dot: "#22c55e", Icon: Home, balanceKey: null },
+  "Annual": { bg: "#fdf4ff", color: "#7e22ce", dot: "#a855f7", Icon: TrendingUp, balanceKey: "annual" },
 };
 const LEAVE_CFG_DEFAULT: LeaveCfgEntry = {
   bg: "#f1f5f9", color: "#475569", dot: "#94a3b8", Icon: Calendar, balanceKey: null,
 };
 const STATUS_CFG: Record<string, StatusCfgEntry> = {
-  Pending:  { bg: "#fffbeb", color: "#92400e", border: "#fcd34d", dot: "#f59e0b", label: "Pending"  },
+  Pending: { bg: "#fffbeb", color: "#92400e", border: "#fcd34d", dot: "#f59e0b", label: "Pending" },
   Approved: { bg: "#f0fdf4", color: "#14532d", border: "#86efac", dot: "#22c55e", label: "Approved" },
   Rejected: { bg: "#fff1f2", color: "#881337", border: "#fda4af", dot: "#f43f5e", label: "Rejected" },
 };
@@ -84,21 +84,21 @@ const AVATAR_COLORS = [
   { bg: "#fef9c3", color: "#ca8a04" }, { bg: "#fee2e2", color: "#dc2626" },
 ];
 const MONTH_NAMES = [
-  "January","February","March","April","May","June",
-  "July","August","September","October","November","December",
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
 ] as const;
-const SHORT_DAYS = ["Su","Mo","Tu","We","Th","Fr","Sa"] as const;
+const SHORT_DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"] as const;
 
 // ─── Pure helpers ──────────────────────────────────────────────────────────────
 
-const getLeaveCfg  = (lt: unknown): LeaveCfgEntry  => typeof lt === "string" ? (LEAVE_CFG[lt]  ?? LEAVE_CFG_DEFAULT)  : LEAVE_CFG_DEFAULT;
-const getStatusCfg = (s:  unknown): StatusCfgEntry => typeof s  === "string" ? (STATUS_CFG[s]  ?? STATUS_CFG_DEFAULT) : STATUS_CFG_DEFAULT;
+const getLeaveCfg = (lt: unknown): LeaveCfgEntry => typeof lt === "string" ? (LEAVE_CFG[lt] ?? LEAVE_CFG_DEFAULT) : LEAVE_CFG_DEFAULT;
+const getStatusCfg = (s: unknown): StatusCfgEntry => typeof s === "string" ? (STATUS_CFG[s] ?? STATUS_CFG_DEFAULT) : STATUS_CFG_DEFAULT;
 const getAvatarStyle = (name?: string | null) => AVATAR_COLORS[((name ?? "").charCodeAt(0) || 65) % AVATAR_COLORS.length];
-const getInitials    = (name?: string | null) => (name ?? "").split(" ").slice(0, 2).map(w => w[0]?.toUpperCase() ?? "").join("");
+const getInitials = (name?: string | null) => (name ?? "").split(" ").slice(0, 2).map(w => w[0]?.toUpperCase() ?? "").join("");
 
 function todayStr() {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 function getDays(from: string, to: string) {
   if (!from || !to) return 1;
@@ -111,11 +111,11 @@ function fmtDate(str: string) {
 }
 function timeAgo(ts: Timestamp | null | undefined) {
   if (!ts) return "—";
-  const d    = ts?.seconds ? new Date(ts.seconds * 1000) : new Date();
+  const d = ts?.seconds ? new Date(ts.seconds * 1000) : new Date();
   const diff = Math.floor((Date.now() - d.getTime()) / 1000);
-  if (diff < 60)      return "Just now";
-  if (diff < 3_600)   return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86_400)  return `${Math.floor(diff / 3_600)}h ago`;
+  if (diff < 60) return "Just now";
+  if (diff < 3_600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86_400) return `${Math.floor(diff / 3_600)}h ago`;
   if (diff < 604_800) return `${Math.floor(diff / 86_400)}d ago`;
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
@@ -160,7 +160,7 @@ function LeaveBalanceBadges({ balance }: { balance: LeaveBalance | null }) {
       {[
         { label: "Annual", value: balance.annual, color: "#7e22ce", bg: "#fdf4ff" },
         { label: "Casual", value: balance.casual, color: "#1d4ed8", bg: "#eff6ff" },
-        { label: "Sick",   value: balance.sick,   color: "#c2410c", bg: "#fff7ed" },
+        { label: "Sick", value: balance.sick, color: "#c2410c", bg: "#fff7ed" },
       ].map(({ label, value, color, bg }) => (
         <div key={label} style={{
           background: bg, color, border: `1px solid ${color}25`,
@@ -177,28 +177,28 @@ function LeaveBalanceBadges({ balance }: { balance: LeaveBalance | null }) {
 // ─── Holiday Calendar ─────────────────────────────────────────────────────────
 
 function HolidayCalendar({ holidays, leaveRequests }: { holidays: Holiday[]; leaveRequests: LeaveRequest[] }) {
-  const now  = new Date();
-  const [month,   setMonth]   = useState(now.getMonth());
-  const [year,    setYear]    = useState(now.getFullYear());
+  const now = new Date();
+  const [month, setMonth] = useState(now.getMonth());
+  const [year, setYear] = useState(now.getFullYear());
   const [selDate, setSelDate] = useState<string | null>(null);
-  const today    = todayStr();
+  const today = todayStr();
   const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
 
-  const prev = () => { if (month === 0) { setMonth(11); setYear(y => y-1); } else setMonth(m => m-1); };
-  const next = () => { if (month === 11) { setMonth(0);  setYear(y => y+1); } else setMonth(m => m+1); };
+  const prev = () => { if (month === 0) { setMonth(11); setYear(y => y - 1); } else setMonth(m => m - 1); };
+  const next = () => { if (month === 11) { setMonth(0); setYear(y => y + 1); } else setMonth(m => m + 1); };
 
   const monthHols = useMemo(() => holidays.filter(h => h.date.startsWith(monthKey)), [holidays, monthKey]);
-  const holSet    = new Set(monthHols.map(h => h.date));
+  const holSet = new Set(monthHols.map(h => h.date));
 
   const leavesPerDate = useMemo<Record<string, LeaveRequest[]>>(() => {
     const map: Record<string, LeaveRequest[]> = {};
     leaveRequests.forEach(l => {
       if ((l.status ?? "") === "Rejected") return;
       const from = new Date((l.fromDate ?? "") + "T00:00:00");
-      const to   = new Date((l.toDate   ?? "") + "T00:00:00");
-      const cur  = new Date(from);
+      const to = new Date((l.toDate ?? "") + "T00:00:00");
+      const cur = new Date(from);
       while (cur <= to) {
-        const ds = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,"0")}-${String(cur.getDate()).padStart(2,"0")}`;
+        const ds = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
         if (ds.startsWith(monthKey)) { if (!map[ds]) map[ds] = []; map[ds].push(l); }
         cur.setDate(cur.getDate() + 1);
       }
@@ -206,12 +206,12 @@ function HolidayCalendar({ holidays, leaveRequests }: { holidays: Holiday[]; lea
     return map;
   }, [leaveRequests, monthKey]);
 
-  const firstDow  = new Date(year, month, 1).getDay();
+  const firstDow = new Date(year, month, 1).getDay();
   const daysInMon = new Date(year, month + 1, 0).getDate();
   const selLeaves = selDate ? (leavesPerDate[selDate] ?? []) : [];
-  const selHols   = selDate ? monthHols.filter(h => h.date === selDate) : [];
-  const natCount  = holidays.filter(h => h.date.startsWith(String(year)) && h.type === "national").length;
-  const optCount  = holidays.filter(h => h.date.startsWith(String(year)) && h.type === "optional").length;
+  const selHols = selDate ? monthHols.filter(h => h.date === selDate) : [];
+  const natCount = holidays.filter(h => h.date.startsWith(String(year)) && h.type === "national").length;
+  const optCount = holidays.filter(h => h.date.startsWith(String(year)) && h.type === "optional").length;
   const onLeaveThisMonth = useMemo<string[]>(() => {
     const names = new Set<string>();
     Object.values(leavesPerDate).forEach(ls => ls.forEach(l => names.add(l.userName ?? "—")));
@@ -219,7 +219,7 @@ function HolidayCalendar({ holidays, leaveRequests }: { holidays: Holiday[]; lea
   }, [leavesPerDate]);
 
   return (
-    <div style={{ padding: "20px 24px", overflowY: "auto" }}>
+    <div style={{ padding: "0", overflowY: "auto" }}>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16, alignItems: "center" }}>
         <span style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>{MONTH_NAMES[month]} {year}</span>
         <span style={{ background: "#dcfce7", color: "#166534", borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 500 }}>{natCount} National</span>
@@ -244,13 +244,13 @@ function HolidayCalendar({ holidays, leaveRequests }: { holidays: Holiday[]; lea
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 2 }}>
             {Array.from({ length: firstDow }).map((_, i) => <div key={`e${i}`} />)}
             {Array.from({ length: daysInMon }, (_, i) => i + 1).map(day => {
-              const ds       = `${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
-              const isHol    = holSet.has(ds);
-              const isTdy    = ds === today;
-              const isSel    = ds === selDate;
-              const dow      = new Date(year, month, day).getDay();
-              const isWkd    = dow === 0 || dow === 6;
-              const leaves   = leavesPerDate[ds] ?? [];
+              const ds = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+              const isHol = holSet.has(ds);
+              const isTdy = ds === today;
+              const isSel = ds === selDate;
+              const dow = new Date(year, month, day).getDay();
+              const isWkd = dow === 0 || dow === 6;
+              const leaves = leavesPerDate[ds] ?? [];
               const hasLeave = leaves.length > 0;
               return (
                 <div key={day}
@@ -341,13 +341,13 @@ function HolidayCalendar({ holidays, leaveRequests }: { holidays: Holiday[]; lea
               {monthHols.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "24px 0", color: "#94a3b8", fontSize: 12, background: "#f8fafc", borderRadius: 10, border: "1px dashed #e2e8f0" }}>No holidays this month</div>
               ) : monthHols.map((h, i) => {
-                const d    = new Date(h.date + "T00:00:00");
+                const d = new Date(h.date + "T00:00:00");
                 const past = h.date < today;
                 return (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 10, background: past ? "#f8fafc" : "#fffbeb", border: `1px solid ${past ? "#e2e8f0" : "#fcd34d"}`, opacity: past ? 0.6 : 1, marginBottom: 6 }}>
                     <div style={{ width: 38, height: 38, borderRadius: 8, flexShrink: 0, background: past ? "#e2e8f0" : "#1e3a5f", color: past ? "#64748b" : "#fff", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", lineHeight: 1.2 }}>
                       <span style={{ fontSize: 13, fontWeight: 600 }}>{d.getDate()}</span>
-                      <span style={{ fontSize: 8, opacity: 0.8 }}>{(["Sun","Mon","Tue","Wed","Thu","Fri","Sat"] as const)[d.getDay()]}</span>
+                      <span style={{ fontSize: 8, opacity: 0.8 }}>{(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const)[d.getDay()]}</span>
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.name}</div>
@@ -374,9 +374,9 @@ function HolidayCalendar({ holidays, leaveRequests }: { holidays: Holiday[]; lea
 
       <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 16 }}>
         {MONTH_NAMES.map((name, i) => {
-          const k   = `${year}-${String(i+1).padStart(2,"0")}`;
-          const hc  = holidays.filter(h => h.date.startsWith(k)).length;
-          const lc  = leaveRequests.filter(l => (l.status ?? "") !== "Rejected" && ((l.fromDate ?? "").startsWith(k) || (l.toDate ?? "").startsWith(k))).length;
+          const k = `${year}-${String(i + 1).padStart(2, "0")}`;
+          const hc = holidays.filter(h => h.date.startsWith(k)).length;
+          const lc = leaveRequests.filter(l => (l.status ?? "") !== "Rejected" && ((l.fromDate ?? "").startsWith(k) || (l.toDate ?? "").startsWith(k))).length;
           const sel = i === month;
           return (
             <button key={name} onClick={() => setMonth(i)} style={{
@@ -408,24 +408,24 @@ const navBtnStyle: React.CSSProperties = {
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function AdminLeaveRequests() {
-  const [requests,        setRequests]        = useState<LeaveRequest[]>([]);
-  const [holidays,        setHolidays]        = useState<Holiday[]>([]);
-  const [loading,         setLoading]         = useState(true);
-  const [error,           setError]           = useState<string | null>(null);
-  const [tab,             setTab]             = useState<"requests" | "calendar">("requests");
-  const [statusFilter,    setStatusFilter]    = useState<"all" | "pending" | "approved" | "rejected">("all");
-  const [typeFilter,      setTypeFilter]      = useState<"all" | string>("all");
-  const [monthFilter,     setMonthFilter]     = useState<"all" | string>("all");
-  const [search,          setSearch]          = useState("");
-  const [selected,        setSelected]        = useState<LeaveRequest | null>(null);
-  const [confirm,         setConfirm]         = useState<{ id: string; action: LeaveStatus } | null>(null);
-  const [deleteConfirm,   setDeleteConfirm]   = useState<string | null>(null); // id of row pending delete
-  const [updating,        setUpdating]        = useState(false);
-  const [deleting,        setDeleting]        = useState(false);
+  const [requests, setRequests] = useState<LeaveRequest[]>([]);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<"requests" | "calendar">("requests");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | string>("all");
+  const [monthFilter, setMonthFilter] = useState<"all" | string>("all");
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<LeaveRequest | null>(null);
+  const [confirm, setConfirm] = useState<{ id: string; action: LeaveStatus } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null); // id of row pending delete
+  const [updating, setUpdating] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [selectedBalance, setSelectedBalance] = useState<LeaveBalance | null>(null);
-  const [loadingBalance,  setLoadingBalance]  = useState(false);
-  const [page,            setPage]            = useState(0);
-  const [perPage,         setPerPage]         = useState(10);
+  const [loadingBalance, setLoadingBalance] = useState(false);
+  const [page, setPage] = useState(0);
+  const [perPage, setPerPage] = useState(10);
 
   // ── Firestore: leaveRequests ────────────────────────────────────────────────
   useEffect(() => {
@@ -446,7 +446,7 @@ export default function AdminLeaveRequests() {
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "holidays"),
       snap => setHolidays(snap.docs.map(d => ({ id: d.id, ...d.data() } as Holiday))),
-      err  => console.error("holidays:", err),
+      err => console.error("holidays:", err),
     );
     return () => unsub();
   }, []);
@@ -482,28 +482,28 @@ export default function AdminLeaveRequests() {
       });
 
       if (newStatus === "Approved" && req.uid) {
-        const lc         = getLeaveCfg(req.leaveType);
+        const lc = getLeaveCfg(req.leaveType);
         const balanceKey = lc.balanceKey;
-        const days       = getDays(req.fromDate ?? "", req.toDate ?? "");
+        const days = getDays(req.fromDate ?? "", req.toDate ?? "");
         const leaveBalSnap = await getDocs(query(collection(db, "leaveBalances"), where("uid", "==", req.uid)));
 
         if (balanceKey === "casual" || balanceKey === "sick") {
           if (!leaveBalSnap.empty) {
-            const balDoc      = leaveBalSnap.docs[0];
-            const balData     = balDoc.data();
-            const currentUsed = balData?.[balanceKey]?.used  ?? 0;
-            const quota       = balData?.[balanceKey]?.quota ?? 12;
+            const balDoc = leaveBalSnap.docs[0];
+            const balData = balDoc.data();
+            const currentUsed = balData?.[balanceKey]?.used ?? 0;
+            const quota = balData?.[balanceKey]?.quota ?? 12;
             await updateDoc(doc(db, "leaveBalances", balDoc.id), {
-              [`${balanceKey}.used`]:  Math.min(currentUsed + days, quota),
+              [`${balanceKey}.used`]: Math.min(currentUsed + days, quota),
               [`${balanceKey}.quota`]: quota,
             });
           } else {
             await addDoc(collection(db, "leaveBalances"), {
-              uid:    req.uid,
-              sick:   { quota: 12, used: balanceKey === "sick"   ? Math.min(days, 12) : 0 },
+              uid: req.uid,
+              sick: { quota: 12, used: balanceKey === "sick" ? Math.min(days, 12) : 0 },
               casual: { quota: 12, used: balanceKey === "casual" ? Math.min(days, 12) : 0 },
-              lop:    { used: 0 },
-              wfh:    { used: 0 },
+              lop: { used: 0 },
+              wfh: { used: 0 },
             });
           }
         }
@@ -511,28 +511,28 @@ export default function AdminLeaveRequests() {
         const leaveKeyLower = req.leaveType?.toLowerCase();
         if (leaveKeyLower === "lop" || leaveKeyLower === "wfh") {
           if (!leaveBalSnap.empty) {
-            const balDoc      = leaveBalSnap.docs[0];
+            const balDoc = leaveBalSnap.docs[0];
             const currentUsed = balDoc.data()?.[leaveKeyLower]?.used ?? 0;
             await updateDoc(doc(db, "leaveBalances", balDoc.id), { [`${leaveKeyLower}.used`]: currentUsed + days });
           } else {
             await addDoc(collection(db, "leaveBalances"), {
-              uid:    req.uid,
-              sick:   { quota: 12, used: 0 },
+              uid: req.uid,
+              sick: { quota: 12, used: 0 },
               casual: { quota: 12, used: 0 },
-              lop:    { used: leaveKeyLower === "lop" ? days : 0 },
-              wfh:    { used: leaveKeyLower === "wfh" ? days : 0 },
+              lop: { used: leaveKeyLower === "lop" ? days : 0 },
+              wfh: { used: leaveKeyLower === "wfh" ? days : 0 },
             });
           }
         }
 
         if (balanceKey) {
-          const empRef  = doc(db, "employees", req.uid);
+          const empRef = doc(db, "employees", req.uid);
           const empSnap = await getDoc(empRef);
           if (empSnap.exists()) {
             const current = empSnap.data().leaveBalance ?? { annual: 18, sick: 12, casual: 6 };
             await updateDoc(empRef, { leaveBalance: { ...current, [balanceKey]: Math.max(0, (current[balanceKey] ?? 0) - days) } });
           } else {
-            const userRef  = doc(db, "users", req.uid);
+            const userRef = doc(db, "users", req.uid);
             const userSnap = await getDoc(userRef);
             if (userSnap.exists()) {
               const current = userSnap.data().leaveBalance ?? { annual: 18, sick: 12, casual: 6 };
@@ -544,15 +544,15 @@ export default function AdminLeaveRequests() {
 
       if (req.uid) {
         await addDoc(collection(db, "notifications"), {
-          toUid:     req.uid,
-          fromName:  "HR Admin",
-          fromUid:   "hr_system",
-          type:      "leave_update",
-          message:   newStatus === "Approved"
+          toUid: req.uid,
+          fromName: "HR Admin",
+          fromUid: "hr_system",
+          type: "leave_update",
+          message: newStatus === "Approved"
             ? `Your ${req.leaveType ?? ""} leave (${req.fromDate} – ${req.toDate}) has been approved ✅`
             : `Your ${req.leaveType ?? ""} leave (${req.fromDate} – ${req.toDate}) has been rejected ❌`,
-          chatId:    "",
-          read:      false,
+          chatId: "",
+          read: false,
           timestamp: serverTimestamp(),
         });
       }
@@ -581,8 +581,8 @@ export default function AdminLeaveRequests() {
   };
 
   // ── Derived stats ──────────────────────────────────────────────────────────
-  const total    = requests.length;
-  const pending  = requests.filter(r => (r.status ?? "") === "Pending").length;
+  const total = requests.length;
+  const pending = requests.filter(r => (r.status ?? "") === "Pending").length;
   const approved = requests.filter(r => (r.status ?? "") === "Approved").length;
   const rejected = requests.filter(r => (r.status ?? "") === "Rejected").length;
 
@@ -594,18 +594,18 @@ export default function AdminLeaveRequests() {
 
   const filtered = useMemo(() => {
     return requests.filter(r => {
-      if (statusFilter === "pending"  && (r.status ?? "") !== "Pending")  return false;
+      if (statusFilter === "pending" && (r.status ?? "") !== "Pending") return false;
       if (statusFilter === "approved" && (r.status ?? "") !== "Approved") return false;
       if (statusFilter === "rejected" && (r.status ?? "") !== "Rejected") return false;
-      if (typeFilter !== "all" && r.leaveType !== typeFilter)              return false;
+      if (typeFilter !== "all" && r.leaveType !== typeFilter) return false;
       if (monthFilter !== "all" && !(r.fromDate ?? "").startsWith(monthFilter)) return false;
       if (search) {
         const s = search.toLowerCase();
         return (
-          (r.userName   || "").toLowerCase().includes(s) ||
-          (r.userEmail  || "").toLowerCase().includes(s) ||
-          (r.leaveType  || "").toLowerCase().includes(s) ||
-          (r.reason     || "").toLowerCase().includes(s) ||
+          (r.userName || "").toLowerCase().includes(s) ||
+          (r.userEmail || "").toLowerCase().includes(s) ||
+          (r.leaveType || "").toLowerCase().includes(s) ||
+          (r.reason || "").toLowerCase().includes(s) ||
           (r.department || "").toLowerCase().includes(s)
         );
       }
@@ -613,9 +613,9 @@ export default function AdminLeaveRequests() {
     });
   }, [requests, statusFilter, typeFilter, monthFilter, search]);
 
-  const totalPages  = Math.ceil(filtered.length / perPage) || 1;
+  const totalPages = Math.ceil(filtered.length / perPage) || 1;
   const currentPage = Math.min(page, totalPages - 1);
-  const pageRows    = filtered.slice(currentPage * perPage, (currentPage + 1) * perPage);
+  const pageRows = filtered.slice(currentPage * perPage, (currentPage + 1) * perPage);
 
   const closeDrawer = () => { setSelected(null); setDeleteConfirm(null); };
 
@@ -627,8 +627,6 @@ export default function AdminLeaveRequests() {
         .lm-root * { box-sizing: border-box; }
         .lm-root {
           font-family: 'Inter', -apple-system, sans-serif;
-          background: #f4f6fb;
-          min-height: 100vh;
           display: flex;
           flex-direction: column;
         }
@@ -864,8 +862,8 @@ export default function AdminLeaveRequests() {
               </div>
               <div className="lm-status-pills">
                 {([
-                  ["all",      `All (${total})`],
-                  ["pending",  `Pending (${pending})`],
+                  ["all", `All (${total})`],
+                  ["pending", `Pending (${pending})`],
                   ["approved", `Approved (${approved})`],
                   ["rejected", `Rejected (${rejected})`],
                 ] as const).map(([f, label]) => (
@@ -913,7 +911,7 @@ export default function AdminLeaveRequests() {
                       <th style={{ width: 110 }}>Leave Type</th>
                       <th style={{ width: 100 }}>From</th>
                       <th style={{ width: 100 }}>To</th>
-                      <th style={{ width: 60  }}>Days</th>
+                      <th style={{ width: 60 }}>Days</th>
                       <th style={{ width: 100 }}>Applied</th>
                       <th style={{ width: 100 }}>Status</th>
                       <th style={{ width: 180 }}>Actions</th>
@@ -921,11 +919,11 @@ export default function AdminLeaveRequests() {
                   </thead>
                   <tbody>
                     {pageRows.map(req => {
-                      const lc   = getLeaveCfg(req.leaveType);
-                      const sc   = getStatusCfg(req.status);
+                      const lc = getLeaveCfg(req.leaveType);
+                      const sc = getStatusCfg(req.status);
                       const days = getDays(req.fromDate ?? "", req.toDate ?? "");
                       const isPending = (req.status ?? "") === "Pending";
-                      const isArmed   = deleteConfirm === req.id;
+                      const isArmed = deleteConfirm === req.id;
                       return (
                         <tr key={req.id} className={selected?.id === req.id ? "selected" : ""} onClick={() => setSelected(req)}>
                           <td>
@@ -948,7 +946,7 @@ export default function AdminLeaveRequests() {
                               {isPending ? (
                                 <>
                                   <button className="lm-approve-inline" disabled={updating} onClick={() => setConfirm({ id: req.id, action: "Approved" })}>✓ Approve</button>
-                                  <button className="lm-reject-inline"  disabled={updating} onClick={() => setConfirm({ id: req.id, action: "Rejected" })}>✗ Reject</button>
+                                  <button className="lm-reject-inline" disabled={updating} onClick={() => setConfirm({ id: req.id, action: "Rejected" })}>✗ Reject</button>
                                 </>
                               ) : (
                                 <button

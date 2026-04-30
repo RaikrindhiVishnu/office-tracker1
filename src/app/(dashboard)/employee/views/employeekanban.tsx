@@ -183,7 +183,7 @@ export function KanbanBoard({
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [collapsedStories, setCollapsedStories] = useState<Set<string>>(new Set());
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
-  const [storyPopup, setStoryPopup] = useState<{ storyId: string } | null>(null);
+  const [storyPopup, setStoryPopup] = useState<{ storyId: string; top: number; left: number } | null>(null);
   const [editingColId, setEditingColId] = useState<string | null>(null);
   const [editingColLabel, setEditingColLabel] = useState("");
   const [editingColWip, setEditingColWip] = useState<number | null>(null);
@@ -221,6 +221,7 @@ export function KanbanBoard({
         setFilters({ search: "", mine: false, overdue: false, priority: "", type: "", assignee: "" });
         setSelectedTasks(new Set());
         setBulkMoveOpen(false);
+        setStoryPopup(null);
       }
       if (e.key === "?" || e.key === "/") { e.preventDefault(); setShowShortcuts(v => !v); }
       if ((e.key === "f" || e.key === "F") && !e.metaKey && !e.ctrlKey) { e.preventDefault(); setIsFullscreen(v => !v); }
@@ -479,7 +480,6 @@ export function KanbanBoard({
           boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
           position: "relative",
           display: "block",
-          // ✅ FIX: prevents flex blowout in narrow swimlane cells
           minWidth: 0,
           boxSizing: "border-box",
           flexShrink: 0,
@@ -487,7 +487,6 @@ export function KanbanBoard({
         onMouseEnter={e => { if (!isDragging) (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)"; }}
         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 3px rgba(0,0,0,0.06)"; }}
       >
-        {/* Top row */}
         <div style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "7px", minWidth: 0 }}>
           <div
             onClick={e => toggleSelect(task.id, e)}
@@ -516,20 +515,14 @@ export function KanbanBoard({
             </div>
           )}
         </div>
-
-        {/* Title */}
         <p style={{ fontSize: "13px", fontWeight: 600, color: "#1f2937", lineHeight: 1.4, marginBottom: "5px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
           {task.title}
         </p>
-
-        {/* Description */}
         {task.description && (
           <p style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "5px", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
             {task.description}
           </p>
         )}
-
-        {/* Tags */}
         {task.tags && task.tags.length > 0 && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginBottom: "6px" }}>
             {task.tags.slice(0, 3).map(tag => (
@@ -538,9 +531,6 @@ export function KanbanBoard({
             {task.tags.length > 3 && <span style={{ fontSize: "10px", color: "#9ca3af" }}>+{task.tags.length - 3}</span>}
           </div>
         )}
-
-        {/* Footer */}
-        {/* ✅ FIX: minWidth:0 + overflow:hidden prevents footer from busting card width */}
         <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, overflow: "hidden" }}>
           {task.assignedToName ? (
             <>
@@ -604,7 +594,6 @@ export function KanbanBoard({
         boxSizing: "border-box",
         flexShrink: 0,
       }}>
-        {/* Draggable header */}
         <div
           draggable={draggable}
           onDragStart={e => { if (!draggable) { e.preventDefault(); return; } handleDragStart(e, story); }}
@@ -612,7 +601,6 @@ export function KanbanBoard({
           onClick={e => { if (e.shiftKey) { toggleSelect(story.id, e); return; } onTaskClick(story); }}
           style={{ padding: "10px 10px 8px", cursor: draggable ? "grab" : "default", borderLeft: "3px solid #7c3aed" }}
         >
-          {/* Top */}
           <div style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "7px", minWidth: 0 }}>
             <div
               onClick={e => toggleSelect(story.id, e)}
@@ -634,13 +622,9 @@ export function KanbanBoard({
               </div>
             )}
           </div>
-
-          {/* Title */}
           <p style={{ fontSize: "13px", fontWeight: 700, color: "#3730a3", lineHeight: 1.4, marginBottom: "6px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
             {story.title}
           </p>
-
-          {/* Tags */}
           {story.tags && story.tags.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginBottom: "6px" }}>
               {story.tags.slice(0, 3).map(tag => (
@@ -648,8 +632,6 @@ export function KanbanBoard({
               ))}
             </div>
           )}
-
-          {/* Progress */}
           <div style={{ marginBottom: "7px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "#8b5cf6", marginBottom: "3px" }}>
               <span>{doneCount}/{allChildren.length} tasks</span>
@@ -659,8 +641,6 @@ export function KanbanBoard({
               <div style={{ height: "4px", borderRadius: "4px", width: `${pct}%`, background: pct === 100 ? "#22c55e" : "#6366f1", transition: "width 0.4s" }} />
             </div>
           </div>
-
-          {/* Footer */}
           <div style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
             {story.assignedToName ? (
               <div style={{ display: "flex", alignItems: "center", gap: "5px", flex: 1, minWidth: 0 }}>
@@ -680,41 +660,26 @@ export function KanbanBoard({
                 {ovd ? "⚡ " : ""}{formatDate(story.dueDate)}
               </span>
             )}
-            {/* Collapse btn */}
             <button
               onClick={e => { e.stopPropagation(); toggleStory(story.id, colId); }}
               style={{ width: "22px", height: "22px", borderRadius: "6px", border: "1px solid #ddd6fe", background: "#ede9fe", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", color: "#6d28d9", marginRight: "4px", flexShrink: 0 }}
             >
               {isCollapsed ? "▶" : "▼"}
             </button>
-            {/* Add child btn */}
             {(isProjectManager || permissions.canCreateTypes.length > 0) && (
+
               <div style={{ position: "relative", flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                 <button
-                  onClick={e => { e.stopPropagation(); setStoryPopup(prev => prev?.storyId === story.id ? null : { storyId: story.id }); }}
+                  onClick={e => {
+                    e.stopPropagation();
+                    const r = e.currentTarget.getBoundingClientRect();
+                    setStoryPopup(prev => prev?.storyId === story.id ? null : { storyId: story.id, top: r.bottom + 6, left: r.left - 138 });
+                  }}
                   style={{ width: "22px", height: "22px", borderRadius: "6px", border: "none", background: projectColor, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "14px", fontWeight: 700 }}
                 >+</button>
-                {storyPopup?.storyId === story.id && (
-                  <>
-                    <div style={{ position: "fixed", inset: 0, zIndex: 40 }} onClick={() => setStoryPopup(null)} />
-                    <div style={{ position: "absolute", right: 0, top: "28px", zIndex: 50, background: "#fff", borderRadius: "12px", boxShadow: "0 8px 24px rgba(0,0,0,0.12)", border: "1px solid #e5e7eb", overflow: "hidden", width: "160px" }}>
-                      <p style={{ fontSize: "10px", fontWeight: 800, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", padding: "8px 12px 6px", borderBottom: "1px solid #f3f4f6" }}>Add to Story</p>
-                      {(["task", "bug", "defect"] as TicketType[])
-                        .filter(type => isProjectManager || permissions.canCreateTypes.includes(type))
-                        .map(type => {
-                          const cfg = TYPE_META[type];
-                          return (
-                            <button key={type} onClick={() => { setStoryPopup(null); onAddChildToStory(story, type); }}
-                              style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", padding: "8px 12px", fontSize: "13px", fontWeight: 600, background: "none", border: "none", cursor: "pointer", color: cfg.color, textAlign: "left" }}>
-                              <span>{cfg.icon}</span><span>{cfg.label}</span>
-                            </button>
-                          );
-                        })}
-                    </div>
-                  </>
-                )}
               </div>
             )}
+
           </div>
         </div>
 
@@ -1213,8 +1178,9 @@ export function KanbanBoard({
   const renderShortcutsModal = () => (
     showShortcuts ? (
       <>
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 100 }} onClick={() => setShowShortcuts(false)} />
-        <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", zIndex: 101, background: "#fff", borderRadius: "16px", padding: "24px", boxShadow: "0 24px 48px rgba(0,0,0,0.18)", minWidth: "320px" }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 10000 }} onClick={() => setShowShortcuts(false)} />
+        <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", zIndex: 10001, background: "#fff", borderRadius: "16px", padding: "24px", boxShadow: "0 24px 48px rgba(0,0,0,0.18)", minWidth: "320px" }}>
+
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
             <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#111827" }}>Keyboard Shortcuts</h3>
             <button onClick={() => setShowShortcuts(false)} style={{ background: "none", border: "none", fontSize: "16px", cursor: "pointer", color: "#6b7280" }}>✕</button>
@@ -1244,9 +1210,10 @@ export function KanbanBoard({
       flexDirection: "column",
       position: isFullscreen ? "fixed" : "relative",
       inset: isFullscreen ? 0 : undefined,
-      zIndex: isFullscreen ? 9999 : undefined,
+      zIndex: isFullscreen ? 9998 : undefined,
       width: isFullscreen ? "100vw" : "100%",
       height: isFullscreen ? "100vh" : "100%",
+
       background: "#fff",
       overflow: "hidden",
     }}>
@@ -1412,7 +1379,33 @@ export function KanbanBoard({
       {/* Shortcuts modal */}
       {renderShortcutsModal()}
 
-      {storyPopup && <div style={{ position: "fixed", inset: 0, zIndex: 30 }} onClick={() => setStoryPopup(null)} />}
+      {storyPopup && (
+        createPortal(
+          <>
+            <div style={{ position: "fixed", inset: 0, zIndex: 10000 }} onClick={() => setStoryPopup(null)} />
+            <div style={{ position: "fixed", top: storyPopup.top, left: storyPopup.left, zIndex: 10001, background: "#fff", borderRadius: "12px", boxShadow: "0 8px 24px rgba(0,0,0,0.12)", border: "1px solid #e5e7eb", overflow: "hidden", width: "160px" }}>
+              <p style={{ fontSize: "10px", fontWeight: 800, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", padding: "8px 12px 6px", borderBottom: "1px solid #f3f4f6" }}>Add to Story</p>
+              {(["task", "bug", "defect"] as TicketType[])
+                .map(type => {
+
+                  const cfg = TYPE_META[type];
+                  const story = localTasks.find(t => t.id === storyPopup.storyId);
+                  return (
+                    <button key={type} onClick={() => { setStoryPopup(null); if (story) onAddChildToStory(story, type); }}
+                      style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", padding: "8px 12px", fontSize: "13px", fontWeight: 600, background: "none", border: "none", cursor: "pointer", color: cfg.color, textAlign: "left" }}>
+                      <span>{cfg.icon}</span><span>{cfg.label}</span>
+                    </button>
+                  );
+                })}
+            </div>
+          </>,
+          document.body
+        )
+      )}
+
+
+
+
     </div>
   );
 

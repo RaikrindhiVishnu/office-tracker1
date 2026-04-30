@@ -209,16 +209,22 @@ function NotificationDropdown({
   const hasNone = totalUnread === 0 && read.leave.length === 0 && read.query.length === 0 && read.chat.length === 0 && read.announcement.length === 0;
 
   const renderChat = (n: any, isRead: boolean) => (
-    <div key={n.id} className={`flex items-start gap-3 p-3 rounded-xl border transition-colors ${isRead ? "bg-gray-50 border-gray-100 opacity-60" : "bg-blue-50 border-blue-200 hover:bg-blue-100"}`}>
-      <button className="flex items-start gap-3 flex-1 min-w-0 text-left" onClick={() => { if (!isRead) markChatRead(n.id); onGoToChat?.(n.chatId); onClose(); }}>
+    <div key={n.id} className={`flex items-start gap-3 p-3 rounded-xl border transition-all duration-300 ${isRead ? "bg-gray-50 border-gray-100 opacity-60" : "bg-blue-50 border-blue-200 hover:bg-blue-100"}`}>
+
+      <button className="flex items-start gap-3 flex-1 min-w-0 text-left" onClick={() => { if (!isRead) markChatRead(n.id); onGoToChat?.(n.chatId); }}>
         <div className={`w-9 h-9 rounded-full bg-linear-to-br flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm ${isRead ? "from-gray-300 to-gray-400" : "from-blue-400 to-indigo-500"}`}>{n.fromName.charAt(0).toUpperCase()}</div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-800 leading-tight">{n.fromName}<span className={`font-normal ml-1 ${isRead ? "text-gray-500" : "text-blue-600"}`}>sent you a message</span></p>
+          <p className="text-sm font-semibold text-gray-800 leading-tight truncate">
+            {n.fromName}
+            <span className={`font-normal ml-1 ${isRead ? "text-gray-500" : "text-blue-600"}`}>sent you a message</span>
+          </p>
           <p className="text-xs text-gray-600 mt-0.5 truncate italic">&ldquo;{n.message}&rdquo;</p>
         </div>
       </button>
+
       {!isRead && (
-        <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); markChatRead(n.id); }} className="w-6 h-6 flex items-center justify-center rounded-full bg-white hover:bg-blue-200 border border-blue-200 transition-colors text-gray-400 hover:text-blue-600 shrink-0 mt-0.5">
+        <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); markChatRead(n.id); }} className="w-6 h-6 flex items-center justify-center rounded-full bg-white hover:bg-blue-200 border border-blue-200 transition-colors text-gray-400 hover:text-blue-600 shrink-0 mt-1 shadow-sm">
+
           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
       )}
@@ -226,22 +232,24 @@ function NotificationDropdown({
   );
 
   const renderLeave = (leave: any, isRead: boolean) => (
-    <div key={leave.id} className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${isRead ? "bg-gray-50 border-gray-100 opacity-60" : leave.status === "Approved" ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
+    <div key={leave.id} className={`flex items-center gap-3 p-3 rounded-xl border transition-all duration-300 ${isRead ? "bg-gray-50 border-gray-100 opacity-60" : leave.status === "Approved" ? "bg-green-50 border-green-200 cursor-pointer hover:bg-green-100" : "bg-red-50 border-red-200 cursor-pointer hover:bg-red-100"}`} onClick={() => { if (!isRead) markLeaveRead(leave.id); }}>
       <div className={`w-9 h-9 rounded-full flex items-center justify-center text-lg shrink-0 ${isRead ? "bg-gray-200 grayscale" : leave.status === "Approved" ? "bg-green-100" : "bg-red-100"}`}>{leave.status === "Approved" ? "✅" : "❌"}</div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-800 leading-tight"><strong>{leave.leaveType}</strong> leave <span className={isRead ? "text-gray-500" : leave.status === "Approved" ? "text-green-600" : "text-red-600"}>{leave.status}</span></p>
+        <p className="text-sm font-semibold text-gray-800 leading-tight truncate"><strong>{leave.leaveType}</strong> leave <span className={isRead ? "text-gray-500" : leave.status === "Approved" ? "text-green-600" : "text-red-600"}>{leave.status}</span></p>
+
         <p className="text-[10px] text-gray-500 mt-0.5">📅 {leave.fromDate} – {leave.toDate}</p>
       </div>
       {!isRead && (
-        <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); markLeaveRead(leave.id); }} className="w-6 h-6 flex items-center justify-center rounded-full bg-white hover:bg-red-100 border border-gray-200 transition-colors text-gray-400 hover:text-red-600 shrink-0">
+        <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); markLeaveRead(leave.id); }} className="w-6 h-6 flex items-center justify-center rounded-full bg-white hover:bg-red-200 border border-gray-200 transition-colors text-gray-400 hover:text-red-600 shrink-0">
           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
       )}
     </div>
+
   );
 
   const renderQuery = (q: any, isRead: boolean) => (
-    <div key={q.id} className={`flex items-start gap-3 p-3 rounded-xl border transition-colors ${isRead ? "bg-gray-50 border-gray-100 opacity-60" : "bg-purple-50 border-purple-200"}`}>
+    <div key={q.id} className={`flex items-start gap-3 p-3 rounded-xl border transition-all duration-300 ${isRead ? "bg-gray-50 border-gray-100 opacity-60" : "bg-purple-50 border-purple-200 cursor-pointer hover:bg-purple-100"}`} onClick={() => { if (!isRead) markQueryRead(q.id); }}>
       <div className={`w-9 h-9 rounded-full flex items-center justify-center text-lg shrink-0 ${isRead ? "bg-gray-200 grayscale" : "bg-purple-100"}`}>💬</div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-gray-800">Admin replied to your query</p>
@@ -254,10 +262,11 @@ function NotificationDropdown({
         </button>
       )}
     </div>
+
   );
 
   const renderAnnouncement = (a: any, isRead: boolean) => (
-    <div key={a.id} className={`flex items-start gap-3 p-3 rounded-xl border transition-colors ${isRead ? "bg-gray-50 border-gray-100 opacity-60" : "bg-yellow-50 border-yellow-200 hover:bg-yellow-100"}`}>
+    <div key={a.id} className={`flex items-start gap-3 p-3 rounded-xl border transition-all duration-300 ${isRead ? "bg-gray-50 border-gray-100 opacity-60" : "bg-yellow-50 border-yellow-200 cursor-pointer hover:bg-yellow-100"}`} onClick={() => { if (!isRead) markAnnouncementRead(a.id); }}>
       <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-lg shrink-0 shadow-sm ${isRead ? "bg-gray-300" : "bg-yellow-400"}`}>📣</div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-gray-800 leading-tight">New Announcement</p>
@@ -269,6 +278,7 @@ function NotificationDropdown({
         </button>
       )}
     </div>
+
   );
 
   return (
@@ -496,10 +506,15 @@ export default function ZohoStyleEmployeeDashboard() {
   useEffect(() => {
     return onSnapshot(query(collection(db, "messages"), orderBy("createdAt", "desc")),
       snap => {
-        const docs = snap.docs.map(d => ({ id: d.id, text: (d.data() as any).text || "" }));
+        const docs = snap.docs.map(d => ({
+          id: d.id,
+          text: (d.data() as any).text || "",
+          createdAt: (d.data() as any).createdAt
+        }));
         setAnnouncements(docs);
         setMessages(docs.map(d => d.text));
       });
+
   }, []);
 
   useEffect(() => {
@@ -668,7 +683,7 @@ export default function ZohoStyleEmployeeDashboard() {
       {/* ── SIDEBAR ── (unchanged) */}
       <aside className={`fixed lg:static inset-y-0 left-0 z-50 bg-[#192e44] text-white flex flex-col transform transition-all duration-300 ${sidebarCollapsed ? "w-16" : "w-64"
         } ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
-        <div className="p-3 flex items-center justify-between border-b border-white/10">
+        <div className="p-4 flex items-center justify-between border-b border-white/10">
           {!sidebarCollapsed && (
             <div className="flex items-center gap-2 ml-2">
               <Image src="/logo.svg" alt="TGY CRM Logo" width={90} height={70} className="object-contain" />
@@ -707,7 +722,7 @@ export default function ZohoStyleEmployeeDashboard() {
             </div>
           </div>
         )}
-        <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20">
+        <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20">
           {sidebarItems.map(([id, label, icon]) => (
             <button key={id} onClick={() => { changeView(id); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 relative group ${activeView === id ? "bg-white/15 text-white shadow-sm border border-white/10" : "text-white/75 hover:bg-white/8 hover:text-white"

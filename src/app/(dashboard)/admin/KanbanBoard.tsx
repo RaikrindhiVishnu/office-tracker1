@@ -51,14 +51,41 @@ const STATIC_COL_CONFIG: Record<string, { color: string; bg: string; border: str
 };
 
 const DYNAMIC_PALETTE = [
-  { color: "#64748b", bg: "#f8fafc", border: "#e2e8f0", headerBg: "#f1f5f9", dot: "#94a3b8" },
+  // Slate / Gray
+  { color: "#475569", bg: "#f8fafc", border: "#e2e8f0", headerBg: "#f1f5f9", dot: "#64748b" },
+  // Blue
   { color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", headerBg: "#dbeafe", dot: "#3b82f6" },
-  { color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", headerBg: "#ede9fe", dot: "#8b5cf6" },
-  { color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0", headerBg: "#dcfce7", dot: "#22c55e" },
-  { color: "#dc2626", bg: "#fef2f2", border: "#fecaca", headerBg: "#fee2e2", dot: "#ef4444" },
+  // Cyan
   { color: "#0891b2", bg: "#ecfeff", border: "#a5f3fc", headerBg: "#cffafe", dot: "#06b6d4" },
+  // Teal
+  { color: "#0d9488", bg: "#f0fdfa", border: "#99f6e4", headerBg: "#ccfbf1", dot: "#14b8a6" },
+  
+  // Green
+  { color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0", headerBg: "#dcfce7", dot: "#22c55e" },
+  // Lime
+  { color: "#65a30d", bg: "#f7fee7", border: "#d9f99d", headerBg: "#ecfccb", dot: "#84cc16" },
+  // Yellow
+  { color: "#ca8a04", bg: "#fefce8", border: "#fef08a", headerBg: "#fef9c3", dot: "#eab308" },
+  // Amber
   { color: "#d97706", bg: "#fffbeb", border: "#fde68a", headerBg: "#fef3c7", dot: "#f59e0b" },
+
+  // Orange
+  { color: "#ea580c", bg: "#fff7ed", border: "#fed7aa", headerBg: "#ffedd5", dot: "#f97316" },
+  // Red
+  { color: "#dc2626", bg: "#fef2f2", border: "#fecaca", headerBg: "#fee2e2", dot: "#ef4444" },
+  // Rose
+  { color: "#e11d48", bg: "#fff1f2", border: "#fecdd3", headerBg: "#ffe4e6", dot: "#f43f5e" },
+  // Pink
   { color: "#be185d", bg: "#fdf2f8", border: "#fbcfe8", headerBg: "#fce7f3", dot: "#ec4899" },
+
+  // Fuchsia
+  { color: "#c026d3", bg: "#fdf4ff", border: "#fae8ff", headerBg: "#f5d0fe", dot: "#d946ef" },
+  // Purple
+  { color: "#9333ea", bg: "#faf5ff", border: "#e9d5ff", headerBg: "#f3e8ff", dot: "#a855f7" },
+  // Violet
+  { color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", headerBg: "#ede9fe", dot: "#8b5cf6" },
+  // Indigo
+  { color: "#4f46e5", bg: "#eef2ff", border: "#c7d2fe", headerBg: "#e0e7ff", dot: "#6366f1" },
 ];
 
 const PRI_CONFIG: Record<string, { dot: string; bg: string; text: string; label: string }> = {
@@ -75,8 +102,18 @@ const avatarColor   = (name: string) => AVATAR_COLORS[(name?.charCodeAt(0) || 0)
 const avatarInitial = (name: string): string => (!name || name.includes("@")) ? "U" : name.trim()[0].toUpperCase();
 const cleanDisplayName = (name: string | null | undefined): string => (!name || name.includes("@")) ? "User" : name;
 
-const SWIMLANE_LABEL_WIDTH = 180;
-const SWIMLANE_COL_WIDTH   = 280;
+const SWIMLANE_LABEL_WIDTH = 160;
+const SWIMLANE_COL_WIDTH   = 260;
+
+function generateThemeFromColor(hex: string) {
+  return {
+    color: hex,
+    bg: `${hex}10`,
+    border: `${hex}30`,
+    headerBg: `${hex}15`,
+    dot: hex
+  };
+}
 
 export function getColStyle(colId: string, index: number) {
   return STATIC_COL_CONFIG[colId] ?? DYNAMIC_PALETTE[index % DYNAMIC_PALETTE.length];
@@ -130,7 +167,7 @@ function ColorPickerPortal({ dotColor, onSelect, onClose }: {
     <>
       {/* backdrop */}
       <div
-        style={{ position: "fixed", inset: 0, zIndex: 99990 }}
+        style={{ position: "fixed", inset: 0, zIndex: 10000 }}
         onMouseDown={(e) => { e.stopPropagation(); onClose(); }}
         onClick={(e) => { e.stopPropagation(); onClose(); }}
       />
@@ -139,35 +176,54 @@ function ColorPickerPortal({ dotColor, onSelect, onClose }: {
         style={{
           position: "fixed", top: "50%", left: "50%",
           transform: "translate(-50%,-50%)",
-          zIndex: 99991, background: "#fff",
-          border: "1px solid #e5e7eb", borderRadius: "16px",
-          boxShadow: "0 24px 64px rgba(0,0,0,0.18)",
-          padding: "16px", width: "212px",
+          zIndex: 10001, background: "#fff",
+          border: "1px solid #f1f5f9", borderRadius: "20px",
+          boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+          padding: "20px", width: "240px",
         }}
+
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
-        <p style={{ fontSize: "10px", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.08em", color: "#9ca3af", marginBottom: "12px" }}>
-          Select Column Theme
+        <p style={{ fontSize: "10px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: "#64748b", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ width: "4px", height: "4px", borderRadius: "50%", background: "#6366f1" }} />
+          Standard Themes
         </p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "10px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "12px", marginBottom: "20px" }}>
           {DYNAMIC_PALETTE.map((pal, pi) => (
             <span
               key={pi}
               title={pal.color}
               style={{
-                display: "inline-block", width: "36px", height: "36px",
-                borderRadius: "50%", background: pal.dot, cursor: "pointer",
+                display: "inline-block", width: "40px", height: "40px",
+                borderRadius: "12px", background: pal.dot, cursor: "pointer",
                 border: `3px solid ${dotColor === pal.dot ? "#1e293b" : "#fff"}`,
-                boxShadow: "0 2px 6px rgba(0,0,0,0.13)",
-                transition: "transform 0.1s",
+                boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)",
+                transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
               }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.18)"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1.1) translateY(-2px)"; (e.currentTarget as HTMLElement).style.boxShadow = "0 10px 15px -3px rgba(0,0,0,0.1)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 6px -1px rgba(0,0,0,0.1)"; }}
               onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
               onClick={(e) => { e.stopPropagation(); onSelect(pal); }}
             />
           ))}
+        </div>
+
+        <p style={{ fontSize: "10px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", color: "#64748b", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ width: "4px", height: "4px", borderRadius: "50%", background: "#ec4899" }} />
+          Custom Spectrum
+        </p>
+        <div style={{ padding: "3px", border: "1px solid #f1f5f9", borderRadius: "14px", background: "#f8fafc", boxShadow: "inset 0 2px 4px 0 rgba(0,0,0,0.05)" }}>
+          <input
+            type="color"
+            value={dotColor}
+            onChange={(e) => onSelect(generateThemeFromColor(e.target.value))}
+            style={{
+              width: "100%", height: "40px", cursor: "pointer",
+              border: "none", borderRadius: "10px", background: "none",
+              display: "block", padding: 0
+            }}
+          />
         </div>
       </div>
     </>,
@@ -217,8 +273,8 @@ function ColorDot({ dotColor, pickerKey, activeKey, setActiveKey, onSelect }: {
 
 /* ─── CONFIRM DIALOG ─── */
 function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
-  return (
-    <div className="fixed inset-0 z-9999 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
+  return createPortal(
+    <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs p-6 text-center">
         <div className="text-3xl mb-3">⚠️</div>
         <p className="text-sm text-gray-700 mb-5 font-medium">{message}</p>
@@ -227,18 +283,21 @@ function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onCo
           <button onClick={onConfirm} className="px-4 py-2 text-sm font-semibold bg-red-500 text-white rounded-lg hover:bg-red-600">Confirm</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
+
 
 /* ─── FLOATING CHILD MENU ─── */
 const FloatingMenu = ({ position, onClose, onCreate }: {
   position: { top: number; left: number }; onClose: () => void; onCreate: (t: string) => void;
 }) => createPortal(
   <>
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 9998 }} />
-    <div style={{ position: "fixed", top: position.top, left: position.left, zIndex: 9999 }}
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 10000 }} />
+    <div style={{ position: "fixed", top: position.top, left: position.left, zIndex: 10001 }}
       className="bg-white border border-gray-200 rounded-xl shadow-2xl w-44 py-1.5 overflow-hidden">
+
       <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-50 mb-1">Add to Story</div>
       {(["task","bug","defect"] as const).map(t => {
         const tm = TYPE_META[t];
@@ -367,8 +426,11 @@ export function TaskModal({
     onClose();
   };
 
-  return (
-    <div className="fixed inset-0 z-55 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)" }}>
+  if (!open) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)" }}>
+
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between"
           style={{ background: `linear-gradient(135deg, ${projectColor}, ${projectColor}dd)` }}>
@@ -483,9 +545,11 @@ export function TaskModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
+
 
 /* ══════════════════════════════════════════════
    MAIN KANBAN BOARD
@@ -622,7 +686,8 @@ export function KanbanBoard({
   const handleTaskDragStart = (e: React.DragEvent, task: Task) => {
     setDragTask(task);
     e.dataTransfer.effectAllowed = "move";
-    setTimeout(() => { (e.currentTarget as HTMLElement).style.opacity = "0.4"; }, 0);
+    const target = e.currentTarget as HTMLElement;
+    setTimeout(() => { if (target) target.style.opacity = "0.4"; }, 0);
   };
   const handleTaskDragEnd = (e: React.DragEvent) => {
     (e.currentTarget as HTMLElement).style.opacity = "1";
@@ -894,7 +959,7 @@ export function KanbanBoard({
                       setActiveKey={setActiveColorKey}
                       onSelect={(pal) => handleUpdateColColor(col.id, pal)}
                     />
-                    <span className="text-[11px] font-extrabold" style={{ color: cfg.color, whiteSpace: "nowrap" }}>
+                    <span className="text-[10px] font-extrabold" style={{ color: cfg.color, whiteSpace: "nowrap" }}>
                       {col.label}
                     </span>
                   </div>
@@ -1120,7 +1185,8 @@ export function KanbanBoard({
   if (!isMounted) return null;
 
   const content = (
-    <div className={isFullscreen ? "fixed inset-0 z-9999 bg-white flex flex-col" : "relative h-full w-full flex flex-col"}>
+    <div className={isFullscreen ? "fixed inset-0 z-[9998] bg-white flex flex-col" : "relative h-full w-full flex flex-col"}>
+
       <style>{`
         .kb-scroll-x { overflow-x: auto; overflow-y: hidden; }
         .kb-scroll-y { overflow-y: auto; overflow-x: hidden; }

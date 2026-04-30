@@ -1215,13 +1215,15 @@ function DetailView({
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
-  .adash-root { min-height:100vh; background:#f8fafc; font-family:'Plus Jakarta Sans',system-ui,sans-serif; -webkit-font-smoothing:antialiased; color:#1e293b; }
-  .adash-topbar { position:sticky; top:0; z-index:50; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:12px 28px; background:rgba(255,255,255,0.9); backdrop-filter:blur(20px); border-bottom:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+  .adash-root { font-family:'Plus Jakarta Sans',system-ui,sans-serif; -webkit-font-smoothing:antialiased; color:#1e293b; }
+  .adash-topbar { position:relative; z-index:10; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; padding:8px 0; background:transparent; border-bottom:1px solid #e2e8f0; margin-bottom:12px; }
+
   .adash-topbar-left { display:flex; align-items:center; gap:12px; }
   .adash-topbar-right { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   .adash-logo { width:38px; height:38px; border-radius:10px; background:#eef2ff; border:1px solid #c7d2fe; display:flex; align-items:center; justify-content:center; }
   .adash-eyebrow { font-size:10px; font-weight:700; color:#94a3b8; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:1px; }
   .adash-title { font-size:19px; font-weight:800; color:#0f172a; letter-spacing:-0.03em; margin:0; }
+
 
   .adash-settings-trigger { display:flex; align-items:center; gap:6px; padding:6px 12px; background:#fff7ed; border:1px solid #fed7aa; border-radius:9px; color:#9a3412; font-size:12px; font-weight:600; font-family:'Plus Jakarta Sans',sans-serif; cursor:pointer; transition:all 0.15s; white-space:nowrap; }
   .adash-settings-trigger:hover { background:#ffedd5; border-color:#fdba74; box-shadow:0 2px 8px rgba(251,146,60,0.2); }
@@ -1240,7 +1242,8 @@ const STYLES = `
   .adash-back-btn { display:flex; align-items:center; gap:6px; padding:7px 14px; background:white; border:1px solid #e2e8f0; border-radius:9px; color:#64748b; font-size:13px; font-weight:600; font-family:'Plus Jakarta Sans',sans-serif; cursor:pointer; transition:all 0.15s; }
   .adash-back-btn:hover { background:#f8fafc; color:#1e293b; border-color:#cbd5e1; }
 
-  .adash-body { max-width:1600px; margin:0 auto; padding:28px 28px 60px; }
+  .adash-body { margin:0; padding:0; }
+
   .adash-kpi-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(155px,1fr)); gap:14px; margin-bottom:20px; }
   .adash-kpi-card { background:white; border:1px solid #e2e8f0; border-radius:16px; padding:18px 18px 14px; box-shadow:0 1px 3px rgba(0,0,0,0.05); animation:adashFadeUp 0.4s ease both; transition:box-shadow 0.2s,transform 0.2s; }
   .adash-kpi-card:hover { box-shadow:0 6px 20px rgba(0,0,0,0.07); transform:translateY(-1px); }

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
+
 import {
   addDoc, collection, serverTimestamp, deleteDoc, doc,
   updateDoc, onSnapshot, query, where, orderBy, getDocs,
@@ -922,33 +924,39 @@ const handleDeleteSprint = async (sprint: Sprint) => {
   /* ══════════════════════════════════════
      TASK DETAIL PANEL
   ══════════════════════════════════════ */
-  const moveModal = moveToSprintTask ? (
-  <MoveToSprintModal
-    open={showMoveToSprint}
-    onClose={() => {
-      setShowMoveToSprint(false);
-      setMoveToSprintTask(null);
-    }}
-    task={moveToSprintTask}
-    sprints={sprints as SprintFull[]}
-    currentSprintId={moveToSprintTask.sprintId}
-    onMoved={async () => {
-      await logActivity(
-        activeProject!.id,
-        "sprint_changed",
-        `Moved "${moveToSprintTask.title}" to a different sprint`,
-        moveToSprintTask.id
-      );
-    }}
-  />
-) : null;
+  const renderTaskDetailPanel = () => {
+    if (!activeTask) return null;
 
-  if (activeTask) {
+    const moveModal = moveToSprintTask ? (
+      <MoveToSprintModal
+        open={showMoveToSprint}
+        onClose={() => {
+          setShowMoveToSprint(false);
+          setMoveToSprintTask(null);
+        }}
+        task={moveToSprintTask}
+        sprints={sprints as SprintFull[]}
+        currentSprintId={moveToSprintTask.sprintId}
+        onMoved={async () => {
+          await logActivity(
+            activeProject!.id,
+            "sprint_changed",
+            `Moved "${moveToSprintTask.title}" to a different sprint`,
+            moveToSprintTask.id
+          );
+        }}
+      />
+    ) : null;
+
+
     const pc = PRIORITY_CONFIG[activeTask.priority];
     const tm = TYPE_META[activeTask.ticketType || "task"] || TYPE_META.task;
     const subtasksDone = subtasks.filter(s => s.done).length;
     const subtaskPct = subtasks.length ? Math.round((subtasksDone / subtasks.length) * 100) : 0;
     const parentStory = activeTask.parentStoryId ? tasks.find(t => t.id === activeTask.parentStoryId) : null;
+    const col = columns.find(c => c.id === activeTask.status);
+    const style = getColConfig(col || { id: activeTask.status, label: activeTask.status }, columns.findIndex(c => c.id === activeTask.status));
+    const isOverdue = activeTask.dueDate && new Date(activeTask.dueDate) < new Date() && activeTask.status !== doneColId;
 
     const TASK_TABS: [string, string][] = [
       ["details","📋"],["subtasks","✅"],["images","🖼️"],["links","🔗"],
@@ -961,10 +969,11 @@ const handleDeleteSprint = async (sprint: Sprint) => {
       empsheet:"My Work", history:"History",
     };
 
-    return (
+    return createPortal(
        <>
       {moveModal} 
-      <div className="fixed inset-0 z-50 flex items-stretch" style={{fontFamily:"'Inter', system-ui, sans-serif"}}>
+      <div className="fixed inset-0 z-[10001] flex items-stretch" style={{fontFamily:"'Inter', system-ui, sans-serif"}}>
+
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setActiveTask(null)} />
         <div className="relative ml-auto w-full max-w-3xl h-full bg-white shadow-2xl flex flex-col overflow-hidden">
 
@@ -998,6 +1007,21 @@ const handleDeleteSprint = async (sprint: Sprint) => {
               </div>
               <p className="text-xs font-bold text-white/70 tracking-wider">{activeTask?.taskCode || "—"}</p>
               <h2 className="text-xl font-bold text-white leading-snug mb-3">{activeTask.title}</h2>
+              <div className="flex items-center gap-2 flex-wrap mb-3">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isOverdue?"bg-red-50 text-red-600":"bg-indigo-50 text-indigo-600"}`}>{isOverdue?"⚠️ Overdue":"🕒 On Track"}</span>
+                      {canManage ? (
+                        <select
+                          value={activeTask.status}
+                          onChange={e => handleTaskStatusChange(activeTask.id, e.target.value)}
+                          className="text-xs font-semibold px-2.5 py-1 rounded-full border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                          style={{ color: style.color }}
+                        >
+                          {columns.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                        </select>
+                      ) : (
+                        <span className="text-sm font-semibold px-2.5 py-1 rounded-full" style={{background:style.bg,color:style.color}}>{col?.label}</span>
+                      )}
+                    </div>
               {activeTask.sprintId && (
                 <div className="mb-2">
                   <span className="text-[10px] font-semibold bg-white/20 text-white px-2 py-0.5 rounded-full">
@@ -1259,9 +1283,11 @@ const handleDeleteSprint = async (sprint: Sprint) => {
           </div>
         </div>
       </div>
-       </>
+       </>,
+       document.body
     );
-  }
+  };
+
 
   /* ══════════════════════════════════════
      PROJECT VIEW
@@ -1270,6 +1296,9 @@ const handleDeleteSprint = async (sprint: Sprint) => {
     return (
       <div className="flex-1 flex flex-col min-h-0 bg-gray-50 overflow-hidden" style={{fontFamily:"'Inter', system-ui, sans-serif"}}>
         <style>{`@keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}} .hide-sb::-webkit-scrollbar{display:none;}.hide-sb{scrollbar-width:none;}`}</style>
+
+        {renderTaskDetailPanel()}
+
 
         {/* Task Modal */}
         <TaskModal
@@ -1640,7 +1669,7 @@ const handleDeleteSprint = async (sprint: Sprint) => {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-[#f5f6fa]" style={{fontFamily:"'Inter', system-ui, sans-serif"}}>
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-8">
+      <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pt-2 pb-8">
       <style>{`
         .proj-card{transition:box-shadow 0.18s ease,transform 0.18s ease;}
         .proj-card:hover{box-shadow:0 8px 32px rgba(0,0,0,0.10)!important;transform:translateY(-2px);}
@@ -1685,8 +1714,8 @@ const handleDeleteSprint = async (sprint: Sprint) => {
 
       {/* Top header */}
       <div className="bg-white border-b border-gray-200 px-6 py-0 sticky top-0 z-30" style={{boxShadow:"0 1px 0 #e5e7eb"}}>
-        <div className="max-w-screen-2xl mx-auto flex items-center justify-between h-14 gap-6">
-          <div className="flex items-center gap-3">
+        <div className="max-w-screen-2xl mx-auto flex flex-col sm:flex-row items-center justify-between py-2 sm:h-14 gap-4">
+          <div className="flex items-center gap-3 shrink-0">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:"#4f46e5"}}>PH</div>
             <div><h1 className="text-sm font-semibold text-gray-900">Project Hub</h1><p className="text-[10px] text-gray-400">Manage &amp; track all company projects</p></div>
           </div>
@@ -1706,10 +1735,10 @@ const handleDeleteSprint = async (sprint: Sprint) => {
         </div>
       </div>
 
-      <div className="max-w-screen-2xl mx-auto px-6 py-5 space-y-5">
+      <div className="max-w-screen-2xl mx-auto px-3 sm:px-6 pt-2 pb-5 space-y-5">
         {mainTab==="dailysheet"&&<AdminDailySheet user={user} users={users} projects={projects||[]} />}
         {mainTab==="projects"&&<>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             {[{label:"Total Projects",val:totalP,color:"#4f46e5",bg:"#eef2ff",border:"#c7d2fe"},{label:"Completed",val:completedP,color:"#059669",bg:"#ecfdf5",border:"#a7f3d0"},{label:"In Progress",val:inProgressP,color:"#d97706",bg:"#fffbeb",border:"#fde68a"},{label:"Billing Projects",val:billingP,color:"#7c3aed",bg:"#f5f3ff",border:"#ddd6fe"}].map(s=>(
               <div key={s.label} className="bg-white rounded-xl p-4 flex items-center gap-4" style={{border:`1px solid ${s.border}`,boxShadow:`0 1px 4px ${s.color}12`}}>
                 <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{background:s.bg}}><span className="text-xl font-black" style={{color:s.color}}>{s.val}</span></div>
@@ -1777,7 +1806,7 @@ const handleDeleteSprint = async (sprint: Sprint) => {
   </div>
 </>
 
-                      <div className="flex items-center justify-between"><div className="flex -space-x-1.5">{memberList?.map((u:any,i:number)=><div key={i} title={u?.email?.split("@")[0]} className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-white text-[9px] font-semibold" style={{background:["#6366f1","#7c3aed","#db2777","#d97706","#059669"][i%5]}}>{u?.email?.[0]?.toUpperCase()}</div>)}{project.members?.length>5&&<span className="text-[10px] text-gray-400 pl-2">+{project.members.length-5}</span>}</div>{isPM&&<div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all"><button onClick={e=>{e.stopPropagation();handleEditProject(project);}} className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 transition text-xs">✏️</button><button onClick={e=>{e.stopPropagation();handleDeleteProject(project.id);}} className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition text-xs">🗑️</button></div>}</div>
+                      <div className="flex items-center justify-between"><div className="flex -space-x-1.5">{memberList?.map((u:any,i:number)=><div key={i} title={u?.email?.split("@")[0]} className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-white text-[9px] font-semibold" style={{background:["#6366f1","#7c3aed","#db2777","#d97706","#059669"][i%5]}}>{u?.email?.[0]?.toUpperCase()}</div>)}{project.members?.length>5&&<span className="text-[10px] text-gray-400 pl-2">+{project.members.length-5}</span>}</div>{isPM&&<div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all"><button onClick={e=>{e.stopPropagation();handleEditProject(project);}} className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 transition text-xs">✏️</button><button onClick={e=>{e.stopPropagation();handleDeleteProject(project.id);}} className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition text-xs">🗑️</button></div>}</div>
                     </div>
                   </div>
                 );
@@ -1805,7 +1834,7 @@ const handleDeleteSprint = async (sprint: Sprint) => {
                         <td className="px-4 py-3"><div className="flex -space-x-1.5">{pms.slice(0,3).map((u:any,i:number)=><div key={i} title={u.displayName||u.name||u.email?.split("@")[0]} className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-white text-[9px] font-semibold" style={{background:["#6366f1","#7c3aed","#db2777"][i%3]}}>{(u.displayName||u.name||u.email)?.[0]?.toUpperCase()}</div>)}{pms.length>3&&<span className="text-[10px] text-gray-400 pl-1">+{pms.length-3}</span>}</div></td>
                         <td className="px-4 py-3"><div className="flex -space-x-1.5">{project.members?.slice(0,4).map((uid:string,i:number)=>{const m=users.find((u:any)=>u.uid===uid);const mName=m?.displayName||m?.name||m?.email?.split("@")[0]||"?";return<div key={i} title={mName} className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-white text-[9px] font-semibold" style={{background:["#6366f1","#7c3aed","#db2777","#d97706"][i%4]}}>{mName[0]?.toUpperCase()}</div>;})}</div></td>
                         <td className="px-4 py-3 text-xs text-gray-500">{project.endDate||"—"}</td>
-                        <td className="px-4 py-3">{isPM&&<div className="flex gap-1 opacity-0 group-hover:opacity-100 transition"><button onClick={e=>{e.stopPropagation();handleEditProject(project);}} className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 text-xs">✏️</button><button onClick={e=>{e.stopPropagation();handleDeleteProject(project.id);}} className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 text-xs">🗑️</button></div>}</td>
+                        <td className="px-4 py-3">{isPM&&<div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition"><button onClick={e=>{e.stopPropagation();handleEditProject(project);}} className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 text-xs">✏️</button><button onClick={e=>{e.stopPropagation();handleDeleteProject(project.id);}} className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 text-xs">🗑️</button></div>}</td>
                       </tr>
                     );
                   })}

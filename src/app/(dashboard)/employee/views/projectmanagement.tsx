@@ -7,6 +7,8 @@
 // ════════════════════════════════════════════════════════════════
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
+
 import {
   collection,
   query,
@@ -650,8 +652,9 @@ function TaskModal({
   const isStory = form.ticketType === "story";
   const tc = TICKET_TYPES[form.ticketType || "task"];
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+  return createPortal(
+    <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
         <div className="shrink-0 px-6 py-4 border-b border-gray-100" style={{ background: `linear-gradient(135deg, ${projectColor}15, ${projectColor}05)` }}>
@@ -856,9 +859,11 @@ function TaskModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
+
 
 /* ═══════════════════════════════════════════
    TASK DETAIL MODAL
@@ -984,8 +989,9 @@ function TaskDetailModal({
     { id: "empsheet", icon: "📝", label: "My Work",  badge: taskEmpEntries.length > 0 ? `${totalEmpHours}h` : null },
   ] as const;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-stretch" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+  return createPortal(
+    <div className="fixed inset-0 z-[10001] flex items-stretch" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div className="relative ml-auto w-full max-w-2xl h-full bg-white shadow-2xl flex flex-col overflow-hidden">
 
@@ -1337,9 +1343,11 @@ function TaskDetailModal({
           />
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
+
 
 /* ═══════════════════════════════════════════
    EMPLOYEE DAILY SHEET

@@ -165,7 +165,7 @@ export default function AdminBreakView({ date }: Props) {
     <div className="space-y-5">
       {/* Stats Bar */}
       <div className="grid grid-cols-3 gap-4">
-        <StatCard
+        <BreakStatCard
           label="On Break"
           value={onBreakCount}
           color="amber"
@@ -173,7 +173,7 @@ export default function AdminBreakView({ date }: Props) {
           onClick={() => setFilterStatus(filterStatus === "ON_BREAK" ? "ALL" : "ON_BREAK")}
           active={filterStatus === "ON_BREAK"}
         />
-        <StatCard
+        <BreakStatCard
           label="Working"
           value={workingCount}
           color="emerald"
@@ -181,7 +181,7 @@ export default function AdminBreakView({ date }: Props) {
           onClick={() => setFilterStatus(filterStatus === "WORKING" ? "ALL" : "WORKING")}
           active={filterStatus === "WORKING"}
         />
-        <StatCard
+        <BreakStatCard
           label="Offline"
           value={offlineCount}
           color="slate"
@@ -213,7 +213,7 @@ export default function AdminBreakView({ date }: Props) {
   );
 }
 
-function StatCard({
+function BreakStatCard({
   label, value, color, icon, onClick, active,
 }: {
   label: string; value: number; color: string; icon: string; onClick: () => void; active: boolean;

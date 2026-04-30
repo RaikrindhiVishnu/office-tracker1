@@ -51,20 +51,20 @@ interface EmployeeQuery {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PRIORITY_CONFIG: Record<string, { label: string; bg: string; color: string; dot: string }> = {
-  low:    { label: "Low",    bg: "#f0fdf4", color: "#16a34a", dot: "#4ade80" },
+  low: { label: "Low", bg: "#f0fdf4", color: "#16a34a", dot: "#4ade80" },
   medium: { label: "Medium", bg: "#fffbeb", color: "#d97706", dot: "#fbbf24" },
-  high:   { label: "High",   bg: "#fff1f2", color: "#e11d48", dot: "#fb7185" },
+  high: { label: "High", bg: "#fff1f2", color: "#e11d48", dot: "#fb7185" },
   urgent: { label: "Urgent", bg: "#faf5ff", color: "#9333ea", dot: "#c084fc" },
 };
 
 const CATEGORY_CONFIG: Record<string, { bg: string; color: string }> = {
   "IT Support": { bg: "#eff6ff", color: "#2563eb" },
-  "Payroll":    { bg: "#f0fdf4", color: "#16a34a" },
-  "HR Policy":  { bg: "#faf5ff", color: "#9333ea" },
-  "Software":   { bg: "#fff7ed", color: "#ea580c" },
+  "Payroll": { bg: "#f0fdf4", color: "#16a34a" },
+  "HR Policy": { bg: "#faf5ff", color: "#9333ea" },
+  "Software": { bg: "#fff7ed", color: "#ea580c" },
   "Facilities": { bg: "#f0f9ff", color: "#0284c7" },
-  "Finance":    { bg: "#fefce8", color: "#ca8a04" },
-  "General":    { bg: "#f8fafc", color: "#64748b" },
+  "Finance": { bg: "#fefce8", color: "#ca8a04" },
+  "General": { bg: "#f8fafc", color: "#64748b" },
 };
 
 const ADMIN_AGENTS = [
@@ -106,9 +106,9 @@ function timeAgo(ts: EmployeeQuery["createdAt"] | number): string {
   else if (typeof ts === "string") d = new Date(ts);
   else d = new Date(ts as number);
   const diff = Math.floor((Date.now() - d.getTime()) / 1000);
-  if (diff < 60)     return "Just now";
-  if (diff < 3600)   return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400)  return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 60) return "Just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
@@ -147,26 +147,26 @@ function Badge({ label, bg, color, dot }: { label: string; bg: string; color: st
 function StatusBadge({ status }: { status: string }) {
   return status === "resolved"
     ? <Badge label="Resolved" bg="#f0fdf4" color="#16a34a" dot="#4ade80" />
-    : <Badge label="Pending"  bg="#fffbeb" color="#d97706" dot="#fbbf24" />;
+    : <Badge label="Pending" bg="#fffbeb" color="#d97706" dot="#fbbf24" />;
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AdminQueriesView() {
-  const [queries,        setQueries]        = useState<EmployeeQuery[]>([]);
-  const [loading,        setLoading]        = useState(true);
-  const [error,          setError]          = useState<string | null>(null);
-  const [statusFilter,   setStatusFilter]   = useState("all");
+  const [queries, setQueries] = useState<EmployeeQuery[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [search,         setSearch]         = useState("");
-  const [page,           setPage]           = useState(1);
-  const [pageSize,       setPageSize]       = useState(10);
-  const [drawer,         setDrawer]         = useState<EmployeeQuery | null>(null);
-  const [replyText,      setReplyText]      = useState("");
-  const [assignTo,       setAssignTo]       = useState("Unassigned");
-  const [sending,        setSending]        = useState(false);
-  const [deleteConfirm,  setDeleteConfirm]  = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [drawer, setDrawer] = useState<EmployeeQuery | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [assignTo, setAssignTo] = useState("Unassigned");
+  const [sending, setSending] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // ── Firestore ────────────────────────────────────────────────────────────────
@@ -259,17 +259,17 @@ export default function AdminQueriesView() {
   };
 
   // ── Derived ──────────────────────────────────────────────────────────────────
-  const total    = queries.length;
-  const pending  = queries.filter((q) => q.status !== "resolved").length;
+  const total = queries.length;
+  const pending = queries.filter((q) => q.status !== "resolved").length;
   const resolved = queries.filter((q) => q.status === "resolved").length;
-  const unread   = queries.filter((q) => q.adminUnread).length;
+  const unread = queries.filter((q) => q.adminUnread).length;
   const categories = Array.from(new Set(queries.map((q) => q.category).filter(Boolean)));
 
   const filtered = queries.filter((q) => {
-    if (statusFilter === "pending"  && q.status === "resolved")      return false;
-    if (statusFilter === "resolved" && q.status !== "resolved")      return false;
-    if (priorityFilter !== "all"   && q.priority !== priorityFilter) return false;
-    if (categoryFilter !== "all"   && q.category !== categoryFilter) return false;
+    if (statusFilter === "pending" && q.status === "resolved") return false;
+    if (statusFilter === "resolved" && q.status !== "resolved") return false;
+    if (priorityFilter !== "all" && q.priority !== priorityFilter) return false;
+    if (categoryFilter !== "all" && q.category !== categoryFilter) return false;
     const s = search.toLowerCase();
     if (s && ![q.employeeName, q.subject, q.message, q.department, q.employeeEmail]
       .some((f) => (f || "").toLowerCase().includes(s))) return false;
@@ -277,8 +277,8 @@ export default function AdminQueriesView() {
   });
 
   const totalPages = Math.ceil(filtered.length / pageSize) || 1;
-  const paginated  = filtered.slice((page - 1) * pageSize, page * pageSize);
-  const resetPage  = () => setPage(1);
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const resetPage = () => setPage(1);
 
   // ─────────────────────────────────────────────────────────────────────────────
   return (
@@ -292,11 +292,9 @@ export default function AdminQueriesView() {
 
         .q-wrap {
           font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-          background: #ffffff;
           width: 100%;
           color: #1a202c;
-          padding: 24px 24px 48px;
-          min-height: 100vh;
+          padding: 0;
         }
 
         /* ── TITLE ROW ── */
@@ -872,8 +870,8 @@ export default function AdminQueriesView() {
 
           <div className="q-tabs">
             {([
-              ["all",      `All (${total})`],
-              ["pending",  `Pending (${pending})`],
+              ["all", `All (${total})`],
+              ["pending", `Pending (${pending})`],
               ["resolved", `Resolved (${resolved})`],
             ] as [string, string][]).map(([f, label]) => (
               <button
@@ -1103,7 +1101,7 @@ export default function AdminQueriesView() {
                   <div key={i} className={`q-msg${r.author === "Admin" ? " adm" : ""}`}>
                     <div className="q-msg-av" style={{
                       background: r.author === "Admin" ? "#2d3748" : getAvatarStyle(r.author || "").bg,
-                      color:      r.author === "Admin" ? "#e2e8f0" : getAvatarStyle(r.author || "").color,
+                      color: r.author === "Admin" ? "#e2e8f0" : getAvatarStyle(r.author || "").color,
                     }}>
                       {r.author === "Admin" ? "A" : getInitials(r.author || "")}
                     </div>
