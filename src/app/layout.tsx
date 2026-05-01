@@ -10,7 +10,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-gray-100 text-gray-900">
-        
+
         {/* Load Jitsi Script Globally */}
         <Script
           src="https://meet.jit.si/external_api.js"

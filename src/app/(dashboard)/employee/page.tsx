@@ -681,8 +681,7 @@ export default function ZohoStyleEmployeeDashboard() {
     <div className="h-screen flex bg-gray-50 overflow-hidden">
 
       {/* ── SIDEBAR ── (unchanged) */}
-      <aside className={`fixed lg:static inset-y-0 left-0 z-50 bg-[#192e44] text-white flex flex-col transform transition-all duration-300 ${sidebarCollapsed ? "w-16" : "w-64"
-        } ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+      <aside className={`fixed lg:static inset-y-0 left-0 z-50 bg-[#1a2e45] text-white flex flex-col transform transition-all duration-300 ${sidebarCollapsed ? "w-16" : "w-64"        } ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
         <div className="p-4 flex items-center justify-between border-b border-white/10">
           {!sidebarCollapsed && (
             <div className="flex items-center gap-2 ml-2">
@@ -725,11 +724,11 @@ export default function ZohoStyleEmployeeDashboard() {
         <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20">
           {sidebarItems.map(([id, label, icon]) => (
             <button key={id} onClick={() => { changeView(id); setMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 relative group ${activeView === id ? "bg-white/15 text-white shadow-sm border border-white/10" : "text-white/75 hover:bg-white/8 hover:text-white"
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 relative group ${activeView === id ? "bg-white/20 text-white shadow-sm border border-white/20" : "text-white/75 hover:bg-white/8 hover:text-white"
                 }`}
               title={sidebarCollapsed ? label : undefined}
             >
-              {activeView === id && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-amber-400 rounded-r-full" />}
+              {activeView === id && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-400 rounded-r-full" />}
               <span className={`text-base shrink-0 transition-transform duration-150 ${activeView === id ? "scale-110" : "group-hover:scale-105"}`}>{icon}</span>
               {!sidebarCollapsed && <span className="text-sm font-medium truncate">{label}</span>}
               {id === "notifications" && totalNotifications > 0 && (
@@ -761,7 +760,7 @@ export default function ZohoStyleEmployeeDashboard() {
       <div className="flex-1 flex flex-col overflow-hidden">
 
         {/* ── HEADER ── */}
-        <header className="bg-linear-to-r from-[#1b3359] to-[#2b404c] text-white shadow-xl relative z-30">
+        <header className="bg-linear-to-r from-[#1a2e45] to-[#243b55] text-white shadow-xl relative z-30">
           <div className="hidden lg:flex items-center justify-between px-4 py-2.5">
             <div className="flex items-center min-w-0 shrink-0">
               <h1 className="text-lg font-bold capitalize flex items-center gap-2 whitespace-nowrap">
@@ -946,7 +945,7 @@ export default function ZohoStyleEmployeeDashboard() {
 
         {/* ── CONTENT ── */}
         <main className="flex-1 overflow-y-auto bg-gray-50">
-          <div className="p-3 space-y-3">
+          <div className="space-y-3">
             {activeView === "dashboard" && (
               <DashboardView
                 user={user}
