@@ -18,6 +18,7 @@ import {
   logLeadWon,
 } from "@/lib/notifications";
 import { useAuth } from "@/context/AuthContext";
+import CrossDeptFeed from "@/components/CrossDeptFeed";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 type Tab = "overview" | "sales" | "leads" | "clients" | "payments" | "analytics" | "collaboration";
@@ -766,6 +767,14 @@ unsubs.push(sub<CollabNote>("collab_notes", setCollabNotes));
           </ResponsiveContainer>
         </Card>
       )}
+
+      {/* Cross-Department Activity Feed */}
+      <CrossDeptFeed
+        role="sales"
+        accentColor="#4f46e5"
+        title="Incoming from Other Teams"
+        maxItems={10}
+      />
     </div>
   );
 

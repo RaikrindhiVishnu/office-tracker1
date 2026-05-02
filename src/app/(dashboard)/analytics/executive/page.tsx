@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { initializeApp, getApps } from "firebase/app";
+import CrossDeptFeed from "@/components/CrossDeptFeed";
+import { db } from "@/lib/firebase";
 import {
-  getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc,
+  collection, onSnapshot, addDoc, updateDoc, deleteDoc,
   doc, serverTimestamp, getDocs,
 } from "firebase/firestore";
 import {
@@ -94,6 +95,15 @@ interface Expense {
   [key: string]: unknown;
 }
 
+interface Ticket {
+  id: string;
+  customer: string;
+  issue: string;
+  priority: string;
+  status: string;
+  createdAt?: any;
+}
+
 interface Alert {
   id: string;
   type: "warning" | "danger" | "info" | "success";
@@ -127,7 +137,7 @@ interface UserRecord {
   [key: string]: unknown;
 }
 
-type ModalType = 
+type ModalType =
   | { type: "project"; data?: Project }
   | { type: "employee"; data?: Employee }
   | { type: "task"; data?: Partial<Task> }
@@ -145,18 +155,8 @@ interface ConfirmState {
 // ══════════════════════════════════════════════════════════
 //  FIREBASE INIT
 // ══════════════════════════════════════════════════════════
-const firebaseConfig = {
-  apiKey: "AIzaSyC99siXcTLipvR_x-HL_1N6eOLQMNj-4ZE",
-  authDomain: "office-tracker-33067.firebaseapp.com",
-  projectId: "office-tracker-33067",
-  storageBucket: "office-tracker-33067.firebasestorage.app",
-  messagingSenderId: "179006164956",
-  appId: "1:179006164956:web:db06a9a5050a2833774919",
-  measurementId: "G-MZY97JTR3F",
-};
-
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-const db = getFirestore(app);
+// Executive dashboard uses shared Firebase db from @/lib/firebase
+// (Removed standalone Firebase initialization to prevent duplicate app errors)
 
 // ══════════════════════════════════════════════════════════
 //  THEME
@@ -193,13 +193,13 @@ const CHART_COLORS = [T.primary, T.success, T.warning, T.purple, T.cyan, T.dange
 // ── FORMATTERS ──────────────────────────────────────────
 const fmtMoney = (v: number): string =>
   v >= 1_000_000 ? `$${(v / 1_000_000).toFixed(2)}M`
-  : v >= 1_000 ? `$${(v / 1_000).toFixed(0)}K`
-  : `$${(v || 0).toFixed(0)}`;
+    : v >= 1_000 ? `$${(v / 1_000).toFixed(0)}K`
+      : `$${(v || 0).toFixed(0)}`;
 
 const fmtShort = (v: number): string =>
   v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M`
-  : v >= 1_000 ? `${(v / 1_000).toFixed(0)}K`
-  : String(v || 0);
+    : v >= 1_000 ? `${(v / 1_000).toFixed(0)}K`
+      : String(v || 0);
 
 // ── GLOBAL CSS ────────────────────────────────────────────
 const CSS = `
@@ -979,6 +979,7 @@ export default function ExecutiveDashboard() {
   const { data: sales, loading: salesLoading } = useCollection<SaleRecord>("sales");
   const { data: projects, loading: projLoading } = useCollection<Project>("projects");
   const { data: users, loading: empLoading } = useCollection<UserRecord>("users");
+  const { data: tickets, loading: ticketsLoading } = useCollection<Ticket>("tickets");
 
   const employees: Employee[] = users
     .filter(u => u.name)
@@ -1240,7 +1241,8 @@ export default function ExecutiveDashboard() {
                 {([
                   { label: "Total Revenue", value: fmtMoney(totalRevenue), change: "--", up: true, icon: "💰", color: T.primary, loading: salesLoading },
                   { label: "Net Profit", value: fmtMoney(totalProfit), subValue: `${profitMargin}% margin`, change: "--", up: true, icon: "📈", color: T.success, loading: salesLoading },
-                  { label: "Total Expenses", value: fmtMoney(totalExpenses + totalExpenseLogs), change: "--", up: false, icon: "📉", color: T.danger, loading: salesLoading },
+                  { label: "SLA Health", value: tickets.length ? `${Math.round((tickets.filter(t => t.priority !== "Critical").length / tickets.length) * 100)}%` : "100%", change: "--", up: true, icon: "🛡️", color: T.purple, loading: ticketsLoading },
+                  { label: "Support Volume", value: String(tickets.filter(t => t.status !== "Resolved").length), change: "--", up: false, icon: "🎧", color: T.warning, loading: ticketsLoading },
                   { label: "Active Projects", value: String(activeProjects), change: "--", up: true, icon: "🚀", color: T.purple, loading: projLoading },
                   { label: "Employees", value: String(employees.length), change: "--", up: true, icon: "👥", color: T.cyan, loading: empLoading },
                   { label: "Customers", value: String(customers.length), change: "--", up: true, icon: "🤝", color: T.primary, loading: custLoading },
@@ -1368,6 +1370,18 @@ export default function ExecutiveDashboard() {
                   </div>
                 </Card>
               </div>
+            </div>
+          )}
+
+          {/* Company-Wide Activity Feed (visible when on overview) */}
+          {tab === "overview" && (
+            <div style={{ marginTop: 16 }}>
+              <CrossDeptFeed
+                role="sales"
+                accentColor="#2563eb"
+                title="🏢 Company Activity Feed"
+                maxItems={15}
+              />
             </div>
           )}
 

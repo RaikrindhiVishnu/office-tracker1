@@ -5,6 +5,9 @@ import {
   doc, onSnapshot, updateDoc, arrayUnion, Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { 
+  FaCoffee, FaUtensils, FaMoon, FaPause, FaSquare, FaBed, FaClock 
+} from "react-icons/fa";
 
 // ── Types 
 export type BreakType = "MORNING" | "LUNCH" | "EVENING";
@@ -47,7 +50,7 @@ const hmLabel = (seconds: number) => {
 
 // ── Break config 
 const BREAK_CONFIG: Record<BreakType, {
-  icon: string;
+  icon: React.ReactNode;
   label: string;
   short: string;
   from: string;
@@ -58,7 +61,7 @@ const BREAK_CONFIG: Record<BreakType, {
   timeline: string;
 }> = {
   MORNING: {
-    icon: "☕",
+    icon: <FaCoffee />,
     label: "Morning Break",
     short: "Morning",
     from: "from-amber-400",
@@ -69,7 +72,7 @@ const BREAK_CONFIG: Record<BreakType, {
     timeline: "border-amber-400",
   },
   LUNCH: {
-    icon: "🍱",
+    icon: <FaUtensils />,
     label: "Lunch Break",
     short: "Lunch",
     from: "from-emerald-400",
@@ -80,7 +83,7 @@ const BREAK_CONFIG: Record<BreakType, {
     timeline: "border-emerald-400",
   },
   EVENING: {
-    icon: "🌆",
+    icon: <FaMoon />,
     label: "Evening Break",
     short: "Evening",
     from: "from-violet-400",
@@ -141,15 +144,15 @@ export default function BreakPanel({
 
   // ── Actions 
   const startBreak = useCallback(async (type: BreakType) => {
-    if (!isCheckedIn) { showToast("⚠️ Please check in first"); return; }
-    if (activeBreak)  { showToast("⚠️ End your current break first"); return; }
+    if (!isCheckedIn) { showToast("Please check in first"); return; }
+    if (activeBreak)  { showToast("End your current break first"); return; }
     const alreadyDone = breaks.some((b) => b.type === type && b.endTime);
-    if (alreadyDone)  { showToast(`⚠️ ${BREAK_CONFIG[type].short} break already taken today`); return; }
+    if (alreadyDone)  { showToast(`${BREAK_CONFIG[type].short} break already taken today`); return; }
     setLoading(true);
     try {
       await updateDoc(docRef, { breaks: arrayUnion({ type, startTime: Timestamp.now() }) });
-      showToast(`${BREAK_CONFIG[type].icon} ${BREAK_CONFIG[type].label} started`);
-    } catch { showToast("❌ Failed to start break"); }
+      showToast(`${BREAK_CONFIG[type].label} started`);
+    } catch { showToast("Failed to start break"); }
     finally { setLoading(false); }
   }, [docRef, isCheckedIn, activeBreak, breaks]);
 
@@ -163,8 +166,8 @@ export default function BreakPanel({
           : b
       );
       await updateDoc(docRef, { breaks: updated });
-      showToast("✅ Break ended — back to work!");
-    } catch { showToast("❌ Failed to end break"); }
+      showToast("Break ended — back to work!");
+    } catch { showToast("Failed to end break"); }
     finally { setLoading(false); }
   }, [docRef, breaks, activeBreak]);
 
@@ -205,7 +208,7 @@ export default function BreakPanel({
         >
           <div>
             <h2 className="text-base font-bold text-white flex items-center gap-2">
-              ⏸ Break Manager
+              <FaPause className="text-white/80" /> Break Manager
             </h2>
             <p className="text-xs text-white/50 mt-0.5">Track and manage your work breaks</p>
           </div>
@@ -225,7 +228,7 @@ export default function BreakPanel({
               activeBreak ? "text-amber-200" : isCheckedIn ? "text-green-200" : "text-white/50"
             }`}>
               {activeBreak
-                ? `${BREAK_CONFIG[activeBreak.type].icon} ${BREAK_CONFIG[activeBreak.type].short}`
+                ? <span className="flex items-center gap-1">{BREAK_CONFIG[activeBreak.type].icon} {BREAK_CONFIG[activeBreak.type].short}</span>
                 : isCheckedIn ? "Working" : "Not In"}
             </span>
           </div>
@@ -310,7 +313,7 @@ export default function BreakPanel({
                 {loading ? (
                   <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                 ) : (
-                  <>⏹ End Break</>
+                  <><FaSquare className="text-xs" /> End Break</>
                 )}
               </button>
             )}
@@ -323,7 +326,7 @@ export default function BreakPanel({
             </p>
             {breaks.length === 0 ? (
               <div className="flex items-center gap-3 p-3.5 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                <span className="text-2xl opacity-40">💤</span>
+                <FaBed className="text-2xl opacity-40 text-gray-400" />
                 <p className="text-sm text-gray-400 italic">No breaks taken yet today</p>
               </div>
             ) : (
@@ -368,7 +371,7 @@ export default function BreakPanel({
             {/* Total break time */}
             <div className="mt-3 flex items-center justify-between px-4 py-3 bg-linear-to-r from-slate-800 to-slate-900 rounded-xl">
               <div className="flex items-center gap-2">
-                <span className="text-sm">⏱</span>
+                <FaClock className="text-white/60 text-sm" />
                 <span className="text-xs font-bold text-white/60 uppercase tracking-wider">Total Break</span>
               </div>
               <span className="font-mono font-black text-base text-white tabular-nums">

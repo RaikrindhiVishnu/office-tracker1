@@ -7,35 +7,20 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ComposedChart, PieChart, Pie, Cell, Legend,
 } from "recharts";
-import { initializeApp, getApps, FirebaseApp } from "firebase/app";
 import {
-  getFirestore, Firestore,
   collection, addDoc, deleteDoc, doc, onSnapshot,
   query, where, orderBy, Timestamp, serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
+import CrossDeptFeed from "@/components/CrossDeptFeed";
+import { db } from "@/lib/firebase";
 
 // ─────────────────────────────────────────────────────────────
 // 1. FIREBASE CONFIG
 // ─────────────────────────────────────────────────────────────
-const FIREBASE_CONFIG = {
-  apiKey:            "YOUR_API_KEY",
-  authDomain:        "YOUR_PROJECT.firebaseapp.com",
-  projectId:         "YOUR_PROJECT_ID",
-  storageBucket:     "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId:             "YOUR_APP_ID",
-};
-
-function getFirebaseApp(): FirebaseApp {
-  if (getApps().length) return getApps()[0];
-  return initializeApp(FIREBASE_CONFIG);
-}
-
-function getDB(): Firestore {
-  return getFirestore(getFirebaseApp());
-}
+// Financial dashboard uses shared Firebase db from @/lib/firebase
+// (Removed standalone Firebase initialization to prevent duplicate app errors)
 
 // ─────────────────────────────────────────────────────────────
 // 2. TYPES
@@ -112,7 +97,6 @@ interface Asset {
 // 3. FIRESTORE SERVICES
 // ─────────────────────────────────────────────────────────────
 export function subscribeEmployees(cb: (items: Employee[], total: number) => void) {
-  const db = getDB();
   return onSnapshot(collection(db, "users"), snap => {
     const items = snap.docs.map(d => {
       const data = d.data() as Employee;
@@ -126,17 +110,16 @@ export function subscribeEmployees(cb: (items: Employee[], total: number) => voi
 }
 
 export async function addEmployee(data: Omit<Employee, "id" | "uid" | "createdAt">) {
-  const db = getDB();
   return addDoc(collection(db, "employees"), { ...data, createdAt: serverTimestamp() });
 }
 export async function deleteEmployee(id: string) {
-  return deleteDoc(doc(getDB(), "employees", id));
+  return deleteDoc(doc(db, "employees", id));
 }
 
 export async function addPayroll(
   data: Omit<PayrollEntry, "id" | "finalSalary" | "createdAt">
 ) {
-  const db = getDB();
+  
   const finalSalary = data.baseSalary + data.bonus - data.deduction;
 
   const ref = await addDoc(collection(db, "payroll"), {
@@ -158,13 +141,13 @@ export async function addPayroll(
   return ref;
 }
 export async function deletePayroll(id: string) {
-  return deleteDoc(doc(getDB(), "payroll", id));
+  return deleteDoc(doc(db, "payroll", id));
 }
 export function subscribePayroll(
   month: string,
   cb: (items: PayrollEntry[], totals: { totalFinal: number; totalBonus: number; totalDeduction: number }) => void,
 ) {
-  const db = getDB();
+  
   const q = query(collection(db, "payroll"), where("month", "==", month));
   return onSnapshot(q, snap => {
     const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as PayrollEntry));
@@ -176,7 +159,7 @@ export function subscribePayroll(
 }
 
 export async function addExpense(data: Omit<Expense, "id" | "month" | "createdAt">) {
-  const db = getDB();
+  
   const month = data.date.slice(0, 7);
 
   const ref = await addDoc(collection(db, "expenses"), {
@@ -199,13 +182,13 @@ export async function addExpense(data: Omit<Expense, "id" | "month" | "createdAt
   return ref;
 }
 export async function deleteExpense(id: string) {
-  return deleteDoc(doc(getDB(), "expenses", id));
+  return deleteDoc(doc(db, "expenses", id));
 }
 export function subscribeExpenses(
   month: string,
   cb: (items: Expense[], totalManual: number, byCategory: Record<string, number>) => void,
 ) {
-  const db = getDB();
+  
   const q = query(collection(db, "expenses"), where("month", "==", month));
   return onSnapshot(q, snap => {
     const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Expense));
@@ -217,18 +200,18 @@ export function subscribeExpenses(
 }
 
 export async function addAsset(data: Omit<Asset, "id" | "totalCost" | "createdAt">) {
-  const db = getDB();
+  
   const totalCost = data.purchaseCost + data.maintenanceCost;
   return addDoc(collection(db, "assets"), { ...data, totalCost, createdAt: serverTimestamp() });
 }
 export async function deleteAsset(id: string) {
-  return deleteDoc(doc(getDB(), "assets", id));
+  return deleteDoc(doc(db, "assets", id));
 }
 export function subscribeAssets(
   month: string,
   cb: (items: Asset[], totalAssetCost: number) => void,
 ) {
-  const db = getDB();
+  
   const q = query(collection(db, "assets"), where("month", "==", month));
   return onSnapshot(q, snap => {
     const items = snap.docs.map(d => ({ id: d.id, ...d.data() } as Asset));
@@ -1288,7 +1271,7 @@ export default function FinancialDashboard() {
 
       {/* CONTENT */}
       <main style={{ padding: "20px 24px", width: "100%" }}>
-        {tab === "overview"  && <OverviewTab  data={data} />}
+        {tab === "overview"  && <><OverviewTab  data={data} /><div style={{marginTop:20}}><CrossDeptFeed role="finance" accentColor="#2563eb" title="Sales & Business Activity" maxItems={8} /></div></>}
         {tab === "expenses"  && <ExpensesTab  expenses={data.expenses}  onAdd={handleAddExpense} onDelete={handleDelExpense} />}
         {tab === "payroll"   && <PayrollTab   payroll={data.payroll}    payrollTotals={data.payrollTotals} month={month} employees={data.employees} onAdd={handleAddPayroll} onDelete={handleDelPayroll} />}
         {tab === "employees" && <EmployeesTab employees={data.employees} />}

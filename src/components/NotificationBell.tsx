@@ -6,6 +6,7 @@ import {
   type AppNotification,
   type NotifRole
 } from "@/lib/notifications";
+import { FaBell, FaBellSlash } from "react-icons/fa";
 
 const PRIORITY_COLOR: Record<string, string> = {
   high: "#dc2626",
@@ -81,7 +82,7 @@ export default function NotificationBell({ role, uid, accentColor = "#4f46e5" }:
         }}
         title="Notifications"
       >
-        🔔
+        <FaBell />
         {unread > 0 && (
           <span style={{
             position: "absolute",
@@ -162,7 +163,7 @@ export default function NotificationBell({ role, uid, accentColor = "#4f46e5" }:
               <div style={{ padding: 32, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>Loading…</div>
             ) : notifs.length === 0 ? (
               <div style={{ padding: 40, textAlign: "center" }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>🔕</div>
+                <div style={{ fontSize: 32, marginBottom: 8, color: "#94a3b8" }}><FaBellSlash /></div>
                 <div style={{ fontSize: 13, color: "#94a3b8" }}>No notifications yet</div>
               </div>
             ) : notifs.map(n => {

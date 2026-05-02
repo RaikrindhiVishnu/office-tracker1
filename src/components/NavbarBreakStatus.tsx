@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { doc, onSnapshot, updateDoc, arrayUnion, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { FaCoffee, FaUtensils, FaCloudMoon, FaCircle, FaSquare } from "react-icons/fa";
 
 // ── Types 
 type BreakType = "MORNING" | "LUNCH" | "EVENING";
@@ -37,28 +38,28 @@ const formatClock = (ts: Timestamp | undefined) => {
   return ts.toDate().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 };
 
-const breakMeta: Record<BreakType, { label: string; icon: string; pillBg: string; pillText: string; dotColor: string; btnGrad: string }> = {
+const breakMeta: Record<BreakType, { label: string; icon: React.ReactNode; pillBg: string; pillText: string; dotColor: string; btnGrad: string }> = {
   MORNING: {
     label: "Morning Break",
-    icon: "☕",
-    pillBg: "bg-amber-500/20 border-amber-400/40",
-    pillText: "text-amber-200",
+    icon: <FaCoffee />,
+    pillBg: "bg-amber-50 border-amber-200",
+    pillText: "text-amber-700",
     dotColor: "bg-amber-400",
     btnGrad: "from-amber-400 to-orange-500",
   },
   LUNCH: {
     label: "Lunch Break",
-    icon: "🍱",
-    pillBg: "bg-emerald-500/20 border-emerald-400/40",
-    pillText: "text-emerald-200",
+    icon: <FaUtensils />,
+    pillBg: "bg-emerald-50 border-emerald-200",
+    pillText: "text-emerald-700",
     dotColor: "bg-emerald-400",
     btnGrad: "from-emerald-400 to-teal-500",
   },
   EVENING: {
     label: "Evening Break",
-    icon: "🌆",
-    pillBg: "bg-violet-500/20 border-violet-400/40",
-    pillText: "text-violet-200",
+    icon: <FaCloudMoon />,
+    pillBg: "bg-violet-50 border-violet-200",
+    pillText: "text-violet-700",
     dotColor: "bg-violet-400",
     btnGrad: "from-violet-400 to-purple-600",
   },
@@ -166,22 +167,22 @@ export default function NavbarBreakStatus({
         bg: breakMeta[activeBreak.type].pillBg,
         text: breakMeta[activeBreak.type].pillText,
         dot: breakMeta[activeBreak.type].dotColor,
-        label: `${breakMeta[activeBreak.type].icon} ${breakMeta[activeBreak.type].label}`,
+        label: <span className="flex items-center gap-1.5">{breakMeta[activeBreak.type].icon} {breakMeta[activeBreak.type].label}</span>,
         timer: formatHHMMSS(elapsed),
       }
     : isCheckedIn
     ? {
-        bg: "bg-green-500/20 border-green-400/40",
-        text: "text-green-200",
+        bg: "bg-emerald-50 border-emerald-200",
+        text: "text-emerald-700",
         dot: "bg-green-400",
         label: "Working",
         timer: null,
       }
     : {
-        bg: "bg-white/10 border-white/20",
-        text: "text-white/60",
+        bg: "bg-gray-50 border-gray-200",
+        text: "text-gray-500",
         dot: "bg-gray-400",
-        label: "⚪ Not Checked In",
+        label: <span className="flex items-center gap-1.5"><FaCircle className="text-[10px] opacity-40" /> Not Checked In</span>,
         timer: null,
       };
 
@@ -192,7 +193,7 @@ export default function NavbarBreakStatus({
         onClick={() => setOpen((p) => !p)}
         disabled={!isCheckedIn}
         className={`
-          flex items-center gap-2 px-3 py-1.5 rounded-full border
+          h-8 flex items-center gap-2 px-3 rounded-lg border
           backdrop-blur-sm transition-all duration-200 select-none
           hover:brightness-110 active:scale-95
           disabled:opacity-50 disabled:cursor-not-allowed
@@ -201,7 +202,7 @@ export default function NavbarBreakStatus({
         style={{ minWidth: 0 }}
       >
         <span className={`w-2 h-2 rounded-full shrink-0 ${pillContent.dot} ${activeBreak ? "animate-pulse" : ""}`} />
-        <span className={`text-xs font-semibold whitespace-nowrap ${pillContent.text}`}>
+        <span className={`text-xs font-bold whitespace-nowrap ${pillContent.text}`}>
           {pillContent.label}
         </span>
         {pillContent.timer && (
@@ -234,7 +235,7 @@ export default function NavbarBreakStatus({
               <p className="text-xs font-bold text-white/40 uppercase tracking-widest">Break Status</p>
               <p className={`text-sm font-bold mt-0.5 ${activeBreak ? breakMeta[activeBreak.type].pillText : "text-green-300"}`}>
                 {activeBreak
-                  ? `${breakMeta[activeBreak.type].icon} On ${breakMeta[activeBreak.type].label}`
+                  ? <span className="flex items-center gap-1.5">{breakMeta[activeBreak.type].icon} On {breakMeta[activeBreak.type].label}</span>
                   : " Currently Working"}
               </p>
             </div>
@@ -284,7 +285,7 @@ export default function NavbarBreakStatus({
                 disabled={loading}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-linear-to-r from-red-500 to-rose-600 hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] transition-all duration-150 mt-1"
               >
-                <span className="text-base">⏹</span>
+                <span className="text-base"><FaSquare /></span>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-bold text-white leading-none">End Break</p>
                   <p className="text-[10px] text-white/70 mt-0.5">Return to working</p>

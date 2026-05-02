@@ -18,9 +18,9 @@ interface EmployeesViewProps {
   setEmail: (email: string) => void;
   designation: string;
   setDesignation: (designation: string) => void;
-  accountType: "EMPLOYEE" | "ADMIN";
+  accountType: "EMPLOYEE" | "ADMIN" | "HR" | "BUSINESSOWNER";
   setAccountType: React.Dispatch<
-    React.SetStateAction<"EMPLOYEE" | "ADMIN">
+    React.SetStateAction<"EMPLOYEE" | "ADMIN" | "HR" | "BUSINESSOWNER">
   >;
   handleAddUser: () => void;
   creatingUser: boolean;
@@ -495,12 +495,14 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                 <select
                   value={accountType}
                   onChange={(e) =>
-                    setAccountType(e.target.value as "EMPLOYEE" | "ADMIN")
+                    setAccountType(e.target.value as "EMPLOYEE" | "ADMIN" | "HR" | "BUSINESSOWNER")
                   }
                   className="w-full border border-gray-300 rounded-lg px-4 py-2.5"
                 >
                   <option value="EMPLOYEE">Employee</option>
                   <option value="ADMIN">Admin</option>
+                  <option value="HR">HR Manager</option>
+                  <option value="BUSINESSOWNER">Business Owner</option>
                 </select>
 
                 {/* DEPARTMENT */}

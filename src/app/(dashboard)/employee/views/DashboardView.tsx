@@ -40,6 +40,7 @@ type Props = {
   totalSeconds?: number;
   onGoToChat?: (chatId: string) => void;
   onOpenMeetChat?: () => void;
+  announcements?: { id: string; text: string }[];
 };
 
 // ─── Holiday Fallback ─────────────────────────────────────────────────────────
@@ -60,7 +61,7 @@ const CANONICAL_HOLIDAYS = [
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const T = {
-  bg: "#F5F5F7",
+  bg: "#FFFFFF",
   card: "#FFFFFF",
   border: "rgba(0,0,0,0.07)",
   borderLight: "rgba(0,0,0,0.04)",
@@ -132,9 +133,9 @@ const CARD: React.CSSProperties = {
 };
 
 const CARD_LABEL: React.CSSProperties = {
-  fontSize: 10, fontWeight: 700, letterSpacing: "0.06em",
-  textTransform: "uppercase", color: T.text3,
-  marginBottom: 14, display: "block",
+  fontSize: 12, fontWeight: 700, letterSpacing: "-0.01em",
+  textTransform: "none", color: T.text2,
+  marginBottom: 12, display: "block",
 };
 
 const INP: React.CSSProperties = {
@@ -408,11 +409,11 @@ function ApplyLeaveModal({ leaveType, setLeaveType, fromDate, setFromDate, toDat
               onClick={handleSubmitLeave}
               disabled={submitting}
               style={{
-                padding: "11px", borderRadius: T.radiusSm,
-                background: submitting ? "#6EE7B7" : T.green, color: "#fff",
-                border: "none", fontSize: 13, fontWeight: 700,
+                padding: "12px", borderRadius: 10,
+                background: submitting ? "#f0fdf4" : "#ecfdf5", color: "#065f46",
+                border: "1px solid #10b98120", fontSize: 13, fontWeight: 800,
                 cursor: submitting ? "not-allowed" : "pointer", fontFamily: T.font,
-                opacity: submitting ? 0.7 : 1,
+                opacity: submitting ? 0.7 : 1, shadow: "0 2px 4px rgba(0,0,0,0.02)"
               }}
             >
               {submitting ? "Submitting…" : "Submit Request"}
@@ -566,7 +567,7 @@ function EmployeeDetailsCard({ user, isCheckedIn, totalSeconds, formatTotal }: {
     <div style={{ ...CARD, padding: 0, display: "flex", flexDirection: "column" }}>
       {/* Profile header */}
       <div style={{ background: "linear-gradient(135deg, #f0f4ff 0%, #e8f0fb 100%)", padding: "24px 20px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 14 }}>
-        <div style={{ width: 56, height: 56, borderRadius: 16, background: T.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 800, color: "#fff", flexShrink: 0, boxShadow: "0 4px 12px rgba(0,113,227,0.25)" }}>
+        <div style={{ width: 60, height: 60, borderRadius: 16, background: T.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 800, color: "#fff", flexShrink: 0, boxShadow: "0 8px 16px -4px rgba(0,113,227,0.3)", border: "2px solid #fff" }}>
           {getInitials(name) || "?"}
         </div>
         <div style={{ minWidth: 0 }}>
@@ -597,8 +598,8 @@ function EmployeeDetailsCard({ user, isCheckedIn, totalSeconds, formatTotal }: {
       <div style={{ margin: "0 16px 16px", background: T.greenLight, borderRadius: 10, padding: "10px 14px", display: "flex", alignItems: "center", gap: 8 }}>
         <div style={{ width: 8, height: 8, borderRadius: "50%", background: isCheckedIn ? T.green : T.text3, flexShrink: 0, boxShadow: isCheckedIn ? "0 0 0 3px rgba(52,199,89,0.2)" : "none" }} />
         <div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: T.text }}>{isCheckedIn ? "Checked In" : "Checked Out"}</div>
-          <div style={{ fontSize: 11, color: T.text2, marginTop: 1 }}>{isCheckedIn ? `${formatTotal(totalWorked)} online today` : "Not checked in"}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{isCheckedIn ? "Checked In" : "Checked Out"}</div>
+          <div style={{ fontSize: 12, color: T.text2, marginTop: 1 }}>{isCheckedIn ? `${formatTotal(totalWorked)} online today` : "Not checked in"}</div>
         </div>
         <div style={{ marginLeft: "auto", fontSize: 13, fontWeight: 800, color: T.green }}>{formatTotal(totalWorked)}</div>
       </div>
@@ -641,7 +642,7 @@ function LeaveBalanceCard({ user, onApplyLeave, onMyLeaves }: { user: any; onApp
         <span style={CARD_LABEL}>Leave Balance</span>
         <button
           onClick={onApplyLeave}
-          style={{ fontSize: 11.5, fontWeight: 700, padding: "5px 13px", borderRadius: 8, background: T.accent, color: "#fff", border: "none", cursor: "pointer", fontFamily: T.font }}
+          style={{ fontSize: 11.5, fontWeight: 800, padding: "6px 14px", borderRadius: 10, background: T.accentLight, color: T.accent, border: "none", cursor: "pointer", fontFamily: T.font, boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}
         >
           Apply Leave
         </button>
@@ -662,8 +663,8 @@ function LeaveBalanceCard({ user, onApplyLeave, onMyLeaves }: { user: any; onApp
                   <span style={{ fontSize: 12, fontWeight: 700, color: leftColor }}>Left {left}</span>
                 </div>
               </div>
-              <div style={{ height: 4, borderRadius: 99, background: "rgba(0,0,0,0.06)", overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${pct}%`, borderRadius: 99, background: pct >= 100 ? T.red : color, transition: "width 1s ease" }} />
+              <div style={{ height: 6, borderRadius: 99, background: "rgba(0,0,0,0.06)", overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${pct}%`, borderRadius: 99, background: pct >= 100 ? T.red : color, transition: "width 1s cubic-bezier(0.4, 0, 0.2, 1)" }} />
               </div>
             </div>
           );
@@ -673,13 +674,16 @@ function LeaveBalanceCard({ user, onApplyLeave, onMyLeaves }: { user: any; onApp
       {/* Summary counts */}
       <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid rgba(0,0,0,0.05)`, display: "flex", gap: 8 }}>
         {([
-          { label: "Pending", value: counts.Pending, color: T.text },
-          { label: "Approved", value: counts.Approved, color: T.green },
-          { label: "Rejected", value: counts.Rejected, color: T.red },
+          { label: "Pending", value: counts.Pending, color: T.text, icon: "⏳" },
+          { label: "Approved", value: counts.Approved, color: T.green, icon: "✅" },
+          { label: "Rejected", value: counts.Rejected, color: T.red, icon: "❌" },
         ] as const).map((s) => (
-          <div key={s.label} onClick={onMyLeaves} style={{ flex: 1, background: "#FAFAFA", borderRadius: 10, padding: "10px 12px", border: `1px solid rgba(0,0,0,0.05)`, cursor: "pointer" }}>
-            <div style={{ fontSize: 18, fontWeight: 800, color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: 10.5, color: T.text2, marginTop: 1, fontWeight: 500 }}>{s.label}</div>
+          <div key={s.label} onClick={onMyLeaves} style={{ flex: 1, background: "#FAFAFA", borderRadius: 12, padding: "12px", border: `1px solid rgba(0,0,0,0.05)`, cursor: "pointer", display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: s.color }}>{s.value}</div>
+              <span style={{ fontSize: 14 }}>{s.icon}</span>
+            </div>
+            <div style={{ fontSize: 11, color: T.text2, fontWeight: 600 }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -832,6 +836,24 @@ function EmployeeDirectoryCard() {
   const [selected, setSelected] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [hovered, setHovered] = useState<string | null>(null);
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const todayStr = new Date().toISOString().split("T")[0];
+    const q = query(collection(db, "attendance"), where("date", "==", todayStr));
+    return onSnapshot(q, (snap) => {
+      const onlineSet = new Set<string>();
+      snap.forEach((docSnap) => {
+        const data = docSnap.data();
+        const sessions = data.sessions || [];
+        const last = sessions[sessions.length - 1];
+        if (last && last.checkOut === null) {
+          onlineSet.add(data.userId);
+        }
+      });
+      setOnlineUserIds(onlineSet);
+    });
+  }, []);
 
   useEffect(() => {
     return onSnapshot(collection(db, "users"), (snap) => {
@@ -844,18 +866,19 @@ function EmployeeDirectoryCard() {
     const q = search.toLowerCase();
     return (e.name ?? "").toLowerCase().includes(q) || (e.email ?? "").toLowerCase().includes(q) || (e.designation ?? "").toLowerCase().includes(q);
   });
-  const onlineCount = employees.filter((e) => e.status === "ONLINE").length;
+  const onlineCount = onlineUserIds.size;
   
 
   return (
     <div style={{ ...CARD, padding: 0, overflow: "hidden" }}>
       {/* Header */}
       <div style={{ padding: "18px 20px 12px", borderBottom: `1px solid rgba(0,0,0,0.05)`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={CARD_LABEL}>Employee Directory</span>
-          <div style={{ display: "flex", gap: 8 }}>
-            {onlineCount > 0 && <span style={{ fontSize: 10, fontWeight: 600, color: T.green, background: T.greenLight, padding: "2px 9px", borderRadius: 5 }}>● {onlineCount} online</span>}
-            <span style={{ fontSize: 10, fontWeight: 600, color: T.accent, background: T.accentLight, padding: "2px 9px", borderRadius: 5 }}>{employees.length} people</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <span style={{ ...CARD_LABEL, margin: 0 }}>Employee Directory</span>
+          <div style={{ display: "flex", gap: 6 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: T.text2, background: "rgba(0,0,0,0.04)", padding: "2px 9px", borderRadius: 6 }}>{employees.length} Total</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: T.green, background: T.greenLight, padding: "2px 9px", borderRadius: 6 }}>● {onlineCount} Online</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: T.red, background: T.redLight, padding: "2px 9px", borderRadius: 6 }}>● {employees.length - onlineCount} Offline</span>
           </div>
         </div>
         {/* Search */}
@@ -873,29 +896,37 @@ function EmployeeDirectoryCard() {
       </div>
 
       {/* Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", maxHeight: 230, overflowY: "auto" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12, maxHeight: 300, overflowY: "auto", padding: "4px" }}>
         {loading ? (
           <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "28px", color: T.text2, fontSize: 12 }}>Loading…</div>
         ) : (
-          filtered.map((emp, i) => (
+          filtered.map((emp) => (
             <div
               key={emp.id}
               onClick={() => setSelected(emp)}
               onMouseEnter={() => setHovered(emp.id)}
               onMouseLeave={() => setHovered(null)}
               style={{
-                display: "flex", alignItems: "center", gap: 10,
-                padding: "12px 16px",
-                borderBottom: `1px solid ${T.borderLight}`,
-                borderRight: i % 4 !== 3 ? `1px solid ${T.borderLight}` : "none",
+                display: "flex", alignItems: "center", gap: 14,
+                padding: "16px 20px",
+                borderRadius: 16,
                 cursor: "pointer",
-                background: hovered === emp.id ? "#FAFAFA" : "transparent",
-                transition: "background 0.12s",
+                background: "#FAFAFA",
+                border: hovered === emp.id ? `1px solid ${T.accent}30` : `1px solid ${T.borderLight}`,
+                boxShadow: hovered === emp.id ? "0 4px 15px rgba(0,0,0,0.05)" : "none",
+                transform: hovered === emp.id ? "translateY(-1px)" : "none",
+                transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
               }}
             >
               <div style={{ position: "relative", flexShrink: 0 }}>
-                <Avatar name={emp.name ?? "?"} size={36} photo={emp.profilePhoto} />
-                <div style={{ position: "absolute", bottom: -1, right: -1, width: 9, height: 9, borderRadius: "50%", background: emp.status === "ONLINE" ? T.green : T.borderLight, border: "2px solid #fff" }} />
+                <Avatar name={emp.name ?? "?"} size={38} photo={emp.profilePhoto} />
+                <div style={{
+                  position: "absolute", bottom: -1, right: -1,
+                  width: 12, height: 12, borderRadius: "50%",
+                  background: onlineUserIds.has(emp.uid) ? T.green : T.red,
+                  border: "2px solid #fff",
+                  boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                }} />
               </div>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: T.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{emp.name ?? "Unnamed"}</div>
@@ -1067,16 +1098,70 @@ function MyProjectsCard({ user }: { user: any }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// MAIN EXPORT
-// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── Small Notice Ticker ────────────────────────────────────────────────────────
+const SmallNoticeTicker = ({ announcements }: { announcements?: { id: string; text: string }[] }) => {
+  if (!announcements || announcements.length === 0) return null;
+
+  return (
+    <div style={{
+      flex: "1",
+      minWidth: "280px",
+      maxWidth: "500px",
+      background: "#eff6ff",
+      borderRadius: "100px",
+      padding: "8px 20px",
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      overflow: "hidden",
+      border: "1px solid #dbeafe",
+      boxShadow: "0 2px 8px rgba(59, 130, 246, 0.05)",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+        <span style={{ fontSize: 14 }}>📢</span>
+        <span style={{ fontSize: 10, fontWeight: 800, color: "#3b82f6", textTransform: "uppercase", letterSpacing: "0.05em" }}>Notice:</span>
+      </div>
+      <div style={{ flex: 1, overflow: "hidden", whiteSpace: "nowrap" }}>
+        <div
+          className="ticker-content"
+          style={{
+            display: "inline-block",
+            paddingLeft: "100%",
+            animation: "ticker-scroll 12s linear infinite",
+            fontSize: "12px",
+            fontWeight: 600,
+            color: "#1e40af",
+            textTransform: "capitalize",
+          }}
+        >
+          <div style={{ display: "flex", gap: 40 }}>
+            {announcements.map((a) => (
+              <span key={a.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                 {a.text}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+      <style>{`
+        @keyframes ticker-scroll {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-100%); }
+        }
+        .ticker-content:hover { animation-play-state: paused; }
+      `}</style>
+    </div>
+  );
+};
+
 export default function DashboardView({
   user, isCheckedIn, sessions,
   formatTotal = (min = 0) => { const m = min < 0 ? 0 : min; return `${Math.floor(m / 60)}h ${m % 60}m`; },
   formatTime = (ts: any) => { try { return ts?.toDate?.()?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) ?? "--"; } catch { return "--"; } },
   leaveType, setLeaveType, fromDate, setFromDate, toDate, setToDate,
   leaveReason, setLeaveReason, handleSubmitLeave, submitting, leaveMsg,
-  totalSeconds = 0, onGoToChat, onOpenMeetChat,
+  totalSeconds = 0, onGoToChat, onOpenMeetChat, announcements,
 }: Props) {
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [leaveNotifications, setLeaveNotifs] = useState<any[]>([]);
@@ -1109,7 +1194,7 @@ export default function DashboardView({
         fontFamily: T.font,
         background: T.bg,
         minHeight: "100vh",
-        padding: "1px 24px 56px",
+        padding: "1px 16px 56px",
         color: T.text,
       }}
     >
@@ -1134,11 +1219,14 @@ export default function DashboardView({
       {activeModal === "help"          && <Modal onClose={close} wide><ModalHeader emoji="💬" title="Help & Support" subtitle="Raise a ticket or browse FAQs" onClose={close} /><HelpView /></Modal>}
 
       {/* ── HEADER ── */}
-      <div style={{ marginBottom: 10 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: T.text, letterSpacing: "-0.03em", margin: 0, lineHeight: 1.2 }}>
-          {greetEmoji} {greeting}, {userName.split(" ")[0]}
-        </h1>
-        <p style={{ fontSize: 13, color: T.text3, marginTop: 5, fontWeight: 500, letterSpacing: "0.01em" }}>{dateStr}</p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4, marginBottom: 4, gap: 20, flexWrap: "wrap" }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: T.text, letterSpacing: "-0.04em", margin: 0, lineHeight: 1.2 }}>
+            <span style={{ marginLeft: -6 }}>{greetEmoji}</span> {greeting}, {userName.split(" ")[0]}
+          </h1>
+          <p style={{ fontSize: 14, color: T.text2, marginTop: 6, fontWeight: 600, letterSpacing: "0.01em" }}>{dateStr}</p>
+        </div>
+        <SmallNoticeTicker announcements={announcements} />
       </div>
 
       {/* ── BENTO GRID — exact layout 1 ── */}

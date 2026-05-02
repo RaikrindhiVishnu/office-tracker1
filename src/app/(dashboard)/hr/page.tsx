@@ -19,6 +19,7 @@ import ProtectedRoute from "@/components/common/ProtectedRoute";
 import MonthlyReport        from "@/app/(dashboard)/admin/monthlyreport";
 import IncomingCallListener from "@/components/IncomingCallListener";
 import EmployeeTodayPanel   from "@/components/EmployeeTodayPanel";
+import CrossDeptFeed from "@/components/CrossDeptFeed";
 
 import type { AttendanceType } from "@/types/attendance";
 import type { Employee }       from "@/types/Employee";
@@ -578,6 +579,14 @@ function HRDashboard() {
                 />
               </div>
 
+              {/* ── Cross-Department Activity Feed ── */}
+              <CrossDeptFeed
+                role="hr"
+                accentColor="#0d9488"
+                title="🏢 Company Activity Feed"
+                maxItems={5}
+              />
+
               {/* ── 3. WIDGET GRID (MIDDLE) ── */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
@@ -797,6 +806,32 @@ function HRDashboard() {
                       ))
                     }
                     {openQ>3&&<button onClick={()=>setView("queries")} className="w-full mt-2 text-xs text-teal-600 font-semibold hover:text-teal-800 transition">View all {openQ} queries →</button>}
+                  </div>
+
+                  {/* ── Sales Commissions (HR Visibility) ── */}
+                  <div className="bg-white rounded-2xl border border-gray-100 p-5">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-sm font-bold text-gray-900">Sales Performance</h3>
+                      <span className="text-[10px] font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full">COMMISSIONS (5%)</span>
+                    </div>
+                    <div className="space-y-3">
+                      {/* We'll use the CrossDeptFeed internally or just show a simplified list here */}
+                      <p className="text-[11px] text-gray-400 mb-2">Recent deals closed by the sales team:</p>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        <CrossDeptFeed
+                          role="hr"
+                          accentColor="#0d9488"
+                          title=""
+                          maxItems={5}
+                          compact
+                          filterType="SALE_CREATED"
+                        />
+                      </div>
+                      <div className="pt-3 border-t border-gray-50 flex items-center justify-between">
+                        <span className="text-xs font-medium text-gray-500">Total Deals Today</span>
+                        <span className="text-sm font-bold text-teal-700">Live Updates</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

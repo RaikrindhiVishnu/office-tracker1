@@ -44,7 +44,7 @@ import {
 
 /* ─── LOCAL TYPES (not needed in kanban file) ─── */
 type ViewMode = "kanban" | "list" | "timeline" | "logs" | "reports";
-type AppTab   = "dashboard" | "projects" | "dailysheet" | "notifications";
+type AppTab = "dashboard" | "projects" | "dailysheet" | "notifications";
 
 interface WorkLog {
   id?: string;
@@ -100,27 +100,27 @@ interface DailyTask {
 
 /* ─── CONSTANTS ─── */
 const DEFAULT_COLUMNS: Column[] = [
-  { id: "todo",       label: "To Do"       },
+  { id: "todo", label: "To Do" },
   { id: "inprogress", label: "In Progress" },
-  { id: "review",     label: "Review"      },
-  { id: "done",       label: "Done"        },
-  { id: "blocked",    label: "Blocked"     },
+  { id: "review", label: "Review" },
+  { id: "done", label: "Done" },
+  { id: "blocked", label: "Blocked" },
 ];
 
 const PRIORITY_CONFIG: Record<string, { color: string; bg: string; icon: string }> = {
-  Low:      { color: "#16a34a", bg: "#f0fdf4", icon: "▼" },
-  Medium:   { color: "#d97706", bg: "#fffbeb", icon: "●" },
-  High:     { color: "#ea580c", bg: "#fff7ed", icon: "▲" },
+  Low: { color: "#16a34a", bg: "#f0fdf4", icon: "▼" },
+  Medium: { color: "#d97706", bg: "#fffbeb", icon: "●" },
+  High: { color: "#ea580c", bg: "#fff7ed", icon: "▲" },
   Critical: { color: "#dc2626", bg: "#fef2f2", icon: "⚡" },
 };
 
-const DAILY_CATEGORIES = ["Development","Design","Testing","Meeting","Documentation","Review","DevOps","Research","Support","Other"];
-const WORK_STATUSES = ["Completed","In Progress","Blocked","Review"] as const;
+const DAILY_CATEGORIES = ["Development", "Design", "Testing", "Meeting", "Documentation", "Review", "DevOps", "Research", "Support", "Other"];
+const WORK_STATUSES = ["Completed", "In Progress", "Blocked", "Review"] as const;
 
 /* ─── HELPERS ─── */
 function getDaysInMonth(year: number, month: number) { return new Date(year, month + 1, 0).getDate(); }
 function getFirstDayOfMonth(year: number, month: number) { const d = new Date(year, month, 1).getDay(); return d === 0 ? 6 : d - 1; }
-const WEEKDAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const nanoid = () => Math.random().toString(36).slice(2, 10);
 
 async function generateUniqueTaskCode(projectId: string, type: TicketType): Promise<string> {
@@ -144,7 +144,7 @@ function EditProjectModal({ open, onClose, project, onSaved }: {
   project: any;
   onSaved?: (updated: any) => void;
 }) {
-  const COLORS = ["#6366f1","#8b5cf6","#ec4899","#f59e0b","#10b981","#3b82f6","#ef4444","#0891b2"];
+  const COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#0891b2"];
   const [form, setForm] = useState({
     name: project?.name || "",
     description: project?.description || "",
@@ -179,7 +179,7 @@ function EditProjectModal({ open, onClose, project, onSaved }: {
       await updateDoc(doc(db, "projects", project.id), {
         ...form,
         projectManagers: adminUids.length > 0 ? adminUids : project.projectManagers,
-        projectManager:  adminUids[0] || project.projectManager,
+        projectManager: adminUids[0] || project.projectManager,
         updatedAt: serverTimestamp(),
       });
       onSaved?.({ ...project, ...form });
@@ -219,7 +219,7 @@ function EditProjectModal({ open, onClose, project, onSaved }: {
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Status</label>
               <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
-                {["Planning","In Progress","On Hold","Completed"].map(s => <option key={s}>{s}</option>)}
+                {["Planning", "In Progress", "On Hold", "Completed"].map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
           </div>
@@ -252,7 +252,7 @@ function EditProjectModal({ open, onClose, project, onSaved }: {
 function ProjectModal({ open, onClose, user, onCreated }: {
   open: boolean; onClose: () => void; user: any; onCreated?: (project: any) => void;
 }) {
-  const COLORS = ["#6366f1","#8b5cf6","#ec4899","#f59e0b","#10b981","#3b82f6","#ef4444","#0891b2"];
+  const COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#0891b2"];
   const [form, setForm] = useState({ name: "", description: "", clientName: "", status: "Planning", color: COLORS[0], endDate: "" });
   const [saving, setSaving] = useState(false);
 
@@ -273,7 +273,7 @@ function ProjectModal({ open, onClose, user, onCreated }: {
         ...form,
         members: allMembers,
         projectManagers: adminUids.length > 0 ? adminUids : [user.uid],
-        projectManager:  adminUids[0] || user.uid,
+        projectManager: adminUids[0] || user.uid,
         progress: 0,
         createdBy: user.uid,
         createdAt: serverTimestamp(),
@@ -316,7 +316,7 @@ function ProjectModal({ open, onClose, user, onCreated }: {
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Status</label>
               <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
-                {["Planning","In Progress","On Hold","Completed"].map(s => <option key={s}>{s}</option>)}
+                {["Planning", "In Progress", "On Hold", "Completed"].map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
           </div>
@@ -346,9 +346,9 @@ function ProjectModal({ open, onClose, user, onCreated }: {
 }
 
 /* ─── SHARED UI ─── */
-const Avatar = ({ name, size = "sm", highlight = false }: { name?: string; size?: "xs"|"sm"|"md"|"lg"; highlight?: boolean }) => {
+const Avatar = ({ name, size = "sm", highlight = false }: { name?: string; size?: "xs" | "sm" | "md" | "lg"; highlight?: boolean }) => {
   const s = { xs: "w-6 h-6 text-[10px]", sm: "w-8 h-8 text-xs", md: "w-10 h-10 text-sm", lg: "w-12 h-12 text-base" };
-  const colors = ["#6366f1","#8b5cf6","#ec4899","#f59e0b","#10b981","#3b82f6"];
+  const colors = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6"];
   const bg = colors[(name?.charCodeAt(0) || 0) % colors.length];
   return (
     <div className={`${s[size]} rounded-full flex items-center justify-center font-bold text-white shrink-0 ${highlight ? "ring-2 ring-indigo-400 ring-offset-1" : ""}`} style={{ background: bg }}>
@@ -361,13 +361,13 @@ const ProgressRing = ({ pct, size = 44, stroke = 4, color = "#6366f1" }: { pct: 
   const r = (size - stroke) / 2, circ = 2 * Math.PI * r, offset = circ - (pct / 100) * circ;
   return (
     <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
-      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#e2e8f0" strokeWidth={stroke} />
-      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" style={{ transition: "stroke-dashoffset 0.6s ease" }} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#e2e8f0" strokeWidth={stroke} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" style={{ transition: "stroke-dashoffset 0.6s ease" }} />
     </svg>
   );
 };
 
-const TicketBadge = ({ type, size = "sm" }: { type?: TicketType; size?: "xs"|"sm" }) => {
+const TicketBadge = ({ type, size = "sm" }: { type?: TicketType; size?: "xs" | "sm" }) => {
   const cfg = TICKET_TYPES[type || "task"];
   const pad = size === "xs" ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]";
   return (
@@ -398,7 +398,7 @@ function TeamButton({ users, activeProject, user, projectColor }: { users: any[]
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const colors = ["#6366f1","#8b5cf6","#ec4899","#f59e0b","#10b981","#3b82f6"];
+  const colors = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6"];
 
   return (
     <div ref={btnRef} style={{ position: "relative", display: "inline-block" }}>
@@ -420,7 +420,7 @@ function TeamButton({ users, activeProject, user, projectColor }: { users: any[]
         </div>
         <span style={{ color: "#6b7280", fontSize: 11 }}>Team</span>
         <svg width="11" height="11" viewBox="0 0 12 12" fill="none" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s", color: "#9ca3af" }}>
-          <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
       {open && (
@@ -486,8 +486,8 @@ function SprintDropdown({
         <button onClick={onNewSprint}
           style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 8, border: "0.5px solid #534AB7", background: "white", color: "#534AB7", fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#534AB7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M7 1v2M7 11v2M1 7h2M11 7h2M3 3l1.4 1.4M9.6 9.6l1.4 1.4M3 11l1.4-1.4M9.6 4.4l1.4-1.4"/>
-            <circle cx="7" cy="7" r="2.5"/>
+            <path d="M7 1v2M7 11v2M1 7h2M11 7h2M3 3l1.4 1.4M9.6 9.6l1.4 1.4M3 11l1.4-1.4M9.6 4.4l1.4-1.4" />
+            <circle cx="7" cy="7" r="2.5" />
           </svg>
           New Sprint
         </button>
@@ -496,12 +496,12 @@ function SprintDropdown({
       <button onClick={() => setOpen(o => !o)}
         style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 8, border: `0.5px solid ${activeSprint ? "#534AB7" : "#d1d5db"}`, background: activeSprint ? "#534AB7" : "white", color: activeSprint ? "#fff" : "#374151", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s" }}>
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-          <circle cx="6.5" cy="6.5" r="5.5" stroke={activeSprint ? "#fff" : "#534AB7"} strokeWidth="1.2"/>
-          <path d="M4 6.5l1.8 1.8L9 4.5" stroke={activeSprint ? "#fff" : "#534AB7"} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+          <circle cx="6.5" cy="6.5" r="5.5" stroke={activeSprint ? "#fff" : "#534AB7"} strokeWidth="1.2" />
+          <path d="M4 6.5l1.8 1.8L9 4.5" stroke={activeSprint ? "#fff" : "#534AB7"} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         <span>{activeLabel}</span>
         <svg width="10" height="10" viewBox="0 0 12 12" fill="none" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
-          <path d="M2 4l4 4 4-4" stroke={activeSprint ? "#fff" : "#9ca3af"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M2 4l4 4 4-4" stroke={activeSprint ? "#fff" : "#9ca3af"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
 
@@ -541,13 +541,13 @@ function SprintDropdown({
                         style={{ width: 26, height: 26, borderRadius: 6, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#6b7280", transition: "all 0.12s" }}
                         onMouseEnter={e => { e.currentTarget.style.background = "#eef0ff"; e.currentTarget.style.color = "#534AB7"; }}
                         onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#6b7280"; }}>
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 9l1.5-1.5L8 2 10 4l-5.5 5.5L1 11V9zM7 3l2 2"/></svg>
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 9l1.5-1.5L8 2 10 4l-5.5 5.5L1 11V9zM7 3l2 2" /></svg>
                       </button>
                       <button onClick={e => { e.stopPropagation(); onDeleteSprint(s); }} title="Delete sprint"
                         style={{ width: 26, height: 26, borderRadius: 6, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#6b7280", transition: "all 0.12s" }}
                         onMouseEnter={e => { e.currentTarget.style.background = "#fef2f2"; e.currentTarget.style.color = "#dc2626"; }}
                         onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#6b7280"; }}>
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h8M5 3V2h2v1M3 3l.5 7h5L9 3"/></svg>
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h8M5 3V2h2v1M3 3l.5 7h5L9 3" /></svg>
                       </button>
                     </div>
                   )}
@@ -733,7 +733,7 @@ function TaskModal({
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Priority</label>
               <select value={form.priority || "Medium"} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
-                {["Low","Medium","High","Critical"].map(p => <option key={p}>{p}</option>)}
+                {["Low", "Medium", "High", "Critical"].map(p => <option key={p}>{p}</option>)}
               </select>
             </div>
             <div>
@@ -816,7 +816,7 @@ function TaskModal({
               )}
               <div className="px-4 py-3 bg-gray-50/50 border-t border-gray-100">
                 <div className="flex gap-2 mb-2">
-                  {(["task","bug","defect"] as TicketType[]).map(type => {
+                  {(["task", "bug", "defect"] as TicketType[]).map(type => {
                     const cfg = TICKET_TYPES[type];
                     const sel = newChild.ticketType === type;
                     return (
@@ -828,7 +828,7 @@ function TaskModal({
                     );
                   })}
                   <select value={newChild.priority} onChange={e => setNewChild(n => ({ ...n, priority: e.target.value }))} className="ml-auto text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none bg-white">
-                    {["Low","Medium","High","Critical"].map(p => <option key={p}>{p}</option>)}
+                    {["Low", "Medium", "High", "Critical"].map(p => <option key={p}>{p}</option>)}
                   </select>
                 </div>
                 <div className="flex gap-2">
@@ -883,7 +883,7 @@ function TaskDetailModal({
   onMoveToSprint: (task: Task, sprintId: string | null) => void;
   onEditTask: (task: Task) => void;
 }) {
-  const [taskTab, setTaskTab] = useState<"details"|"subtasks"|"files"|"comments"|"worklogs"|"empsheet">("details");
+  const [taskTab, setTaskTab] = useState<"details" | "subtasks" | "files" | "comments" | "worklogs" | "empsheet">("details");
   const [comments, setComments] = useState<any[]>([]);
   const [taskFiles, setTaskFiles] = useState<any[]>([]);
   const [subtasks, setSubtasks] = useState<any[]>([]);
@@ -911,11 +911,11 @@ function TaskDetailModal({
   useEffect(() => { setLocalTask(task); }, [task.id]);
 
   useEffect(() => {
-    const u1 = onSnapshot(query(collection(firestoreDb, "taskComments"), where("taskId","==",task.id), orderBy("createdAt","asc")), s => setComments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const u2 = onSnapshot(query(collection(firestoreDb, "taskFiles"), where("taskId","==",task.id), orderBy("createdAt","desc")), s => setTaskFiles(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const u3 = onSnapshot(query(collection(firestoreDb, "subtasks"), where("taskId","==",task.id)), s => setSubtasks(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const u4 = onSnapshot(query(collection(firestoreDb, "workLogs"), where("taskId","==",task.id), orderBy("createdAt","desc")), s => setTaskWorklogs(s.docs.map(d => ({ id: d.id, ...d.data() } as WorkLog))));
-    const u5 = onSnapshot(query(collection(firestoreDb, "dailyEntries"), where("taskId","==",task.id), orderBy("createdAt","desc")), s => setTaskEmpEntries(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const u1 = onSnapshot(query(collection(firestoreDb, "taskComments"), where("taskId", "==", task.id), orderBy("createdAt", "asc")), s => setComments(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const u2 = onSnapshot(query(collection(firestoreDb, "taskFiles"), where("taskId", "==", task.id), orderBy("createdAt", "desc")), s => setTaskFiles(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const u3 = onSnapshot(query(collection(firestoreDb, "subtasks"), where("taskId", "==", task.id)), s => setSubtasks(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const u4 = onSnapshot(query(collection(firestoreDb, "workLogs"), where("taskId", "==", task.id), orderBy("createdAt", "desc")), s => setTaskWorklogs(s.docs.map(d => ({ id: d.id, ...d.data() } as WorkLog))));
+    const u5 = onSnapshot(query(collection(firestoreDb, "dailyEntries"), where("taskId", "==", task.id), orderBy("createdAt", "desc")), s => setTaskEmpEntries(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     return () => { u1(); u2(); u3(); u4(); u5(); };
   }, [task.id]);
 
@@ -962,7 +962,7 @@ function TaskDetailModal({
   const handleSubmitWorkLog = async () => {
     if (!wl.description.trim() || !wl.hoursWorked) return;
     await addDoc(collection(firestoreDb, "workLogs"), { userId: currentUserId, userName, projectId: task.projectId, projectName, taskId: task.id, taskName: task.title, description: wl.description, hoursWorked: Number(wl.hoursWorked), workStatus: wl.workStatus, date: wl.date, createdAt: serverTimestamp() });
-    const td = await getDocs(query(collection(firestoreDb, "projectTasks"), where("projectId","==",task.projectId)));
+    const td = await getDocs(query(collection(firestoreDb, "projectTasks"), where("projectId", "==", task.projectId)));
     const found = td.docs.find(d => d.id === task.id);
     if (found) await updateDoc(doc(firestoreDb, "projectTasks", task.id), { actualHours: (found.data().actualHours || 0) + Number(wl.hoursWorked) });
     setWl({ description: "", hoursWorked: "", workStatus: "In Progress", date: new Date().toISOString().split("T")[0] });
@@ -981,12 +981,12 @@ function TaskDetailModal({
   const totalEmpHours = taskEmpEntries.reduce((s, e) => s + (e.hoursWorked || 0), 0);
 
   const TABS = [
-    { id: "details",  icon: "📋", label: "Details",  badge: null },
+    { id: "details", icon: "📋", label: "Details", badge: null },
     { id: "subtasks", icon: "✅", label: "Subtasks", badge: subtasks.length > 0 ? `${subtasksDone}/${subtasks.length}` : null },
-    { id: "files",    icon: "📎", label: "Files",    badge: taskFiles.length > 0 ? String(taskFiles.length) : null },
+    { id: "files", icon: "📎", label: "Files", badge: taskFiles.length > 0 ? String(taskFiles.length) : null },
     { id: "comments", icon: "💬", label: "Comments", badge: comments.length > 0 ? String(comments.length) : null },
-    { id: "worklogs", icon: "⏱", label: "Logs",     badge: taskWorklogs.length > 0 ? `${totalLoggedHours}h` : null },
-    { id: "empsheet", icon: "📝", label: "My Work",  badge: taskEmpEntries.length > 0 ? `${totalEmpHours}h` : null },
+    { id: "worklogs", icon: "⏱", label: "Logs", badge: taskWorklogs.length > 0 ? `${totalLoggedHours}h` : null },
+    { id: "empsheet", icon: "📝", label: "My Work", badge: taskEmpEntries.length > 0 ? `${totalEmpHours}h` : null },
   ] as const;
 
   return createPortal(
@@ -1100,12 +1100,12 @@ function TaskDetailModal({
                   <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-2">Status</p>
                   {canEdit
                     ? <select value={localTask.status} onChange={e => { setLocalTask(t => ({ ...t, status: e.target.value })); onStatusChange(task.id, e.target.value); }}
-                        className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                        {columns.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-                      </select>
+                      className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                      {columns.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                    </select>
                     : <span className="text-xs font-semibold" style={{ color: getColStyle(task.status, columns.findIndex(c => c.id === task.status)).color }}>
-                        {columns.find(c => c.id === task.status)?.label ?? task.status}
-                      </span>
+                      {columns.find(c => c.id === task.status)?.label ?? task.status}
+                    </span>
                   }
                 </div>
                 <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
@@ -1172,12 +1172,12 @@ function TaskDetailModal({
               {taskFiles.length === 0
                 ? <div className="text-center py-8 text-gray-300"><div className="text-4xl mb-2">📁</div><p className="text-sm">No files</p></div>
                 : <div className="space-y-2">{taskFiles.map(f => (
-                    <a key={f.id} href={f.fileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50 transition">
-                      <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-xl">{f.fileName.match(/\.(png|jpg|jpeg|gif)$/i) ? "🖼️" : f.fileName.match(/\.pdf$/i) ? "📕" : "📄"}</div>
-                      <div className="flex-1 min-w-0"><p className="text-sm font-semibold text-gray-800 truncate">{f.fileName}</p><p className="text-xs text-gray-400">{f.uploadedByName}</p></div>
-                      <span className="text-gray-300">↗</span>
-                    </a>
-                  ))}</div>
+                  <a key={f.id} href={f.fileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50 transition">
+                    <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center text-xl">{f.fileName.match(/\.(png|jpg|jpeg|gif)$/i) ? "🖼️" : f.fileName.match(/\.pdf$/i) ? "📕" : "📄"}</div>
+                    <div className="flex-1 min-w-0"><p className="text-sm font-semibold text-gray-800 truncate">{f.fileName}</p><p className="text-xs text-gray-400">{f.uploadedByName}</p></div>
+                    <span className="text-gray-300">↗</span>
+                  </a>
+                ))}</div>
               }
             </div>
           )}
@@ -1231,24 +1231,24 @@ function TaskDetailModal({
                 {taskWorklogs.length === 0
                   ? <div className="text-center py-10 text-gray-300"><div className="text-4xl mb-2">⏱</div><p className="text-sm">No work logged yet</p></div>
                   : <div className="divide-y divide-gray-50">
-                      {taskWorklogs.map(log => (
-                        <div key={log.id} className="flex items-start gap-3 p-4 hover:bg-gray-50 transition">
-                          <Avatar name={log.userName} size="sm" highlight={log.userId === currentUserId} />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-0.5">
-                              <span className="text-xs font-bold text-gray-700">{log.userName}</span>
-                              {log.userId === currentUserId && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ background: projectColor }}>You</span>}
-                            </div>
-                            <p className="text-sm text-gray-600">{log.description}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-xs text-gray-400">{log.date}</span>
-                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${log.workStatus === "Completed" ? "bg-green-100 text-green-700" : log.workStatus === "Blocked" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>{log.workStatus}</span>
-                            </div>
+                    {taskWorklogs.map(log => (
+                      <div key={log.id} className="flex items-start gap-3 p-4 hover:bg-gray-50 transition">
+                        <Avatar name={log.userName} size="sm" highlight={log.userId === currentUserId} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-xs font-bold text-gray-700">{log.userName}</span>
+                            {log.userId === currentUserId && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ background: projectColor }}>You</span>}
                           </div>
-                          <span className="text-xl font-black shrink-0" style={{ color: projectColor }}>{log.hoursWorked}h</span>
+                          <p className="text-sm text-gray-600">{log.description}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-gray-400">{log.date}</span>
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${log.workStatus === "Completed" ? "bg-green-100 text-green-700" : log.workStatus === "Blocked" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>{log.workStatus}</span>
+                          </div>
                         </div>
-                      ))}
-                    </div>
+                        <span className="text-xl font-black shrink-0" style={{ color: projectColor }}>{log.hoursWorked}h</span>
+                      </div>
+                    ))}
+                  </div>
                 }
               </div>
             </div>
@@ -1258,7 +1258,7 @@ function TaskDetailModal({
             <div className="space-y-4">
               <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
                 <div className="flex items-center gap-2 mb-4">
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="#534AB7" strokeWidth="1.2"/><path d="M5 6h6M5 9h4" stroke="#534AB7" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="#534AB7" strokeWidth="1.2" /><path d="M5 6h6M5 9h4" stroke="#534AB7" strokeWidth="1.2" strokeLinecap="round" /></svg>
                   <span className="text-sm font-semibold text-gray-800">Add daily work</span>
                 </div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">What did you work on?</label>
@@ -1291,30 +1291,30 @@ function TaskDetailModal({
               {taskEmpEntries.length === 0
                 ? <p className="text-center text-sm text-gray-400 py-6">No entries yet — add your first work log above.</p>
                 : <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                      <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Work History</h3>
-                      <span className="text-sm font-black" style={{ color: projectColor }}>{totalEmpHours}h total</span>
-                    </div>
-                    <div className="divide-y divide-gray-50">
-                      {taskEmpEntries.map((entry: any) => (
-                        <div key={entry.id} className="flex items-start gap-3 p-4 hover:bg-gray-50 transition">
-                          <Avatar name={entry.userName} size="sm" highlight={entry.userId === currentUserId} />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-0.5">
-                              <span className="text-xs font-bold text-gray-800">{entry.userName}</span>
-                              {entry.userId === currentUserId && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ background: projectColor }}>You</span>}
-                            </div>
-                            <p className="text-sm text-gray-600">{entry.description}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-xs text-gray-400">{entry.date}</span>
-                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${entry.workStatus === "Completed" ? "bg-green-100 text-green-700" : entry.workStatus === "Blocked" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>{entry.workStatus}</span>
-                            </div>
-                          </div>
-                          <span className="text-xl font-black shrink-0" style={{ color: projectColor }}>{entry.hoursWorked}h</span>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                    <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Work History</h3>
+                    <span className="text-sm font-black" style={{ color: projectColor }}>{totalEmpHours}h total</span>
                   </div>
+                  <div className="divide-y divide-gray-50">
+                    {taskEmpEntries.map((entry: any) => (
+                      <div key={entry.id} className="flex items-start gap-3 p-4 hover:bg-gray-50 transition">
+                        <Avatar name={entry.userName} size="sm" highlight={entry.userId === currentUserId} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-xs font-bold text-gray-800">{entry.userName}</span>
+                            {entry.userId === currentUserId && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ background: projectColor }}>You</span>}
+                          </div>
+                          <p className="text-sm text-gray-600">{entry.description}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-gray-400">{entry.date}</span>
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${entry.workStatus === "Completed" ? "bg-green-100 text-green-700" : entry.workStatus === "Blocked" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>{entry.workStatus}</span>
+                          </div>
+                        </div>
+                        <span className="text-xl font-black shrink-0" style={{ color: projectColor }}>{entry.hoursWorked}h</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               }
             </div>
           )}
@@ -1357,7 +1357,7 @@ function EmployeeDailySheet({ user, projects }: { user: any; projects: any[] }) 
   const [viewMonth, setViewMonth] = useState(currentMonth);
   const [entries, setEntries] = useState<DailyEntry[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [mode, setMode] = useState<"calendar"|"fill"|"summary">("calendar");
+  const [mode, setMode] = useState<"calendar" | "fill" | "summary">("calendar");
   const [currentEntry, setCurrentEntry] = useState<DailyEntry | null>(null);
   const [taskList, setTaskList] = useState<DailyTask[]>([]);
   const [saving, setSaving] = useState(false);
@@ -1367,11 +1367,11 @@ function EmployeeDailySheet({ user, projects }: { user: any; projects: any[] }) 
   const userName = user?.displayName || user?.email?.split("@")[0] || "";
   const myProjects = projects?.filter(p => p.members?.includes(user?.uid)) || [];
 
-  const parsedYear  = parseInt(viewMonth.split("-")[0], 10);
+  const parsedYear = parseInt(viewMonth.split("-")[0], 10);
   const parsedMonth = parseInt(viewMonth.split("-")[1], 10) - 1;
   const daysInMonth = getDaysInMonth(parsedYear, parsedMonth);
-  const firstDay    = getFirstDayOfMonth(parsedYear, parsedMonth);
-  const monthName   = new Date(parsedYear, parsedMonth, 1).toLocaleString("default", { month: "long", year: "numeric" });
+  const firstDay = getFirstDayOfMonth(parsedYear, parsedMonth);
+  const monthName = new Date(parsedYear, parsedMonth, 1).toLocaleString("default", { month: "long", year: "numeric" });
 
   const buildMonthStr = (y: number, m0: number) => `${y}-${String(m0 + 1).padStart(2, "0")}`;
   const prevMonth = () => { const d = new Date(parsedYear, parsedMonth - 1, 1); setViewMonth(buildMonthStr(d.getFullYear(), d.getMonth())); };
@@ -1380,13 +1380,13 @@ function EmployeeDailySheet({ user, projects }: { user: any; projects: any[] }) 
   useEffect(() => {
     if (!user?.uid) return;
     const start = `${viewMonth}-01`;
-    const end   = `${viewMonth}-${String(daysInMonth).padStart(2, "0")}`;
-    const q = query(collection(db, "dailyEntries"), where("userId","==",user.uid), where("date",">=",start), where("date","<=",end), orderBy("date","asc"));
+    const end = `${viewMonth}-${String(daysInMonth).padStart(2, "0")}`;
+    const q = query(collection(db, "dailyEntries"), where("userId", "==", user.uid), where("date", ">=", start), where("date", "<=", end), orderBy("date", "asc"));
     return onSnapshot(q, snap => setEntries(snap.docs.map(d => ({ id: d.id, ...d.data() } as DailyEntry))));
   }, [user?.uid, viewMonth]);
 
-  const getEntry  = (dateStr: string) => entries.find(e => e.date === dateStr) || null;
-  const openFill  = (dateStr: string) => {
+  const getEntry = (dateStr: string) => entries.find(e => e.date === dateStr) || null;
+  const openFill = (dateStr: string) => {
     const entry = getEntry(dateStr);
     setSelectedDate(dateStr); setCurrentEntry(entry);
     setTaskList(entry ? [...entry.tasks] : []);
@@ -1400,7 +1400,7 @@ function EmployeeDailySheet({ user, projects }: { user: any; projects: any[] }) 
     setTf(t => ({ ...t, taskTitle: "", description: "", hoursWorked: 1 }));
   };
 
-  const saveEntry = async (status: "submitted"|"draft") => {
+  const saveEntry = async (status: "submitted" | "draft") => {
     if (!selectedDate || !user?.uid) return;
     setSaving(true);
     const totalHours = taskList.reduce((s, t) => s + t.hoursWorked, 0);
@@ -1414,9 +1414,9 @@ function EmployeeDailySheet({ user, projects }: { user: any; projects: any[] }) 
   };
 
   const totalMonthHours = entries.reduce((s, e) => s + e.totalHours, 0);
-  const submittedDays   = entries.filter(e => e.status === "submitted").length;
-  const todayStr        = new Date().toISOString().split("T")[0];
-  const popupEntry      = popupDate ? getEntry(popupDate) : null;
+  const submittedDays = entries.filter(e => e.status === "submitted").length;
+  const todayStr = new Date().toISOString().split("T")[0];
+  const popupEntry = popupDate ? getEntry(popupDate) : null;
 
   if (mode === "fill" && selectedDate) {
     const dateLabel = new Date(selectedDate + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
@@ -1484,7 +1484,7 @@ function EmployeeDailySheet({ user, projects }: { user: any; projects: any[] }) 
         </div>
         <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-100"><tr>{["Date","Project","Task","Category","Status","Hours"].map(h => <th key={h} className="px-5 py-3.5 text-left text-[11px] font-black text-gray-400 uppercase tracking-wider">{h}</th>)}</tr></thead>
+            <thead className="bg-gray-50 border-b border-gray-100"><tr>{["Date", "Project", "Task", "Category", "Status", "Hours"].map(h => <th key={h} className="px-5 py-3.5 text-left text-[11px] font-black text-gray-400 uppercase tracking-wider">{h}</th>)}</tr></thead>
             <tbody>
               {entries.flatMap(entry =>
                 (entry.tasks || []).map((task, ti) => {
@@ -1567,7 +1567,7 @@ function EmployeeDailySheet({ user, projects }: { user: any; projects: any[] }) 
           {Array(daysInMonth).fill(null).map((_, i) => {
             const day = i + 1;
             const dateStr = `${viewMonth}-${String(day).padStart(2, "0")}`;
-            const entry   = getEntry(dateStr);
+            const entry = getEntry(dateStr);
             const isToday = dateStr === todayStr;
             const isFuture = dateStr > todayStr;
             return (
@@ -1606,7 +1606,7 @@ function ProjectsPage({ user, myProjects, onOpenProject, onCreateProject, onEdit
       <div className="flex items-center justify-between">
         <div><h2 className="text-2xl font-black text-gray-900">My Projects</h2><p className="text-sm text-gray-400">{myProjects.length} project{myProjects.length !== 1 ? "s" : ""}</p></div>
         <button onClick={onCreateProject} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white shadow-sm transition hover:opacity-90" style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><path d="M7 1v12M1 7h12"/></svg>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><path d="M7 1v12M1 7h12" /></svg>
           New Project
         </button>
       </div>
@@ -1663,33 +1663,33 @@ function ProjectsPage({ user, myProjects, onOpenProject, onCreateProject, onEdit
    MAIN COMPONENT
 ═══════════════════════════════════════════ */
 export default function ProjectManagement({ user, projects, users }: any) {
-  const [activeTab, setActiveTab]         = useState<AppTab>("dashboard");
+  const [activeTab, setActiveTab] = useState<AppTab>("dashboard");
   const [activeProject, setActiveProject] = useState<any>(null);
-  const [viewMode, setViewMode]           = useState<ViewMode>("kanban");
+  const [viewMode, setViewMode] = useState<ViewMode>("kanban");
 
-  const [tasks, setTasks]           = useState<Task[]>([]);
-  const [sprints, setSprints]       = useState<any[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [sprints, setSprints] = useState<any[]>([]);
   const [activeSprint, setActiveSprint] = useState<any>(null);
   const [activities, setActivities] = useState<any[]>([]);
   const [myWorkLogs, setMyWorkLogs] = useState<WorkLog[]>([]);
   const [allWorkLogs, setAllWorkLogs] = useState<WorkLog[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [milestones, setMilestones] = useState<any[]>([]);
-  const [columns, setColumns]       = useState<Column[]>(DEFAULT_COLUMNS);
+  const [columns, setColumns] = useState<Column[]>(DEFAULT_COLUMNS);
 
-  const [filterPriority, setFilterPriority]     = useState("all");
-  const [filterTicketType, setFilterTicketType] = useState<"all"|TicketType>("all");
-  const [search, setSearch]                     = useState("");
-  const [showMyTasksOnly, setShowMyTasksOnly]   = useState(false);
+  const [filterPriority, setFilterPriority] = useState("all");
+  const [filterTicketType, setFilterTicketType] = useState<"all" | TicketType>("all");
+  const [search, setSearch] = useState("");
+  const [showMyTasksOnly, setShowMyTasksOnly] = useState(false);
 
-  const [showCreateModal, setShowCreateModal]   = useState(false);
-  const [quickAddStory, setQuickAddStory]       = useState<{ story: Task; ticketType: TicketType } | null>(null);
-  const [viewingTask, setViewingTask]           = useState<Task | null>(null);
-  const [editingTask, setEditingTask]           = useState<Task | null>(null);
-  const [showSprintModal, setShowSprintModal]   = useState(false);
-  const [editingSprint, setEditingSprint]       = useState<any>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [quickAddStory, setQuickAddStory] = useState<{ story: Task; ticketType: TicketType } | null>(null);
+  const [viewingTask, setViewingTask] = useState<Task | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [showSprintModal, setShowSprintModal] = useState(false);
+  const [editingSprint, setEditingSprint] = useState<any>(null);
   const [showProjectModal, setShowProjectModal] = useState(false);
-  const [editingProject, setEditingProject]     = useState<any>(null);
+  const [editingProject, setEditingProject] = useState<any>(null);
 
   const [showWorkLogForm, setShowWorkLogForm] = useState(false);
   const [wl, setWl] = useState({ taskId: "", taskName: "", description: "", hoursWorked: "", workStatus: "In Progress" as WorkLog["workStatus"], date: new Date().toISOString().split("T")[0] });
@@ -1697,30 +1697,30 @@ export default function ProjectManagement({ user, projects, users }: any) {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const showToast = (msg: string) => setToastMsg(msg);
 
-  const myProjects      = projects?.filter((p: any) => p.members?.includes(user?.uid)) || [];
-  const userName        = user?.displayName || user?.email?.split("@")[0] || "";
-  const projectColor    = activeProject?.color || "#6366f1";
-  const permissions     = getPermissions(user, activeProject);
+  const myProjects = projects?.filter((p: any) => p.members?.includes(user?.uid)) || [];
+  const userName = user?.displayName || user?.email?.split("@")[0] || "";
+  const projectColor = activeProject?.color || "#6366f1";
+  const permissions = getPermissions(user, activeProject);
   const isProjectManager = permissions.fullControl;
   const { isPM, isAdmin } = permissions;
-  const fullControl     = isAdmin || isPM;
-  const stories         = tasks.filter(t => t.ticketType === "story");
+  const fullControl = isAdmin || isPM;
+  const stories = tasks.filter(t => t.ticketType === "story");
 
   const handleAddChildToStory = (story: Task, ticketType: TicketType) => setQuickAddStory({ story, ticketType });
 
   useEffect(() => {
     if (!user?.uid) return;
-    return onSnapshot(query(collection(db, "notifications"), where("userId","==",user.uid), orderBy("createdAt","desc")), s => setNotifications(s.docs.map(d => ({ id: d.id, ...d.data() } as Notification))));
+    return onSnapshot(query(collection(db, "notifications"), where("userId", "==", user.uid), orderBy("createdAt", "desc")), s => setNotifications(s.docs.map(d => ({ id: d.id, ...d.data() } as Notification))));
   }, [user?.uid]);
 
   useEffect(() => {
     if (!user?.uid) return;
-    return onSnapshot(query(collection(db, "workLogs"), where("userId","==",user.uid), orderBy("createdAt","desc")), s => setMyWorkLogs(s.docs.map(d => ({ id: d.id, ...d.data() } as WorkLog))));
+    return onSnapshot(query(collection(db, "workLogs"), where("userId", "==", user.uid), orderBy("createdAt", "desc")), s => setMyWorkLogs(s.docs.map(d => ({ id: d.id, ...d.data() } as WorkLog))));
   }, [user?.uid]);
 
   useEffect(() => {
     if (!activeProject?.id) return;
-    const q = query(collection(db, "projectColumns"), where("projectId","==",activeProject.id));
+    const q = query(collection(db, "projectColumns"), where("projectId", "==", activeProject.id));
     return onSnapshot(q, snap => {
       if (!snap.empty) {
         const data = snap.docs[0].data();
@@ -1731,13 +1731,13 @@ export default function ProjectManagement({ user, projects, users }: any) {
 
   useEffect(() => {
     if (!activeProject) return;
-    const u1 = onSnapshot(query(collection(db, "projectTasks"), where("projectId","==",activeProject.id)), s => setTasks(s.docs.map(d => ({ id: d.id, ...d.data() } as Task))));
-    const u2 = onSnapshot(query(collection(db, "sprints"), where("projectId","==",activeProject.id), orderBy("createdAt","desc")), s => setSprints(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const u3 = onSnapshot(query(collection(db, "projectActivities"), where("projectId","==",activeProject.id), orderBy("createdAt","desc")), s => setActivities(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const u4 = onSnapshot(query(collection(db, "workLogs"), where("projectId","==",activeProject.id), orderBy("createdAt","desc")), s => setAllWorkLogs(s.docs.map(d => ({ id: d.id, ...d.data() } as WorkLog))));
-    const u5 = onSnapshot(query(collection(db, "milestones"), where("projectId","==",activeProject.id)), s => setMilestones(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const u1 = onSnapshot(query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id)), s => setTasks(s.docs.map(d => ({ id: d.id, ...d.data() } as Task))));
+    const u2 = onSnapshot(query(collection(db, "sprints"), where("projectId", "==", activeProject.id), orderBy("createdAt", "desc")), s => setSprints(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const u3 = onSnapshot(query(collection(db, "projectActivities"), where("projectId", "==", activeProject.id), orderBy("createdAt", "desc")), s => setActivities(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const u4 = onSnapshot(query(collection(db, "workLogs"), where("projectId", "==", activeProject.id), orderBy("createdAt", "desc")), s => setAllWorkLogs(s.docs.map(d => ({ id: d.id, ...d.data() } as WorkLog))));
+    const u5 = onSnapshot(query(collection(db, "milestones"), where("projectId", "==", activeProject.id)), s => setMilestones(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const initCols = async () => {
-      const colSnap = await getDocs(query(collection(db, "projectColumns"), where("projectId","==",activeProject.id)));
+      const colSnap = await getDocs(query(collection(db, "projectColumns"), where("projectId", "==", activeProject.id)));
       if (colSnap.empty) await addDoc(collection(db, "projectColumns"), { projectId: activeProject.id, columns: DEFAULT_COLUMNS, updatedAt: serverTimestamp() });
     };
     initCols();
@@ -1751,7 +1751,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
   const handleUpdateColumns = async (updated: Column[]) => {
     if (!activeProject?.id || !isProjectManager) return;
     setColumns(updated);
-    const q = query(collection(db, "projectColumns"), where("projectId","==",activeProject.id));
+    const q = query(collection(db, "projectColumns"), where("projectId", "==", activeProject.id));
     const snap = await getDocs(q);
     if (!snap.empty) await updateDoc(doc(db, "projectColumns", snap.docs[0].id), { columns: updated, updatedAt: serverTimestamp() });
     else await addDoc(collection(db, "projectColumns"), { projectId: activeProject.id, columns: updated, updatedAt: serverTimestamp() });
@@ -1767,7 +1767,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
       ...(newStatus === "done" ? { completedAt: serverTimestamp() } : {}),
     });
     await logActivity(activeProject.id, "moved task", `"${task.title}" → ${columns.find(c => c.id === newStatus)?.label ?? newStatus}`, taskId);
-    const snap = await getDocs(query(collection(db, "projectTasks"), where("projectId","==",activeProject.id)));
+    const snap = await getDocs(query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id)));
     const all = snap.docs.map(d => d.data());
     if (all.length) await updateDoc(doc(db, "projects", activeProject.id), { progress: Math.round((all.filter(t => t.status === "done").length / all.length) * 100) });
   };
@@ -1798,7 +1798,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
     }
     setShowCreateModal(false);
     setQuickAddStory(null);
-    const snap = await getDocs(query(collection(db, "projectTasks"), where("projectId","==",activeProject.id)));
+    const snap = await getDocs(query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id)));
     const all = snap.docs.map(d => d.data());
     if (all.length) await updateDoc(doc(db, "projects", activeProject.id), { progress: Math.round((all.filter(t => t.status === "done").length / all.length) * 100) });
   };
@@ -1846,7 +1846,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
       workStatus: wl.workStatus, date: wl.date, createdAt: serverTimestamp(),
     });
     if (wl.taskId) {
-      const snap = await getDocs(query(collection(db, "projectTasks"), where("projectId","==",activeProject.id)));
+      const snap = await getDocs(query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id)));
       const td = snap.docs.find(d => d.id === wl.taskId);
       if (td) await updateDoc(doc(db, "projectTasks", wl.taskId), { actualHours: (td.data().actualHours || 0) + Number(wl.hoursWorked) });
     }
@@ -1856,16 +1856,16 @@ export default function ProjectManagement({ user, projects, users }: any) {
   };
 
   const markAllRead = async () => { for (const n of notifications.filter(n => !n.read)) await updateDoc(doc(db, "notifications", n.id), { read: true }); };
-  const markRead    = async (nid: string) => { await updateDoc(doc(db, "notifications", nid), { read: true }); };
+  const markRead = async (nid: string) => { await updateDoc(doc(db, "notifications", nid), { read: true }); };
 
-  const unreadCount  = notifications.filter(n => !n.read).length;
-  const myTasks      = tasks.filter(t => t.assignedTo === user?.uid);
-  const myDone       = myTasks.filter(t => t.status === "done").length;
-  const myProgress   = myTasks.length > 0 ? Math.round((myDone / myTasks.length) * 100) : 0;
+  const unreadCount = notifications.filter(n => !n.read).length;
+  const myTasks = tasks.filter(t => t.assignedTo === user?.uid);
+  const myDone = myTasks.filter(t => t.status === "done").length;
+  const myProgress = myTasks.length > 0 ? Math.round((myDone / myTasks.length) * 100) : 0;
   const overdueTasks = myTasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "done");
-  const todayStr     = new Date().toISOString().split("T")[0];
-  const todayLogs    = myWorkLogs.filter(l => l.date === todayStr);
-  const todayHours   = todayLogs.reduce((s, l) => s + l.hoursWorked, 0);
+  const todayStr = new Date().toISOString().split("T")[0];
+  const todayLogs = myWorkLogs.filter(l => l.date === todayStr);
+  const todayHours = todayLogs.reduce((s, l) => s + l.hoursWorked, 0);
   const totalHoursAll = myWorkLogs.reduce((s, l) => s + l.hoursWorked, 0);
 
   const sprintFilteredTasks = activeSprint ? tasks.filter(t => t.sprintId === activeSprint.id) : tasks;
@@ -1910,11 +1910,11 @@ export default function ProjectManagement({ user, projects, users }: any) {
           <div className="px-6 py-2 flex items-center gap-2 bg-gray-50 border-t border-gray-100 flex-wrap">
             <div className="flex bg-white border border-gray-200 rounded-lg overflow-hidden">
               {([
-                ["kanban",   "⊞ Board"],
-                ["list",     "☰ List"],
+                ["kanban", "⊞ Board"],
+                ["list", "☰ List"],
                 ["timeline", "📅 Activity"],
-                ["logs",     "⏱ Logs"],
-                ["reports",  "📊 Reports"],
+                ["logs", "⏱ Logs"],
+                ["reports", "📊 Reports"],
               ] as [ViewMode, string][]).map(([mode, label]) => (
                 <button key={mode} onClick={() => setViewMode(mode)}
                   className={`px-3 py-1.5 text-xs font-semibold transition ${viewMode === mode ? "text-white" : "text-gray-500 hover:bg-gray-50"}`}
@@ -1927,7 +1927,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
             {viewMode !== "reports" && (
               <>
                 <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none">
-                  <option value="all">All Priorities</option>{["Low","Medium","High","Critical"].map(p => <option key={p}>{p}</option>)}
+                  <option value="all">All Priorities</option>{["Low", "Medium", "High", "Critical"].map(p => <option key={p}>{p}</option>)}
                 </select>
                 <select value={filterTicketType} onChange={e => setFilterTicketType(e.target.value as any)} className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none">
                   <option value="all">All Types</option>
@@ -1975,12 +1975,12 @@ export default function ProjectManagement({ user, projects, users }: any) {
         {viewMode !== "reports" && (
           <div className="shrink-0 px-6 py-2.5 bg-white border-b border-gray-100 flex items-center gap-6">
             {[
-              { label: "My Tasks",    val: myTasks.length,                                        color: "#64748b" },
-              { label: "Done",        val: myDone,                                                color: "#16a34a" },
+              { label: "My Tasks", val: myTasks.length, color: "#64748b" },
+              { label: "Done", val: myDone, color: "#16a34a" },
               { label: "In Progress", val: myTasks.filter(t => t.status === "inprogress").length, color: "#2563eb" },
-              { label: "Overdue",     val: overdueTasks.length,                                   color: "#dc2626" },
-              { label: "Stories",     val: tasks.filter(t => t.ticketType === "story").length,    color: "#7c3aed" },
-              { label: "Bugs",        val: tasks.filter(t => t.ticketType === "bug").length,      color: "#dc2626" },
+              { label: "Overdue", val: overdueTasks.length, color: "#dc2626" },
+              { label: "Stories", val: tasks.filter(t => t.ticketType === "story").length, color: "#7c3aed" },
+              { label: "Bugs", val: tasks.filter(t => t.ticketType === "bug").length, color: "#dc2626" },
             ].map(s => (
               <div key={s.label} className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full" style={{ background: s.color }} />
@@ -2036,13 +2036,13 @@ export default function ProjectManagement({ user, projects, users }: any) {
             <div className="p-6">
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <table className="w-full">
-                  <thead><tr className="bg-gray-50 border-b border-gray-100">{["","Type","Title","Status","Priority","Assignee","Due","Est."].map(h => <th key={h} className="px-4 py-3 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">{h}</th>)}</tr></thead>
+                  <thead><tr className="bg-gray-50 border-b border-gray-100">{["", "Type", "Title", "Status", "Priority", "Assignee", "Due", "Est."].map(h => <th key={h} className="px-4 py-3 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">{h}</th>)}</tr></thead>
                   <tbody>
                     {filteredTasks.map(task => {
                       const mine = task.assignedTo === user?.uid;
-                      const pc   = PRIORITY_CONFIG[task.priority];
+                      const pc = PRIORITY_CONFIG[task.priority];
                       const colIdx = columns.findIndex(c => c.id === task.status);
-                      const cc   = getColStyle(task.status, colIdx >= 0 ? colIdx : 0);
+                      const cc = getColStyle(task.status, colIdx >= 0 ? colIdx : 0);
                       return (
                         <tr key={task.id} onClick={() => setViewingTask(task)}
                           className={`border-b border-gray-50 cursor-pointer transition group ${(mine || isProjectManager) ? "hover:bg-indigo-50/40" : "hover:bg-gray-50 opacity-60"}`}>
@@ -2197,9 +2197,9 @@ export default function ProjectManagement({ user, projects, users }: any) {
           </div>
           <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
             {([
-              ["dashboard",     "🏠 Dashboard"],
-              ["projects",      "📁 Projects"],
-              ["dailysheet",    "📋 Daily Sheet"],
+              ["dashboard", "🏠 Dashboard"],
+              ["projects", "📁 Projects"],
+              ["dailysheet", "📋 Daily Sheet"],
               ["notifications", "🔔 Inbox"],
             ] as [AppTab, string][]).map(([t, label]) => (
               <button key={t} onClick={() => setActiveTab(t)}
@@ -2219,10 +2219,10 @@ export default function ProjectManagement({ user, projects, users }: any) {
           <div className="space-y-5">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { icon: "📁", label: "My Projects",   val: myProjects.length,   bg: "#e8f1ff" },
-                { icon: "⏱", label: "Today's Hours",  val: `${todayHours}h`,    bg: "#e7f8ee" },
-                { icon: "📊", label: "Total Hours",    val: `${totalHoursAll}h`, bg: "#eef2ff" },
-                { icon: "⚠️", label: "Overdue Tasks",  val: overdueTasks.length, bg: "#fff4e5" },
+                { icon: "📁", label: "My Projects", val: myProjects.length, bg: "#e8f1ff" },
+                { icon: "⏱", label: "Today's Hours", val: `${todayHours}h`, bg: "#e7f8ee" },
+                { icon: "📊", label: "Total Hours", val: `${totalHoursAll}h`, bg: "#eef2ff" },
+                { icon: "⚠️", label: "Overdue Tasks", val: overdueTasks.length, bg: "#fff4e5" },
               ].map(s => (
                 <div key={s.label} className="rounded-2xl p-5 shadow-sm" style={{ background: s.bg }}>
                   <div className="flex justify-between items-start">
@@ -2241,12 +2241,12 @@ export default function ProjectManagement({ user, projects, users }: any) {
                 {todayLogs.length === 0
                   ? <div className="text-center py-10 text-gray-300"><div className="text-4xl mb-2">📝</div><p className="text-sm font-medium">No work logged today</p></div>
                   : <div className="divide-y divide-gray-50">{todayLogs.map(log => (
-                      <div key={log.id} className="flex items-start gap-3 p-4">
-                        <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-indigo-400" />
-                        <div className="flex-1"><p className="text-xs font-bold text-indigo-600 mb-0.5">{log.projectName}</p>{log.taskName && <p className="text-xs text-gray-400">{log.taskName}</p>}<p className="text-sm text-gray-700 mt-0.5">{log.description}</p></div>
-                        <p className="font-black text-lg text-indigo-600">{log.hoursWorked}h</p>
-                      </div>
-                    ))}</div>
+                    <div key={log.id} className="flex items-start gap-3 p-4">
+                      <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-indigo-400" />
+                      <div className="flex-1"><p className="text-xs font-bold text-indigo-600 mb-0.5">{log.projectName}</p>{log.taskName && <p className="text-xs text-gray-400">{log.taskName}</p>}<p className="text-sm text-gray-700 mt-0.5">{log.description}</p></div>
+                      <p className="font-black text-lg text-indigo-600">{log.hoursWorked}h</p>
+                    </div>
+                  ))}</div>
                 }
               </div>
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -2292,29 +2292,29 @@ export default function ProjectManagement({ user, projects, users }: any) {
             {notifications.length === 0
               ? <div className="text-center py-24 bg-white rounded-2xl border border-gray-100 text-gray-300"><div className="text-6xl mb-4">🔔</div><p className="text-xl font-bold text-gray-400">All clear!</p></div>
               : <div className="space-y-2">
-                  {notifications.map(n => (
-                    <div key={n.id} onClick={() => markRead(n.id)}
-                      className={`bg-white rounded-2xl border p-4 cursor-pointer hover:shadow-md transition-all ${!n.read ? "border-indigo-100 shadow-sm" : "border-gray-100"}`}>
-                      <div className="flex items-start gap-4">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 ${n.type === "project_added" ? "bg-indigo-100" : n.type === "task_assigned" ? "bg-amber-100" : "bg-gray-100"}`}>
-                          {n.type === "project_added" ? "📁" : n.type === "task_assigned" ? "📋" : "🔔"}
+                {notifications.map(n => (
+                  <div key={n.id} onClick={() => markRead(n.id)}
+                    className={`bg-white rounded-2xl border p-4 cursor-pointer hover:shadow-md transition-all ${!n.read ? "border-indigo-100 shadow-sm" : "border-gray-100"}`}>
+                    <div className="flex items-start gap-4">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 ${n.type === "project_added" ? "bg-indigo-100" : n.type === "task_assigned" ? "bg-amber-100" : "bg-gray-100"}`}>
+                        {n.type === "project_added" ? "📁" : n.type === "task_assigned" ? "📋" : "🔔"}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div><p className="font-bold text-sm text-gray-800">{n.title}</p><p className="text-sm text-gray-500 mt-0.5">{n.message}</p></div>
+                          {!n.read && <div className="w-2 h-2 rounded-full bg-indigo-500 shrink-0 mt-1.5" />}
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-start justify-between gap-2">
-                            <div><p className="font-bold text-sm text-gray-800">{n.title}</p><p className="text-sm text-gray-500 mt-0.5">{n.message}</p></div>
-                            {!n.read && <div className="w-2 h-2 rounded-full bg-indigo-500 shrink-0 mt-1.5" />}
-                          </div>
-                          <div className="flex items-center gap-3 mt-2">
-                            <span className="text-xs text-gray-400">{n.createdAt?.toDate().toLocaleString()}</span>
-                            {n.projectId && (
-                              <button onClick={e => { e.stopPropagation(); const p = myProjects.find((proj: any) => proj.id === n.projectId); if (p) { setActiveProject(p); setViewMode("kanban"); } markRead(n.id); }} className="text-xs font-semibold text-indigo-600">Open Project →</button>
-                            )}
-                          </div>
+                        <div className="flex items-center gap-3 mt-2">
+                          <span className="text-xs text-gray-400">{n.createdAt?.toDate().toLocaleString()}</span>
+                          {n.projectId && (
+                            <button onClick={e => { e.stopPropagation(); const p = myProjects.find((proj: any) => proj.id === n.projectId); if (p) { setActiveProject(p); setViewMode("kanban"); } markRead(n.id); }} className="text-xs font-semibold text-indigo-600">Open Project →</button>
+                          )}
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
+              </div>
             }
           </div>
         )}

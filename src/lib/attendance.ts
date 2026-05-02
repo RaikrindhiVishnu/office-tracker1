@@ -42,6 +42,8 @@ export async function checkIn(userId: string) {
       ],
       totalMinutes: 0,
     });
+    // ✅ Sync status to users collection
+    await updateDoc(doc(db, "users", userId), { status: "ONLINE" });
     return;
   }
 
@@ -63,6 +65,8 @@ export async function checkIn(userId: string) {
       },
     ],
   });
+  // ✅ Sync status to users collection
+  await updateDoc(doc(db, "users", userId), { status: "ONLINE" });
 }
 
 /** Check Out */
@@ -100,4 +104,6 @@ export async function checkOut(userId: string) {
     sessions,
     totalMinutes,
   });
+  // ✅ Sync status to users collection
+  await updateDoc(doc(db, "users", userId), { status: "OFFLINE" });
 }

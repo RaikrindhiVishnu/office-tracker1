@@ -16,6 +16,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
+import { FaPaperclip, FaUsers, FaRegSmile } from "react-icons/fa";
 
 /* ---------------- TYPES ---------------- */
 

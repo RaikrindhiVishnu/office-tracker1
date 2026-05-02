@@ -6,6 +6,12 @@ import {
   doc, addDoc, serverTimestamp, Timestamp
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { 
+  FaChartBar, FaClock, FaClipboardList, FaCoffee, FaPause, FaLightbulb, 
+  FaSync, FaBan, FaRegEye, FaUtensils, FaMoon, FaPlay, FaInbox 
+} from "react-icons/fa";
+import { IoCheckmarkCircle, IoCloseCircle } from "react-icons/io5";
+import { GoDotFill } from "react-icons/go";
 import type { EmployeeRow } from "@/types/EmployeeRow";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -90,16 +96,16 @@ const getActiveBreak = (breaks: Break[]): Break | null =>
   breaks.find(b => b.startTime && !b.endTime) ?? null;
 
 const getBreakLabel = (type: string) =>
-  type === "MORNING" ? "☕ Morning" : type === "LUNCH" ? "🍱 Lunch" : "🌆 Evening";
+  type === "MORNING" ? "Morning" : type === "LUNCH" ? "Lunch" : "Evening";
 
 const BREAK_LIMITS: Record<string, number> = { MORNING: 15 * 60, LUNCH: 45 * 60, EVENING: 15 * 60 };
 
 // ── Status / Priority config ──────────────────────────────────────────────────
-const STATUS_CFG: Record<string, { icon: string; bg: string; color: string }> = {
-  "In Progress": { icon: "🔄", bg: "bg-blue-100",   color: "text-blue-700"   },
-  "Completed":   { icon: "✅", bg: "bg-green-100",  color: "text-green-700"  },
-  "Blocked":     { icon: "🚫", bg: "bg-red-100",    color: "text-red-700"    },
-  "Review":      { icon: "👀", bg: "bg-purple-100", color: "text-purple-700" },
+const STATUS_CFG: Record<string, { icon: React.ReactNode; bg: string; color: string }> = {
+  "In Progress": { icon: <FaSync className="animate-spin" />, bg: "bg-blue-100",   color: "text-blue-700"   },
+  "Completed":   { icon: <IoCheckmarkCircle />, bg: "bg-green-100",  color: "text-green-700"  },
+  "Blocked":     { icon: <FaBan />, bg: "bg-red-100",    color: "text-red-700"    },
+  "Review":      { icon: <FaRegEye />, bg: "bg-purple-100", color: "text-purple-700" },
 };
 
 const PRIORITY_CFG: Record<string, { dot: string; color: string }> = {
@@ -111,7 +117,7 @@ const PRIORITY_CFG: Record<string, { dot: string; color: string }> = {
 
 // ── Tab Button ────────────────────────────────────────────────────────────────
 function TabBtn({ label, icon, active, onClick, badge }: {
-  label: string; icon: string; active: boolean;
+  label: string; icon: React.ReactNode; active: boolean;
   onClick: () => void; badge?: number;
 }) {
   return (
@@ -146,7 +152,7 @@ function StatPill({ label, value, color }: { label: string; value: string; color
 
 // ── Timeline Event ────────────────────────────────────────────────────────────
 function TimelineEvent({ time, label, icon, color, note }: {
-  time: string; label: string; icon: string; color: string; note?: string;
+  time: string; label: string; icon: React.ReactNode; color: string; note?: string;
 }) {
   return (
     <div className="flex gap-3 items-start group">
@@ -366,19 +372,19 @@ export default function EmployeeTodayPanel({ employee, adminUid, onClose }: Prop
   if (totalUpdates === 0 && isCheckedIn)
     alerts.push({ type: "warn", text: "No work updates added today" });
   if (productivityScore >= 80)
-    alerts.push({ type: "ok", text: "High productivity today 🚀" });
+    alerts.push({ type: "ok", text: "High productivity today" });
 
   // ── Timeline events ────────────────────────────────────────────────────────
-  type TEvent = { time: number; label: string; icon: string; color: string; note?: string };
+  type TEvent = { time: number; label: string; icon: React.ReactNode; color: string; note?: string };
   const timelineEvents: TEvent[] = [];
 
   sessions.forEach(sess => {
-    if (sess.checkIn)  timelineEvents.push({ time: sess.checkIn.toDate().getTime(),  label: "Checked In",  icon: "🟢", color: "bg-emerald-100" });
-    if (sess.checkOut) timelineEvents.push({ time: sess.checkOut.toDate().getTime(), label: "Checked Out", icon: "🔴", color: "bg-red-100"     });
+    if (sess.checkIn)  timelineEvents.push({ time: sess.checkIn.toDate().getTime(),  label: "Checked In",  icon: <GoDotFill className="text-emerald-500" />, color: "bg-emerald-100" });
+    if (sess.checkOut) timelineEvents.push({ time: sess.checkOut.toDate().getTime(), label: "Checked Out", icon: <GoDotFill className="text-red-500" />, color: "bg-red-100"     });
   });
   breaks.forEach(b => {
-    if (b.startTime) timelineEvents.push({ time: b.startTime.toDate().getTime(), label: `${getBreakLabel(b.type)} break started`, icon: "☕", color: "bg-amber-100" });
-    if (b.endTime)   timelineEvents.push({ time: b.endTime.toDate().getTime(),   label: `${getBreakLabel(b.type)} break ended`,   icon: "▶️", color: "bg-blue-100"  });
+    if (b.startTime) timelineEvents.push({ time: b.startTime.toDate().getTime(), label: `${getBreakLabel(b.type)} break started`, icon: <FaCoffee className="text-amber-500" />, color: "bg-amber-100" });
+    if (b.endTime)   timelineEvents.push({ time: b.endTime.toDate().getTime(),   label: `${getBreakLabel(b.type)} break ended`,   icon: <FaPlay className="text-blue-500" />, color: "bg-blue-100"  });
   });
   updates.forEach(u => {
     if (u.createdAt) {
@@ -420,8 +426,8 @@ export default function EmployeeTodayPanel({ employee, adminUid, onClose }: Prop
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className={`px-3 py-1.5 rounded-full text-xs font-bold border ${statusColor}`}>
-                {isOnBreak ? "⏸ " : isCheckedIn ? "🟢 " : "⚫ "}{currentStatus}
+              <span className={`px-3 py-1.5 rounded-full text-xs font-bold border flex items-center gap-1.5 ${statusColor}`}>
+                {isOnBreak ? <FaPause className="text-[10px]" /> : isCheckedIn ? <GoDotFill className="text-emerald-500" /> : <GoDotFill className="text-slate-400" />}{currentStatus}
               </span>
               <button onClick={onClose}
                 className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors text-white/80 hover:text-white">
@@ -452,13 +458,13 @@ export default function EmployeeTodayPanel({ employee, adminUid, onClose }: Prop
         {/* ── Tabs ── */}
         <div className="border-b border-slate-200 px-4 py-2 flex gap-1 overflow-x-auto shrink-0 bg-slate-50">
           {([
-            ["overview",  "Overview",  "📊"],
-            ["timeline",  "Timeline",  "⏱"],
-            ["tasks",     "Work Updates", "📋", totalUpdates],
-            ["breaks",    "Breaks",    "☕"],
-            ["activity",  "Activity",  "🟢"],
-            ["insights",  "Insights",  "💡", alerts.filter(a => a.type !== "ok").length],
-          ] as [Tab, string, string, number?][]).map(([id, label, icon, badge]) => (
+            ["overview",  "Overview",  <FaChartBar />],
+            ["timeline",  "Timeline",  <FaClock />],
+            ["tasks",     "Work Updates", <FaClipboardList />, totalUpdates],
+            ["breaks",    "Breaks",    <FaCoffee />],
+            ["activity",  "Activity",  <GoDotFill className="text-emerald-500" />],
+            ["insights",  "Insights",  <FaLightbulb />, alerts.filter(a => a.type !== "ok").length],
+          ] as [Tab, string, React.ReactNode, number?][]).map(([id, label, icon, badge]) => (
             <TabBtn key={id} label={label} icon={icon} active={tab === id}
               onClick={() => setTab(id)} badge={badge}/>
           ))}
@@ -503,7 +509,7 @@ export default function EmployeeTodayPanel({ employee, adminUid, onClose }: Prop
                 <div className="bg-white rounded-2xl border-2 border-indigo-100 p-4">
                   <p className="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-2">Latest Update</p>
                   <div className="flex items-start gap-3">
-                    <span className="text-xl mt-0.5">{STATUS_CFG[latestUpdate.status]?.icon ?? "📋"}</span>
+                    <span className="text-xl mt-0.5 text-indigo-500">{STATUS_CFG[latestUpdate.status]?.icon ?? <FaClipboardList />}</span>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-slate-800">{latestUpdate.task}</p>
                       {latestUpdate.notes && (
@@ -534,7 +540,7 @@ export default function EmployeeTodayPanel({ employee, adminUid, onClose }: Prop
                       a.type === "error" ? "bg-red-50 text-red-700 border border-red-200"
                       : a.type === "warn" ? "bg-amber-50 text-amber-700 border border-amber-200"
                       : "bg-green-50 text-green-700 border border-green-200"}`}>
-                      <span>{a.type === "error" ? "🔴" : a.type === "warn" ? "🟡" : "🟢"}</span>
+                      <span>{a.type === "error" ? <GoDotFill className="text-red-500" /> : a.type === "warn" ? <GoDotFill className="text-amber-500" /> : <GoDotFill className="text-emerald-500" />}</span>
                       {a.text}
                     </div>
                   ))}
@@ -553,7 +559,7 @@ export default function EmployeeTodayPanel({ employee, adminUid, onClose }: Prop
               </p>
               {timelineEvents.length === 0 ? (
                 <div className="text-center py-12 text-slate-400">
-                  <div className="text-4xl mb-2">📭</div>
+                  <FaInbox className="text-4xl mb-2 mx-auto" />
                   <p className="font-medium">No activity recorded yet</p>
                 </div>
               ) : (
@@ -601,7 +607,7 @@ export default function EmployeeTodayPanel({ employee, adminUid, onClose }: Prop
 
               {updates.length === 0 ? (
                 <div className="text-center py-12 text-slate-400">
-                  <div className="text-4xl mb-2">📋</div>
+                  <FaClipboardList className="text-4xl mb-2 mx-auto" />
                   <p className="font-medium">No work updates today</p>
                 </div>
               ) : (
@@ -614,7 +620,7 @@ export default function EmployeeTodayPanel({ employee, adminUid, onClose }: Prop
                         <div className={`h-1 w-full ${cfg.bg}`}/>
                         <div className="p-4">
                           <div className="flex items-start gap-3">
-                            <span className="text-xl mt-0.5 shrink-0">{cfg.icon}</span>
+                            <span className="text-xl mt-0.5 shrink-0 text-indigo-500">{cfg.icon}</span>
                             <div className="flex-1 min-w-0">
                               <p className="font-semibold text-slate-800">{u.task}</p>
                               {u.notes && (
@@ -653,7 +659,7 @@ export default function EmployeeTodayPanel({ employee, adminUid, onClose }: Prop
 
               {breaks.length === 0 ? (
                 <div className="text-center py-12 text-slate-400">
-                  <div className="text-4xl mb-2">☕</div>
+                  <FaCoffee className="text-4xl mb-2 mx-auto" />
                   <p className="font-medium">No breaks taken today</p>
                 </div>
               ) : (
@@ -668,7 +674,7 @@ export default function EmployeeTodayPanel({ employee, adminUid, onClose }: Prop
                     <div key={i} className={`rounded-2xl border p-4 ${exceeded ? "bg-red-50 border-red-200" : isActive ? "bg-amber-50 border-amber-300" : "bg-white border-slate-200"}`}>
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <span className="text-xl">{b.type === "MORNING" ? "☕" : b.type === "LUNCH" ? "🍱" : "🌆"}</span>
+                          <span className="text-xl text-amber-600">{b.type === "MORNING" ? <FaCoffee /> : b.type === "LUNCH" ? <FaUtensils /> : <FaMoon />}</span>
                           <span className="font-bold text-slate-800">{getBreakLabel(b.type)} Break</span>
                           {isActive && <span className="text-[10px] bg-amber-500 text-white px-2 py-0.5 rounded-full font-bold animate-pulse">ACTIVE</span>}
                         </div>
@@ -680,7 +686,7 @@ export default function EmployeeTodayPanel({ employee, adminUid, onClose }: Prop
                       </div>
                       {exceeded && (
                         <div className="mt-2 flex items-center gap-1.5 text-xs text-red-600 font-semibold">
-                          <span>⚠️</span> Exceeded by {fmtDuration(dur - limit)}
+                          <IoWarning className="text-amber-500" /> Exceeded by {fmtDuration(dur - limit)}
                           <span className="text-red-400">(limit: {fmtDuration(limit)})</span>
                         </div>
                       )}
@@ -791,7 +797,7 @@ export default function EmployeeTodayPanel({ employee, adminUid, onClose }: Prop
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Alerts & Insights</p>
                 {alerts.length === 0 && (
                   <div className="text-center py-8 text-slate-400">
-                    <div className="text-3xl mb-2">✅</div>
+                    <IoCheckmarkCircle className="text-3xl mb-2 mx-auto text-emerald-500" />
                     <p className="font-medium">No issues detected</p>
                   </div>
                 )}

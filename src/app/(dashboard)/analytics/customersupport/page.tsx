@@ -1,6 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { logActivity, logTicketCreated, logTicketResolved } from "@/lib/notifications";
+import CrossDeptFeed from "@/components/CrossDeptFeed";
+import { db } from "@/lib/firebase";
+import {
+  collection, onSnapshot, query, orderBy, limit,
+  addDoc, serverTimestamp, updateDoc, doc, deleteDoc
+} from "firebase/firestore";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, BarChart, Bar
@@ -76,21 +83,9 @@ const agents = [
   { name:"Dev Patel",    initials:"DP", handled:33, resolved:29, time:"16m", csat:85, trend:"-3%", color:T.rose   },
 ];
 
-const queue: { id:string; customer:string; issue:string; priority:PriorityKey; status:StatusKey; wait:string; ch:string }[] = [
-  { id:"#4821", customer:"John Smith",   issue:"Login failure on mobile",    priority:"Critical", status:"Open",        wait:"2m",  ch:"💬" },
-  { id:"#4822", customer:"Maria Garcia", issue:"Duplicate charge on card",   priority:"High",     status:"In Progress", wait:"6m",  ch:"✉️" },
-  { id:"#4823", customer:"Ravi Kumar",   issue:"Password reset not working", priority:"High",     status:"Open",        wait:"9m",  ch:"📞" },
-  { id:"#4824", customer:"Lisa Wang",    issue:"Invoice PDF not loading",    priority:"Medium",   status:"Waiting",     wait:"14m", ch:"✉️" },
-  { id:"#4825", customer:"Ahmed Hassan", issue:"App crashes on checkout",    priority:"Critical", status:"Open",        wait:"4m",  ch:"💬" },
-  { id:"#4826", customer:"Emma Johnson", issue:"Dark mode not saving",       priority:"Low",      status:"Open",        wait:"21m", ch:"✉️" },
-];
+// (Mock data moved to state for real-time sync)
 
-const sla: { id:string; issue:string; priority:PriorityKey; breached:boolean; left:string }[] = [
-  { id:"#4801", issue:"Payment Gateway Timeout", priority:"Critical", breached:true,  left:"Breached 28m ago"   },
-  { id:"#4807", issue:"Auth Service Down",        priority:"Critical", breached:true,  left:"Breached 1h 4m ago" },
-  { id:"#4815", issue:"Slow API Response",        priority:"High",     breached:false, left:"11m remaining"      },
-  { id:"#4829", issue:"Export Timeout",           priority:"Medium",   breached:false, left:"38m remaining"      },
-];
+// (Mock data moved to state)
 
 const csatMonths = [
   {m:"Jan",s:88},{m:"Feb",s:90},{m:"Mar",s:87},
@@ -182,19 +177,29 @@ function Ring({ pct, color, size = 90, stroke = 8 }: { pct:number; color:string;
 
 /* ══════════════════════════════════════════════════════════
    OVERVIEW TAB
+   (Now accepts tickets as props for real-time updates)
 ══════════════════════════════════════════════════════════ */
-function OverviewTab() {
+function OverviewTab({ tickets }: { tickets: any[] }) {
+  const queue = tickets.filter(t => t.status !== "Resolved").slice(0, 6);
+  const resolvedCount = tickets.filter(t => t.status === "Resolved").length;
+  const openCount = tickets.filter(t => t.status === "Open").length;
+  const criticalCount = tickets.filter(t => t.priority === "Critical" && t.status !== "Resolved").length;
+
+  const resolveTicket = async (id: string, customer: string) => {
+    await updateDoc(doc(db, "tickets", id), { status: "Resolved", updatedAt: serverTimestamp() });
+    await logTicketResolved("Support Agent", customer, id);
+  };
   const kpis: { label:string; value:number; suffix:string; color:string; bg:string; icon:string; delta:string; up:boolean }[] = [
-    { label:"Total Tickets", value:1240, suffix:"",  color:T.blue,   bg:"#eff6ff", icon:"🎫", delta:"+12%", up:true  },
-    { label:"Open Tickets",  value:180,  suffix:"",  color:T.rose,   bg:"#fff1f2", icon:"🔴", delta:"+5%",  up:false },
-    { label:"Resolved",      value:1020, suffix:"",  color:T.green,  bg:"#f0fdf4", icon:"✅", delta:"+9%",  up:true  },
-    { label:"Pending",       value:40,   suffix:"",  color:T.amber,  bg:"#fffbeb", icon:"⏳", delta:"-2%",  up:true  },
+    { label:"Total Tickets", value:tickets.length, suffix:"",  color:T.blue,   bg:"#eff6ff", icon:"🎫", delta:"+12%", up:true  },
+    { label:"Open Tickets",  value:openCount,  suffix:"",  color:T.rose,   bg:"#fff1f2", icon:"🔴", delta:"+5%",  up:false },
+    { label:"Resolved",      value:resolvedCount, suffix:"",  color:T.green,  bg:"#f0fdf4", icon:"✅", delta:"+9%",  up:true  },
+    { label:"Critical",      value:criticalCount, suffix:"",  color:T.amber,  bg:"#fffbeb", icon:"⏳", delta:"-2%",  up:true  },
     { label:"Avg Response",  value:12,   suffix:"m", color:T.violet, bg:"#f5f3ff", icon:"⚡", delta:"-3m",  up:true  },
     { label:"CSAT Score",    value:92,   suffix:"%", color:T.teal,   bg:"#f0fdfa", icon:"😊", delta:"+2%",  up:true  },
   ];
 
   const statusBars: { l:string; pct:number; c:string }[] = [
-    { l:"Open",        pct:40, c:T.blue   },
+    { l:"Open",        pct:tickets.length ? Math.round((openCount/tickets.length)*100) : 0, c:T.blue   },
     { l:"In Progress", pct:25, c:T.violet },
     { l:"Waiting",     pct:15, c:T.amber  },
     { l:"Resolved",    pct:20, c:T.green  },
@@ -367,20 +372,20 @@ function OverviewTab() {
 /* ══════════════════════════════════════════════════════════
    TICKETS TAB
 ══════════════════════════════════════════════════════════ */
-function TicketsTab() {
+function TicketsTab({ tickets }: { tickets: any[] }) {
   const [search,  setSearch]  = useState("");
   const [filterP, setFilterP] = useState<PriorityFilterKey>("All");
 
-  const filtered = queue.filter(t => {
-    const matchSearch = t.customer.toLowerCase().includes(search.toLowerCase()) || t.issue.toLowerCase().includes(search.toLowerCase()) || t.id.includes(search);
+  const filtered = tickets.filter(t => {
+    const matchSearch = (t.customer || "").toLowerCase().includes(search.toLowerCase()) || (t.issue || "").toLowerCase().includes(search.toLowerCase()) || t.id.includes(search);
     const matchP      = filterP === "All" || t.priority === filterP;
     return matchSearch && matchP;
   });
 
   const stats: { label:string; value:number|string; color:string; icon:string; raw?:boolean }[] = [
-    { label:"Total Open",    value:180,  color:T.blue,   icon:"📂"           },
-    { label:"Critical",      value:2,    color:T.rose,   icon:"🔴"           },
-    { label:"High Priority", value:12,   color:T.orange, icon:"🟠"           },
+    { label:"Total Open",    value:tickets.filter(t=>t.status!=="Resolved").length,  color:T.blue,   icon:"📂"           },
+    { label:"Critical",      value:tickets.filter(t=>t.priority==="Critical"&&t.status!=="Resolved").length,    color:T.rose,   icon:"🔴"           },
+    { label:"High Priority", value:tickets.filter(t=>t.priority==="High"&&t.status!=="Resolved").length,   color:T.orange, icon:"🟠"           },
     { label:"Avg Wait Time", value:"9m", color:T.violet, icon:"⏱", raw:true },
   ];
 
@@ -443,7 +448,20 @@ function TicketsTab() {
               <div style={{ fontSize:11, color:T.muted, fontWeight:600 }}>{t.ch} {t.wait}</div>
               <div style={{ display:"flex", gap:4 }}>
                 <button style={{ padding:"4px 9px", background:"#eff6ff", color:T.blue, border:`1px solid ${T.blue}30`, borderRadius:6, fontSize:10, fontWeight:700, cursor:"pointer" }}>Assign</button>
-                <button style={{ padding:"4px 9px", background:"#fff1f2", color:T.rose, border:`1px solid ${T.rose}30`, borderRadius:6, fontSize:10, fontWeight:700, cursor:"pointer" }}>Escalate</button>
+                <button
+                  style={{ padding:"4px 9px", background:"#fff1f2", color:T.rose, border:`1px solid ${T.rose}30`, borderRadius:6, fontSize:10, fontWeight:700, cursor:"pointer" }}
+                  onClick={() => {
+                    logActivity({
+                      type: "TICKET_ESCALATED",
+                      title: `Ticket escalated: ${t.id}`,
+                      message: `${t.customer}'s ticket "${t.issue}" has been escalated (${t.priority} priority). Sales team may need to follow up.`,
+                      icon: "🚨",
+                      createdBy: "Support",
+                      visibleTo: ["sales", "admin", "finance"],
+                      priority: t.priority === "Critical" ? "high" : t.priority === "High" ? "medium" : "low",
+                    });
+                  }}
+                >Escalate</button>
               </div>
             </div>
           );
@@ -451,25 +469,28 @@ function TicketsTab() {
       </Panel>
 
       <Panel>
-        <SLabel>SLA Monitoring</SLabel>
+        <SLabel>SLA Monitoring & Resolve</SLabel>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))", gap:10 }}>
-          {sla.map(s => {
-            const ps = priorityCfg[s.priority];
+          {tickets.filter(t => t.status !== "Resolved").map(s => {
+            const ps = priorityCfg[s.priority as PriorityKey] || priorityCfg.Low;
+            const breached = s.priority === "Critical";
             return (
-              <div key={s.id} style={{ padding:"14px 16px", borderRadius:12, background:s.breached?"#fff1f2":"#fffbeb", border:`1.5px solid ${s.breached?"#fecdd3":"#fde68a"}` }}>
+              <div key={s.id} style={{ padding:"14px 16px", borderRadius:12, background:breached?"#fff1f2":"#fffbeb", border:`1.5px solid ${breached?"#fecdd3":"#fde68a"}` }}>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
                   <div>
                     <div style={{ display:"flex", gap:7, alignItems:"center", marginBottom:4 }}>
-                      <span style={{ fontFamily:"monospace", fontSize:11, fontWeight:800, color:T.blue }}>{s.id}</span>
+                      <span style={{ fontFamily:"monospace", fontSize:11, fontWeight:800, color:T.blue }}>{s.id.slice(0, 5)}</span>
                       <Badge label={s.priority} cfg={ps} />
                     </div>
                     <div style={{ fontSize:13, fontWeight:600, color:T.text }}>{s.issue}</div>
                   </div>
-                  <button style={{ padding:"5px 10px", borderRadius:8, fontSize:11, fontWeight:700, cursor:"pointer", border:"none", background:s.breached?T.rose:T.amber, color:"#fff", flexShrink:0, marginLeft:8 }}>
-                    {s.breached?"Resolve":"Review"}
+                  <button
+                    onClick={() => resolveTicket(s.id, s.customer)}
+                    style={{ padding:"5px 10px", borderRadius:8, fontSize:11, fontWeight:700, cursor:"pointer", border:"none", background:breached?T.rose:T.amber, color:"#fff", flexShrink:0, marginLeft:8 }}>
+                    {breached?"Resolve":"Review"}
                   </button>
                 </div>
-                <div style={{ fontSize:11, fontWeight:700, color:s.breached?T.rose:T.amber }}>{s.breached?"🔴":"🟡"} {s.left}</div>
+                <div style={{ fontSize:11, fontWeight:700, color:breached?T.rose:T.amber }}>{breached?"🔴":"🟡"} {breached ? "Breached SLA" : "SLA Active"}</div>
               </div>
             );
           })}
@@ -736,9 +757,36 @@ function SettingsTab() {
    MAIN APP
 ══════════════════════════════════════════════════════════ */
 export default function SupportDashboard() {
+  const [tickets, setTickets] = useState<any[]>([]);
   const [tab,    setTab]    = useState<TabKey>("overview");
   const [filter, setFilter] = useState<FilterKey>("This Week");
   const [now,    setNow]    = useState(new Date());
+
+  useEffect(() => {
+    const q = query(collection(db, "tickets"), orderBy("createdAt", "desc"), limit(50));
+    const unsub = onSnapshot(q, (snap) => {
+      setTickets(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, []);
+
+  const addDemoTicket = async () => {
+    const issues = ["Login failure", "Payment Error", "App Crash", "Feature Request", "UI Bug"];
+    const priorities: PriorityKey[] = ["Low", "Medium", "High", "Critical"];
+    const customers = ["John Doe", "Jane Smith", "Mike Ross", "Harvey Specter", "Donna Paulsen"];
+
+    const ticket = {
+      customer: customers[Math.floor(Math.random() * customers.length)],
+      issue: issues[Math.floor(Math.random() * issues.length)],
+      priority: priorities[Math.floor(Math.random() * priorities.length)],
+      status: "Open",
+      createdAt: serverTimestamp(),
+      ch: "💬"
+    };
+
+    const docRef = await addDoc(collection(db, "tickets"), ticket);
+    await logTicketCreated(ticket.customer, ticket.issue, ticket.priority, docRef.id);
+  };
 
   useEffect(() => {
     const link = document.createElement("link");
@@ -757,8 +805,8 @@ export default function SupportDashboard() {
   ];
 
   const tabContent: Record<TabKey, React.ReactNode> = {
-    overview: <OverviewTab />,
-    tickets:  <TicketsTab />,
+    overview: <OverviewTab tickets={tickets} />,
+    tickets:  <TicketsTab tickets={tickets} />,
     agents:   <AgentsTab />,
     reports:  <ReportsTab />,
     settings: <SettingsTab />,
@@ -816,12 +864,24 @@ export default function SupportDashboard() {
                 </button>
               ))}
             </div>
-            <button style={{ padding:"7px 16px", background:T.blue, color:"#fff", border:"none", borderRadius:10, fontSize:12, fontWeight:700, cursor:"pointer", boxShadow:`0 2px 8px ${T.blue}40` }}>⬇ Export</button>
+            <button
+              onClick={addDemoTicket}
+              style={{ padding:"7px 16px", background:T.blue, color:"#fff", border:"none", borderRadius:10, fontSize:12, fontWeight:700, cursor:"pointer", boxShadow:`0 2px 8px ${T.blue}40` }}>＋ New Ticket</button>
           </div>
         </header>
 
         <main style={{ padding:"24px 28px", flex:1, animation:"fadeUp 0.3s ease" }}>
           {tabContent[tab]}
+          {tab === "overview" && (
+            <div style={{ marginTop: 20 }}>
+              <CrossDeptFeed
+                role="sales"
+                accentColor="#3b82f6"
+                title="Sales & Business Activity"
+                maxItems={8}
+              />
+            </div>
+          )}
           <div style={{ textAlign:"center", color:T.muted, fontSize:11, marginTop:24, paddingBottom:8 }}>
             Customer Support Dashboard · {new Date().toLocaleDateString()} · Support Intelligence Platform
           </div>

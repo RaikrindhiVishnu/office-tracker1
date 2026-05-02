@@ -40,7 +40,8 @@ export type NotifRole =
   | "hr"
   | "finance"
   | "admin"
-  | "marketing";
+  | "marketing"
+  | "executive";
 
 export interface AppNotification {
   id?: string;
@@ -227,7 +228,7 @@ export const logSaleCreated = (
     icon: "💵",
     createdBy: salesPerson,
     relatedId: saleId,
-    visibleTo: ["sales", "finance", "hr", "admin"],
+    visibleTo: ["sales", "finance", "hr", "admin", "executive"],
     priority: amount >= 100000 ? "high" : "medium",
   });
 
@@ -243,7 +244,7 @@ export const logLeadWon = (
     message: `${salesPerson} converted ${leadName} from ${company} — ₹${value.toLocaleString("en-IN")}`,
     icon: "🎯",
     createdBy: salesPerson,
-    visibleTo: ["sales", "hr", "finance"],
+    visibleTo: ["sales", "hr", "finance", "executive"],
     priority: "high",
   });
 
@@ -254,7 +255,7 @@ export const logEmployeeAdded = (employeeName: string, department: string) =>
     message: `${employeeName} joined the ${department} department`,
     icon: "👤",
     createdBy: "HR",
-    visibleTo: ["hr", "admin", "finance"],
+    visibleTo: ["hr", "admin", "finance", "executive"],
     priority: "medium",
   });
 
@@ -270,7 +271,7 @@ export const logLeaveApproved = (
     message: `${employeeName}'s ${leaveType} leave (${dates}) approved by ${hrName}`,
     icon: "✅",
     createdBy: hrName,
-    visibleTo: ["hr", "admin"],
+    visibleTo: ["hr", "admin", "executive"],
     priority: "low",
   });
 
@@ -281,7 +282,7 @@ export const logExpenseAdded = (category: string, amount: number, month: string)
     message: `${category} expense of ₹${amount.toLocaleString("en-IN")} added for ${month}`,
     icon: "🧾",
     createdBy: "Finance",
-    visibleTo: ["finance", "admin"],
+    visibleTo: ["finance", "admin", "executive"],
     priority: amount >= 50000 ? "high" : "low",
   });
 
@@ -292,7 +293,7 @@ export const logPayrollProcessed = (employeeName: string, finalSalary: number, m
     message: `${employeeName}'s salary of ₹${finalSalary.toLocaleString("en-IN")} processed for ${month}`,
     icon: "💰",
     createdBy: "Finance",
-    visibleTo: ["finance", "hr", "admin"],
+    visibleTo: ["finance", "hr", "admin", "executive"],
     priority: "medium",
   });
 
@@ -303,6 +304,30 @@ export const logAnnouncement = (hrName: string, messageText: string) =>
     message: messageText.slice(0, 120),
     icon: "📣",
     createdBy: hrName,
-    visibleTo: ["sales", "finance", "hr", "admin"],
+    visibleTo: ["sales", "finance", "hr", "admin", "executive"],
     priority: "medium",
+  });
+
+export const logTicketCreated = (customer: string, issue: string, priority: string, ticketId: string) =>
+  logActivity({
+    type: "TICKET_CREATED",
+    title: "New support ticket",
+    message: `${customer} opened a ticket: "${issue}" (${priority} priority)`,
+    icon: "🎫",
+    createdBy: "Support System",
+    relatedId: ticketId,
+    visibleTo: ["admin", "executive", "sales", "finance", "hr"],
+    priority: priority === "Critical" ? "high" : priority === "High" ? "medium" : "low",
+  });
+
+export const logTicketResolved = (agent: string, customer: string, ticketId: string) =>
+  logActivity({
+    type: "TICKET_RESOLVED",
+    title: "Ticket resolved",
+    message: `${agent} resolved ${customer}'s ticket`,
+    icon: "✅",
+    createdBy: agent,
+    relatedId: ticketId,
+    visibleTo: ["admin", "executive", "finance", "hr"],
+    priority: "low",
   });

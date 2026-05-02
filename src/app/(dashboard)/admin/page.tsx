@@ -37,6 +37,8 @@ import MessagesView from "./meassages";
 import MeetChatApp from "@/components/MeetChatAppUpdated";
 import AccountsDashboard from "./Accounts/AccountsDashboard";
 import AdminBreakView from "@/components/AdminBreakView";  // ← NEW
+import LeadsView from "./LeadsView"; // ← NEW CRM MODULE
+import InvoicesView from "./InvoicesView"; // ← NEW BILLING MODULE
 import { Employee } from "@/types/Employee";
 import type { Session } from "@/types/Employee";
 import { EmployeeRow } from "@/types/EmployeeRow";
@@ -173,7 +175,7 @@ export default function AdminPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [designation, setDesignation] = useState("Developer");
-  const [accountType, setAccountType] = useState<"EMPLOYEE" | "ADMIN">("EMPLOYEE");
+  const [accountType, setAccountType] = useState<"EMPLOYEE" | "ADMIN" | "HR" | "BUSINESSOWNER">("EMPLOYEE");
   const [msg, setMsg] = useState("");
   const [creatingUser, setCreatingUser] = useState(false);
 
@@ -196,6 +198,20 @@ export default function AdminPage() {
   };
 
   const [queryCount, setQueryCount] = useState(0);
+  const [chatNotifications, setChatNotifications] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const q = query(
+      collection(db, "notifications"),
+      where("toUid", "==", user.uid),
+      where("read", "==", false)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setChatNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, [user]);
 
   useEffect(() => {
     const q = query(
@@ -602,6 +618,18 @@ export default function AdminPage() {
             onClick={() => { setView("accounts"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
           />
 
+          <NavItem
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>}
+            label="Leads (CRM)" active={view === "leads"}
+            onClick={() => { setView("leads"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
+          <NavItem
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>}
+            label="Invoices" active={view === "invoices"}
+            onClick={() => { setView("invoices"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
         </nav>
 
         {/* Logout */}
@@ -658,9 +686,14 @@ export default function AdminPage() {
 
                 <button
                   onClick={() => { window.open("/meet", "_blank"); setSidebarOpen(false); }}
-                  className="flex items-center justify-center w-8 h-8 rounded-xl font-semibold text-white bg-[#2380de] shadow-lg hover:shadow-xl transition-all duration-300 active:scale-[0.98]"
+                  className="flex items-center justify-center w-8 h-8 rounded-xl font-semibold text-white bg-[#2380de] shadow-lg hover:shadow-xl transition-all duration-300 active:scale-[0.98] relative"
                 >
                   <img src="https://cdn-icons-png.flaticon.com/128/8407/8407947.png" alt="Meet" className="w-5 h-5 object-contain" />
+                  {chatNotifications.length > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow-sm animate-bounce">
+                      {chatNotifications.length > 9 ? "9+" : chatNotifications.length}
+                    </span>
+                  )}
                 </button>
 
                 <div className="flex items-center gap-3">
@@ -868,6 +901,10 @@ export default function AdminPage() {
           <MeetChatApp users={users} isOpen={showMeet} onClose={() => setShowMeet(false)} />
 
           {view === "accounts" && <AccountsDashboard />}
+
+          {view === "leads" && <LeadsView />}
+
+          {view === "invoices" && <InvoicesView />}
 
         </main>
 

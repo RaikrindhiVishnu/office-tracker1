@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { logActivity } from "@/lib/notifications";
 import NotificationBell from "@/components/NotificationBell";
+import CrossDeptFeed from "@/components/CrossDeptFeed";
+import { useAuth } from "@/context/AuthContext";
 import {
   AreaChart, Area, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -89,7 +91,7 @@ export async function addCampaign(data: Omit<Campaign, "id" | "createdAt">) {
     message: `${data.name} campaign started on ${data.channel}`,
     icon: "📢",
     createdBy: "Marketing",
-    visibleTo: ["sales", "admin","finance"],
+    visibleTo: ["sales", "admin", "finance"],
     priority: "medium",
   });
   return ref;
@@ -134,7 +136,7 @@ export async function updateLeadStage(lead: Lead, stage: Lead["stage"]) {
       message: `${lead.name} converted via ${lead.source}`,
       icon: "🔥",
       createdBy: "Marketing",
-      visibleTo: ["sales","admin"],
+      visibleTo: ["sales", "admin"],
       priority: "high",
     });
   }
@@ -171,8 +173,8 @@ async function checkCTRAlert(campaign: Campaign) {
 // ─────────────────────────────────────────────────────────────
 function useMarketing(month: string) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [leads,     setLeads]     = useState<Lead[]>([]);
-  const [social,    setSocial]    = useState<SocialStat[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [social, setSocial] = useState<SocialStat[]>([]);
   const alertedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -190,24 +192,24 @@ function useMarketing(month: string) {
     return () => { u1(); u2(); u3(); };
   }, [month]);
 
-  const totalReach     = campaigns.reduce((s, c) => s + c.impressions, 0);
-  const totalClicks    = campaigns.reduce((s, c) => s + c.clicks, 0);
-  const totalConv      = campaigns.reduce((s, c) => s + c.conversions, 0);
-  const totalSpend     = campaigns.reduce((s, c) => s + c.spend, 0);
-  const totalRevenue   = campaigns.reduce((s, c) => s + c.revenue, 0);
-  const overallCTR     = totalReach ? parseFloat(((totalClicks / totalReach) * 100).toFixed(2)) : 0;
-  const roi            = totalSpend ? parseFloat(((totalRevenue / totalSpend) * 100).toFixed(1)) : 0;
-  const converted      = leads.filter(l => l.stage === "converted").length;
-  const convRate       = leads.length ? parseFloat(((converted / leads.length) * 100).toFixed(1)) : 0;
+  const totalReach = campaigns.reduce((s, c) => s + c.impressions, 0);
+  const totalClicks = campaigns.reduce((s, c) => s + c.clicks, 0);
+  const totalConv = campaigns.reduce((s, c) => s + c.conversions, 0);
+  const totalSpend = campaigns.reduce((s, c) => s + c.spend, 0);
+  const totalRevenue = campaigns.reduce((s, c) => s + c.revenue, 0);
+  const overallCTR = totalReach ? parseFloat(((totalClicks / totalReach) * 100).toFixed(2)) : 0;
+  const roi = totalSpend ? parseFloat(((totalRevenue / totalSpend) * 100).toFixed(1)) : 0;
+  const converted = leads.filter(l => l.stage === "converted").length;
+  const convRate = leads.length ? parseFloat(((converted / leads.length) * 100).toFixed(1)) : 0;
   const totalFollowers = social.reduce((s, r) => s + r.followers, 0);
-  const avgEngagement  = social.length ? parseFloat((social.reduce((s, r) => s + r.engagement, 0) / social.length).toFixed(1)) : 0;
+  const avgEngagement = social.length ? parseFloat((social.reduce((s, r) => s + r.engagement, 0) / social.length).toFixed(1)) : 0;
 
   const channelMap: Record<string, { conversions: number; spend: number; revenue: number }> = {};
   campaigns.forEach(c => {
     if (!channelMap[c.channel]) channelMap[c.channel] = { conversions: 0, spend: 0, revenue: 0 };
     channelMap[c.channel].conversions += c.conversions;
-    channelMap[c.channel].spend       += c.spend;
-    channelMap[c.channel].revenue     += c.revenue;
+    channelMap[c.channel].spend += c.spend;
+    channelMap[c.channel].revenue += c.revenue;
   });
   const byChannel = Object.entries(channelMap)
     .sort((a, b) => b[1].conversions - a[1].conversions)
@@ -222,9 +224,9 @@ function useMarketing(month: string) {
   const STAGE_COLORS = [T.blue, T.violet, T.amber, T.green];
   const STAGES: Lead["stage"][] = ["awareness", "interest", "consideration", "converted"];
   const funnelData = STAGES.map((st, i) => ({
-    name:  st.charAt(0).toUpperCase() + st.slice(1),
+    name: st.charAt(0).toUpperCase() + st.slice(1),
     value: leads.filter(l => l.stage === st).length,
-    fill:  STAGE_COLORS[i],
+    fill: STAGE_COLORS[i],
   }));
 
   return {
@@ -240,35 +242,35 @@ function useMarketing(month: string) {
 // 4. DESIGN TOKENS  — identical to Finance dashboard
 // ─────────────────────────────────────────────────────────────
 const T = {
-  bg:        "#f0f2f8",
-  surface:   "#ffffff",
+  bg: "#f0f2f8",
+  surface: "#ffffff",
   surfaceHi: "#f4f6fb",
-  border:    "#e2e8f0",
-  borderHi:  "#c9d3e0",
-  ink:       "#0f172a",
-  inkMid:    "#475569",
-  inkDim:    "#94a3b8",
-  green:     "#059669",
-  greenBg:   "#ecfdf5",
-  blue:      "#2563eb",
-  blueBg:    "#eff6ff",
-  red:       "#dc2626",
-  redBg:     "#fef2f2",
-  amber:     "#d97706",
-  amberBg:   "#fffbeb",
-  violet:    "#7c3aed",
-  violetBg:  "#f5f3ff",
-  teal:      "#0891b2",
-  tealBg:    "#ecfeff",
-  pink:      "#db2777",
-  pinkBg:    "#fdf2f8",
-  sky:       "#0ea5e9",
-  skyBg:     "#f0f9ff",
+  border: "#e2e8f0",
+  borderHi: "#c9d3e0",
+  ink: "#0f172a",
+  inkMid: "#475569",
+  inkDim: "#94a3b8",
+  green: "#059669",
+  greenBg: "#ecfdf5",
+  blue: "#2563eb",
+  blueBg: "#eff6ff",
+  red: "#dc2626",
+  redBg: "#fef2f2",
+  amber: "#d97706",
+  amberBg: "#fffbeb",
+  violet: "#7c3aed",
+  violetBg: "#f5f3ff",
+  teal: "#0891b2",
+  tealBg: "#ecfeff",
+  pink: "#db2777",
+  pinkBg: "#fdf2f8",
+  sky: "#0ea5e9",
+  skyBg: "#f0f9ff",
 };
 
-const PALETTE  = [T.blue, T.green, T.violet, T.amber, T.red, T.teal, T.pink, "#ffa657"];
+const PALETTE = [T.blue, T.green, T.violet, T.amber, T.red, T.teal, T.pink, "#ffa657"];
 const CHANNELS = ["Paid Search", "Social Ads", "Email", "Organic SEO", "Referral", "Display", "Google Ads", "YouTube"];
-const SOURCES  = ["Facebook", "Instagram", "LinkedIn", "Google", "Twitter", "Email", "Referral", "Organic"];
+const SOURCES = ["Facebook", "Instagram", "LinkedIn", "Google", "Twitter", "Email", "Referral", "Organic"];
 const STAGES: Lead["stage"][] = ["awareness", "interest", "consideration", "converted"];
 const PLATFORMS = ["Instagram", "LinkedIn", "Facebook", "Twitter / X", "YouTube", "TikTok"];
 
@@ -283,7 +285,7 @@ function fmt(v: number) {
 }
 function fmtNum(v: number) {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000)     return `${(v / 1_000).toFixed(0)}K`;
+  if (v >= 1_000) return `${(v / 1_000).toFixed(0)}K`;
   return String(v);
 }
 function fmtShort(v: number) {
@@ -308,14 +310,14 @@ function KPICard({ icon, label, value, sub, accent = T.blue }: {
       onMouseEnter={e => {
         const el = e.currentTarget as HTMLDivElement;
         el.style.borderColor = accent;
-        el.style.transform   = "translateY(-2px)";
-        el.style.boxShadow   = `0 8px 24px ${accent}22`;
+        el.style.transform = "translateY(-2px)";
+        el.style.boxShadow = `0 8px 24px ${accent}22`;
       }}
       onMouseLeave={e => {
         const el = e.currentTarget as HTMLDivElement;
         el.style.borderColor = T.border;
-        el.style.transform   = "translateY(0)";
-        el.style.boxShadow   = "none";
+        el.style.transform = "translateY(0)";
+        el.style.boxShadow = "none";
       }}
     >
       <div style={{ position: "absolute", top: 0, right: 0, width: 70, height: 70, background: `radial-gradient(circle at 100% 0%, ${accent}28 0%, transparent 70%)` }} />
@@ -368,7 +370,7 @@ function FieldInput({ label, value, onChange, type = "text", placeholder = "" }:
           transition: "border-color 0.15s", outline: "none",
         }}
         onFocus={e => (e.target.style.borderColor = T.blue)}
-        onBlur={e  => (e.target.style.borderColor = T.border)}
+        onBlur={e => (e.target.style.borderColor = T.border)}
       />
     </div>
   );
@@ -476,10 +478,10 @@ function ChartTooltip({ active, payload, label }: {
 
 function StageBadge({ stage }: { stage: Lead["stage"] }) {
   const map: Record<Lead["stage"], [string, string]> = {
-    awareness:     [T.sky,    T.skyBg],
-    interest:      [T.violet, T.violetBg],
-    consideration: [T.amber,  T.amberBg],
-    converted:     [T.green,  T.greenBg],
+    awareness: [T.sky, T.skyBg],
+    interest: [T.violet, T.violetBg],
+    consideration: [T.amber, T.amberBg],
+    converted: [T.green, T.greenBg],
   };
   const [color, bg] = map[stage] || ["#64748b", "#f1f5f9"];
   return (
@@ -489,14 +491,14 @@ function StageBadge({ stage }: { stage: Lead["stage"] }) {
 
 function ChannelBadge({ ch }: { ch: string }) {
   const colors: Record<string, [string, string]> = {
-    "Social Ads":  [T.pink,   T.pinkBg],
-    "Paid Search": [T.blue,   T.blueBg],
-    "Email":       [T.violet, T.violetBg],
-    "Organic SEO": [T.green,  T.greenBg],
-    "Referral":    [T.amber,  T.amberBg],
-    "Display":     [T.teal,   T.tealBg],
-    "Google Ads":  [T.red,    T.redBg],
-    "YouTube":     [T.red,    T.redBg],
+    "Social Ads": [T.pink, T.pinkBg],
+    "Paid Search": [T.blue, T.blueBg],
+    "Email": [T.violet, T.violetBg],
+    "Organic SEO": [T.green, T.greenBg],
+    "Referral": [T.amber, T.amberBg],
+    "Display": [T.teal, T.tealBg],
+    "Google Ads": [T.red, T.redBg],
+    "YouTube": [T.red, T.redBg],
   };
   const [color, bg] = colors[ch] ?? [T.inkMid, T.surfaceHi];
   return (
@@ -526,12 +528,12 @@ function OverviewTab({ data }: { data: ReturnType<typeof useMarketing> }) {
 
       {/* KPI Row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12 }}>
-        <KPICard icon="📡" label="Total Reach"    value={fmtNum(totalReach)}    accent={T.sky}    sub="impressions across campaigns" />
-        <KPICard icon="🎯" label="Total Leads"    value={String(leads.length)}  accent={T.violet} sub={`${converted} converted`} />
-        <KPICard icon="🔄" label="Conv. Rate"     value={`${convRate}%`}        accent={T.green}  sub="leads → converted" />
-        <KPICard icon="💸" label="Total Spend"    value={fmt(totalSpend)}       accent={T.amber}  sub="ad spend this month" />
-        <KPICard icon="📈" label="ROI"            value={`${roi}%`}             accent={T.green}  sub="revenue / spend" />
-        <KPICard icon="👆" label="Avg. CTR"       value={`${overallCTR}%`}      accent={T.pink}   sub="clicks / impressions" />
+        <KPICard icon="📡" label="Total Reach" value={fmtNum(totalReach)} accent={T.sky} sub="impressions across campaigns" />
+        <KPICard icon="🎯" label="Total Leads" value={String(leads.length)} accent={T.violet} sub={`${converted} converted`} />
+        <KPICard icon="🔄" label="Conv. Rate" value={`${convRate}%`} accent={T.green} sub="leads → converted" />
+        <KPICard icon="💸" label="Total Spend" value={fmt(totalSpend)} accent={T.amber} sub="ad spend this month" />
+        <KPICard icon="📈" label="ROI" value={`${roi}%`} accent={T.green} sub="revenue / spend" />
+        <KPICard icon="👆" label="Avg. CTR" value={`${overallCTR}%`} accent={T.pink} sub="clicks / impressions" />
       </div>
 
       {/* Charts Row 1 */}
@@ -542,8 +544,8 @@ function OverviewTab({ data }: { data: ReturnType<typeof useMarketing> }) {
             <AreaChart data={trafficTrend}>
               <defs>
                 <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor={T.blue} stopOpacity={0.2} />
-                  <stop offset="95%" stopColor={T.blue} stopOpacity={0}   />
+                  <stop offset="5%" stopColor={T.blue} stopOpacity={0.2} />
+                  <stop offset="95%" stopColor={T.blue} stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
@@ -598,7 +600,7 @@ function OverviewTab({ data }: { data: ReturnType<typeof useMarketing> }) {
                   <XAxis dataKey="name" tick={{ fill: T.inkMid, fontSize: 9 }} axisLine={false} tickLine={false} />
                   <YAxis tickFormatter={fmtShort} tick={{ fill: T.inkMid, fontSize: 10 }} axisLine={false} tickLine={false} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="Spend"   fill={T.amber} radius={[4, 4, 0, 0]} opacity={0.85} />
+                  <Bar dataKey="Spend" fill={T.amber} radius={[4, 4, 0, 0]} opacity={0.85} />
                   <Bar dataKey="Revenue" fill={T.green} radius={[4, 4, 0, 0]} opacity={0.85} />
                 </BarChart>
               </ResponsiveContainer>
@@ -643,7 +645,7 @@ function OverviewTab({ data }: { data: ReturnType<typeof useMarketing> }) {
           headers={["Campaign", "Channel", "Impressions", "Clicks", "CTR", "Conversions", "Spend", "Revenue", "ROI"]}
           rows={campaigns.slice(0, 8).map(c => {
             const ctrColor = (c.ctr ?? 0) >= 5 ? T.green : (c.ctr ?? 0) >= 3 ? T.amber : T.red;
-            const campRoi  = c.spend > 0 ? Math.round((c.revenue / c.spend) * 100) : 0;
+            const campRoi = c.spend > 0 ? Math.round((c.revenue / c.spend) * 100) : 0;
             const roiColor = campRoi >= 200 ? T.green : campRoi >= 100 ? T.amber : T.red;
             return [
               <span style={{ fontWeight: 700, color: T.ink }}>{c.name}</span>,
@@ -652,7 +654,7 @@ function OverviewTab({ data }: { data: ReturnType<typeof useMarketing> }) {
               <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: T.inkMid }}>{fmtNum(c.clicks)}</span>,
               <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 800, color: ctrColor }}>{c.ctr ?? 0}%</span>,
               <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: T.inkMid }}>{c.conversions.toLocaleString()}</span>,
-              <MoneyTag v={c.spend}   color={T.amber} />,
+              <MoneyTag v={c.spend} color={T.amber} />,
               <MoneyTag v={c.revenue} color={T.green} />,
               <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 800, color: roiColor }}>{campRoi}%</span>,
             ];
@@ -672,13 +674,13 @@ function CampaignsTab({ campaigns, month, onAdd, onDelete }: {
   onAdd: (data: Omit<Campaign, "id" | "createdAt">) => void;
   onDelete: (id: string, name: string) => void;
 }) {
-  const [name,        setName]        = useState("");
-  const [channel,     setChannel]     = useState("Social Ads");
+  const [name, setName] = useState("");
+  const [channel, setChannel] = useState("Social Ads");
   const [impressions, setImpressions] = useState("");
-  const [clicks,      setClicks]      = useState("");
+  const [clicks, setClicks] = useState("");
   const [conversions, setConversions] = useState("");
-  const [spend,       setSpend]       = useState("");
-  const [revenue,     setRevenue]     = useState("");
+  const [spend, setSpend] = useState("");
+  const [revenue, setRevenue] = useState("");
 
   const handleAdd = () => {
     if (!name.trim() || !spend) return;
@@ -689,9 +691,9 @@ function CampaignsTab({ campaigns, month, onAdd, onDelete }: {
     setName(""); setImpressions(""); setClicks(""); setConversions(""); setSpend(""); setRevenue("");
   };
 
-  const totalSpend   = campaigns.reduce((s, c) => s + c.spend, 0);
+  const totalSpend = campaigns.reduce((s, c) => s + c.spend, 0);
   const totalRevenue = campaigns.reduce((s, c) => s + c.revenue, 0);
-  const totalConv    = campaigns.reduce((s, c) => s + c.conversions, 0);
+  const totalConv = campaigns.reduce((s, c) => s + c.conversions, 0);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -699,15 +701,15 @@ function CampaignsTab({ campaigns, month, onAdd, onDelete }: {
 
         <SectionCard title="Add Campaign" subtitle="Auto-tagged to selected month">
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <FieldInput  label="Campaign Name *"  value={name}        onChange={setName}        placeholder="e.g. Summer Sale 2026" />
-            <FieldSelect label="Channel"          value={channel}     onChange={setChannel}     options={CHANNELS} />
+            <FieldInput label="Campaign Name *" value={name} onChange={setName} placeholder="e.g. Summer Sale 2026" />
+            <FieldSelect label="Channel" value={channel} onChange={setChannel} options={CHANNELS} />
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              <FieldInput label="Impressions"     value={impressions} onChange={setImpressions} type="number" placeholder="100000" />
-              <FieldInput label="Clicks"          value={clicks}      onChange={setClicks}      type="number" placeholder="5000" />
-              <FieldInput label="Conversions"     value={conversions} onChange={setConversions} type="number" placeholder="500" />
-              <FieldInput label="Spend (₹)"       value={spend}       onChange={setSpend}       type="number" placeholder="20000" />
+              <FieldInput label="Impressions" value={impressions} onChange={setImpressions} type="number" placeholder="100000" />
+              <FieldInput label="Clicks" value={clicks} onChange={setClicks} type="number" placeholder="5000" />
+              <FieldInput label="Conversions" value={conversions} onChange={setConversions} type="number" placeholder="500" />
+              <FieldInput label="Spend (₹)" value={spend} onChange={setSpend} type="number" placeholder="20000" />
             </div>
-            <FieldInput  label="Revenue (₹)"      value={revenue}     onChange={setRevenue}     type="number" placeholder="50000" />
+            <FieldInput label="Revenue (₹)" value={revenue} onChange={setRevenue} type="number" placeholder="50000" />
             {spend && revenue && (
               <div style={{ padding: "10px 14px", background: T.surfaceHi, borderRadius: 9, border: `1px solid ${T.border}`, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <div>
@@ -732,9 +734,9 @@ function CampaignsTab({ campaigns, month, onAdd, onDelete }: {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-            <KPICard icon="💸" label="Total Spend"   value={fmt(totalSpend)}   accent={T.amber} />
+            <KPICard icon="💸" label="Total Spend" value={fmt(totalSpend)} accent={T.amber} />
             <KPICard icon="💰" label="Total Revenue" value={fmt(totalRevenue)} accent={T.green} />
-            <KPICard icon="🔄" label="Conversions"   value={String(totalConv)} accent={T.blue}  />
+            <KPICard icon="🔄" label="Conversions" value={String(totalConv)} accent={T.blue} />
           </div>
 
           <SectionCard title="Campaign Records" subtitle={`${campaigns.length} campaigns in ${month}`}>
@@ -742,7 +744,7 @@ function CampaignsTab({ campaigns, month, onAdd, onDelete }: {
               headers={["Campaign", "Channel", "Impressions", "Clicks", "CTR", "Conv.", "Spend", "Revenue", "ROI", ""]}
               rows={campaigns.map(c => {
                 const ctrColor = (c.ctr ?? 0) >= 5 ? T.green : (c.ctr ?? 0) >= 3 ? T.amber : T.red;
-                const campRoi  = c.spend > 0 ? Math.round((c.revenue / c.spend) * 100) : 0;
+                const campRoi = c.spend > 0 ? Math.round((c.revenue / c.spend) * 100) : 0;
                 return [
                   <span style={{ fontWeight: 700, color: T.ink }}>{c.name}</span>,
                   <ChannelBadge ch={c.channel} />,
@@ -750,7 +752,7 @@ function CampaignsTab({ campaigns, month, onAdd, onDelete }: {
                   <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: T.inkMid }}>{fmtNum(c.clicks)}</span>,
                   <span style={{ fontWeight: 800, color: ctrColor }}>{c.ctr ?? 0}%</span>,
                   <span style={{ color: T.inkMid }}>{c.conversions}</span>,
-                  <MoneyTag v={c.spend}   color={T.amber} />,
+                  <MoneyTag v={c.spend} color={T.amber} />,
                   <MoneyTag v={c.revenue} color={T.green} />,
                   <span style={{ fontWeight: 800, color: campRoi >= 200 ? T.green : campRoi >= 100 ? T.amber : T.red }}>{campRoi}%</span>,
                   <DeleteBtn onClick={() => c.id && onDelete(c.id, c.name)} />,
@@ -773,10 +775,10 @@ function LeadsTab({ leads, onAdd, onDelete, onStageChange }: {
   onDelete: (id: string) => void;
   onStageChange: (lead: Lead, stage: Lead["stage"]) => void;
 }) {
-  const [name,   setName]   = useState("");
-  const [email,  setEmail]  = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [source, setSource] = useState("Facebook");
-  const [stage,  setStage]  = useState<Lead["stage"]>("awareness");
+  const [stage, setStage] = useState<Lead["stage"]>("awareness");
 
   const handleAdd = () => {
     if (!name.trim()) return;
@@ -796,7 +798,7 @@ function LeadsTab({ leads, onAdd, onDelete, onStageChange }: {
         {STAGES.map(st => {
           const count = leads.filter(l => l.stage === st).length;
           const color = stageColors[st];
-          const pct   = leads.length ? Math.round((count / leads.length) * 100) : 0;
+          const pct = leads.length ? Math.round((count / leads.length) * 100) : 0;
           return (
             <div key={st} style={{ background: T.surface, border: `1px solid ${color}44`, borderRadius: 14, padding: "16px 18px" }}>
               <div style={{ fontSize: 10, color: T.inkMid, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>{st}</div>
@@ -814,10 +816,10 @@ function LeadsTab({ leads, onAdd, onDelete, onStageChange }: {
 
         <SectionCard title="Add Lead" subtitle="Capture new marketing leads">
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <FieldInput  label="Name *" value={name}  onChange={setName}  placeholder="John Doe" />
-            <FieldInput  label="Email"  value={email} onChange={setEmail} type="email" placeholder="john@example.com" />
+            <FieldInput label="Name *" value={name} onChange={setName} placeholder="John Doe" />
+            <FieldInput label="Email" value={email} onChange={setEmail} type="email" placeholder="john@example.com" />
             <FieldSelect label="Source" value={source} onChange={setSource} options={SOURCES} />
-            <FieldSelect label="Stage"  value={stage}  onChange={v => setStage(v as Lead["stage"])} options={STAGES.map(s => s.charAt(0).toUpperCase() + s.slice(1))} />
+            <FieldSelect label="Stage" value={stage} onChange={v => setStage(v as Lead["stage"])} options={STAGES.map(s => s.charAt(0).toUpperCase() + s.slice(1))} />
             <AddBtn onClick={handleAdd} label="🎯 Add Lead" color={T.violet} />
           </div>
         </SectionCard>
@@ -862,11 +864,11 @@ function SocialTab({ social, onAdd, onDelete }: {
   onAdd: (data: Omit<SocialStat, "id" | "createdAt">) => void;
   onDelete: (id: string) => void;
 }) {
-  const [platform,   setPlatform]   = useState("Instagram");
-  const [followers,  setFollowers]  = useState("");
+  const [platform, setPlatform] = useState("Instagram");
+  const [followers, setFollowers] = useState("");
   const [engagement, setEngagement] = useState("");
-  const [posts,      setPosts]      = useState("");
-  const [reach,      setReach]      = useState("");
+  const [posts, setPosts] = useState("");
+  const [reach, setReach] = useState("");
 
   const handleAdd = () => {
     if (!followers) return;
@@ -875,7 +877,7 @@ function SocialTab({ social, onAdd, onDelete }: {
   };
 
   const totalFollowers = social.reduce((s, r) => s + r.followers, 0);
-  const avgEngagement  = social.length
+  const avgEngagement = social.length
     ? (social.reduce((s, r) => s + r.engagement, 0) / social.length).toFixed(1)
     : "0";
 
@@ -884,9 +886,9 @@ function SocialTab({ social, onAdd, onDelete }: {
 
       <SectionCard title="Add Platform" subtitle="Track social media stats">
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <FieldSelect label="Platform"          value={platform}   onChange={setPlatform}   options={PLATFORMS} />
-          <FieldInput  label="Followers"         value={followers}  onChange={setFollowers}  type="number" placeholder="10000" />
-          <FieldInput  label="Engagement Rate %" value={engagement} onChange={setEngagement} type="number" placeholder="5.2" />
+          <FieldSelect label="Platform" value={platform} onChange={setPlatform} options={PLATFORMS} />
+          <FieldInput label="Followers" value={followers} onChange={setFollowers} type="number" placeholder="10000" />
+          <FieldInput label="Engagement Rate %" value={engagement} onChange={setEngagement} type="number" placeholder="5.2" />
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             <FieldInput label="Posts" value={posts} onChange={setPosts} type="number" placeholder="120" />
             <FieldInput label="Reach" value={reach} onChange={setReach} type="number" placeholder="50000" />
@@ -897,9 +899,9 @@ function SocialTab({ social, onAdd, onDelete }: {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-          <KPICard icon="👥" label="Total Followers" value={fmtNum(totalFollowers)} accent={T.sky}    />
-          <KPICard icon="💬" label="Avg Engagement"  value={`${avgEngagement}%`}   accent={T.green}  />
-          <KPICard icon="📱" label="Platforms"        value={String(social.length)} accent={T.violet} />
+          <KPICard icon="👥" label="Total Followers" value={fmtNum(totalFollowers)} accent={T.sky} />
+          <KPICard icon="💬" label="Avg Engagement" value={`${avgEngagement}%`} accent={T.green} />
+          <KPICard icon="📱" label="Platforms" value={String(social.length)} accent={T.violet} />
         </div>
 
         {/* Platform cards */}
@@ -926,8 +928,8 @@ function SocialTab({ social, onAdd, onDelete }: {
               </div>
               {(s.posts || s.reach) && (
                 <div style={{ display: "flex", gap: 14, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${T.border}44` }}>
-                  {s.posts  ? <div style={{ fontSize: 11, color: T.inkMid }}><span style={{ fontWeight: 800, color: T.ink }}>{s.posts}</span> posts</div>  : null}
-                  {s.reach  ? <div style={{ fontSize: 11, color: T.inkMid }}><span style={{ fontWeight: 800, color: T.ink }}>{fmtNum(s.reach)}</span> reach</div> : null}
+                  {s.posts ? <div style={{ fontSize: 11, color: T.inkMid }}><span style={{ fontWeight: 800, color: T.ink }}>{s.posts}</span> posts</div> : null}
+                  {s.reach ? <div style={{ fontSize: 11, color: T.inkMid }}><span style={{ fontWeight: 800, color: T.ink }}>{fmtNum(s.reach)}</span> reach</div> : null}
                 </div>
               )}
             </div>
@@ -1028,7 +1030,7 @@ function SchemaTab() {
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${T.border}` }}>
         <TabBtn label="Collection Schema" active={active === "schema"} onClick={() => setActive("schema")} />
-        <TabBtn label="Security Rules"   active={active === "rules"}  onClick={() => setActive("rules")}  />
+        <TabBtn label="Security Rules" active={active === "rules"} onClick={() => setActive("rules")} />
       </div>
       <div style={{ background: "#0f172a", borderRadius: 12, overflow: "hidden" }}>
         <div style={{ padding: "10px 18px", borderBottom: "1px solid #1e293b", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -1052,13 +1054,13 @@ function SchemaTab() {
 // 12. MONTHS CONFIG
 // ─────────────────────────────────────────────────────────────
 const MONTHS = [
-  "2026-01","2026-02","2026-03","2026-04","2026-05","2026-06",
-  "2026-07","2026-08","2026-09","2026-10","2026-11","2026-12",
+  "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06",
+  "2026-07", "2026-08", "2026-09", "2026-10", "2026-11", "2026-12",
 ];
 const MONTH_LABELS: Record<string, string> = {
-  "2026-01":"Jan 2026","2026-02":"Feb 2026","2026-03":"Mar 2026","2026-04":"Apr 2026",
-  "2026-05":"May 2026","2026-06":"Jun 2026","2026-07":"Jul 2026","2026-08":"Aug 2026",
-  "2026-09":"Sep 2026","2026-10":"Oct 2026","2026-11":"Nov 2026","2026-12":"Dec 2026",
+  "2026-01": "Jan 2026", "2026-02": "Feb 2026", "2026-03": "Mar 2026", "2026-04": "Apr 2026",
+  "2026-05": "May 2026", "2026-06": "Jun 2026", "2026-07": "Jul 2026", "2026-08": "Aug 2026",
+  "2026-09": "Sep 2026", "2026-10": "Oct 2026", "2026-11": "Nov 2026", "2026-12": "Dec 2026",
 };
 
 type MarketingTab = "overview" | "campaigns" | "leads" | "social" | "schema";
@@ -1067,24 +1069,25 @@ type MarketingTab = "overview" | "campaigns" | "leads" | "social" | "schema";
 // 13. MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────
 export default function MarketingDashboard() {
+  const { user } = useAuth();
   const [month, setMonth] = useState("2026-04");
-  const [tab,   setTab]   = useState<MarketingTab>("overview");
+  const [tab, setTab] = useState<MarketingTab>("overview");
 
   const data = useMarketing(month);
 
-  const handleAddCampaign = useCallback((d: Omit<Campaign,   "id"|"createdAt">)         => addCampaign(d),              []);
-  const handleDelCampaign = useCallback((id: string, name: string)                       => deleteCampaign(id, name),    []);
-  const handleAddLead     = useCallback((d: Omit<Lead,       "id"|"createdAt">)          => addLead(d),                  []);
-  const handleDelLead     = useCallback((id: string)                                      => deleteLead(id),              []);
-  const handleStageChange = useCallback((lead: Lead, stage: Lead["stage"])               => updateLeadStage(lead, stage), []);
-  const handleAddSocial   = useCallback((d: Omit<SocialStat, "id"|"createdAt">)          => addSocialStat(d),            []);
-  const handleDelSocial   = useCallback((id: string)                                      => deleteSocialStat(id),        []);
+  const handleAddCampaign = useCallback((d: Omit<Campaign, "id" | "createdAt">) => addCampaign(d), []);
+  const handleDelCampaign = useCallback((id: string, name: string) => deleteCampaign(id, name), []);
+  const handleAddLead = useCallback((d: Omit<Lead, "id" | "createdAt">) => addLead(d), []);
+  const handleDelLead = useCallback((id: string) => deleteLead(id), []);
+  const handleStageChange = useCallback((lead: Lead, stage: Lead["stage"]) => updateLeadStage(lead, stage), []);
+  const handleAddSocial = useCallback((d: Omit<SocialStat, "id" | "createdAt">) => addSocialStat(d), []);
+  const handleDelSocial = useCallback((id: string) => deleteSocialStat(id), []);
 
   const TABS: { key: MarketingTab; label: string; count?: number }[] = [
-    { key: "overview",  label: "Overview" },
+    { key: "overview", label: "Overview" },
     { key: "campaigns", label: "Campaigns", count: data.campaigns.length },
-    { key: "leads",     label: "Leads",     count: data.leads.length },
-    { key: "social",    label: "Social",    count: data.social.length },
+    { key: "leads", label: "Leads", count: data.leads.length },
+    { key: "social", label: "Social", count: data.social.length },
     // { key: "schema",    label: "Schema" },
   ];
 
@@ -1121,7 +1124,7 @@ export default function MarketingDashboard() {
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <NotificationBell
             role="marketing"
-            uid={"current-user-id"}   // 👈 replace with your auth uid
+            uid={user?.uid || ""}
             accentColor={T.sky}
           />
 
@@ -1162,11 +1165,11 @@ export default function MarketingDashboard() {
 
       {/* ── CONTENT ────────────────────────────────────────── */}
       <main style={{ padding: "20px 24px", width: "100%" }}>
-        {tab === "overview"  && <OverviewTab  data={data} />}
+        {tab === "overview" && <><OverviewTab data={data} /><div style={{ marginTop: 20 }}><CrossDeptFeed role="marketing" accentColor={T.sky} title="Sales & Business Activity" maxItems={8} /></div></>}
         {tab === "campaigns" && <CampaignsTab campaigns={data.campaigns} month={month} onAdd={handleAddCampaign} onDelete={handleDelCampaign} />}
-        {tab === "leads"     && <LeadsTab     leads={data.leads}          onAdd={handleAddLead}   onDelete={handleDelLead}   onStageChange={handleStageChange} />}
-        {tab === "social"    && <SocialTab    social={data.social}        onAdd={handleAddSocial} onDelete={handleDelSocial} />}
-        {tab === "schema"    && <SchemaTab />}
+        {tab === "leads" && <LeadsTab leads={data.leads} onAdd={handleAddLead} onDelete={handleDelLead} onStageChange={handleStageChange} />}
+        {tab === "social" && <SocialTab social={data.social} onAdd={handleAddSocial} onDelete={handleDelSocial} />}
+        {tab === "schema" && <SchemaTab />}
       </main>
     </div>
   );
