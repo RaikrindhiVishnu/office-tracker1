@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect, useMemo, Fragment } from "react";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { createPortal } from "react-dom";
 
 /* ─── TYPES ─── */
@@ -193,6 +195,13 @@ export function KanbanBoard({
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [allSubtasks, setAllSubtasks] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!activeProject?.id) return;
+    const q = query(collection(db, "subtasks"), where("projectId", "==", activeProject.id));
+    return onSnapshot(q, s => setAllSubtasks(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+  }, [activeProject?.id]);
 
   useEffect(() => { setIsMounted(true); }, []);
 
@@ -622,7 +631,7 @@ export function KanbanBoard({
               </div>
             )}
           </div>
-          <p style={{ fontSize: "13px", fontWeight: 700, color: "#3730a3", lineHeight: 1.4, marginBottom: "6px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          <p style={{ fontSize: "13px", fontWeight: 700, color: "#3730a3", lineHeight: 1.4, marginBottom: "4px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
             {story.title}
           </p>
           {story.tags && story.tags.length > 0 && (
@@ -789,7 +798,9 @@ export function KanbanBoard({
             {isProjectManager && (
               <>
                 <button onClick={() => toggleCol(col.id)} style={{ width: "20px", height: "20px", borderRadius: "5px", border: `1px solid ${cfg.border}`, background: "transparent", cursor: "pointer", fontSize: "10px", color: cfg.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>◀</button>
-                <button onClick={() => handleDeleteCol(col.id)} disabled={columns.length <= 1} style={{ width: "20px", height: "20px", borderRadius: "5px", border: "none", background: "transparent", cursor: columns.length <= 1 ? "not-allowed" : "pointer", fontSize: "11px", color: "#9ca3af", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, opacity: columns.length <= 1 ? 0.3 : 1 }}>✕</button>
+                {permissions.isAdmin && (
+                  <button onClick={() => handleDeleteCol(col.id)} disabled={columns.length <= 1} style={{ width: "20px", height: "20px", borderRadius: "5px", border: "none", background: "transparent", cursor: columns.length <= 1 ? "not-allowed" : "pointer", fontSize: "11px", color: "#9ca3af", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, opacity: columns.length <= 1 ? 0.3 : 1 }}>✕</button>
+                )}
               </>
             )}
           </div>

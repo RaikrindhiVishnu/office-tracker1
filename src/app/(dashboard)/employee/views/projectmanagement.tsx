@@ -727,7 +727,7 @@ function TaskModal({
           </div>
           <div>
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Description</label>
-            <textarea value={form.description || ""} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Add details, acceptance criteria, steps to reproduce..." rows={3} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none" />
+            <textarea value={form.description || ""} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Add details, acceptance criteria, steps to reproduce..." rows={8} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-vertical" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -901,6 +901,23 @@ function TaskDetailModal({
   const [empSubmitting, setEmpSubmitting] = useState(false);
   const [showSprintMove, setShowSprintMove] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [newSubtaskText, setNewSubtaskText] = useState("");
+
+  const toggleSubtask = async (st: any) => {
+    await updateDoc(doc(firestoreDb, "subtasks", st.id), { done: !st.done });
+  };
+
+  const handleAddSubtask = async () => {
+    if (!newSubtaskText.trim()) return;
+    await addDoc(collection(firestoreDb, "subtasks"), {
+      taskId: task.id,
+      projectId: task.projectId,
+      text: newSubtaskText.trim(),
+      done: false,
+      createdAt: serverTimestamp(),
+    });
+    setNewSubtaskText("");
+  };
 
   const canEdit = isProjectManager || task.assignedTo === currentUserId;
   const userName = user?.displayName || user?.email?.split("@")[0] || "";
@@ -1090,10 +1107,16 @@ function TaskDetailModal({
             <div className="space-y-4">
               <div>
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Description</label>
-                <textarea value={localTask.description || ""} disabled={!canEdit}
-                  onChange={e => setLocalTask(t => ({ ...t, description: e.target.value }))} rows={3}
-                  className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none bg-white disabled:bg-gray-50 disabled:cursor-default"
-                  placeholder="No description..." />
+                {!canEdit ? (
+                  <div className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 bg-gray-50 text-gray-700 min-h-[150px] whitespace-pre-wrap overflow-y-auto max-h-[500px]">
+                    {localTask.description || "No description..."}
+                  </div>
+                ) : (
+                  <textarea value={localTask.description || ""}
+                    onChange={e => setLocalTask(t => ({ ...t, description: e.target.value }))} rows={12}
+                    className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-vertical bg-white"
+                    placeholder="No description..." />
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
@@ -1139,6 +1162,18 @@ function TaskDetailModal({
                   </div>
                 </div>
               </div>
+
+              {subtasks.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Subtask Progress</h3>
+                    <span className="text-xs font-bold" style={{ color: projectColor }}>{subtasksDone}/{subtasks.length} ({Math.round((subtasksDone / subtasks.length) * 100)}%)</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden border border-gray-50">
+                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(subtasksDone / subtasks.length) * 100}%`, background: subtasksDone === subtasks.length ? "#22c55e" : projectColor }} />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1149,14 +1184,32 @@ function TaskDetailModal({
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{subtasksDone}/{subtasks.length}</span>
               </div>
               {subtasks.map(st => (
-                <div key={st.id} className={`flex items-center gap-3 p-2.5 rounded-xl ${st.done ? "opacity-60" : "hover:bg-gray-50"} transition`}>
-                  <div className="w-5 h-5 rounded-md flex items-center justify-center border-2 shrink-0" style={{ background: st.done ? projectColor : "transparent", borderColor: st.done ? projectColor : "#d1d5db" }}>
-                    {st.done && <span className="text-white text-xs font-bold">✓</span>}
+                <div key={st.id} onClick={() => toggleSubtask(st)} className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer ${st.done ? "opacity-60 bg-gray-50/50" : "hover:bg-gray-50"} transition border border-transparent hover:border-gray-100`}>
+                  <div className="w-5 h-5 rounded-md flex items-center justify-center border-2 shrink-0 transition-colors" style={{ background: st.done ? projectColor : "transparent", borderColor: st.done ? projectColor : "#d1d5db" }}>
+                    {st.done && <span className="text-white text-[10px] font-bold">✓</span>}
                   </div>
-                  <span className={`text-sm ${st.done ? "line-through text-gray-400" : "text-gray-700"}`}>{st.text}</span>
+                  <span className={`text-sm flex-1 ${st.done ? "line-through text-gray-400" : "text-gray-700"}`}>{st.text}</span>
+                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${st.done ? "bg-green-100 text-green-600" : "bg-gray-100 text-gray-400"}`}>
+                    {st.done ? "COMPLETED" : "PENDING"}
+                  </span>
                 </div>
               ))}
-              {subtasks.length === 0 && <p className="text-xs text-gray-400 text-center py-4">No subtasks</p>}
+              {subtasks.length === 0 && <p className="text-xs text-gray-400 text-center py-4 italic">No subtasks assigned yet.</p>}
+
+              {canEdit && (
+                <div className="flex gap-2 pt-2 border-t border-gray-50 mt-2">
+                  <input
+                    value={newSubtaskText}
+                    onChange={e => setNewSubtaskText(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && handleAddSubtask()}
+                    placeholder="Assign a new subtask..."
+                    className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  />
+                  <button onClick={handleAddSubtask} className="px-4 py-2 text-white text-[10px] font-bold rounded-lg shadow-sm transition hover:opacity-90" style={{ background: projectColor }}>
+                    ADD
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { createPortal } from "react-dom";
 
 /* ─── TYPES ─── */
@@ -454,9 +456,9 @@ export function TaskModal({
               placeholder={`${TYPE_META[f.ticketType as TicketType]?.label || "Task"} title...`}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200" />
           </div>
-          <textarea value={f.description} onChange={e => setF({ ...f, description: e.target.value })} rows={2}
+          <textarea value={f.description} onChange={e => setF({ ...f, description: e.target.value })} rows={12}
             placeholder="Description..."
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none resize-none" />
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none resize-vertical" />
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-gray-500 block mb-1">Assignee</label>
@@ -546,6 +548,13 @@ export function KanbanBoard({
   const [floatingMenu, setFloatingMenu] = useState<{ storyId: string; top: number; left: number } | null>(null);
   const [addingCol, setAddingCol] = useState(false);
   const [newColLabel, setNewColLabel] = useState("");
+  const [allSubtasks, setAllSubtasks] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!activeProject?.id) return;
+    const q = query(collection(db, "subtasks"), where("projectId", "==", activeProject.id));
+    return onSnapshot(q, s => setAllSubtasks(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+  }, [activeProject?.id]);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("board");
@@ -797,6 +806,25 @@ export function KanbanBoard({
           </div>
           <p className="text-sm font-semibold text-gray-800 group-hover/card:text-indigo-700 transition leading-snug mb-2 line-clamp-2">{task.title}</p>
           {task.description && <p className="text-[11px] text-gray-400 line-clamp-1 mb-2">{task.description}</p>}
+
+          {/* Subtask Progress */}
+          {(() => {
+            const taskSubs = allSubtasks.filter(s => s.taskId === task.id);
+            if (taskSubs.length === 0) return null;
+            const done = taskSubs.filter(s => s.done).length;
+            const pct = Math.round((done / taskSubs.length) * 100);
+            return (
+              <div className="mb-3 px-0.5">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">{done}/{taskSubs.length} subtasks</span>
+                  <span className="text-[9px] font-black text-indigo-600">{pct}%</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-1 overflow-hidden border border-gray-50">
+                  <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: pct === 100 ? "#22c55e" : (activeProject?.color || "#6366f1") }} />
+                </div>
+              </div>
+            );
+          })()}
           {task.tags && task.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mb-2">
               {task.tags.slice(0, 2).map(tag => <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">#{tag}</span>)}
@@ -1165,7 +1193,7 @@ export function KanbanBoard({
                     style={{ color: style.color, borderColor: style.border }}
                   >{taskCount}</span>
 
-                  {canManage && (
+                  {currentUser?.accountType === "ADMIN" && (
                     <button
                       onClick={e => { e.stopPropagation(); handleDeleteColumn(col.id); }}
                       className="flex w-5 h-5 items-center justify-center rounded-full hover:bg-red-50 text-red-400 hover:text-red-600 transition text-[10px] font-bold"
