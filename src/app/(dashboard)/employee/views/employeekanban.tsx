@@ -467,7 +467,7 @@ export function KanbanBoard({
       });
 
       return Array.from(map.entries())
-        .filter(([, g]) => g.tasks.length > 0 || stories.some(s => s.id === g.key))
+        .filter(([key, g]) => g.tasks.length > 0 || stories.some(s => s.id === key))
         .map(([key, g]) => ({ key, label: g.label, avatar: undefined, tasks: g.tasks }));
     }
     return [];
