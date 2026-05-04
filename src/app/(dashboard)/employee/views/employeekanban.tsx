@@ -8,7 +8,7 @@ import { createPortal } from "react-dom";
 /* ─── TYPES ─── */
 export type TicketType = "story" | "task" | "bug" | "defect";
 export type ViewMode = "board" | "swimlane";
-export type GroupBy = "assignee" | "priority" | "type";
+export type GroupBy = "assignee" | "priority" | "type" | "story";
 
 export interface Column {
   id: string;
@@ -452,6 +452,24 @@ export function KanbanBoard({
         key: tp, label: TICKET_TYPES[tp].label, avatar: undefined, tasks: filteredTasks.filter(t => t.ticketType === tp),
       })).filter(g => g.tasks.length > 0);
     }
+    if (groupBy === "story") {
+      const map = new Map<string, { label: string; avatar?: string; tasks: Task[] }>();
+      const stories = localTasks.filter(t => t.ticketType === "story");
+      
+      stories.forEach(s => map.set(s.id, { label: s.title, tasks: [] }));
+      map.set("nostory", { label: "Direct Tasks (No Story)", tasks: [] });
+
+      filteredTasks.forEach(t => {
+        if (t.ticketType === "story") return;
+        const key = t.parentStoryId || "nostory";
+        if (!map.has(key)) map.set(key, { label: t.parentStoryTitle || "Unknown Story", tasks: [] });
+        map.get(key)!.tasks.push(t);
+      });
+
+      return Array.from(map.entries())
+        .filter(([, g]) => g.tasks.length > 0 || stories.some(s => s.id === g.key))
+        .map(([key, g]) => ({ key, label: g.label, avatar: undefined, tasks: g.tasks }));
+    }
     return [];
   }, [filteredTasks, groupBy]);
 
@@ -720,11 +738,11 @@ export function KanbanBoard({
 
     const visibleStories = localTasks.filter(t => {
       if (t.ticketType !== "story") return false;
-      if (t.status !== col.id) return false;
       const storyPassesFilter = filteredTasks.some(ft => ft.id === t.id);
       const hasVisibleChildrenHere = filteredTasks.some(ft =>
         ft.parentStoryId === t.id && ft.status === col.id && ft.ticketType !== "story"
       );
+      if (t.status !== col.id && !hasVisibleChildrenHere) return false;
       return storyPassesFilter || hasVisibleChildrenHere;
     });
 
@@ -1313,6 +1331,7 @@ export function KanbanBoard({
               <option value="assignee">By Assignee</option>
               <option value="priority">By Priority</option>
               <option value="type">By Type</option>
+              <option value="story">By Story</option>
             </select>
           )}
 

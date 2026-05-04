@@ -8,7 +8,7 @@ import { createPortal } from "react-dom";
 /* ─── TYPES ─── */
 export type TicketType = "story" | "task" | "bug" | "defect";
 export type ViewMode = "board" | "swimlane";
-export type GroupBy = "assignee" | "priority" | "type";
+export type GroupBy = "assignee" | "priority" | "type" | "story";
 
 export interface KanbanColumn {
   id: string;
@@ -612,7 +612,11 @@ export function KanbanBoard({
     return true;
   }), [tasks, filters, currentUser]);
 
-  const stories = filteredTasks.filter(t => t.ticketType === "story");
+  const stories = useMemo(() => {
+    const sIds = new Set(filteredTasks.filter(t => t.ticketType === "story").map(t => t.id));
+    filteredTasks.forEach(t => { if (t.parentStoryId) sIds.add(t.parentStoryId); });
+    return tasks.filter(t => t.ticketType === "story" && sIds.has(t.id));
+  }, [tasks, filteredTasks]);
   const orphans = filteredTasks.filter(t => t.ticketType !== "story" && !t.parentStoryId);
 
   const toggleStory = (id: string) => setCollapsedStories(p => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; });
@@ -890,6 +894,7 @@ export function KanbanBoard({
           <option value="assignee">Group: Assignee</option>
           <option value="priority">Group: Priority</option>
           <option value="type">Group: Type</option>
+          <option value="story">Group: Story</option>
         </select>
       )}
       <div className="flex-1" />
@@ -918,10 +923,26 @@ export function KanbanBoard({
         map.get(key)!.tasks.push(t);
       });
       groups = Array.from(map.entries()).map(([key, g]) => ({ key, ...g }));
-    } else if (groupBy === "priority") {
-      groups = ["Critical", "High", "Medium", "Low"].map(p => ({
-        key: p, label: p, color: PRI_CONFIG[p].dot, tasks: filteredTasks.filter(t => t.priority === p),
-      })).filter(g => g.tasks.length > 0);
+    } else if (groupBy === "story") {
+      const map = new Map<string, { label: string; tasks: Task[] }>();
+      const stories = tasks.filter(t => t.ticketType === "story");
+      
+      // Initialize with stories
+      stories.forEach(s => map.set(s.id, { label: s.title, tasks: [] }));
+      map.set("nostory", { label: "Direct Tasks (No Story)", tasks: [] });
+
+      filteredTasks.forEach(t => {
+        if (t.ticketType === "story") return; // Stories themselves are row headers
+        const key = t.parentStoryId || "nostory";
+        if (!map.has(key)) {
+           // Case where parent story might be filtered out or missing
+           map.set(key, { label: t.parentStoryTitle || "Unknown Story", tasks: [] });
+        }
+        map.get(key)!.tasks.push(t);
+      });
+      groups = Array.from(map.entries())
+        .map(([key, g]) => ({ key, ...g }))
+        .filter(g => g.tasks.length > 0 || stories.some(s => s.id === g.key));
     } else {
       groups = (["story", "task", "bug", "defect"] as TicketType[]).map(tp => ({
         key: tp, label: TICKET_TYPES[tp].label, color: TICKET_TYPES[tp].color, tasks: filteredTasks.filter(t => t.ticketType === tp),
