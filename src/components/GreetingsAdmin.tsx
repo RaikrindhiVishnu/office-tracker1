@@ -11,16 +11,34 @@ import { db } from "@/lib/firebase";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { 
-  FaThLarge, FaBirthdayCake, FaTrophy, FaHandWave, FaCalendarAlt, 
-  FaHistory, FaInbox, FaBell, FaSearch, FaPaperPlane, FaPaperclip, 
-  FaTrash, FaEdit, FaChevronRight, FaPlus, FaCheckCircle, FaExclamationTriangle 
+  FaThLarge, 
+  FaBirthdayCake, 
+  FaTrophy, 
+  FaHandshake,   // ✅ fixed
+  FaCalendarAlt, 
+  FaHistory, 
+  FaInbox, 
+  FaBell, 
+  FaSearch, 
+  FaPaperPlane, 
+  FaPaperclip, 
+  FaTrash, 
+  FaEdit, 
+  FaChevronRight, 
+  FaPlus, 
+  FaCheckCircle, 
+  FaExclamationTriangle,
+  FaBuilding,
+  FaUser,
+  FaRobot
 } from "react-icons/fa";
 import { 
   IoSparkles, IoCloseCircle, IoNotifications, IoGift, IoBalloon, 
-  IoMail, IoBusiness, IoPeople, IoPerson, IoMegaphone 
+  IoMail, IoBusiness, IoPeople, IoPerson, IoMegaphone,
+  IoCheckmarkCircle
 } from "react-icons/io5";
-import { MdCelebration, MdOutlineMail } from "react-icons/md";
-import { GiDiyaLamp } from "react-icons/gi";
+import { MdCelebration, MdOutlineMail, MdWavingHand } from "react-icons/md";
+import { GiLantern } from "react-icons/gi";
 import { GoDotFill } from "react-icons/go";
 
 interface Employee {
@@ -114,8 +132,8 @@ const NAV_ITEMS:{id:Tab;label:string;icon:React.ReactNode}[] = [
   {id:"birthdays",    label:"Birthdays",        icon:<FaBirthdayCake />},
   {id:"anniversaries",label:"Work Anniversary", icon:<MdCelebration />},
   {id:"achievements", label:"Achievements",     icon:<FaTrophy />},
-  {id:"welcome",      label:"New Joiners",      icon:<FaHandWave />},
-  {id:"festivals",    label:"Festivals",        icon:<GiDiyaLamp />},
+  {id:"welcome",      label:"New Joiners",      icon:<MdWavingHand />},
+  {id:"festivals",    label:"Festivals",        icon:<GiLantern />},
   {id:"events",       label:"Events",           icon:<FaCalendarAlt />},
   {id:"mail",         label:"Send Mail",        icon:<MdOutlineMail />},  // ✅ NEW
   {id:"history",      label:"History",          icon:<FaHistory />},
@@ -452,7 +470,7 @@ export default function GreetingsAdmin() {
   const notifications = [
     ...todayBdays.map(e=>({icon:<FaBirthdayCake />,msg:`${e.name}'s Birthday today!`,color:"#7c3aed",action:()=>{setTab("birthdays");setShowNotifs(false);}})),
     ...todayAnnivsrs.map(e=>({icon:<MdCelebration />,msg:`${e.name} — ${yearsWorked(e.joinDate||"")}yr Anniversary!`,color:"#d97706",action:()=>{setTab("anniversaries");setShowNotifs(false);}})),
-    ...upcomingFests.filter(f=>daysUntil(f.festivalDate)<=3).map(f=>({icon:<GiDiyaLamp />,msg:`${f.title} in ${daysUntil(f.festivalDate)}d`,color:"#b45309",action:()=>{setTab("festivals");setShowNotifs(false);}})),
+    ...upcomingFests.filter(f=>daysUntil(f.festivalDate)<=3).map(f=>({icon:<GiLantern />,msg:`${f.title} in ${daysUntil(f.festivalDate)}d`,color:"#b45309",action:()=>{setTab("festivals");setShowNotifs(false);}})),
   ];
 
   const recentEmails = logs.slice(0,8);
@@ -841,7 +859,7 @@ export default function GreetingsAdmin() {
                       :recentEmails.map(l=>(
                         <div key={l.id} className="gr-panel-item">
                           <div className="gr-panel-ico" style={{background:l.status==="success"?"#f0fdf4":"#fff1f2"}}>
-                            {l.type==="birthday" ? <FaBirthdayCake /> : l.type==="festival" ? <GiDiyaLamp /> : l.type==="anniversary" ? <MdCelebration /> : l.type==="achievement" ? <FaTrophy /> : l.type==="welcome" ? <FaHandWave /> : l.type==="mail" ? <IoMail /> : <FaCalendarAlt />}
+                            {l.type==="birthday" ? <FaBirthdayCake /> : l.type==="festival" ? <GiLantern /> : l.type==="anniversary" ? <MdCelebration /> : l.type==="achievement" ? <FaTrophy /> : l.type==="welcome" ? <MdWavingHand /> : l.type==="mail" ? <IoMail /> : <FaCalendarAlt />}
                           </div>
                           <div style={{flex:1,minWidth:0}}>
                             <div className="gr-panel-msg" style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.recipientName||l.recipientEmail}</div>
@@ -897,8 +915,8 @@ export default function GreetingsAdmin() {
                     {icon:<FaBirthdayCake />,label:"Birthday Wish",    sub:"Individual",bg:"#fdf4ff",action:()=>setTab("birthdays")},
                     {icon:<MdCelebration />,label:"Work Anniversary", sub:"Individual",bg:"#fffbeb",action:()=>setTab("anniversaries")},
                     {icon:<FaTrophy />,label:"Achievement Award",sub:"Individual",bg:"#f5f3ff",action:()=>setTab("achievements")},
-                    {icon:<FaHandWave />,label:"Welcome Joiner",   sub:"Individual",bg:"#eff6ff",action:()=>setTab("welcome")},
-                    {icon:<GiDiyaLamp />,label:"Festival Greeting",sub:"Broadcast",bg:"#fef3c7",action:()=>setTab("festivals")},
+                    {icon:<MdWavingHand />,label:"Welcome Joiner",   sub:"Individual",bg:"#eff6ff",action:()=>setTab("welcome")},
+                    {icon:<GiLantern />,label:"Festival Greeting",sub:"Broadcast",bg:"#fef3c7",action:()=>setTab("festivals")},
                     {icon:<FaCalendarAlt />,label:"Event Invitation", sub:"Broadcast",bg:"#f0fdf4",action:()=>setTab("events")},
                     {icon:<IoMail />,label:"Send Mail",        sub:"Any recipients",bg:"#f0f9ff",action:()=>setTab("mail")},
                     {icon:<FaHistory />,label:"View History",     sub:"All emails",bg:"#f8fafc",action:()=>setTab("history")},
@@ -980,14 +998,14 @@ export default function GreetingsAdmin() {
                   {/* Upcoming Festivals Card */}
                   <div className="gr-card">
                     <div className="gr-card-hd">
-                      <div className="gr-card-title"><GiDiyaLamp className="text-amber-500" /> Upcoming Festivals
+                      <div className="gr-card-title"><GiLantern className="text-amber-500" /> Upcoming Festivals
                         {nextFestList.length>0&&<span className="gr-b gr-b-amber" style={{marginLeft:6}}>{nextFestList.length} total</span>}
                       </div>
                       <button className="gr-btn gr-btn-ghost gr-btn-sm" onClick={()=>setTab("festivals")}>Manage →</button>
                     </div>
                     {nextFestList.length===0 ? (
                       <div className="gr-empty">
-                        <div className="gr-empty-ico"><GiDiyaLamp className="text-amber-400" /></div>
+                        <div className="gr-empty-ico"><GiLantern className="text-amber-400" /></div>
                         <div>No upcoming festivals scheduled.</div>
                         <div style={{fontSize:11,marginTop:6,color:"#94a3b8"}}>If festivals show as "Date passed", update their year in the <span style={{color:"#2563eb",cursor:"pointer",fontWeight:700}} onClick={()=>setTab("festivals")}>Festivals tab →</span></div>
                       </div>
@@ -1056,7 +1074,7 @@ export default function GreetingsAdmin() {
                     <div style={{padding:"14px 16px",display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:8}}>
                       {logs.slice(0,6).map(l=>(
                         <div key={l.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:9,background:l.status==="success"?"#f8f9ff":"#fff5f5",border:(l.status==="success"?"1px solid #e0e7ff":"1px solid #fecdd3")}}>
-                          <span style={{fontSize:16,flexShrink:0}}>{l.type==="birthday" ? <FaBirthdayCake className="text-purple-500" /> : l.type==="festival" ? <GiDiyaLamp className="text-amber-500" /> : l.type==="anniversary" ? <MdCelebration className="text-orange-500" /> : l.type==="achievement" ? <FaTrophy className="text-amber-500" /> : l.type==="welcome" ? <FaHandWave className="text-blue-500" /> : l.type==="mail" ? <IoMail className="text-indigo-500" /> : <FaCalendarAlt className="text-slate-500" />}</span>
+                          <span style={{fontSize:16,flexShrink:0}}>{l.type==="birthday" ? <FaBirthdayCake className="text-purple-500" /> : l.type==="festival" ? <GiLantern className="text-amber-500" /> : l.type==="anniversary" ? <MdCelebration className="text-orange-500" /> : l.type==="achievement" ? <FaTrophy className="text-amber-500" /> : l.type==="welcome" ? <MdWavingHand className="text-blue-500" /> : l.type==="mail" ? <IoMail className="text-indigo-500" /> : <FaCalendarAlt className="text-slate-500" />}</span>
                           <div style={{flex:1,minWidth:0}}>
                             <div style={{fontSize:12,fontWeight:700,color:"#0f172a",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.recipientName||l.recipientEmail}</div>
                             <div style={{fontSize:10.5,color:"#94a3b8",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{l.subject}</div>
@@ -1201,7 +1219,7 @@ export default function GreetingsAdmin() {
                   <div><div className="gr-hd-title">👋 New Joiner Welcome Emails</div><div className="gr-hd-sub">{newJoiners.length} new joiners logged</div></div>
                   <button className="gr-btn gr-btn-teal gr-btn-lg" onClick={()=>{setJoinModal("new");setJoinForm(emptyJoin);setFormErr({});}}>+ Add New Joiner</button>
                 </div>
-                <div className="gr-type-banner individual"><FaHandWave className="mr-2" /><span><strong>Individual Email</strong> — Welcome emails sent to the new employee only.</span></div>
+                <div className="gr-type-banner individual"><MdWavingHand className="mr-2" /><span><strong>Individual Email</strong> — Welcome emails sent to the new employee only.</span></div>
                 <div className="gr-card">
                   <div className="gr-tw">
                     <table className="gr-table">
@@ -1227,7 +1245,7 @@ export default function GreetingsAdmin() {
                         })}
                       </tbody>
                     </table>
-                    {newJoiners.length===0&&<div className="gr-empty"><div className="gr-empty-ico"><FaHandWave className="text-slate-300" /></div>No new joiners added yet.</div>}
+                    {newJoiners.length===0&&<div className="gr-empty"><div className="gr-empty-ico"><MdWavingHand className="text-slate-300" /></div>No new joiners added yet.</div>}
                   </div>
                 </div>
               </>
@@ -1267,7 +1285,7 @@ export default function GreetingsAdmin() {
                         })}
                       </tbody>
                     </table>
-                    {festivals.length===0&&<div className="gr-empty"><div className="gr-empty-ico"><GiDiyaLamp className="text-slate-300" /></div>No festivals added yet.</div>}
+                    {festivals.length===0&&<div className="gr-empty"><div className="gr-empty-ico"><GiLantern className="text-slate-300" /></div>No festivals added yet.</div>}
                   </div>
                 </div>
               </>
@@ -1599,7 +1617,7 @@ export default function GreetingsAdmin() {
                 <div className="gr-hd">
                   <div><div className="gr-hd-title">📋 Email History</div><div className="gr-hd-sub">{logs.length} emails · {successCount} successful · {failCount} failed</div></div>
                   <div className="gr-ftabs">
-                    {[{k:"all",l:"All"},{k:"birthday",l:<><FaBirthdayCake className="mr-1.5" /> Birthday</>},{k:"anniversary",l:<><MdCelebration className="mr-1.5" /> Anniversary</>},{k:"achievement",l:<><FaTrophy className="mr-1.5" /> Achievement</>},{k:"welcome",l:<><FaHandWave className="mr-1.5" /> Welcome</>},{k:"festival",l:<><GiDiyaLamp className="mr-1.5" /> Festival</>},{k:"event",l:<><FaCalendarAlt className="mr-1.5" /> Event</>},{k:"mail",l:<><IoMail className="mr-1.5" /> Mail</>}].map(f=>(
+                    {[{k:"all",l:"All"},{k:"birthday",l:<><FaBirthdayCake className="mr-1.5" /> Birthday</>},{k:"anniversary",l:<><MdCelebration className="mr-1.5" /> Anniversary</>},{k:"achievement",l:<><FaTrophy className="mr-1.5" /> Achievement</>},{k:"welcome",l:<><MdWavingHand className="mr-1.5" /> Welcome</>},{k:"festival",l:<><GiLantern className="mr-1.5" /> Festival</>},{k:"event",l:<><FaCalendarAlt className="mr-1.5" /> Event</>},{k:"mail",l:<><IoMail className="mr-1.5" /> Mail</>}].map(f=>(
                       <button key={f.k} className={"gr-ftab"+(histFilter===f.k?" on":"")} onClick={()=>setHistFilter(f.k)}>{f.l}</button>
                     ))}
                   </div>
@@ -1611,7 +1629,7 @@ export default function GreetingsAdmin() {
                       <tbody>
                         {filteredLogs.map(l=>(
                           <tr key={l.id}>
-                            <td><span className={"gr-b "+(l.type==="birthday"?"gr-b-purple":l.type==="festival"?"gr-b-amber":l.type==="anniversary"?"gr-b-orange":l.type==="achievement"?"gr-b-purple":l.type==="welcome"?"gr-b-teal":l.type==="mail"?"gr-b-blue":"gr-b-blue")}>{l.type==="birthday"?<FaBirthdayCake className="mr-1.5" />:l.type==="festival"?<GiDiyaLamp className="mr-1.5" />:l.type==="anniversary"?<MdCelebration className="mr-1.5" />:l.type==="achievement"?<FaTrophy className="mr-1.5" />:l.type==="welcome"?<FaHandWave className="mr-1.5" />:l.type==="mail"?<IoMail className="mr-1.5" />:<FaCalendarAlt className="mr-1.5" />} {l.type}</span></td>
+                            <td><span className={"gr-b "+(l.type==="birthday"?"gr-b-purple":l.type==="festival"?"gr-b-amber":l.type==="anniversary"?"gr-b-orange":l.type==="achievement"?"gr-b-purple":l.type==="welcome"?"gr-b-teal":l.type==="mail"?"gr-b-blue":"gr-b-blue")}>{l.type==="birthday"?<FaBirthdayCake className="mr-1.5" />:l.type==="festival"?<GiLantern className="mr-1.5" />:l.type==="anniversary"?<MdCelebration className="mr-1.5" />:l.type==="achievement"?<FaTrophy className="mr-1.5" />:l.type==="welcome"?<MdWavingHand className="mr-1.5" />:l.type==="mail"?<IoMail className="mr-1.5" />:<FaCalendarAlt className="mr-1.5" />} {l.type}</span></td>
                             <td style={{fontWeight:700,color:"var(--text)"}}>{l.recipientName||"—"}</td>
                             <td style={{color:"var(--text2)"}}>{l.recipientEmail}</td>
                             <td style={{maxWidth:140,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",color:"var(--text3)"}}>{l.subject}</td>
@@ -1655,7 +1673,7 @@ export default function GreetingsAdmin() {
       {joinModal&&(
         <div className="gr-mbk" onClick={e=>e.target===e.currentTarget&&setJoinModal(null)}>
           <div className="gr-modal">
-            <div className="gr-mtitle"><FaHandWave className="inline-block mr-2 mb-1" /> {joinModal==="new"?"Add New Joiner":"Edit New Joiner"}</div>
+            <div className="gr-mtitle"><MdWavingHand className="inline-block mr-2 mb-1" /> {joinModal==="new"?"Add New Joiner":"Edit New Joiner"}</div>
             <div className="gr-2col">
               <div className="gr-frow"><label className="gr-lbl">Full Name *</label><input type="text" placeholder="e.g. Priya Sharma" className={"gr-inp"+(formErr.name?" err":"")} value={joinForm.name} onChange={e=>setJoinForm({...joinForm,name:e.target.value})}/>{formErr.name&&<div className="gr-inp-err">⚠️ {formErr.name}</div>}</div>
               <div className="gr-frow"><label className="gr-lbl">Work Email *</label><input type="email" placeholder="priya@techgyinnovations.com" className={"gr-inp"+(formErr.email?" err":"")} value={joinForm.email} onChange={e=>setJoinForm({...joinForm,email:e.target.value})}/>{formErr.email&&<div className="gr-inp-err">⚠️ {formErr.email}</div>}</div>

@@ -1,5 +1,5 @@
 import { db } from "@/lib/firebase";
-import { collection, addDoc, query, where, getDocs, Timestamp } from "firebase/firestore";
+import { collection, addDoc, query, where, getDocs, Timestamp, orderBy } from "firebase/firestore";
 
 export interface InvoiceItem {
   description: string;

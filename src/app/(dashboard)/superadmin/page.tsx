@@ -225,7 +225,7 @@ export default function SuperAdminPage() {
 
       {/* Content */}
       <main style={{ flex: 1, overflowY: "auto", padding: "24px 32px" }}>
-        {activeTab === "overview" && <Overview companies={companies} auditLogs={auditLogs} onNav={setActiveTab} />}
+        {activeTab === "overview" && <Overview companies={companies} allUsers={allUsers} auditLogs={auditLogs} onNav={setActiveTab} />}
         {activeTab === "companies" && <CompaniesView companies={companies} />}
         {activeTab === "users" && <UsersView users={allUsers} />}
         {activeTab === "audit" && <AuditView logs={auditLogs} />}
@@ -235,7 +235,7 @@ export default function SuperAdminPage() {
 }
 
 // ── OVERVIEW ─────────────────────────────────────────────────────────────────
-function Overview({ companies, auditLogs, onNav }: any) {
+function Overview({ companies, allUsers, auditLogs, onNav }: any) {
   const mrr = companies.reduce((s: number, c: any) => s + (c.mrr || 0), 0);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>

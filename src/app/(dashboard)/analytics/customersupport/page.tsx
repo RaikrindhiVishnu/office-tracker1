@@ -49,6 +49,18 @@ type PriorityFilterKey = "All" | PriorityKey;
 type NotifState        = { email: boolean; sla: boolean; newTicket: boolean; dailyReport: boolean };
 type SlaHState         = { critical: string; high: string; medium: string };
 
+interface Ticket {
+  id: string;
+  customer: string;
+  issue: string;
+  priority: PriorityKey;
+  status: StatusKey;
+  createdAt: any;
+  updatedAt?: any;
+  ch?: string;
+  wait?: string;
+}
+
 /* ── Demo data ─────────────────────────────────────────── */
 const ticketTrend = [
   { day:"Mon", new:120, resolved:98  },
@@ -179,16 +191,12 @@ function Ring({ pct, color, size = 90, stroke = 8 }: { pct:number; color:string;
    OVERVIEW TAB
    (Now accepts tickets as props for real-time updates)
 ══════════════════════════════════════════════════════════ */
-function OverviewTab({ tickets }: { tickets: any[] }) {
+function OverviewTab({ tickets }: { tickets: Ticket[] }) {
   const queue = tickets.filter(t => t.status !== "Resolved").slice(0, 6);
   const resolvedCount = tickets.filter(t => t.status === "Resolved").length;
   const openCount = tickets.filter(t => t.status === "Open").length;
   const criticalCount = tickets.filter(t => t.priority === "Critical" && t.status !== "Resolved").length;
 
-  const resolveTicket = async (id: string, customer: string) => {
-    await updateDoc(doc(db, "tickets", id), { status: "Resolved", updatedAt: serverTimestamp() });
-    await logTicketResolved("Support Agent", customer, id);
-  };
   const kpis: { label:string; value:number; suffix:string; color:string; bg:string; icon:string; delta:string; up:boolean }[] = [
     { label:"Total Tickets", value:tickets.length, suffix:"",  color:T.blue,   bg:"#eff6ff", icon:"🎫", delta:"+12%", up:true  },
     { label:"Open Tickets",  value:openCount,  suffix:"",  color:T.rose,   bg:"#fff1f2", icon:"🔴", delta:"+5%",  up:false },
@@ -372,7 +380,7 @@ function OverviewTab({ tickets }: { tickets: any[] }) {
 /* ══════════════════════════════════════════════════════════
    TICKETS TAB
 ══════════════════════════════════════════════════════════ */
-function TicketsTab({ tickets }: { tickets: any[] }) {
+function TicketsTab({ tickets, onResolve }: { tickets: Ticket[]; onResolve: (id: string, customer: string) => void }) {
   const [search,  setSearch]  = useState("");
   const [filterP, setFilterP] = useState<PriorityFilterKey>("All");
 
@@ -433,8 +441,8 @@ function TicketsTab({ tickets }: { tickets: any[] }) {
         )}
 
         {filtered.map((t, i) => {
-          const ps = priorityCfg[t.priority];
-          const ss = statusCfg[t.status];
+          const ps = priorityCfg[t.priority as PriorityKey] || priorityCfg.Low;
+          const ss = statusCfg[t.status as StatusKey] || statusCfg.Open;
           return (
             <div key={t.id}
               style={{ display:"grid", gridTemplateColumns:"90px 150px 1fr 110px 120px 70px 140px", gap:10, padding:"13px 12px", borderRadius:10, alignItems:"center", border:"1px solid transparent", transition:"all 0.15s", cursor:"pointer", background:i%2===0?"transparent":T.surfaceHi }}
@@ -485,7 +493,7 @@ function TicketsTab({ tickets }: { tickets: any[] }) {
                     <div style={{ fontSize:13, fontWeight:600, color:T.text }}>{s.issue}</div>
                   </div>
                   <button
-                    onClick={() => resolveTicket(s.id, s.customer)}
+                    onClick={() => onResolve(s.id, s.customer)}
                     style={{ padding:"5px 10px", borderRadius:8, fontSize:11, fontWeight:700, cursor:"pointer", border:"none", background:breached?T.rose:T.amber, color:"#fff", flexShrink:0, marginLeft:8 }}>
                     {breached?"Resolve":"Review"}
                   </button>
@@ -757,15 +765,20 @@ function SettingsTab() {
    MAIN APP
 ══════════════════════════════════════════════════════════ */
 export default function SupportDashboard() {
-  const [tickets, setTickets] = useState<any[]>([]);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [tab,    setTab]    = useState<TabKey>("overview");
   const [filter, setFilter] = useState<FilterKey>("This Week");
   const [now,    setNow]    = useState(new Date());
 
+  const resolveTicket = async (id: string, customer: string) => {
+    await updateDoc(doc(db, "tickets", id), { status: "Resolved", updatedAt: serverTimestamp() });
+    await logTicketResolved("Support Agent", customer, id);
+  };
+
   useEffect(() => {
     const q = query(collection(db, "tickets"), orderBy("createdAt", "desc"), limit(50));
     const unsub = onSnapshot(q, (snap) => {
-      setTickets(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setTickets(snap.docs.map(d => ({ id: d.id, ...d.data() } as Ticket)));
     });
     return () => unsub();
   }, []);
@@ -806,7 +819,7 @@ export default function SupportDashboard() {
 
   const tabContent: Record<TabKey, React.ReactNode> = {
     overview: <OverviewTab tickets={tickets} />,
-    tickets:  <TicketsTab tickets={tickets} />,
+    tickets:  <TicketsTab tickets={tickets} onResolve={resolveTicket} />,
     agents:   <AgentsTab />,
     reports:  <ReportsTab />,
     settings: <SettingsTab />,

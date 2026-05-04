@@ -413,7 +413,7 @@ function ApplyLeaveModal({ leaveType, setLeaveType, fromDate, setFromDate, toDat
                 background: submitting ? "#f0fdf4" : "#ecfdf5", color: "#065f46",
                 border: "1px solid #10b98120", fontSize: 13, fontWeight: 800,
                 cursor: submitting ? "not-allowed" : "pointer", fontFamily: T.font,
-                opacity: submitting ? 0.7 : 1, shadow: "0 2px 4px rgba(0,0,0,0.02)"
+                opacity: submitting ? 0.7 : 1, boxShadow: "0 2px 4px rgba(0,0,0,0.02)"
               }}
             >
               {submitting ? "Submitting…" : "Submit Request"}

@@ -10,7 +10,7 @@ import {
   FaChartBar, FaClock, FaClipboardList, FaCoffee, FaPause, FaLightbulb, 
   FaSync, FaBan, FaRegEye, FaUtensils, FaMoon, FaPlay, FaInbox 
 } from "react-icons/fa";
-import { IoCheckmarkCircle, IoCloseCircle } from "react-icons/io5";
+import { IoCheckmarkCircle, IoCloseCircle, IoWarning } from "react-icons/io5";
 import { GoDotFill } from "react-icons/go";
 import type { EmployeeRow } from "@/types/EmployeeRow";
 
