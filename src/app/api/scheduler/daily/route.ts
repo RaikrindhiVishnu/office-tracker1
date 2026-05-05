@@ -30,23 +30,34 @@ export async function POST(req: NextRequest) {
 
   // ── 1. Birthday Wishes ──────────────────────────────────────────────────────
   try {
-    const snap = await db.collection("birthdays").get();
-    const all  = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    const snap = await db.collection("users").get();
+    const users = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
 
-    const due = all.filter((e: any) =>
-      e.birthMonthDay === todayMMDD &&
-      e.lastWishSentOn !== todayISO &&
-      e.email
-    );
+    const due = users.filter((u: any) => {
+      const birthDate = u.dateOfBirth || u.birthDate;
+      if (!birthDate || !u.email) return false;
+      
+      const mm = birthDate.slice(5, 7);
+      const dd = birthDate.slice(8, 10);
+      const birthMonthDay = `${mm}-${dd}`;
+      
+      return birthMonthDay === todayMMDD && u.lastWishSentOn !== todayISO;
+    });
 
     if (due.length > 0) {
       const result = await sendBatch({
-        recipients: due.map((e: any) => ({ id: e.id, email: e.email, name: e.name })),
+        recipients: due.map((u: any) => ({ id: u.id, email: u.email, name: u.name })),
         subject:    `🎂 Happy Birthday from Techgy Innovations! 🎉`,
         html:       buildBirthdayHtml,
         type:       "birthday",
         sentBy:     "system",
       });
+      
+      // Update lastWishSentOn in users collection
+      for (const u of due) {
+        await db.collection("users").doc(u.id).update({ lastWishSentOn: todayISO });
+      }
+      
       report.jobs.push({ job: "birthday_wishes", count: due.length, ...result });
     } else {
       report.jobs.push({ job: "birthday_wishes", skipped: true });

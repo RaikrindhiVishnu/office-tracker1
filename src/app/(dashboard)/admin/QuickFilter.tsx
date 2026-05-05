@@ -111,6 +111,19 @@ export function applyQuickFilter(tasks: any[], f: QuickFilterState, columns: { i
         if (!due || due.getMonth() !== today.getMonth() || due.getFullYear() !== today.getFullYear()) return false;
       }
     }
+
+    /* Custom Date Range */
+    if (f.startDate) {
+      const start = new Date(f.startDate + "T00:00:00");
+      const due = t.dueDate ? new Date(t.dueDate + "T12:00:00") : null;
+      if (!due || due < start) return false;
+    }
+    if (f.endDate) {
+      const end = new Date(f.endDate + "T23:59:59");
+      const due = t.dueDate ? new Date(t.dueDate + "T12:00:00") : null;
+      if (!due || due > end) return false;
+    }
+
     return true;
   });
 }

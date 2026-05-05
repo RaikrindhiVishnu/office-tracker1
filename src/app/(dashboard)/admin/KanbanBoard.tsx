@@ -123,7 +123,7 @@ interface KanbanBoardProps {
   setColumns: (c: KanbanColumn[]) => void;
   projectColor?: string;
   onTaskClick: (t: Task) => void;
-  onStatusChange: (id: string, status: string) => void;
+  onStatusChange: (id: string, status: string, newParentId?: string | null) => void;
   canManage: boolean;
   onSaveColumns: (c: KanbanColumn[]) => void;
   onCreateTask?: (storyId: string, ticketType: string) => void;
@@ -673,10 +673,18 @@ export function KanbanBoard({
     (e.currentTarget as HTMLElement).style.opacity = "1";
     setDragTask(null); setDragOver(null);
   };
-  const handleTaskDrop = (e: React.DragEvent, colId: string) => {
+  const handleTaskDrop = (e: React.DragEvent, colId: string, newParentId?: string | null) => {
     e.preventDefault();
-    if (dragTask && dragTask.status !== colId && dragTask.ticketType !== "story") {
-      if (canDragTask(currentUser, dragTask, activeProject)) onStatusChange(dragTask.id, colId);
+    if (dragTask) {
+      const statusChanged = dragTask.status !== colId;
+      const parentChanged = newParentId !== undefined && dragTask.parentStoryId !== newParentId;
+
+      if (statusChanged || parentChanged) {
+        if (canDragTask(currentUser, dragTask, activeProject)) {
+          // Surgical update: only move this specific card
+          onStatusChange(dragTask.id, colId, newParentId);
+        }
+      }
     }
     setDragTask(null); setDragOver(null);
   };
@@ -701,7 +709,11 @@ export function KanbanBoard({
         style={{ background: isSelected ? "#eef2ff" : "#f5f3ff", border: `2px solid ${isSelected ? "#6366f1" : "#c4b5fd"}`, boxShadow: "0 2px 8px rgba(99,102,241,0.10)" }}>
         <div
           draggable={canDragTask(currentUser, story, activeProject)}
-          onDragStart={e => { if (!canDragTask(currentUser, story, activeProject)) { e.preventDefault(); return; } handleTaskDragStart(e, story); }}
+          onDragStart={e => { 
+            e.stopPropagation(); // Prevent bubbling to parent containers
+            if (!canDragTask(currentUser, story, activeProject)) { e.preventDefault(); return; } 
+            handleTaskDragStart(e, story); 
+          }}
           onDragEnd={handleTaskDragEnd}
           className="p-3" onClick={() => onTaskClick(story)}
           style={{ cursor: canDragTask(currentUser, story, activeProject) ? "grab" : "default" }}
@@ -782,7 +794,11 @@ export function KanbanBoard({
     return (
       <div
         draggable={canDragTask(currentUser, task, activeProject)}
-        onDragStart={e => { if (!canDragTask(currentUser, task, activeProject)) { e.preventDefault(); return; } handleTaskDragStart(e, task); }}
+        onDragStart={e => { 
+          e.stopPropagation(); // Ensure we only drag the task, not the story header
+          if (!canDragTask(currentUser, task, activeProject)) { e.preventDefault(); return; } 
+          handleTaskDragStart(e, task); 
+        }}
         onDragEnd={handleTaskDragEnd}
         onClick={() => onTaskClick(task)}
         className={`rounded-xl border cursor-pointer group/card transition-all duration-150 ${isChild ? "mx-2 my-1.5" : "mx-2 my-2"}`}
@@ -1045,6 +1061,12 @@ export function KanbanBoard({
                         return (
                           <div
                             key={col.id}
+                            onDragOver={e => { e.preventDefault(); setDragOver(`${group.key}_${col.id}`); }}
+                            onDragLeave={() => setDragOver(null)}
+                            onDrop={e => {
+                              const newPid = groupBy === "story" ? (group.key === "nostory" ? null : group.key) : undefined;
+                              handleTaskDrop(e, col.id, newPid);
+                            }}
                             style={{
                               width: SWIMLANE_COL_WIDTH,
                               minWidth: SWIMLANE_COL_WIDTH,
@@ -1052,8 +1074,9 @@ export function KanbanBoard({
                               maxHeight: `${SWIMLANE_CELL_MAX_HEIGHT}px`,
                               overflowY: colTasks.length > 0 ? "auto" : "hidden",
                               scrollbarWidth: "thin",
+                              background: dragOver === `${group.key}_${col.id}` ? "#eef2ff" : "transparent"
                             }}
-                            className="shrink-0 p-2 border-r border-gray-50 flex flex-col gap-2"
+                            className="shrink-0 p-2 border-r border-gray-50 flex flex-col gap-2 transition-colors"
                           >
                             {colTasks.length === 0 ? (
                               <div className="flex items-center justify-center py-6 text-gray-300">
@@ -1066,6 +1089,13 @@ export function KanbanBoard({
                               colTasks.map(t => (
                                 <div
                                   key={t.id}
+                                  draggable={canDragTask(currentUser, t, activeProject)}
+                                  onDragStart={e => {
+                                    e.stopPropagation();
+                                    if (!canDragTask(currentUser, t, activeProject)) { e.preventDefault(); return; }
+                                    handleTaskDragStart(e, t);
+                                  }}
+                                  onDragEnd={handleTaskDragEnd}
                                   onClick={() => onTaskClick(t)}
                                   className="bg-white rounded-lg border border-gray-200 p-2 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer group/card shrink-0"
                                 >

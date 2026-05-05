@@ -261,7 +261,7 @@ const CSS = `
 .zc-gs-avatar-btn:hover{border-color:#e8512a;color:#e8512a;background:#fff3ef;}
 `;
 
-export default function TeamsStyleChat({ users }: { users: User[] }) {
+export default function TeamsStyleChat({ users, targetUid }: { users: User[]; targetUid?: string | null }) {
   const { user } = useAuth();
   const [tab, setTab] = useState<"chats" | "calls">("chats");
   const [activeTab, setActiveTab] = useState<"all" | "direct" | "groups">("all");
@@ -310,6 +310,15 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
   const callTypeRef = useRef<"video" | "audio">("audio");
 
   const chatId = useMemo(() => selectedChat?.id || null, [selectedChat]);
+
+  // ── Programmatic chat selection ──────────────────────────────────────────
+  useEffect(() => {
+    if (targetUid && user && chats.length > 0) {
+      const id = [user.uid, targetUid].sort().join("_");
+      const c = chats.find(ch => ch.id === id);
+      if (c) setSelectedChat(c);
+    }
+  }, [targetUid, user, chats]);
 
   // ── Derived admin check ───────────────────────────────────────────────────
   const isAdmin = groupData?.admins?.includes(user?.uid);

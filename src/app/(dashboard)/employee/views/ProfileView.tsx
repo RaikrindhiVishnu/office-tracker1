@@ -7,6 +7,8 @@ import Skeleton from "react-loading-skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { updateEmployeeData } from "@/lib/employeeSync";
 import { uploadToCloudinary } from "@/lib/cloudinary";
+import { collection, addDoc, updateDoc, doc, query, where, getDocs, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 /* ═══════════════════════════════════════════════════════════════
    ICONS
@@ -41,9 +43,16 @@ const EMPTY = {
   employmentType:"", workLocation:"", reportingManager:"", workExperience:"",
   salary:"", bankName:"", accountNumber:"", ifscCode:"", panNumber:"", aadharNumber:"",
   emergencyContactName:"", emergencyContactRelation:"", emergencyContactPhone:"",
+  assetSource: "Own", // "Own" or "Company"
+  assetName: "",
+  assetType: "laptop",
+  assetSerial: "",
+  assetStatus: "active",
+  assetCost: 0,
+  assetExpiry: "",
 };
 type FK = keyof typeof EMPTY;
-const TABS = ["Personal Information","Job Information","Salary Information","Emergency Contact","Home Address"] as const;
+const TABS = ["Personal Information","Job Information","Salary Information","Emergency Contact","Home Address", "Assets"] as const;
 type Tab = typeof TABS[number];
 
 /* ═══════════════════════════════════════════════════════════════
@@ -158,6 +167,44 @@ export default function ProfileView() {
       if(profilePhoto) photoURL=await uploadToCloudinary(profilePhoto);
       const updated={...form, salary:form.salary?Number(form.salary):0, profilePhoto:photoURL};
       await updateEmployeeData({ userId:user.uid, updates:updated, updatedBy:user.uid, role:userData?.role||"employee" });
+      
+      // Handle IT Assets sync if it's the Assets section
+      if (section === "assets") {
+        const assetsRef = collection(db, "it_assets");
+        const q = query(assetsRef, where("assignedTo", "==", user.email));
+        const snap = await getDocs(q);
+        
+        const assetData: any = {
+          name: form.assetName,
+          assignedTo: user.email,
+          ownership: form.assetSource,
+          updatedAt: serverTimestamp(),
+        };
+
+        if (form.assetSource === "Company") {
+          assetData.type = form.assetType;
+          assetData.serialNumber = form.assetSerial;
+          assetData.status = form.assetStatus;
+          assetData.purchaseCost = Number(form.assetCost) || 0;
+          assetData.warrantyExpiry = form.assetExpiry;
+          assetData.department = form.department || "IT";
+        } else {
+          assetData.type = "laptop";
+          assetData.status = "active";
+        }
+
+        if (!snap.empty) {
+          // Update existing asset
+          await updateDoc(doc(db, "it_assets", snap.docs[0].id), assetData);
+        } else {
+          // Create new asset
+          await addDoc(assetsRef, {
+            ...assetData,
+            createdAt: serverTimestamp(),
+          });
+        }
+      }
+
       setLocalData(updated); setPhotoPreview(photoURL); setProfilePhoto(null); setEditingSection(null);
     }catch(e){ console.error(e); alert("Failed. Try again."); }
     finally{ setSavingSection(null); }
@@ -385,6 +432,27 @@ export default function ProfileView() {
               <InfoRow label="Address"     value={form.address}    editing={isEditing("address")} onChange={setF("address")}/>
               <InfoRow label="City"        value={form.city}       editing={isEditing("address")} onChange={setF("city")}/>
               <InfoRow label="Postal Code" value={form.postalCode} editing={isEditing("address")} onChange={setF("postalCode")} last/>
+            </SectionCard>
+          )}
+
+          {/* ── Assets Information ── */}
+          {activeTab==="Assets" && (
+            <SectionCard title="Asset Details" iconBg="bg-blue-100" icon={<span className="text-blue-600"><Ic.Brief/></span>}
+              onEdit={()=>startEdit("assets")} editing={isEditing("assets")}
+              onSave={()=>saveSection("assets")} onCancel={cancelEdit} saving={isSaving("assets")}>
+              <InfoRow label="Asset Source" value={form.assetSource} editing={isEditing("assets")} onChange={setF("assetSource")} options={["Own", "Company"]}/>
+              
+              <InfoRow label="Asset Name" value={form.assetName} editing={isEditing("assets")} onChange={setF("assetName")} last={form.assetSource === "Own"} />
+              
+              {form.assetSource === "Company" && (
+                <>
+                  <InfoRow label="Asset Type" value={form.assetType} editing={isEditing("assets")} onChange={setF("assetType")} options={["laptop", "server", "license", "software"]}/>
+                  <InfoRow label="Serial Number" value={form.assetSerial} editing={isEditing("assets")} onChange={setF("assetSerial")} />
+                  <InfoRow label="Status" value={form.assetStatus} editing={isEditing("assets")} onChange={setF("assetStatus")} options={["active", "under_repair", "retired"]}/>
+                  <InfoRow label="Purchase Cost (₹)" value={String(form.assetCost)} editing={isEditing("assets")} onChange={setF("assetCost")} type="number"/>
+                  <InfoRow label="Warranty/Expiry" value={form.assetExpiry} editing={isEditing("assets")} onChange={setF("assetExpiry")} type="date" last/>
+                </>
+              )}
             </SectionCard>
           )}
 

@@ -32,7 +32,7 @@ import {
 import DashboardView from "./views/DashboardView";
 import WorkUpdateView from "./views/WorkUpdateView";
 import AttendanceView from "./views/AttendanceView";
-import NotificationsView from "./views/NotificationsView";
+import UnifiedNotificationsView from "./views/NotificationsView";
 import CalendarModal from "./views/CalendarView";
 import HolidaysView from "./views/HolidaysView";
 import LeaveHistoryView from "./views/LeaveHistoryView";
@@ -129,6 +129,7 @@ export default function ZohoStyleEmployeeDashboard() {
 
   // ── ✅ NEW: MeetChat overlay state ──────────────────────
   const [showMeetChat, setShowMeetChat] = useState(false);
+  const [chatTargetUid, setChatTargetUid] = useState<string | null>(null);
 
   const [showCalendar, setShowCalendar] = useState(false);
   const [totalSeconds, setTotalSeconds] = useState<number>(0);
@@ -207,8 +208,10 @@ export default function ZohoStyleEmployeeDashboard() {
     return onSnapshot(
       query(collection(db, "notifications"), where("toUid", "==", user.uid)),
       snap => {
-        const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as ChatNotif));
-        docs.sort((a, b) => (b.timestamp?.toMillis?.() || 0) - (a.timestamp?.toMillis?.() || 0));
+        const docs = snap.docs
+          .map(d => ({ id: d.id, ...d.data() } as any))
+          .filter(n => n.deletedByEmployee !== true) // Filter out deleted
+          .sort((a, b) => (b.timestamp?.toMillis?.() || 0) - (a.timestamp?.toMillis?.() || 0));
         setChatNotifications(docs.slice(0, 50));
       }
     );
@@ -310,15 +313,25 @@ export default function ZohoStyleEmployeeDashboard() {
     if (!user) return;
     return onSnapshot(
       query(collection(db, "leaveRequests"), where("uid", "==", user.uid), orderBy("createdAt", "desc")),
-      snap => setLeaveRequests(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) }))));
+      snap => setLeaveRequests(
+        snap.docs
+          .map(d => ({ id: d.id, ...(d.data() as any) }))
+          .filter(l => l.deletedByEmployee !== true)
+      ));
   }, [user]);
 
   useEffect(() => {
     if (!user) return;
     return onSnapshot(
-      query(collection(db, "employeeQueries"), where("employeeId", "==", user.uid), orderBy("createdAt", "desc")),
+      query(
+        collection(db, "employeeQueries"), 
+        where("employeeId", "==", user.uid), 
+        orderBy("createdAt", "desc")
+      ),
       snap => setQueryNotifications(
-        snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        snap.docs
+          .map(d => ({ id: d.id, ...d.data() } as any))
+          .filter(q => q.deletedByEmployee !== true)
       ));
   }, [user]);
 
@@ -434,6 +447,15 @@ export default function ZohoStyleEmployeeDashboard() {
     await batch.commit();
   };
 
+  const handleDeleteNotification = (id: string, type: string) => {
+    if (type === "announcement") {
+      const newSet = new Set(dismissedAnnouncements);
+      newSet.add(id);
+      setDismissedAnnouncements(newSet);
+      localStorage.setItem("tgy_dismissed_announcements", JSON.stringify(Array.from(newSet)));
+    }
+  };
+
   const formatTimer = (seconds: number) => {
     const h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60), s = seconds % 60;
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
@@ -443,9 +465,20 @@ export default function ZohoStyleEmployeeDashboard() {
   const doCheckOut = async () => { setBusy(true); await checkOut(user.uid); await loadAttendance(); setBusy(false); };
   const handleSetLeaveType = (v: LeaveType) => setLeaveType(v);
 
+  const todayMD = new Date().toISOString().slice(5, 10);
+  const todayBirthdayCount = users.filter(u => {
+    const bday = u.dateOfBirth || u.birthDate;
+    return bday && bday.slice(5, 10) === todayMD;
+  }).length;
+
   // ── ✅ NEW: open MeetChat overlay (called from dashboard card + navbar button)
-  const openMeetChat = () => setShowMeetChat(true);
-  const closeMeetChat = () => setShowMeetChat(false);
+  const openMeetChat = () => { setChatTargetUid(null); setShowMeetChat(true); };
+  const closeMeetChat = () => { setShowMeetChat(false); setChatTargetUid(null); };
+
+  const openChatWith = (uid: string) => {
+    setChatTargetUid(uid);
+    setShowMeetChat(true);
+  };
 
   return (
     <div className="h-screen flex bg-white overflow-hidden">
@@ -563,8 +596,8 @@ export default function ZohoStyleEmployeeDashboard() {
                 </button>
                 {showNotifDropdown && (
                   <div className="absolute top-full right-0 mt-2 w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 overflow-hidden" style={{ maxHeight: "80vh" }}>
-                    <NotificationsView
-                      hideHeader={true}
+                    <UnifiedNotificationsView
+                      hideHeader={false}
                       leaveNotifications={leaveRequests.filter(l => (l.status === "Approved" || l.status === "Rejected"))}
                       markNotificationAsRead={markNotificationAsRead}
                       queryNotifications={queryNotifications}
@@ -572,8 +605,10 @@ export default function ZohoStyleEmployeeDashboard() {
                       chatNotifications={chatNotifications}
                       markChatNotificationAsRead={markChatNotificationAsRead}
                       announcements={announcements}
+                      dismissedAnnouncements={dismissedAnnouncements}
                       markAnnouncementRead={markAnnouncementRead}
                       markAllNotificationsRead={markAllNotificationsRead}
+                      onDeleteNotification={handleDeleteNotification}
                       onClose={() => setShowNotifDropdown(false)}
                       onGoToChat={(_chatId) => { openMeetChat(); setShowNotifDropdown(false); }}
                     />
@@ -656,8 +691,8 @@ export default function ZohoStyleEmployeeDashboard() {
                   </button>
                   {showNotifDropdown && (
                     <div className="absolute top-full right-0 mt-2 w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 overflow-hidden" style={{ maxHeight: "80vh" }}>
-                      <NotificationsView
-                        hideHeader={true}
+                      <UnifiedNotificationsView
+                        hideHeader={false}
                         leaveNotifications={leaveRequests.filter(l => (l.status === "Approved" || l.status === "Rejected"))}
                         markNotificationAsRead={markNotificationAsRead}
                         queryNotifications={queryNotifications}
@@ -665,8 +700,10 @@ export default function ZohoStyleEmployeeDashboard() {
                         chatNotifications={chatNotifications}
                         markChatNotificationAsRead={markChatNotificationAsRead}
                         announcements={announcements}
+                        dismissedAnnouncements={dismissedAnnouncements}
                         markAnnouncementRead={markAnnouncementRead}
                         markAllNotificationsRead={markAllNotificationsRead}
+                        onDeleteNotification={handleDeleteNotification}
                         onClose={() => setShowNotifDropdown(false)}
                         onGoToChat={(_chatId) => { openMeetChat(); setShowNotifDropdown(false); }}
                       />
@@ -710,9 +747,14 @@ export default function ZohoStyleEmployeeDashboard() {
               )}
             </div>
             <div className="flex items-center gap-1.5">
-              <button onClick={() => setShowCalendar(true)} className="flex items-center gap-1 px-2.5 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg transition-all text-xs font-semibold text-gray-700 border border-gray-200">
+              <button onClick={() => setShowCalendar(true)} className="flex items-center gap-1 px-2.5 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg transition-all text-xs font-semibold text-gray-700 border border-gray-200 relative">
                 <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                 <span>Calendar</span>
+                {todayBirthdayCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full border-2 border-white shadow-sm animate-bounce">
+                    {todayBirthdayCount}
+                  </span>
+                )}
               </button>
               {/* ✅ Mobile MeetChat button — opens overlay */}
               <button
@@ -765,11 +807,16 @@ export default function ZohoStyleEmployeeDashboard() {
             {activeView === "work-update" && <WorkUpdateView />}
             {activeView === "projects" && <ProjectManagement user={user} projects={projects} users={users} />}
             {activeView === "notifications" && (
-              <NotificationsView
-                leaveNotifications={leaveRequests.filter(l => (l.status === "Approved" || l.status === "Rejected") && !l.notificationRead)}
+              <UnifiedNotificationsView
+                chatNotifications={chatNotifications}
+                markChatNotificationAsRead={markChatNotificationAsRead}
+                leaveNotifications={leaveRequests}
                 markNotificationAsRead={markNotificationAsRead}
+                announcements={announcements.filter(a => !dismissedAnnouncements.has(a.id))}
+                markAnnouncementRead={markAnnouncementRead}
                 queryNotifications={queryNotifications}
                 markQueryNotificationAsRead={markQueryNotificationAsRead}
+                onDeleteNotification={handleDeleteNotification}
                 onClose={() => changeView("dashboard")}
               />
             )}
@@ -808,6 +855,7 @@ export default function ZohoStyleEmployeeDashboard() {
         isFourthSaturday={isFourthSaturday}
         isFifthSaturday={isFifthSaturday}
         isHoliday={isHoliday}
+        onWishEmployee={openChatWith}
       />
 
       {showAttendanceSummary && (
@@ -842,6 +890,7 @@ export default function ZohoStyleEmployeeDashboard() {
         users={users}
         isOpen={showMeetChat}
         onClose={closeMeetChat}
+        targetUid={chatTargetUid}
       />
 
       <style jsx>{`

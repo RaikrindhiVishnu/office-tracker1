@@ -23,6 +23,7 @@ interface MeetChatAppProps {
   users: User[];
   isOpen?: boolean;
   onClose?: () => void;
+  targetUid?: string | null;
 }
 
 type UserStatus = "available" | "busy" | "dnd" | "brb" | "away" | "offline" | "lunch";
@@ -49,7 +50,7 @@ const STATUS_CONFIG: Record<UserStatus, { label: string; color: string }> = {
 
 const getUserName = (u?: Partial<User> | null) => u?.name ?? u?.email ?? "User";
 
-export default function MeetChatAppUpdated({ users, isOpen = false, onClose }: MeetChatAppProps) {
+export default function MeetChatAppUpdated({ users, isOpen = false, onClose, targetUid }: MeetChatAppProps) {
   const { user } = useAuth();
   const [showFullScreen, setShowFullScreen] = useState(isOpen);
   const [activeTab, setActiveTab] = useState<"chat" | "calls">("chat");
@@ -350,7 +351,7 @@ export default function MeetChatAppUpdated({ users, isOpen = false, onClose }: M
 
       {/* MAIN CONTENT */}
       <div style={{ flex: 1, overflow: "hidden" }}>
-        {activeTab === "chat" && <TeamsStyleChatUpdated users={users} />}
+        {activeTab === "chat" && <TeamsStyleChatUpdated users={users} targetUid={targetUid} />}
         {activeTab === "calls" && <TeamsStyleCalls users={users} />}
       </div>
     </div>

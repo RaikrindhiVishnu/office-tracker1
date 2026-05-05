@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
 import {
   collection, onSnapshot,
   addDoc, deleteDoc, updateDoc, doc,
@@ -11,6 +12,7 @@ import { db } from "@/lib/firebase";
 interface BirthdayRecord {
   id: string; name: string; email: string;
   birthDate: string; birthMonthDay: string;
+  uid?: string;
   department?: string; lastWishSentOn?: string;
 }
 interface Festival {
@@ -46,6 +48,7 @@ interface CalendarViewProps {
   isFifthSaturday: (y: number, m: number, d: number) => boolean;
 
   isHoliday: (dateStr: string) => { title: string } | null;
+  onWishEmployee?: (uid: string) => void;
 }
 
 const EVENT_COLORS = [
@@ -96,7 +99,11 @@ function getNextFestival(festivals: Festival[]) {
 const CalendarView: React.FC<CalendarViewProps> = ({
   showCalendar, setShowCalendar, calendarDate, setCalendarDate,
   isSunday, isSecondSaturday, isFourthSaturday, isFifthSaturday, isHoliday,
+  onWishEmployee,
 }) => {
+  const { userRole } = useAuth();
+  const isAdmin = userRole === "admin" || userRole === "superadmin";
+
   const [birthdays,  setBirthdays]  = useState<BirthdayRecord[]>([]);
   const [festivals,  setFestivals]  = useState<Festival[]>([]);
   const [events,     setEvents]     = useState<CompanyEvent[]>([]);
@@ -147,6 +154,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
           const dd=birthDate?.slice(8,10);
           return {
             id:d.id,
+            uid:d.id,
             name:data.name||"",
             email:data.email||"",
             birthDate,
@@ -390,8 +398,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({
 
       {toast && <div className="cm-toast" style={{background:toast.ok!==false?"#193677":"#dc2626"}}>{toast.msg}</div>}
 
-      <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
-        <div className="w-full max-w-5xl max-h-[95vh] flex flex-col" onClick={e=>e.stopPropagation()}>
+      <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-2" onClick={onClose}>
+        <div className="w-full max-w-4xl max-h-[98vh] flex flex-col" onClick={e=>e.stopPropagation()}>
 
           {/* Tab bar */}
           <div className="flex items-center justify-between mb-3">
@@ -399,9 +407,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({
               {([
                 {key:"calendar",  label:"📅 Calendar",  badge:0},
                 {key:"birthdays", label:"🎂 Birthdays",  badge:todayBdayCount},
-                {key:"festivals", label:"🪔 Festivals",  badge:upcomingFestCount},
-                {key:"events",    label:"📌 Events",     badge:0},
-                {key:"history",   label:"📋 History",    badge:0},
               ] as {key:Tab;label:string;badge:number}[]).map(t=>(
                 <button key={t.key} className={"cm-tab "+(tab===t.key?"on":"off")} onClick={()=>setTab(t.key)}>
                   {t.label}
@@ -414,20 +419,22 @@ const CalendarView: React.FC<CalendarViewProps> = ({
 
           {/* CALENDAR TAB */}
           {tab==="calendar" && (
-            <div className="flex gap-3 flex-1 min-h-0">
-              <div className="flex-1 bg-white rounded-xl shadow-xl border border-slate-200 p-4 overflow-y-auto">
-                <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-900">Holiday Calendar</h2>
-                    <p className="text-xs text-slate-500">Holidays · Birthdays · Festivals · Events</p>
-                  </div>
+            <div className="flex gap-2 flex-1 min-h-0">
+              <div className="flex-1 bg-white rounded-xl shadow-xl border border-slate-200 p-3 overflow-hidden">
+                <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <button className="cm-add-btn pink" onClick={()=>{setShowBdayForm(true);setBdayErr({});setEditBday(null);setBdayForm(emptyBday);}}>🎂 Add Birthday</button>
-                    <button className="cm-add-btn amber" onClick={()=>{setShowFestForm(true);setFestErr({});setEditFest(null);setFestForm(emptyFest);}}>🪔 Add Festival</button>
-                    <button className="cm-add-btn" onClick={()=>{setShowEventForm(true);setEventErr({});setEditEvent(null);setEventForm(emptyEvent);}}>📌 Add Event</button>
-                    <button onClick={()=>setCalendarDate(new Date(calendarDate.getFullYear(),calendarDate.getMonth()-1,1))} className="px-3 py-1.5 border-2 border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium">← Prev</button>
-                    <div className="px-4 py-1.5 bg-linear-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-bold text-sm">{calendarDate.toLocaleDateString("en-IN",{month:"long",year:"numeric"})}</div>
-                    <button onClick={()=>setCalendarDate(new Date(calendarDate.getFullYear(),calendarDate.getMonth()+1,1))} className="px-3 py-1.5 border-2 border-slate-300 rounded-lg hover:bg-slate-50 text-sm font-medium">Next →</button>
+                    {isAdmin && (
+                      <>
+                        <button className="cm-add-btn pink" onClick={()=>{setShowBdayForm(true);setBdayErr({});setEditBday(null);setBdayForm(emptyBday);}}>🎂 Add Birthday</button>
+                        <button className="cm-add-btn amber" onClick={()=>{setShowFestForm(true);setFestErr({});setEditFest(null);setFestForm(emptyFest);}}>🪔 Add Festival</button>
+                        <button className="cm-add-btn" onClick={()=>{setShowEventForm(true);setEventErr({});setEditEvent(null);setEventForm(emptyEvent);}}>📌 Add Event</button>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap ml-auto">
+                    <button onClick={()=>setCalendarDate(new Date(calendarDate.getFullYear(),calendarDate.getMonth()-1,1))} className="px-2 py-1 border-2 border-slate-300 rounded-lg hover:bg-slate-50 text-[11px] font-bold">← Prev</button>
+                    <div className="px-3 py-1 bg-linear-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-bold text-[12px] min-w-[110px] text-center">{calendarDate.toLocaleDateString("en-IN",{month:"long",year:"numeric"})}</div>
+                    <button onClick={()=>setCalendarDate(new Date(calendarDate.getFullYear(),calendarDate.getMonth()+1,1))} className="px-2 py-1 border-2 border-slate-300 rounded-lg hover:bg-slate-50 text-[11px] font-bold">Next →</button>
                   </div>
                 </div>
                 <div className="flex gap-3 mb-3 flex-wrap">
@@ -455,19 +462,28 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                     const dayEvts=getEventsForDay(dateStr);
                     const bg=isToday?"bg-green-50 border-green-400":dayBdays.length?"bg-purple-50 border-purple-300":dayFests.length?"bg-amber-50 border-amber-300":dayEvts.length?"bg-indigo-50 border-indigo-300":isHolDay?"bg-rose-50 border-rose-300":"bg-white border-slate-200";
                     return (
-                      <div key={day} className={"h-24 border-2 rounded-lg p-1 text-xs overflow-hidden hover:shadow-md transition-shadow "+bg}>
-                        <div className={"font-bold text-sm leading-none mb-0.5 "+(isToday?"text-green-700":dayBdays.length?"text-purple-700":"")}>{day}</div>
+                      <div key={day} className={"h-20 border rounded-lg p-1 text-[10px] overflow-hidden hover:shadow transition-shadow "+bg}>
+                        <div className={"font-bold text-xs leading-none mb-0.5 "+(isToday?"text-green-700":dayBdays.length?"text-purple-700":"")}>{day}</div>
                         {holiday&&<div className="text-[9px] text-rose-600 truncate">{holiday.title}</div>}
                         {dayBdays.map(b=>(
                           <div key={b.id}>
                             <span className="cm-bday-pill" title={b.name}>🎂 {b.name.split(" ")[0]}</span>
-                            {b.birthMonthDay===todayMD&&(
+                            {isToday && isAdmin && (
                               <button
                                 className={"cm-wish-btn"+(b.lastWishSentOn===todayISO?" sent":"")}
                                 disabled={sending===b.id}
                                 onClick={e=>sendWish(e,b)}
                               >
                                 {sending===b.id?"…":b.lastWishSentOn===todayISO?"✓ Sent":"Send Wish"}
+                              </button>
+                            )}
+                            {isToday && !isAdmin && onWishEmployee && b.uid && (
+                              <button
+                                className="cm-wish-btn"
+                                onClick={(e) => { e.stopPropagation(); onWishEmployee(b.uid!); }}
+                                style={{ background: "linear-gradient(135deg, #e8512a, #f5853f)", color: "#fff", borderColor: "transparent" }}
+                              >
+                                💬 Message
                               </button>
                             )}
                           </div>
@@ -481,43 +497,31 @@ const CalendarView: React.FC<CalendarViewProps> = ({
               </div>
 
               {/* Right sidebar */}
-              <div className="w-52 flex flex-col gap-3 overflow-y-auto">
-                {nextBday&&(
-                  <div className="cm-next-card" style={{background:"linear-gradient(135deg,#7c3aed,#ec4899)"}}>
-                    <div style={{position:"absolute",top:7,right:8,fontSize:10,fontWeight:900,color:"rgba(255,255,255,.9)",background:"rgba(255,255,255,.2)",padding:"1px 7px",borderRadius:8}}>{nextBday.days}d</div>
-                    <div style={{fontSize:18,marginBottom:2}}>🎂</div>
-                    <div style={{fontSize:12,fontWeight:800,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{nextBday.emp.name}</div>
-                    <div style={{fontSize:10,color:"rgba(255,255,255,.75)"}}>Next Birthday</div>
-                  </div>
-                )}
-                {nextFest&&(
-                  <div className="cm-next-card" style={{background:"linear-gradient(135deg,#f59e0b,#f97316)"}}>
-                    <div style={{position:"absolute",top:7,right:8,fontSize:10,fontWeight:900,color:"rgba(255,255,255,.9)",background:"rgba(255,255,255,.2)",padding:"1px 7px",borderRadius:8}}>{nextFest.days}d</div>
-                    <div style={{fontSize:18,marginBottom:2}}>{nextFest.fest.bannerEmoji}</div>
-                    <div style={{fontSize:12,fontWeight:800,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{nextFest.fest.title}</div>
-                    <div style={{fontSize:10,color:"rgba(255,255,255,.75)"}}>{fmtDate(nextFest.fest.festivalDate)}</div>
-                  </div>
-                )}
+              <div className="w-44 flex flex-col gap-2 overflow-y-auto">
 
                 {/* Birthdays sidebar */}
                 <div className="bg-white rounded-xl border border-slate-200 shadow p-3">
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-bold text-slate-700 text-xs uppercase tracking-wide">🎂 Birthdays</span>
-                    <button className="cm-add-btn pink sm" onClick={()=>{setShowBdayForm(true);setBdayErr({});setEditBday(null);setBdayForm(emptyBday);}}>+ Add</button>
+                    {isAdmin && (
+                      <button className="cm-add-btn pink sm" onClick={()=>{setShowBdayForm(true);setBdayErr({});setEditBday(null);setBdayForm(emptyBday);}}>+ Add</button>
+                    )}
                   </div>
-                  {monthBirthdays.length===0
-                    ?<div className="text-xs text-slate-400">None this month</div>
-                    :monthBirthdays.map(b=>{
-                      const isToday=b.birthMonthDay===todayMD;
+                  {monthBirthdays.filter(b => b.birthMonthDay === todayMD).length === 0
+                    ? <div className="text-xs text-slate-400">None today</div>
+                    : monthBirthdays.filter(b => b.birthMonthDay === todayMD).map(b => {
+                        const isToday = true;
                       return (
                         <div key={b.id} className={"rounded-lg px-2 py-1.5 mb-1 border text-xs "+(isToday?"bg-purple-50 border-purple-200":"bg-slate-50 border-slate-100")}>
                           <div className="flex items-center justify-between gap-1">
                             <span className="font-bold text-slate-800 truncate flex-1">{b.name}</span>
-                            <button className="text-rose-400 hover:text-rose-600 font-bold text-[11px] px-1 border-none bg-transparent cursor-pointer" disabled={deleting===b.id} onClick={()=>handleDeleteBday(b.id,b.name)}>{deleting===b.id?"…":"✕"}</button>
+                            {isAdmin && (
+                              <button className="text-rose-400 hover:text-rose-600 font-bold text-[11px] px-1 border-none bg-transparent cursor-pointer" disabled={deleting===b.id} onClick={()=>handleDeleteBday(b.id,b.name)}>{deleting===b.id?"…":"✕"}</button>
+                            )}
                           </div>
                           <div className="flex items-center justify-between gap-1 mt-0.5">
                             <span className={"text-[10px] font-bold px-1.5 rounded "+(isToday?"bg-purple-200 text-purple-800":"bg-slate-200 text-slate-600")}>{isToday?"🎉 Today":b.birthMonthDay.slice(3)}</span>
-                            {isToday&&(
+                            {isToday && isAdmin && (
                               <button
                                 className={"cm-wish-btn"+(b.lastWishSentOn===todayISO?" sent":"")}
                                 disabled={sending===b.id}
@@ -527,6 +531,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                                 {sending===b.id?"…":b.lastWishSentOn===todayISO?"✓":"🎉 Wish"}
                               </button>
                             )}
+                            {isToday && !isAdmin && onWishEmployee && b.uid && (
+                              <button
+                                className="cm-wish-btn"
+                                onClick={(e) => { e.stopPropagation(); onWishEmployee(b.uid!); }}
+                                style={{ fontSize: 10, padding: "2px 7px", background: "linear-gradient(135deg, #e8512a, #f5853f)", color: "#fff", borderColor: "transparent" }}
+                              >
+                                💬 Message
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
@@ -534,61 +547,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                   }
                 </div>
 
-                {/* Festivals sidebar — shows ALL festivals, not just this month */}
-                <div className="bg-white rounded-xl border border-slate-200 shadow p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-bold text-slate-700 text-xs uppercase tracking-wide">🪔 Festivals</span>
-                    <button className="cm-add-btn amber sm" onClick={()=>{setShowFestForm(true);setFestErr({});setEditFest(null);setFestForm(emptyFest);}}>+ Add</button>
-                  </div>
-                  {/* ✅ Show ALL festivals sorted: upcoming first, then past */}
-                  {festivals.length===0
-                    ?<div className="text-xs text-slate-400">No festivals added</div>
-                    :[
-                        ...festivals.filter(f=>daysUntil(f.festivalDate)>=0).sort((a,b)=>a.festivalDate.localeCompare(b.festivalDate)),
-                        ...festivals.filter(f=>daysUntil(f.festivalDate)<0).sort((a,b)=>b.festivalDate.localeCompare(a.festivalDate)),
-                      ].map(f=>{
-                        const days=daysUntil(f.festivalDate);
-                        const isPast=days<0;
-                        return (
-                          <div key={f.id} className={"rounded-lg px-2 py-1.5 mb-1 text-xs border "+(days===0?"bg-amber-100 border-amber-300":isPast?"bg-slate-50 border-slate-100":"bg-amber-50 border-amber-100")}>
-                            <div className="flex items-center justify-between gap-1">
-                              <span className="font-bold text-slate-800 truncate flex-1">{f.bannerEmoji} {f.title}</span>
-                              <button className="text-rose-400 hover:text-rose-600 font-bold text-[11px] px-1 border-none bg-transparent cursor-pointer" disabled={deleting===f.id} onClick={()=>handleDeleteFest(f.id,f.title)}>{deleting===f.id?"…":"✕"}</button>
-                            </div>
-                            <div className="flex items-center justify-between mt-0.5">
-                              <span className="text-[10px] text-amber-600">{fmtDate(f.festivalDate)}</span>
-                              {days===0&&<span className="text-[9px] font-bold bg-amber-200 text-amber-800 px-1 rounded">Today!</span>}
-                              {days>0&&days<=7&&<span className="text-[9px] font-bold bg-orange-100 text-orange-700 px-1 rounded">{days}d</span>}
-                              {isPast&&<span className="text-[9px] font-bold bg-slate-200 text-slate-500 px-1 rounded">⚠️ Past</span>}
-                            </div>
-                          </div>
-                        );
-                      })
-                  }
-                </div>
-
-                {/* Events sidebar */}
-                <div className="bg-white rounded-xl border border-slate-200 shadow p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-bold text-slate-700 text-xs uppercase tracking-wide">📌 Events</span>
-                    <button className="cm-add-btn sm" onClick={()=>{setShowEventForm(true);setEventErr({});setEditEvent(null);setEventForm(emptyEvent);}}>+ Add</button>
-                  </div>
-                  {monthEvents.length===0
-                    ?<div className="text-xs text-slate-400">None this month</div>
-                    :monthEvents.map(ev=>(
-                      <div key={ev.id} className="rounded-lg px-2 py-1.5 mb-1 bg-slate-50 border border-slate-100 text-xs">
-                        <div className="flex items-center gap-1.5 justify-between">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <div className="w-2 h-2 rounded-full shrink-0" style={{background:ev.color||"#6366f1"}}/>
-                            <span className="font-bold text-slate-800 truncate">{ev.title}</span>
-                          </div>
-                          <button className="text-rose-400 hover:text-rose-600 font-bold text-[11px] px-1 border-none bg-transparent cursor-pointer" disabled={deleting===ev.id} onClick={()=>handleDeleteEvent(ev.id,ev.title)}>{deleting===ev.id?"…":"✕"}</button>
-                        </div>
-                        <div className="text-[10px] text-slate-400 mt-0.5">{fmtDate(ev.date)}</div>
-                      </div>
-                    ))
-                  }
-                </div>
               </div>
             </div>
           )}
@@ -598,7 +556,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({
             <div className="bg-white rounded-xl shadow-xl border border-slate-200 p-5 overflow-y-auto flex-1">
               <div className="cm-sec-head">
                 <div><div className="cm-sec-title">🎂 Birthday Management</div><div className="text-xs text-slate-400 mt-0.5">{birthdays.length} employees · {birthdays.filter(b=>b.birthMonthDay===todayMD).length} today</div></div>
-                <button className="cm-add-btn pink" onClick={()=>{setShowBdayForm(true);setBdayErr({});setEditBday(null);setBdayForm(emptyBday);}}>+ Add Birthday</button>
+                {isAdmin && (
+                  <button className="cm-add-btn pink" onClick={()=>{setShowBdayForm(true);setBdayErr({});setEditBday(null);setBdayForm(emptyBday);}}>+ Add Birthday</button>
+                )}
               </div>
               {birthdays.length===0
                 ?<div className="cm-empty"><div style={{fontSize:36,marginBottom:8}}>🎈</div>No birthdays yet.</div>
@@ -619,7 +579,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                       </div>
                       <div className="text-xs text-slate-400 mr-2">{r.lastWishSentOn?<span className="cm-badge cm-badge-success">✅ {r.lastWishSentOn}</span>:"Never"}</div>
                       <div className="flex gap-1.5 shrink-0">
-                        {isToday&&(
+                        {isToday && isAdmin && (
                           <button
                             className={"cm-wish-btn"+(alreadySent?" sent":"")}
                             style={{fontSize:11,padding:"5px 10px"}}
@@ -629,8 +589,21 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                             {sending===r.id?"…":alreadySent?"✓ Sent":"🎉 Wish"}
                           </button>
                         )}
-                        <button className="cm-ghost-btn" onClick={()=>{setEditBday(r);setBdayForm({name:r.name,email:r.email,birthDate:r.birthDate,department:r.department||""});setBdayErr({});setShowBdayForm(true);}}>✏️</button>
-                        <button className="cm-del-btn" disabled={deleting===r.id} onClick={()=>handleDeleteBday(r.id,r.name)}>{deleting===r.id?"…":"✕ Remove"}</button>
+                        {isToday && !isAdmin && onWishEmployee && r.uid && (
+                          <button
+                            className="cm-wish-btn"
+                            style={{ fontSize: 11, padding: "5px 10px", background: "linear-gradient(135deg, #e8512a, #f5853f)", color: "#fff", borderColor: "transparent" }}
+                            onClick={(e) => { e.stopPropagation(); onWishEmployee(r.uid!); }}
+                          >
+                            💬 Send Message
+                          </button>
+                        )}
+                        {isAdmin && (
+                          <>
+                            <button className="cm-ghost-btn" onClick={()=>{setEditBday(r);setBdayForm({name:r.name,email:r.email,birthDate:r.birthDate,department:r.department||""});setBdayErr({});setShowBdayForm(true);}}>✏️</button>
+                            <button className="cm-del-btn" disabled={deleting===r.id} onClick={()=>handleDeleteBday(r.id,r.name)}>{deleting===r.id?"…":"✕ Remove"}</button>
+                          </>
+                        )}
                       </div>
                     </div>
                   );
@@ -639,138 +612,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({
             </div>
           )}
 
-          {/* FESTIVALS TAB */}
-          {tab==="festivals" && (
-            <div className="bg-white rounded-xl shadow-xl border border-slate-200 p-5 overflow-y-auto flex-1">
-              <div className="cm-sec-head">
-                <div><div className="cm-sec-title">🪔 Festival Greetings</div><div className="text-xs text-slate-400 mt-0.5">{festivals.length} festivals · {festivals.filter(f=>daysUntil(f.festivalDate)>=0).length} upcoming</div></div>
-                <button className="cm-add-btn amber" onClick={()=>{setShowFestForm(true);setFestErr({});setEditFest(null);setFestForm(emptyFest);}}>+ Add Festival</button>
-              </div>
-              {festivals.length===0
-                ?<div className="cm-empty"><div style={{fontSize:36,marginBottom:8}}>🪔</div>No festivals yet.</div>
-                :<table className="cm-table">
-                  <thead><tr><th>Festival</th><th>Date</th><th>Status</th><th>Advance</th><th>Email</th><th>Last Sent</th><th>Actions</th></tr></thead>
-                  <tbody>
-                    {/* ✅ Show ALL festivals: upcoming first then past */}
-                    {[
-                      ...festivals.filter(f=>daysUntil(f.festivalDate)>=0).sort((a,b)=>a.festivalDate.localeCompare(b.festivalDate)),
-                      ...festivals.filter(f=>daysUntil(f.festivalDate)<0).sort((a,b)=>b.festivalDate.localeCompare(a.festivalDate)),
-                    ].map(f=>{
-                      const days=daysUntil(f.festivalDate);
-                      const isPast=days<0;
-                      return (
-                        <tr key={f.id}>
-                          <td>
-                            <div className="flex items-center gap-2">
-                              <span style={{fontSize:20}}>{f.bannerEmoji||"🎉"}</span>
-                              <div>
-                                <div className="font-bold text-slate-800 text-xs">{f.title}</div>
-                                <div className="text-[10px] text-slate-400 truncate max-w-30">{f.emailSubject}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td>
-                            <div className="font-semibold text-slate-700 text-xs">{fmtDate(f.festivalDate)}</div>
-                            {!isPast&&days<=7&&<span className="cm-badge cm-badge-warn" style={{marginTop:2,display:"inline-flex"}}>{days===0?"🎊 Today!":days+"d away"}</span>}
-                          </td>
-                          <td>
-                            {isPast
-                              ?<span className="cm-badge cm-badge-danger">⚠️ Past — update year</span>
-                              :days===0?<span className="cm-badge cm-badge-warn">🎊 Today!</span>
-                              :<span className="cm-badge cm-badge-info">{days}d away</span>
-                            }
-                          </td>
-                          <td className="text-slate-400 text-xs">{f.sendInAdvanceDays>0?f.sendInAdvanceDays+"d before":"On day"}</td>
-                          <td>{f.sendEmail?<span className="cm-badge cm-badge-success">✅ On</span>:<span className="cm-badge cm-badge-danger">Off</span>}</td>
-                          <td>{f.lastSentOn?<span className="cm-badge cm-badge-teal">💌 {f.lastSentOn}</span>:<span className="text-slate-300 text-xs">Never</span>}</td>
-                          <td>
-                            <div className="flex gap-1.5">
-                              <button className="cm-send-btn" disabled={sending===f.id} onClick={()=>sendFestival(f)}>{sending===f.id?"…":"📨 Send"}</button>
-                              <button className="cm-ghost-btn" onClick={()=>{setEditFest(f);setFestForm({title:f.title,festivalDate:f.festivalDate,sendEmail:f.sendEmail,sendInAdvanceDays:f.sendInAdvanceDays,emailSubject:f.emailSubject,emailMessage:f.emailMessage,bannerEmoji:f.bannerEmoji||"🎉",bannerColor:f.bannerColor||"#f59e0b"});setFestErr({});setShowFestForm(true);}}>✏️</button>
-                              <button className="cm-del-btn" disabled={deleting===f.id} onClick={()=>handleDeleteFest(f.id,f.title)}>{deleting===f.id?"…":"✕"}</button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              }
-            </div>
-          )}
-
-          {/* EVENTS TAB */}
-          {tab==="events" && (
-            <div className="bg-white rounded-xl shadow-xl border border-slate-200 p-5 overflow-y-auto flex-1">
-              <div className="cm-sec-head">
-                <div><div className="cm-sec-title">📌 Company Events</div><div className="text-xs text-slate-400 mt-0.5">{events.length} events configured</div></div>
-                <button className="cm-add-btn" onClick={()=>{setShowEventForm(true);setEventErr({});setEditEvent(null);setEventForm(emptyEvent);}}>+ Add Event</button>
-              </div>
-              {events.length===0
-                ?<div className="cm-empty"><div style={{fontSize:36,marginBottom:8}}>📅</div>No events yet.</div>
-                :events.slice().sort((a,b)=>(a.date||"").localeCompare(b.date||"")).map(ev=>{
-                  const days=daysUntil(ev.date);
-                  return (
-                    <div key={ev.id} className="cm-list-item">
-                      <div className="w-1 h-10 rounded shrink-0" style={{background:ev.color||"#6366f1"}}/>
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0" style={{background:(ev.color||"#6366f1")+"22"}}>📌</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-bold text-slate-800">{ev.title}</span>
-                          {ev.announcementSentOn?<span className="cm-badge cm-badge-success">✅ Announced</span>:<span className="cm-badge cm-badge-warn">⏳ Pending</span>}
-                          {days>=0&&days<=7&&<span className="cm-badge cm-badge-info">{days===0?"Today!":days+"d"}</span>}
-                        </div>
-                        {ev.description&&<div className="text-xs text-slate-500 truncate">{ev.description}</div>}
-                        <div className="flex gap-3 mt-0.5 flex-wrap">
-                          <span className="text-[10px] text-slate-400">📅 {fmtDate(ev.date)}</span>
-                          {ev.location&&<span className="text-[10px] text-slate-400">📍 {ev.location}</span>}
-                          {ev.reminderDaysBefore&&ev.reminderDaysBefore>0&&<span className="text-[10px] text-slate-400">⏰ {ev.reminderDaysBefore}d reminder</span>}
-                        </div>
-                      </div>
-                      <div className="flex gap-1.5 shrink-0">
-                        <button className="cm-add-btn sm" disabled={!!sending} onClick={()=>sendEvent(ev,"announcement")}>{sending===ev.id+"announcement"?"…":"📨 Announce"}</button>
-                        {ev.reminderDaysBefore&&ev.reminderDaysBefore>0&&<button className="cm-send-btn" disabled={!!sending} onClick={()=>sendEvent(ev,"reminder")}>{sending===ev.id+"reminder"?"…":"⏰"}</button>}
-                        <button className="cm-ghost-btn" onClick={()=>{setEditEvent(ev);setEventForm({title:ev.title,date:ev.date,description:ev.description||"",color:ev.color||"#6366f1",location:ev.location||"",rsvpLink:ev.rsvpLink||"",sendAnnouncementEmail:ev.sendAnnouncementEmail??true,reminderDaysBefore:ev.reminderDaysBefore??1});setEventErr({});setShowEventForm(true);}}>✏️</button>
-                        <button className="cm-del-btn" disabled={deleting===ev.id} onClick={()=>handleDeleteEvent(ev.id,ev.title)}>{deleting===ev.id?"…":"✕ Delete"}</button>
-                      </div>
-                    </div>
-                  );
-                })
-              }
-            </div>
-          )}
-
-          {/* HISTORY TAB */}
-          {tab==="history" && (
-            <div className="bg-white rounded-xl shadow-xl border border-slate-200 p-5 overflow-y-auto flex-1">
-              <div className="cm-sec-head">
-                <div><div className="cm-sec-title">📋 Greeting History</div><div className="text-xs text-slate-400 mt-0.5">{logs.length} total · {logs.filter(l=>l.status==="success").length} successful</div></div>
-                <div className="flex gap-1.5">
-                  {["all","birthday","festival","event"].map(f=>(
-                    <button key={f} className={"cm-tab "+(histFilter===f?"on":"off")} style={{padding:"5px 10px",fontSize:11}} onClick={()=>setHistFilter(f)}>
-                      {f==="all"?"All":f==="birthday"?"🎂 Birthday":f==="festival"?"🪔 Festival":"📅 Event"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <table className="cm-table">
-                <thead><tr><th>Type</th><th>Recipient</th><th>Subject</th><th>Sent By</th><th>Time</th><th>Status</th></tr></thead>
-                <tbody>
-                  {filteredLogs.map(l=>(
-                    <tr key={l.id}>
-                      <td><span className={"cm-badge "+(l.type==="birthday"?"cm-badge-purple":l.type==="festival"?"cm-badge-warn":"cm-badge-info")}>{l.type==="birthday"?"🎂":l.type==="festival"?"🪔":"📅"} {l.type}</span></td>
-                      <td className="font-semibold text-slate-800">{l.recipientName||l.recipientEmail}</td>
-                      <td className="text-slate-500 max-w-37.5 truncate">{l.subject}</td>
-                      <td><span className={"cm-badge "+(l.sentBy==="admin"?"cm-badge-info":"cm-badge-teal")}>{l.sentBy==="admin"?"👤":"🤖"} {l.sentBy}</span></td>
-                      <td className="text-slate-400 whitespace-nowrap">{l.sentAt?.slice(0,16).replace("T"," ")||"—"}</td>
-                      <td><span className={"cm-badge "+(l.status==="success"?"cm-badge-success":"cm-badge-danger")}>{l.status==="success"?"✅":"❌"} {l.status}</span>{l.error&&<div className="text-[10px] text-rose-500 mt-0.5">{l.error}</div>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {filteredLogs.length===0&&<p className="cm-empty">No history found</p>}
-            </div>
-          )}
         </div>
       </div>
 
@@ -784,42 +625,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({
             <div className="cm-field"><label className="cm-label">Date of Birth *</label><input className={"cm-input"+(bdayErr.birthDate?" err":"")} type="date" value={bdayForm.birthDate} onChange={e=>setBdayForm({...bdayForm,birthDate:e.target.value})}/>{bdayErr.birthDate&&<div className="cm-err-txt">{bdayErr.birthDate}</div>}</div>
             <div className="cm-field"><label className="cm-label">Department (optional)</label><input className="cm-input" placeholder="e.g. Engineering" value={bdayForm.department} onChange={e=>setBdayForm({...bdayForm,department:e.target.value})}/></div>
             <div className="cm-modal-btns"><button className="cm-cancel-btn" onClick={()=>{setShowBdayForm(false);setEditBday(null);}}>Cancel</button><button className="cm-save-btn" disabled={savingBday} onClick={handleSaveBday}>{savingBday?"Saving…":editBday?"Save Changes":"Add Birthday"}</button></div>
-          </div>
-        </div>
-      )}
-
-      {/* FESTIVAL MODAL */}
-      {showFestForm&&(
-        <div className="fixed inset-0 bg-black/50 z-60 flex items-center justify-center p-4" onClick={e=>e.target===e.currentTarget&&setShowFestForm(false)}>
-          <div className="cm-modal-inner">
-            <div className="cm-modal-title">{festForm.bannerEmoji} {editFest?"Edit":"Add"} Festival</div>
-            <div className="cm-field"><label className="cm-label">Festival Name *</label><input className={"cm-input"+(festErr.title?" err":"")} placeholder="e.g. Diwali, Holi, Christmas" value={festForm.title} onChange={e=>setFestForm({...festForm,title:e.target.value})}/>{festErr.title&&<div className="cm-err-txt">{festErr.title}</div>}</div>
-            <div className="cm-field"><label className="cm-label">Festival Date *</label><input className={"cm-input"+(festErr.festivalDate?" err":"")} type="date" value={festForm.festivalDate} onChange={e=>setFestForm({...festForm,festivalDate:e.target.value})}/>{festErr.festivalDate&&<div className="cm-err-txt">{festErr.festivalDate}</div>}</div>
-            <div className="cm-field"><label className="cm-label">Email Subject *</label><input className={"cm-input"+(festErr.emailSubject?" err":"")} placeholder="e.g. 🪔 Happy Diwali from Techgy!" value={festForm.emailSubject} onChange={e=>setFestForm({...festForm,emailSubject:e.target.value})}/>{festErr.emailSubject&&<div className="cm-err-txt">{festErr.emailSubject}</div>}</div>
-            <div className="cm-field"><label className="cm-label">Email Message</label><textarea className="cm-textarea" placeholder="Custom greeting for this festival..." value={festForm.emailMessage} onChange={e=>setFestForm({...festForm,emailMessage:e.target.value})}/></div>
-            <div className="cm-field"><label className="cm-label">Send In Advance (days)</label><input className="cm-input" type="number" min="0" max="30" value={festForm.sendInAdvanceDays} onChange={e=>setFestForm({...festForm,sendInAdvanceDays:parseInt(e.target.value)||0})}/></div>
-            <div className="cm-field"><label className="cm-label">Festival Emoji</label><div className="cm-emoji-grid">{FESTIVAL_EMOJIS.map(em=><div key={em} className={"cm-emoji-opt"+(festForm.bannerEmoji===em?" sel":"")} onClick={()=>setFestForm({...festForm,bannerEmoji:em})}>{em}</div>)}</div></div>
-            <div className="cm-field"><label className="cm-label">Banner Colour</label><div className="cm-color-grid">{FESTIVAL_COLORS.map(c=><div key={c} className={"cm-color-dot"+(festForm.bannerColor===c?" sel":"")} style={{background:c}} onClick={()=>setFestForm({...festForm,bannerColor:c})}/>)}</div></div>
-            <div className="cm-field"><div className="flex items-center gap-2 cursor-pointer" onClick={()=>setFestForm({...festForm,sendEmail:!festForm.sendEmail})}><div className={"cm-toggle-track"+(festForm.sendEmail?" on":"")}><div className="cm-toggle-thumb"/></div><span className="text-sm text-slate-600 font-medium">Send automated email greetings</span></div></div>
-            <div className="cm-modal-btns"><button className="cm-cancel-btn" onClick={()=>{setShowFestForm(false);setEditFest(null);}}>Cancel</button><button className="cm-save-btn" disabled={savingFest} onClick={handleSaveFest}>{savingFest?"Saving…":editFest?"Save Changes":"Add Festival"}</button></div>
-          </div>
-        </div>
-      )}
-
-      {/* EVENT MODAL */}
-      {showEventForm&&(
-        <div className="fixed inset-0 bg-black/50 z-60 flex items-center justify-center p-4" onClick={e=>e.target===e.currentTarget&&setShowEventForm(false)}>
-          <div className="cm-modal-inner">
-            <div className="cm-modal-title">📌 {editEvent?"Edit":"Add"} Company Event</div>
-            <div className="cm-field"><label className="cm-label">Event Title *</label><input className={"cm-input"+(eventErr.title?" err":"")} placeholder="e.g. Annual Day, Team Outing" value={eventForm.title} onChange={e=>setEventForm({...eventForm,title:e.target.value})}/>{eventErr.title&&<div className="cm-err-txt">{eventErr.title}</div>}</div>
-            <div className="cm-field"><label className="cm-label">Date *</label><input className={"cm-input"+(eventErr.date?" err":"")} type="date" value={eventForm.date} onChange={e=>setEventForm({...eventForm,date:e.target.value})}/>{eventErr.date&&<div className="cm-err-txt">{eventErr.date}</div>}</div>
-            <div className="cm-field"><label className="cm-label">Description</label><textarea className="cm-textarea" placeholder="Short description…" value={eventForm.description} onChange={e=>setEventForm({...eventForm,description:e.target.value})}/></div>
-            <div className="cm-field"><label className="cm-label">Location (optional)</label><input className="cm-input" placeholder="e.g. Bangalore HQ / Online" value={eventForm.location} onChange={e=>setEventForm({...eventForm,location:e.target.value})}/></div>
-            <div className="cm-field"><label className="cm-label">RSVP Link (optional)</label><input className="cm-input" type="url" placeholder="https://…" value={eventForm.rsvpLink} onChange={e=>setEventForm({...eventForm,rsvpLink:e.target.value})}/></div>
-            <div className="cm-field"><label className="cm-label">Reminder (days before)</label><input className="cm-input" type="number" min="0" max="30" value={eventForm.reminderDaysBefore} onChange={e=>setEventForm({...eventForm,reminderDaysBefore:parseInt(e.target.value)||0})}/></div>
-            <div className="cm-field"><label className="cm-label">Colour</label><div className="cm-color-grid">{EVENT_COLORS.map(c=><div key={c.hex} className={"cm-color-dot"+(eventForm.color===c.hex?" sel":"")} style={{background:c.hex}} title={c.label} onClick={()=>setEventForm({...eventForm,color:c.hex})}/>)}</div></div>
-            <div className="cm-field"><div className="flex items-center gap-2 cursor-pointer" onClick={()=>setEventForm({...eventForm,sendAnnouncementEmail:!eventForm.sendAnnouncementEmail})}><div className={"cm-toggle-track"+(eventForm.sendAnnouncementEmail?" on":"")}><div className="cm-toggle-thumb"/></div><span className="text-sm text-slate-600 font-medium">Send automated announcement emails</span></div></div>
-            <div className="cm-modal-btns"><button className="cm-cancel-btn" onClick={()=>{setShowEventForm(false);setEditEvent(null);}}>Cancel</button><button className="cm-save-btn" disabled={savingEvent} onClick={handleSaveEvent}>{savingEvent?"Saving…":editEvent?"Save Changes":"Add Event"}</button></div>
           </div>
         </div>
       )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 
 import {
@@ -798,7 +798,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
     }
     await logActivity(activeProject!.id, "assigned task", `Assigned to ${assignedToName || "user"}`, taskId);
   };
-  const handleTaskStatusChange = async (taskId: string, newStatus: string) => {
+  const handleTaskStatusChange = async (taskId: string, newStatus: string, newParentId?: string | null) => {
     if (newStatus === "__DELETE__") { await deleteDoc(doc(db, "projectTasks", taskId)); return; }
     const oldTask = tasks.find(t => t.id === taskId);
     if (!oldTask) return;
@@ -809,14 +809,27 @@ export default function AdminProjectManagement({ user, projects, users }: { user
     const isAssignee = oldTask.assignedTo === user?.uid;
     if (!isAdmin && !isPM && !isAssignee) return;
 
-    await updateDoc(doc(db, "projectTasks", taskId), {
+    const updateData: any = {
       status: newStatus,
       ...(newStatus === "inprogress" ? { startedAt: serverTimestamp() } : {}),
       ...(newStatus === "done" ? {
         completedAt: serverTimestamp(),
         completedAtISO: new Date().toISOString(),
       } : {}),
-    });
+    };
+
+    if (newParentId !== undefined) {
+      updateData.parentStoryId = newParentId || null;
+      // Also update parentStoryTitle if we have it
+      if (newParentId) {
+        const story = tasks.find(t => t.id === newParentId);
+        if (story) updateData.parentStoryTitle = story.title;
+      } else {
+        updateData.parentStoryTitle = "";
+      }
+    }
+
+    await updateDoc(doc(db, "projectTasks", taskId), updateData);
     await logActivity(activeProject!.id, "status_changed", `→ ${columns.find(c => c.id === newStatus)?.label || newStatus}`, taskId);
     await addDoc(collection(db, "activityLogs"), { projectId: activeProject!.id, taskId, userId: user.uid, userName: user.email?.split("@")[0] ?? "", action: "status_changed", from: { status: oldTask?.status }, to: { status: newStatus }, description: `Status changed to ${columns.find(c => c.id === newStatus)?.label || newStatus}`, createdAt: serverTimestamp() });
     const snap = await getDocs(query(collection(db, "projectTasks"), where("projectId", "==", activeProject!.id)));
@@ -887,17 +900,26 @@ export default function AdminProjectManagement({ user, projects, users }: { user
     setWorkDesc(""); setWorkHours("");
   };
 
-  const filteredTasks = applyQuickFilter(
-    tasks.filter(t => {
-      if (filterPriority !== "all" && t.priority !== filterPriority) return false;
-      if (filterAssignee !== "all" && t.assignedTo !== filterAssignee) return false;
-      if (filterType !== "all" && t.ticketType !== filterType) return false;
-      if (search && !t.title.toLowerCase().includes(search.toLowerCase()) && !t.taskCode?.toLowerCase().includes(search.toLowerCase())) return false;
-      return true;
-    }),
-    quickFilter,
-    columns
-  );
+  const filteredTasks = useMemo(() => {
+    return applyQuickFilter(
+      tasks.filter(t => {
+        if (filterPriority !== "all" && t.priority !== filterPriority) return false;
+        if (filterAssignee !== "all" && t.assignedTo !== filterAssignee) return false;
+        if (filterType !== "all" && t.ticketType !== filterType) return false;
+        if (search && !t.title.toLowerCase().includes(search.toLowerCase()) && !t.taskCode?.toLowerCase().includes(search.toLowerCase())) return false;
+        return true;
+      }),
+      quickFilter,
+      columns
+    );
+  }, [tasks, filterPriority, filterAssignee, filterType, search, quickFilter, columns]);
+
+  const tasksForKanban = useMemo(() => {
+    const ids = new Set(filteredTasks.map(t => t.id));
+    // Important: include parent stories so they don't look like orphans in Kanban swimlanes
+    filteredTasks.forEach((t: Task) => { if (t.parentStoryId) ids.add(t.parentStoryId); });
+    return tasks.filter((t: Task) => ids.has(t.id));
+  }, [tasks, filteredTasks]);
 
   const projectMembers = activeProject ? users.filter((u: any) => activeProject.members.includes(u.uid)) : [];
   const totalHours = workLogs.reduce((s, l) => s + (l.hoursWorked || 0), 0);
@@ -1522,7 +1544,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
             <div className="flex-1 flex flex-col min-h-0 m-0 gap-0">
               <div className="flex-1 border border-gray-200 overflow-hidden bg-white shadow-sm flex flex-col min-h-0">
                 <KanbanBoard
-                  tasks={filteredTasks}
+                  tasks={tasksForKanban}
                   columns={columns}
                   setColumns={setColumns}
                   projectColor={activeProject.color || "#6366f1"}
@@ -1545,7 +1567,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                 <table className="w-full">
                   <thead><tr className="border-b border-gray-100 bg-gray-50">{["Type", "Code", "Title", "Status", "Priority", "Assignee", "Est.", "Due Date", "Sprint", "Tags"].map(h => <th key={h} className="px-4 py-3 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">{h}</th>)}</tr></thead>
                   <tbody>
-                    {filteredTasks.map(task => {
+                    {filteredTasks.map((task: Task) => {
                       const pc = PRIORITY_CONFIG[task.priority];
                       const tm2 = TYPE_META[task.ticketType || "task"];
                       const col = columns.find(c => c.id === task.status);

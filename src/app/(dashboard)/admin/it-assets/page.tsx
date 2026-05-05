@@ -11,6 +11,7 @@ import {
   onSnapshot,
   query,
   orderBy,
+  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -29,7 +30,8 @@ interface ITAsset {
   status: AssetStatus;
   purchaseCost: number;
   warrantyExpiry: string;
-  createdAt: string;
+  ownership?: string;
+  createdAt: any;
 }
 
 const EMPTY_FORM = {
@@ -48,6 +50,7 @@ const DEPARTMENTS = ["IT", "Engineering", "HR", "Finance", "Marketing", "Operati
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function daysUntil(dateStr: string) {
+  if (!dateStr) return null;
   const today = new Date(); today.setHours(0, 0, 0, 0);
   return Math.ceil((new Date(dateStr).getTime() - today.getTime()) / 86400000);
 }
@@ -105,24 +108,18 @@ export default function ITAssetsPage() {
 
   async function createRepairTransaction(assetId: string, assetName: string, note: string, cost: number, department: string) {
     await addDoc(collection(db, "transactions"), {
-  type: "expense",
-  category: "repair",
-
-  assetId,
-  assetName,
-
-  description: note,
-  amount: cost,
-
-  department,
-
-  createdBy: user?.uid || "unknown",          // ✅ VERY IMPORTANT
-  createdByName: user?.displayName || "User", // ✅ OPTIONAL BUT GOOD
-
-  createdAt: new Date(),                     // ✅ better than toISOString()
-
-  status: "pending",
-});
+      type: "expense",
+      category: "repair",
+      assetId,
+      assetName,
+      description: note,
+      amount: cost,
+      department,
+      createdBy: user?.uid || "unknown",
+      createdByName: user?.displayName || user?.email?.split("@")[0] || "User",
+      createdAt: serverTimestamp(),
+      status: "pending",
+    });
   }
 
   // ─── Add / Edit ────────────────────────────────────────────────────────────
@@ -162,14 +159,13 @@ export default function ITAssetsPage() {
     }
     setSaving(true); setFormError("");
     try {
-      const now = new Date().toISOString();
       if (editAsset) {
-        await updateDoc(doc(db, "it_assets", editAsset.id), { ...form, updatedAt: now });
+        await updateDoc(doc(db, "it_assets", editAsset.id), { ...form, updatedAt: serverTimestamp() });
         if (form.status === "under_repair" && repairNote) {
           await createRepairTransaction(editAsset.id, form.name, repairNote, repairCost, form.department);
         }
       } else {
-        const ref = await addDoc(collection(db, "it_assets"), { ...form, createdAt: now, updatedAt: now });
+        const ref = await addDoc(collection(db, "it_assets"), { ...form, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
         if (form.status === "under_repair" && repairNote) {
           await createRepairTransaction(ref.id, form.name, repairNote, repairCost, form.department);
         }
@@ -198,7 +194,7 @@ export default function ITAssetsPage() {
     try {
       await updateDoc(doc(db, "it_assets", repairTarget.id), {
         status: "under_repair",
-        updatedAt: new Date().toISOString(),
+        updatedAt: serverTimestamp(),
       });
       await createRepairTransaction(
         repairTarget.id, repairTarget.name,
@@ -214,8 +210,8 @@ export default function ITAssetsPage() {
 
   // ─── Computed ──────────────────────────────────────────────────────────────
 
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const in30 = new Date(today); in30.setDate(in30.getDate() + 30);
+  const todayDate = new Date(); todayDate.setHours(0, 0, 0, 0);
+  const in30 = new Date(todayDate); in30.setDate(in30.getDate() + 30);
 
   const alerts = assets.filter((a) => {
     if (!a.warrantyExpiry) return false;
@@ -258,7 +254,7 @@ export default function ITAssetsPage() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-5">
+    <div className="p-6 max-w-7xl mx-auto space-y-5 bg-white min-h-screen">
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -284,7 +280,7 @@ export default function ITAssetsPage() {
               return (
                 <p key={a.id} className="text-xs text-amber-700">
                   <strong>{a.name}</strong> —{" "}
-                  {days < 0 ? `expired ${Math.abs(days)}d ago` : days === 0 ? "expires today" : `expires in ${days}d`}
+                  {days === null ? "" : days < 0 ? `expired ${Math.abs(days)}d ago` : days === 0 ? "expires today" : `expires in ${days}d`}
                   {" "}({fmtDate(a.warrantyExpiry)})
                 </p>
               );
@@ -344,7 +340,7 @@ export default function ITAssetsPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                {["Name", "Type", "Serial #", "Dept", "Assigned To", "Status", "Cost", "Expiry", "Actions"].map((h) => (
+                {["Name", "Type", "Serial #", "Dept", "Assigned To", "Owner", "Status", "Cost", "Expiry", "Actions"].map((h) => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -364,6 +360,11 @@ export default function ITAssetsPage() {
                     <td className="px-4 py-3 font-mono text-xs text-gray-500">{a.serialNumber || "—"}</td>
                     <td className="px-4 py-3 text-gray-600">{a.department}</td>
                     <td className="px-4 py-3 text-gray-600 text-xs">{a.assignedTo || "—"}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${a.ownership === "Own" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}>
+                        {a.ownership || "Company"}
+                      </span>
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge(a.status)}`}>
                         {a.status === "under_repair" ? "Under Repair" : a.status.charAt(0).toUpperCase() + a.status.slice(1)}
@@ -520,7 +521,7 @@ export default function ITAssetsPage() {
       {/* ── Quick Repair Modal ───────────────────────────────────────────── */}
       {repairTarget && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-md">
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <div>
                 <h2 className="text-base font-semibold">Log Repair</h2>
