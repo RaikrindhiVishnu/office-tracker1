@@ -46,6 +46,9 @@ import { View } from "@/types/View";
 import { updateEmployeeData } from "@/lib/employeeSync";
 import AdminNotificationBell from "./AdminNotificationBell";
 import Image from "next/image";
+import { checkIn, checkOut, getTodayAttendance } from "@/lib/attendance";
+import { getActiveBreak, getTodayDateStr, type Break } from "@/lib/breakTracking";
+import NavbarBreakStatus from "@/components/NavbarBreakStatus";
 
 /* ================= TYPES ================= */
 type User = {
@@ -199,6 +202,10 @@ export default function AdminPage() {
 
   const [queryCount, setQueryCount] = useState(0);
   const [chatNotifications, setChatNotifications] = useState<any[]>([]);
+  const [adminAttendance, setAdminAttendance] = useState<any>(null);
+  const [busyAttendance, setBusyAttendance] = useState(false);
+  const [totalSeconds, setTotalSeconds] = useState<number>(0);
+  const [todayBreaks, setTodayBreaks] = useState<Break[]>([]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -357,6 +364,61 @@ export default function AdminPage() {
     setLeaveRequests(snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
   };
 
+  const loadAdminAttendance = async () => {
+    if (!user) return;
+    const data = await getTodayAttendance(user.uid);
+    setAdminAttendance(data);
+  };
+
+  useEffect(() => {
+    if (!loading && user) loadAdminAttendance();
+  }, [loading, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const dateStr = getTodayDateStr();
+    const attRef = doc(db, "attendance", `${user.uid}_${dateStr}`);
+    return onSnapshot(attRef, (snap) => {
+      if (snap.exists()) setTodayBreaks(snap.data().breaks || []);
+      else setTodayBreaks([]);
+    });
+  }, [user]);
+
+  const activeBreak = getActiveBreak(todayBreaks);
+
+  useEffect(() => {
+    if (!adminAttendance?.sessions?.length) return;
+    const calc = () => {
+      let s = 0;
+      adminAttendance.sessions.forEach((sess: any) => {
+        const ci = sess.checkIn?.toDate()?.getTime();
+        if (!ci) return;
+        const now = new Date();
+        const shiftEnd = new Date(); shiftEnd.setHours(19, 0, 0, 0);
+        let co = sess.checkOut ? sess.checkOut.toDate().getTime() : Math.min(now.getTime(), shiftEnd.getTime());
+        if (activeBreak?.startTime && !sess.checkOut) co = activeBreak.startTime.toDate().getTime();
+        if (co > ci) {
+          let sessionSeconds = Math.floor((co - ci) / 1000);
+          const totalBreakSeconds = todayBreaks.reduce((acc: number, b: Break) => {
+            if (!b.startTime) return acc;
+            const start = b.startTime.toDate().getTime();
+            const end = b.endTime ? b.endTime.toDate().getTime() : activeBreak?.startTime ? activeBreak.startTime.toDate().getTime() : start;
+            return acc + Math.max(0, Math.floor((end - start) / 1000));
+          }, 0);
+          sessionSeconds -= totalBreakSeconds;
+          s += Math.max(0, sessionSeconds);
+        }
+      });
+      setTotalSeconds(s);
+    };
+    calc();
+    const last = adminAttendance.sessions.at(-1);
+    if (last && !last.checkOut) {
+      const iv = setInterval(calc, 1000);
+      return () => clearInterval(iv);
+    }
+  }, [adminAttendance, todayBreaks, activeBreak]);
+
   useEffect(() => {
     if (loading || !user) return;
     loadDashboard();
@@ -366,6 +428,14 @@ export default function AdminPage() {
     const i = setInterval(loadDashboard, 60000);
     return () => clearInterval(i);
   }, [loading, user]);
+
+  const doCheckIn = async () => { if (!user) return; setBusyAttendance(true); await checkIn(user.uid); await loadAdminAttendance(); setBusyAttendance(false); };
+  const doCheckOut = async () => { if (!user) return; setBusyAttendance(true); await checkOut(user.uid); await loadAdminAttendance(); setBusyAttendance(false); };
+
+  const formatTimer = (seconds: number) => {
+    const h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60), s = seconds % 60;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  };
 
   /* ================= ACTIONS ================= */
   const sendMessage = async () => {
@@ -500,6 +570,10 @@ export default function AdminPage() {
       setCreatingUser(false);
     }
   };
+
+  const adminSessions = adminAttendance?.sessions || [];
+  const lastAdminSession = adminSessions.at(-1);
+  const isCheckedIn = !!(lastAdminSession && !lastAdminSession.checkOut);
 
   /* ================= UI ================= */
   return (
@@ -667,8 +741,23 @@ export default function AdminPage() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-4">
-                <div className="flex items-center justify-center">
+              <div className="flex items-center gap-2 sm:gap-4 flex-wrap justify-end">
+                {/* Attendance Controls */}
+                <div className="flex items-center gap-2">
+                  <div className="h-8 flex items-center gap-2 bg-amber-50 rounded-lg px-2 sm:px-3 border border-amber-200 shadow-sm transition-all shrink-0">
+                    <div className="font-mono font-bold text-[10px] sm:text-xs text-amber-700 flex items-center gap-1">
+                      <span className="opacity-70 text-sm">⏱</span><span className="tabular-nums">{formatTimer(totalSeconds)}</span>
+                    </div>
+                  </div>
+                  <NavbarBreakStatus uid={user.uid} isCheckedIn={isCheckedIn} />
+                  {isCheckedIn ? (
+                    <button disabled={busyAttendance} onClick={doCheckOut} className="h-8 px-2 sm:px-4 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg hover:bg-rose-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-bold text-[10px] sm:text-xs hover:scale-[1.02] active:scale-95 shadow-sm shrink-0">Check Out</button>
+                  ) : (
+                    <button disabled={busyAttendance} onClick={doCheckIn} className="h-8 px-2 sm:px-4 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-bold text-[10px] sm:text-xs hover:scale-[1.02] active:scale-95 shadow-sm shrink-0">Check In</button>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-center shrink-0">
                   <AdminNotificationBell />
                 </div>
 

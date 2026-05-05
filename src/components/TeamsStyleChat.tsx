@@ -11,50 +11,50 @@ import { db, storage } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 
 type User = {
-  uid: string; name?: string|null; email: string|null;
+  uid: string; name?: string | null; email: string | null;
   profilePhoto?: string; avatar?: string;
-  online?: boolean; status?: "available"|"busy"|"dnd"|"brb"|"away"|"offline"|"lunch";
+  online?: boolean; status?: "available" | "busy" | "dnd" | "brb" | "away" | "offline" | "lunch";
 };
 type Message = {
   id: string; text?: string; imageUrl?: string; fileUrl?: string;
   fileName?: string; fileType?: string; senderUid: string; senderName?: string;
-  status?: "sent"|"delivered"|"seen"; createdAt: any; readBy?: string[];
+  status?: "sent" | "delivered" | "seen"; createdAt: any; readBy?: string[];
   editedAt?: any; isEdited?: boolean;
 };
 type Chat = {
   id: string; participants: string[]; lastMessage?: string;
-  lastMessageTime?: any; unreadCount?: {[uid:string]:number};
+  lastMessageTime?: any; unreadCount?: { [uid: string]: number };
   isGroup?: boolean; groupName?: string; groupAvatar?: string;
   createdBy?: string; createdAt?: any;
   admins?: string[]; // ✅ NEW
 };
 type Call = {
   id: string; callerId: string; callerName: string; receiverId: string;
-  type: "video"|"audio"; status: "ringing"|"accepted"|"rejected"|"ended";
+  type: "video" | "audio"; status: "ringing" | "accepted" | "rejected" | "ended";
   offer?: any; answer?: any; startTime?: any; endTime?: any;
 };
 
-type UserStatus = "available"|"busy"|"dnd"|"brb"|"away"|"offline"|"lunch";
+type UserStatus = "available" | "busy" | "dnd" | "brb" | "away" | "offline" | "lunch";
 
-const getUserName = (u?: Partial<User>|null) => u?.name ?? u?.email ?? "User";
+const getUserName = (u?: Partial<User> | null) => u?.name ?? u?.email ?? "User";
 
-const STATUS_CONFIG: Record<UserStatus,{label:string;color:string}> = {
-  available: { label:"Available",       color:"#22c55e" },
-  busy:      { label:"Busy",            color:"#ef4444" },
-  dnd:       { label:"Do not disturb",  color:"#ef4444" },
-  brb:       { label:"Be right back",   color:"#f59e0b" },
-  away:      { label:"Appear away",     color:"#f59e0b" },
-  lunch:     { label:"Out for lunch",   color:"#a855f7" },
-  offline:   { label:"Appear offline",  color:"#9ca3af" },
+const STATUS_CONFIG: Record<UserStatus, { label: string; color: string }> = {
+  available: { label: "Available", color: "#22c55e" },
+  busy: { label: "Busy", color: "#ef4444" },
+  dnd: { label: "Do not disturb", color: "#ef4444" },
+  brb: { label: "Be right back", color: "#f59e0b" },
+  away: { label: "Appear away", color: "#f59e0b" },
+  lunch: { label: "Out for lunch", color: "#a855f7" },
+  offline: { label: "Appear offline", color: "#9ca3af" },
 };
 
 const COLORS = [
-  ["#e8512a","#f5853f"],["#7c3aed","#a78bfa"],["#0891b2","#22d3ee"],
-  ["#059669","#34d399"],["#db2777","#f472b6"],["#1d4ed8","#60a5fa"],
-  ["#d97706","#fbbf24"],["#0f766e","#2dd4bf"],
+  ["#e8512a", "#f5853f"], ["#7c3aed", "#a78bfa"], ["#0891b2", "#22d3ee"],
+  ["#059669", "#34d399"], ["#db2777", "#f472b6"], ["#1d4ed8", "#60a5fa"],
+  ["#d97706", "#fbbf24"], ["#0f766e", "#2dd4bf"],
 ];
-const avGrad   = (n:string) => COLORS[(n?.charCodeAt(0)??65)%COLORS.length];
-const initials = (n:string) => (n??"").split(" ").slice(0,2).map(w=>w[0]?.toUpperCase()??"").join("");
+const avGrad = (n: string) => COLORS[(n?.charCodeAt(0) ?? 65) % COLORS.length];
+const initials = (n: string) => (n ?? "").split(" ").slice(0, 2).map(w => w[0]?.toUpperCase() ?? "").join("");
 
 // ── ICE / TURN config ─────────────────────────────────────────────────────────
 const ICE_SERVERS: RTCConfiguration = {
@@ -263,67 +263,67 @@ const CSS = `
 
 export default function TeamsStyleChat({ users }: { users: User[] }) {
   const { user } = useAuth();
-  const [tab,setTab]                   = useState<"chats"|"calls">("chats");
-  const [activeTab,setActiveTab]       = useState<"all"|"direct"|"groups">("all");
-  const [selectedChat,setSelectedChat] = useState<Chat|null>(null);
-  const [messages,setMessages]         = useState<Message[]>([]);
-  const [text,setText]                 = useState("");
-  const [typing,setTyping]             = useState<string[]>([]);
-  const [searchQuery,setSearchQuery]   = useState("");
-  const [chats,setChats]               = useState<Chat[]>([]);
-  const [showCreateGroup,setShowCreateGroup] = useState(false);
-  const [groupName,setGroupName]       = useState("");
-  const [selectedMembers,setSelectedMembers] = useState<string[]>([]);
-  const [notifications,setNotifications]     = useState<any[]>([]);
-  const [showDots,setShowDots]         = useState(false);
-  const [myStatus,setMyStatus]         = useState<UserStatus>("available");
-  const [collapsedGroups,setCollapsedGroups] = useState<Set<string>>(new Set());
-  const [editingMsgId,setEditingMsgId] = useState<string|null>(null);
-  const [editText,setEditText]         = useState("");
-  const [selectedFile,setSelectedFile] = useState<File|null>(null);
-  const [uploading,setUploading]       = useState(false);
-  const [incomingCall,setIncomingCall] = useState<Call|null>(null);
-  const [activeCall,setActiveCall]     = useState<Call|null>(null);
-  const [isMuted,setIsMuted]           = useState(false);
-  const [isVideoOff,setIsVideoOff]     = useState(false);
-  const [callTimer,setCallTimer]       = useState(0);
-  const [userStatuses,setUserStatuses] = useState<Record<string,{status:UserStatus;online:boolean}>>({});
+  const [tab, setTab] = useState<"chats" | "calls">("chats");
+  const [activeTab, setActiveTab] = useState<"all" | "direct" | "groups">("all");
+  const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [text, setText] = useState("");
+  const [typing, setTyping] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [groupName, setGroupName] = useState("");
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showDots, setShowDots] = useState(false);
+  const [myStatus, setMyStatus] = useState<UserStatus>("available");
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [incomingCall, setIncomingCall] = useState<Call | null>(null);
+  const [activeCall, setActiveCall] = useState<Call | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isVideoOff, setIsVideoOff] = useState(false);
+  const [callTimer, setCallTimer] = useState(0);
+  const [userStatuses, setUserStatuses] = useState<Record<string, { status: UserStatus; online: boolean }>>({});
 
   // ── NEW: Group Settings state ─────────────────────────────────────────────
-  const [showGroupSettings,setShowGroupSettings] = useState(false);
-  const [groupData,setGroupData]       = useState<any>(null);
-  const avatarFileRef                  = useRef<HTMLInputElement>(null);
+  const [showGroupSettings, setShowGroupSettings] = useState(false);
+  const [groupData, setGroupData] = useState<any>(null);
+  const avatarFileRef = useRef<HTMLInputElement>(null);
 
-  const msgsEnd   = useRef<HTMLDivElement>(null);
+  const msgsEnd = useRef<HTMLDivElement>(null);
   const typingRef = useRef<any>(null);
-  const peerRef   = useRef<RTCPeerConnection|null>(null);
-  const streamRef = useRef<MediaStream|null>(null);
-  const timerRef  = useRef<any>(null);
-  const fileRef   = useRef<HTMLInputElement>(null);
-  const iceQueue  = useRef<RTCIceCandidateInit[]>([]);
-  const dotsRef   = useRef<HTMLDivElement>(null);
+  const peerRef = useRef<RTCPeerConnection | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const timerRef = useRef<any>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const iceQueue = useRef<RTCIceCandidateInit[]>([]);
+  const dotsRef = useRef<HTMLDivElement>(null);
 
-  const localVideoRef  = useRef<HTMLVideoElement>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const localAudioRef  = useRef<HTMLAudioElement>(null);
+  const localAudioRef = useRef<HTMLAudioElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
-  const callTypeRef    = useRef<"video"|"audio">("audio");
+  const callTypeRef = useRef<"video" | "audio">("audio");
 
-  const chatId = useMemo(()=>selectedChat?.id||null,[selectedChat]);
+  const chatId = useMemo(() => selectedChat?.id || null, [selectedChat]);
 
   // ── Derived admin check ───────────────────────────────────────────────────
   const isAdmin = groupData?.admins?.includes(user?.uid);
 
   // ── Ringtone helpers ──────────────────────────────────────────────────────
-  const ringCtxRef  = useRef<AudioContext|null>(null);
-  const ringLoopRef = useRef<ReturnType<typeof setInterval>|null>(null);
+  const ringCtxRef = useRef<AudioContext | null>(null);
+  const ringLoopRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(()=>{
+  useEffect(() => {
     const unlock = () => {
-      if(!ringCtxRef.current){
-        ringCtxRef.current = new (window.AudioContext||(window as any).webkitAudioContext)();
+      if (!ringCtxRef.current) {
+        ringCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       }
-      if(ringCtxRef.current.state==="suspended") ringCtxRef.current.resume().catch(()=>{});
+      if (ringCtxRef.current.state === "suspended") ringCtxRef.current.resume().catch(() => { });
       document.removeEventListener("click", unlock);
       document.removeEventListener("keydown", unlock);
       document.removeEventListener("touchstart", unlock);
@@ -331,23 +331,23 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
     document.addEventListener("click", unlock);
     document.addEventListener("keydown", unlock);
     document.addEventListener("touchstart", unlock);
-    return()=>{
+    return () => {
       document.removeEventListener("click", unlock);
       document.removeEventListener("keydown", unlock);
       document.removeEventListener("touchstart", unlock);
     };
-  },[]);
+  }, []);
 
   const stopRing = () => {
-    if(ringLoopRef.current){clearInterval(ringLoopRef.current);ringLoopRef.current=null;}
+    if (ringLoopRef.current) { clearInterval(ringLoopRef.current); ringLoopRef.current = null; }
   };
 
   const playRingCycle = (ctx: AudioContext) => {
-    if(ctx.state==="suspended") ctx.resume().catch(()=>{});
+    if (ctx.state === "suspended") ctx.resume().catch(() => { });
     const now = ctx.currentTime;
-    [[0, 0.4],[0.5, 0.9]].forEach(([start, end])=>{
-      [440, 480].forEach(freq=>{
-        const osc  = ctx.createOscillator();
+    [[0, 0.4], [0.5, 0.9]].forEach(([start, end]) => {
+      [440, 480].forEach(freq => {
+        const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain); gain.connect(ctx.destination);
         osc.type = "sine"; osc.frequency.value = freq;
@@ -363,261 +363,261 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
   const startRing = () => {
     stopRing();
     try {
-      if(!ringCtxRef.current)
-        ringCtxRef.current = new (window.AudioContext||(window as any).webkitAudioContext)();
+      if (!ringCtxRef.current)
+        ringCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       const ctx = ringCtxRef.current;
       const doPlay = () => playRingCycle(ctx);
       ctx.resume().then(doPlay).catch(doPlay);
-      ringLoopRef.current = setInterval(()=>{
-        if(ringCtxRef.current) playRingCycle(ringCtxRef.current);
+      ringLoopRef.current = setInterval(() => {
+        if (ringCtxRef.current) playRingCycle(ringCtxRef.current);
       }, 3000);
-    } catch(e){ /* AudioContext unavailable */ }
+    } catch (e) { /* AudioContext unavailable */ }
   };
 
-  useEffect(()=>{
-    if(incomingCall){ startRing(); } else { stopRing(); }
-    return()=>stopRing();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[!!incomingCall]);
+  useEffect(() => {
+    if (incomingCall) { startRing(); } else { stopRing(); }
+    return () => stopRing();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!incomingCall]);
 
-  useEffect(()=>{
-    if(activeCall?.status==="ringing"&&activeCall.callerId===user?.uid){ startRing(); }
+  useEffect(() => {
+    if (activeCall?.status === "ringing" && activeCall.callerId === user?.uid) { startRing(); }
     else { stopRing(); }
-    return()=>stopRing();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[activeCall?.status]);
+    return () => stopRing();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCall?.status]);
 
-  useEffect(()=>{
-    const h=(e:MouseEvent)=>{
-      if(dotsRef.current&&!dotsRef.current.contains(e.target as Node)) setShowDots(false);
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (dotsRef.current && !dotsRef.current.contains(e.target as Node)) setShowDots(false);
     };
-    document.addEventListener("mousedown",h);
-    return()=>document.removeEventListener("mousedown",h);
-  },[]);
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
 
-  useEffect(()=>{
-    if(!user)return;
-    const upd=()=>setDoc(doc(db,"userStatus",user.uid),{online:true,status:myStatus,lastSeen:serverTimestamp()},{merge:true});
-    upd(); const iv=setInterval(upd,30000);
-    return()=>{clearInterval(iv);setDoc(doc(db,"userStatus",user.uid),{online:false,lastSeen:serverTimestamp()},{merge:true});};
-  },[user,myStatus]);
+  useEffect(() => {
+    if (!user) return;
+    const upd = () => setDoc(doc(db, "userStatus", user.uid), { online: true, status: myStatus, lastSeen: serverTimestamp() }, { merge: true });
+    upd(); const iv = setInterval(upd, 30000);
+    return () => { clearInterval(iv); setDoc(doc(db, "userStatus", user.uid), { online: false, lastSeen: serverTimestamp() }, { merge: true }); };
+  }, [user, myStatus]);
 
-  useEffect(()=>{
-    const subs=users.map(u=>onSnapshot(doc(db,"userStatus",u.uid),snap=>{
-      if(snap.exists()) setUserStatuses(p=>({...p,[u.uid]:{status:snap.data().status||"offline",online:snap.data().online||false}}));
+  useEffect(() => {
+    const subs = users.map(u => onSnapshot(doc(db, "userStatus", u.uid), snap => {
+      if (snap.exists()) setUserStatuses(p => ({ ...p, [u.uid]: { status: snap.data().status || "offline", online: snap.data().online || false } }));
     }));
-    return()=>subs.forEach(s=>s());
-  },[users]);
+    return () => subs.forEach(s => s());
+  }, [users]);
 
-  useEffect(()=>{
-    if(!user)return;
-    const q=query(collection(db,"notifications"),where("toUid","==",user.uid),where("read","==",false),orderBy("timestamp","desc"));
-    return onSnapshot(q,snap=>setNotifications(snap.docs.map(d=>({id:d.id,...d.data()}))));
-  },[user]);
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "notifications"), where("toUid", "==", user.uid), where("read", "==", false), orderBy("timestamp", "desc"));
+    return onSnapshot(q, snap => setNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+  }, [user]);
 
-  useEffect(()=>{
-    if(activeCall?.status==="accepted"){
-      setCallTimer(0); timerRef.current=setInterval(()=>setCallTimer(p=>p+1),1000);
+  useEffect(() => {
+    if (activeCall?.status === "accepted") {
+      setCallTimer(0); timerRef.current = setInterval(() => setCallTimer(p => p + 1), 1000);
     } else { clearInterval(timerRef.current); setCallTimer(0); }
-    return()=>clearInterval(timerRef.current);
-  },[activeCall?.status]);
+    return () => clearInterval(timerRef.current);
+  }, [activeCall?.status]);
 
-  useEffect(()=>{
-    if(!user)return;
-    const q=query(collection(db,"calls"),where("receiverId","==",user.uid),where("status","==","ringing"));
-    return onSnapshot(q,snap=>snap.forEach(d=>setIncomingCall({id:d.id,...d.data()} as Call)));
-  },[user]);
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "calls"), where("receiverId", "==", user.uid), where("status", "==", "ringing"));
+    return onSnapshot(q, snap => snap.forEach(d => setIncomingCall({ id: d.id, ...d.data() } as Call)));
+  }, [user]);
 
-  useEffect(()=>{
-    if(!activeCall?.id)return;
-    return onSnapshot(doc(db,"calls",activeCall.id),async snap=>{
-      if(!snap.exists()){endCall();return;}
-      const call={id:snap.id,...snap.data()} as Call;
-      if(call.answer&&peerRef.current&&!peerRef.current.remoteDescription){
+  useEffect(() => {
+    if (!activeCall?.id) return;
+    return onSnapshot(doc(db, "calls", activeCall.id), async snap => {
+      if (!snap.exists()) { endCall(); return; }
+      const call = { id: snap.id, ...snap.data() } as Call;
+      if (call.answer && peerRef.current && !peerRef.current.remoteDescription) {
         await peerRef.current.setRemoteDescription(new RTCSessionDescription(call.answer));
-        for(const c of iceQueue.current)
+        for (const c of iceQueue.current)
           await peerRef.current.addIceCandidate(new RTCIceCandidate(c)).catch(console.error);
-        iceQueue.current=[];
+        iceQueue.current = [];
       }
-      if(call.status==="ended"||call.status==="rejected"){ endCall(); return; }
-      setActiveCall(prev=>{
-        if(!prev) return call;
-        if(prev.status!==call.status||prev.answer!==call.answer) return call;
+      if (call.status === "ended" || call.status === "rejected") { endCall(); return; }
+      setActiveCall(prev => {
+        if (!prev) return call;
+        if (prev.status !== call.status || prev.answer !== call.answer) return call;
         return prev;
       });
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[activeCall?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCall?.id]);
 
-  useEffect(()=>{msgsEnd.current?.scrollIntoView({behavior:"smooth"});},[messages]);
+  useEffect(() => { msgsEnd.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-  useEffect(()=>{
-    if(!user)return;
-    const init=users.filter(u=>u.uid!==user.uid).map(u=>{
-      const id=[user.uid,u.uid].sort().join("_");
-      return{id,participants:[user.uid,u.uid],unreadCount:{[user.uid]:0},isGroup:false} as Chat;
+  useEffect(() => {
+    if (!user) return;
+    const init = users.filter(u => u.uid !== user.uid).map(u => {
+      const id = [user.uid, u.uid].sort().join("_");
+      return { id, participants: [user.uid, u.uid], unreadCount: { [user.uid]: 0 }, isGroup: false } as Chat;
     });
     setChats(init);
-    const subs:(()=>void)[]=[];
-    users.forEach(u=>{
-      if(u.uid===user.uid)return;
-      const id=[user.uid,u.uid].sort().join("_");
-      subs.push(onSnapshot(query(collection(db,"chats",id,"messages"),orderBy("createdAt","desc")),snap=>{
-        const unread=snap.docs.filter(d=>{const dd=d.data();return dd.senderUid!==user.uid&&(!dd.readBy||!dd.readBy.includes(user.uid));}).length;
-        const last=snap.docs[0]?.data();
-        setChats(prev=>prev.map(c=>c.id===id?{...c,unreadCount:{...c.unreadCount,[user.uid]:unread},lastMessage:last?.text||last?.fileName||"File",lastMessageTime:last?.createdAt}:c));
+    const subs: (() => void)[] = [];
+    users.forEach(u => {
+      if (u.uid === user.uid) return;
+      const id = [user.uid, u.uid].sort().join("_");
+      subs.push(onSnapshot(query(collection(db, "chats", id, "messages"), orderBy("createdAt", "desc")), snap => {
+        const unread = snap.docs.filter(d => { const dd = d.data(); return dd.senderUid !== user.uid && (!dd.readBy || !dd.readBy.includes(user.uid)); }).length;
+        const last = snap.docs[0]?.data();
+        setChats(prev => prev.map(c => c.id === id ? { ...c, unreadCount: { ...c.unreadCount, [user.uid]: unread }, lastMessage: last?.text || last?.fileName || "File", lastMessageTime: last?.createdAt } : c));
       }));
     });
-    const gu=onSnapshot(query(collection(db,"groupChats"),where("participants","array-contains",user.uid)),snap=>{
-      snap.forEach(gDoc=>{
-        const gd=gDoc.data();
-        subs.push(onSnapshot(query(collection(db,"groupChats",gDoc.id,"messages"),orderBy("createdAt","desc")),mSnap=>{
-          const unread=mSnap.docs.filter(d=>{const dd=d.data();return dd.senderUid!==user.uid&&(!dd.readBy||!dd.readBy.includes(user.uid));}).length;
-          const last=mSnap.docs[0]?.data();
-          setChats(prev=>{
-            const ex=prev.find(c=>c.id===gDoc.id);
-            if(ex) return prev.map(c=>c.id===gDoc.id?{...c,unreadCount:{...c.unreadCount,[user.uid]:unread},lastMessage:last?.text||last?.fileName||"File",lastMessageTime:last?.createdAt}:c);
-            return[...prev,{id:gDoc.id,participants:gd.participants,unreadCount:{[user.uid]:unread},lastMessage:last?.text||last?.fileName||"File",lastMessageTime:last?.createdAt,isGroup:true,groupName:gd.groupName,groupAvatar:gd.groupAvatar,createdBy:gd.createdBy,admins:gd.admins}];
+    const gu = onSnapshot(query(collection(db, "groupChats"), where("participants", "array-contains", user.uid)), snap => {
+      snap.forEach(gDoc => {
+        const gd = gDoc.data();
+        subs.push(onSnapshot(query(collection(db, "groupChats", gDoc.id, "messages"), orderBy("createdAt", "desc")), mSnap => {
+          const unread = mSnap.docs.filter(d => { const dd = d.data(); return dd.senderUid !== user.uid && (!dd.readBy || !dd.readBy.includes(user.uid)); }).length;
+          const last = mSnap.docs[0]?.data();
+          setChats(prev => {
+            const ex = prev.find(c => c.id === gDoc.id);
+            if (ex) return prev.map(c => c.id === gDoc.id ? { ...c, unreadCount: { ...c.unreadCount, [user.uid]: unread }, lastMessage: last?.text || last?.fileName || "File", lastMessageTime: last?.createdAt } : c);
+            return [...prev, { id: gDoc.id, participants: gd.participants, unreadCount: { [user.uid]: unread }, lastMessage: last?.text || last?.fileName || "File", lastMessageTime: last?.createdAt, isGroup: true, groupName: gd.groupName, groupAvatar: gd.groupAvatar, createdBy: gd.createdBy, admins: gd.admins }];
           });
         }));
       });
     });
-    return()=>{subs.forEach(s=>s());gu();};
-  },[user,users]);
+    return () => { subs.forEach(s => s()); gu(); };
+  }, [user, users]);
 
-  useEffect(()=>{
-    if(!chatId||!selectedChat)return;
-    const path=selectedChat.isGroup?`groupChats/${chatId}/messages`:`chats/${chatId}/messages`;
-    return onSnapshot(query(collection(db,path),orderBy("createdAt","asc")),snap=>{
-      const data=snap.docs.map(d=>({id:d.id,...d.data()} as Message));
+  useEffect(() => {
+    if (!chatId || !selectedChat) return;
+    const path = selectedChat.isGroup ? `groupChats/${chatId}/messages` : `chats/${chatId}/messages`;
+    return onSnapshot(query(collection(db, path), orderBy("createdAt", "asc")), snap => {
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as Message));
       setMessages(data);
-      const batch=writeBatch(db);
-      data.forEach(m=>{if(m.senderUid!==user?.uid&&(!m.readBy||!m.readBy.includes(user!.uid))) batch.update(doc(db,path,m.id),{readBy:[...(m.readBy||[]),user!.uid],status:"seen"});});
+      const batch = writeBatch(db);
+      data.forEach(m => { if (m.senderUid !== user?.uid && (!m.readBy || !m.readBy.includes(user!.uid))) batch.update(doc(db, path, m.id), { readBy: [...(m.readBy || []), user!.uid], status: "seen" }); });
       batch.commit();
     });
-  },[chatId,selectedChat,user]);
+  }, [chatId, selectedChat, user]);
 
-  useEffect(()=>{
-    if(!chatId||!selectedChat)return;
-    const tp=selectedChat.isGroup?`groupChats/${chatId}/typing`:`chats/${chatId}/typing`;
-    return onSnapshot(query(collection(db,tp)),snap=>{
-      const t:string[]=[];
-      snap.forEach(d=>{if(d.id!==user?.uid&&d.data().typing){const u2=users.find(u=>u.uid===d.id);if(u2)t.push(u2.name??u2.email??"User");}});
+  useEffect(() => {
+    if (!chatId || !selectedChat) return;
+    const tp = selectedChat.isGroup ? `groupChats/${chatId}/typing` : `chats/${chatId}/typing`;
+    return onSnapshot(query(collection(db, tp)), snap => {
+      const t: string[] = [];
+      snap.forEach(d => { if (d.id !== user?.uid && d.data().typing) { const u2 = users.find(u => u.uid === d.id); if (u2) t.push(u2.name ?? u2.email ?? "User"); } });
       setTyping(t);
     });
-  },[chatId,selectedChat,user,users]);
+  }, [chatId, selectedChat, user, users]);
 
   // ── NEW: Listen to live group data ────────────────────────────────────────
-  useEffect(()=>{
-    if(!selectedChat?.isGroup) return;
-    const unsub = onSnapshot(doc(db,"groupChats",selectedChat.id),(snap)=>{
-      if(snap.exists()) setGroupData({id:snap.id,...snap.data()});
+  useEffect(() => {
+    if (!selectedChat?.isGroup) return;
+    const unsub = onSnapshot(doc(db, "groupChats", selectedChat.id), (snap) => {
+      if (snap.exists()) setGroupData({ id: snap.id, ...snap.data() });
     });
-    return()=>unsub();
-  },[selectedChat]);
+    return () => unsub();
+  }, [selectedChat]);
 
-  const handleTyping=async()=>{
-    if(!chatId||!user||!selectedChat)return;
-    const tp=selectedChat.isGroup?`groupChats/${chatId}/typing`:`chats/${chatId}/typing`;
-    await setDoc(doc(db,tp,user.uid),{typing:true,timestamp:serverTimestamp()});
+  const handleTyping = async () => {
+    if (!chatId || !user || !selectedChat) return;
+    const tp = selectedChat.isGroup ? `groupChats/${chatId}/typing` : `chats/${chatId}/typing`;
+    await setDoc(doc(db, tp, user.uid), { typing: true, timestamp: serverTimestamp() });
     clearTimeout(typingRef.current);
-    typingRef.current=setTimeout(()=>deleteDoc(doc(db,tp,user.uid)),1500);
+    typingRef.current = setTimeout(() => deleteDoc(doc(db, tp, user.uid)), 1500);
   };
 
-  const sendText=async()=>{
-    if((!text.trim()&&!selectedFile)||!chatId||!user||!selectedChat)return;
+  const sendText = async () => {
+    if ((!text.trim() && !selectedFile) || !chatId || !user || !selectedChat) return;
     setUploading(true);
-    try{
-      let fu="",fn="",ft="";
-      if(selectedFile){const r=ref(storage,`chat-files/${chatId}/${Date.now()}_${selectedFile.name}`);await uploadBytes(r,selectedFile);fu=await getDownloadURL(r);fn=selectedFile.name;ft=selectedFile.type;}
-      const path=selectedChat.isGroup?`groupChats/${chatId}/messages`:`chats/${chatId}/messages`;
-      const msg:any={senderUid:user.uid,senderName:getUserName(user),status:"sent",readBy:[user.uid],createdAt:serverTimestamp()};
-      if(text.trim())msg.text=text;if(fu){msg.fileUrl=fu;msg.fileName=fn;msg.fileType=ft;}
-      await addDoc(collection(db,path),msg);
-      const others=selectedChat.participants.filter(p=>p!==user.uid);
-      for(const pid of others) await addDoc(collection(db,"notifications"),{fromUid:user.uid,fromName:getUserName(user),toUid:pid,message:text||fn||"Sent a file",chatId,timestamp:serverTimestamp(),read:false});
-      const tp=selectedChat.isGroup?`groupChats/${chatId}/typing`:`chats/${chatId}/typing`;
-      await deleteDoc(doc(db,tp,user.uid));
-      setText("");setSelectedFile(null);
-    }catch(e){console.error(e);}finally{setUploading(false);}
+    try {
+      let fu = "", fn = "", ft = "";
+      if (selectedFile) { const r = ref(storage, `chat-files/${chatId}/${Date.now()}_${selectedFile.name}`); await uploadBytes(r, selectedFile); fu = await getDownloadURL(r); fn = selectedFile.name; ft = selectedFile.type; }
+      const path = selectedChat.isGroup ? `groupChats/${chatId}/messages` : `chats/${chatId}/messages`;
+      const msg: any = { senderUid: user.uid, senderName: getUserName(user), status: "sent", readBy: [user.uid], createdAt: serverTimestamp() };
+      if (text.trim()) msg.text = text; if (fu) { msg.fileUrl = fu; msg.fileName = fn; msg.fileType = ft; }
+      await addDoc(collection(db, path), msg);
+      const others = selectedChat.participants.filter(p => p !== user.uid);
+      for (const pid of others) await addDoc(collection(db, "notifications"), { fromUid: user.uid, fromName: getUserName(user), toUid: pid, message: text || fn || "Sent a file", chatId, timestamp: serverTimestamp(), read: false });
+      const tp = selectedChat.isGroup ? `groupChats/${chatId}/typing` : `chats/${chatId}/typing`;
+      await deleteDoc(doc(db, tp, user.uid));
+      setText(""); setSelectedFile(null);
+    } catch (e) { console.error(e); } finally { setUploading(false); }
   };
 
-  const deleteMsg=async(id:string)=>{
-    if(!selectedChat||!chatId)return;
-    await deleteDoc(doc(db,selectedChat.isGroup?`groupChats/${chatId}/messages`:`chats/${chatId}/messages`,id));
+  const deleteMsg = async (id: string) => {
+    if (!selectedChat || !chatId) return;
+    await deleteDoc(doc(db, selectedChat.isGroup ? `groupChats/${chatId}/messages` : `chats/${chatId}/messages`, id));
   };
-  const saveEdit=async()=>{
-    if(!editingMsgId||!editText.trim()||!selectedChat||!chatId)return;
-    await updateDoc(doc(db,selectedChat.isGroup?`groupChats/${chatId}/messages`:`chats/${chatId}/messages`,editingMsgId),{text:editText,isEdited:true,editedAt:serverTimestamp()});
-    setEditingMsgId(null);setEditText("");
+  const saveEdit = async () => {
+    if (!editingMsgId || !editText.trim() || !selectedChat || !chatId) return;
+    await updateDoc(doc(db, selectedChat.isGroup ? `groupChats/${chatId}/messages` : `chats/${chatId}/messages`, editingMsgId), { text: editText, isEdited: true, editedAt: serverTimestamp() });
+    setEditingMsgId(null); setEditText("");
   };
 
-  const changeStatus=async(s:UserStatus)=>{
+  const changeStatus = async (s: UserStatus) => {
     setMyStatus(s);
-    if(user) await updateDoc(doc(db,"userStatus",user.uid),{status:s,online:s!=="offline"});
+    if (user) await updateDoc(doc(db, "userStatus", user.uid), { status: s, online: s !== "offline" });
   };
 
-  const markAllRead=async()=>{
-    const b=writeBatch(db);
-    notifications.forEach(n=>b.update(doc(db,"notifications",n.id),{read:true}));
+  const markAllRead = async () => {
+    const b = writeBatch(db);
+    notifications.forEach(n => b.update(doc(db, "notifications", n.id), { read: true }));
     await b.commit();
   };
 
   // ── Group Management Functions ─────────────────────────────────────────────
 
-  const addMember=async(uid:string)=>{
-    if(!groupData)return;
-    await updateDoc(doc(db,"groupChats",groupData.id),{
-      participants:[...groupData.participants,uid],
+  const addMember = async (uid: string) => {
+    if (!groupData) return;
+    await updateDoc(doc(db, "groupChats", groupData.id), {
+      participants: [...groupData.participants, uid],
     });
   };
 
-  const removeMember=async(uid:string)=>{
-    if(!groupData)return;
-    await updateDoc(doc(db,"groupChats",groupData.id),{
-      participants:groupData.participants.filter((u:string)=>u!==uid),
-      admins:groupData.admins?.filter((a:string)=>a!==uid),
+  const removeMember = async (uid: string) => {
+    if (!groupData) return;
+    await updateDoc(doc(db, "groupChats", groupData.id), {
+      participants: groupData.participants.filter((u: string) => u !== uid),
+      admins: groupData.admins?.filter((a: string) => a !== uid),
     });
   };
 
-  const toggleAdmin=async(uid:string)=>{
-    if(!groupData)return;
-    const isAlreadyAdmin=groupData.admins?.includes(uid);
-    await updateDoc(doc(db,"groupChats",groupData.id),{
-      admins:isAlreadyAdmin
-        ?groupData.admins.filter((a:string)=>a!==uid)
-        :[...(groupData.admins||[]),uid],
+  const toggleAdmin = async (uid: string) => {
+    if (!groupData) return;
+    const isAlreadyAdmin = groupData.admins?.includes(uid);
+    await updateDoc(doc(db, "groupChats", groupData.id), {
+      admins: isAlreadyAdmin
+        ? groupData.admins.filter((a: string) => a !== uid)
+        : [...(groupData.admins || []), uid],
     });
   };
 
-  const renameGroup=async(newName:string)=>{
-    if(!groupData||!newName.trim())return;
-    await updateDoc(doc(db,"groupChats",groupData.id),{groupName:newName.trim()});
+  const renameGroup = async (newName: string) => {
+    if (!groupData || !newName.trim()) return;
+    await updateDoc(doc(db, "groupChats", groupData.id), { groupName: newName.trim() });
   };
 
-  const changeGroupAvatar=async(file:File)=>{
-    if(!groupData)return;
-    const storageRef=ref(storage,`group-avatar/${groupData.id}`);
-    await uploadBytes(storageRef,file);
-    const url=await getDownloadURL(storageRef);
-    await updateDoc(doc(db,"groupChats",groupData.id),{groupAvatar:url});
+  const changeGroupAvatar = async (file: File) => {
+    if (!groupData) return;
+    const storageRef = ref(storage, `group-avatar/${groupData.id}`);
+    await uploadBytes(storageRef, file);
+    const url = await getDownloadURL(storageRef);
+    await updateDoc(doc(db, "groupChats", groupData.id), { groupAvatar: url });
   };
 
-  const leaveGroup=async()=>{
-    if(!groupData||!user)return;
-    if(!confirm("Leave this group?"))return;
-    await updateDoc(doc(db,"groupChats",groupData.id),{
-      participants:groupData.participants.filter((u:string)=>u!==user.uid),
-      admins:groupData.admins?.filter((a:string)=>a!==user.uid),
+  const leaveGroup = async () => {
+    if (!groupData || !user) return;
+    if (!confirm("Leave this group?")) return;
+    await updateDoc(doc(db, "groupChats", groupData.id), {
+      participants: groupData.participants.filter((u: string) => u !== user.uid),
+      admins: groupData.admins?.filter((a: string) => a !== user.uid),
     });
     setShowGroupSettings(false);
     setSelectedChat(null);
   };
 
-  const deleteGroup=async()=>{
-    if(!groupData)return;
-    if(!confirm("Delete this group for everyone?"))return;
-    await deleteDoc(doc(db,"groupChats",groupData.id));
+  const deleteGroup = async () => {
+    if (!groupData) return;
+    if (!confirm("Delete this group for everyone?")) return;
+    await deleteDoc(doc(db, "groupChats", groupData.id));
     setShowGroupSettings(false);
     setSelectedChat(null);
   };
@@ -626,350 +626,354 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
   const buildOnTrack = (pc: RTCPeerConnection) => {
     pc.ontrack = (e) => {
       const remoteStream = e.streams[0];
-      if(callTypeRef.current === "video"){
-        if(remoteVideoRef.current){
+      if (callTypeRef.current === "video") {
+        if (remoteVideoRef.current) {
           remoteVideoRef.current.srcObject = remoteStream;
           remoteVideoRef.current.muted = false;
-          remoteVideoRef.current.play().catch(err=>console.warn("remote video autoplay:", err));
+          remoteVideoRef.current.play().catch(err => console.warn("remote video autoplay:", err));
         }
       } else {
-        if(remoteAudioRef.current){
+        if (remoteAudioRef.current) {
           remoteAudioRef.current.srcObject = remoteStream;
           remoteAudioRef.current.muted = false;
-          remoteAudioRef.current.play().catch(err=>console.warn("remote audio autoplay:", err));
+          remoteAudioRef.current.play().catch(err => console.warn("remote audio autoplay:", err));
         }
       }
     };
   };
 
-  const attachLocalStream = (stream: MediaStream, type: "video"|"audio") => {
-    if(type === "video" && localVideoRef.current) localVideoRef.current.srcObject = stream;
-    if(type === "audio" && localAudioRef.current) localAudioRef.current.srcObject = stream;
+  const attachLocalStream = (stream: MediaStream, type: "video" | "audio") => {
+    if (type === "video" && localVideoRef.current) localVideoRef.current.srcObject = stream;
+    if (type === "audio" && localAudioRef.current) localAudioRef.current.srcObject = stream;
   };
 
-  const initiateCall=async(type:"video"|"audio")=>{
-    if(!user||!selectedChat||selectedChat.isGroup)return;
-    const rid=selectedChat.participants.find(p=>p!==user.uid);if(!rid)return;
-    const recv=users.find(u=>u.uid===rid);if(!recv)return;
+  const initiateCall = async (type: "video" | "audio") => {
+    if (!user || !selectedChat || selectedChat.isGroup) return;
+    const rid = selectedChat.participants.find(p => p !== user.uid); if (!rid) return;
+    const recv = users.find(u => u.uid === rid); if (!recv) return;
     callTypeRef.current = type;
-    try{
-      const stream=await navigator.mediaDevices.getUserMedia({
-        video:type==="video"?{width:1280,height:720,facingMode:"user"}:false,
-        audio:{echoCancellation:true,noiseSuppression:true,sampleRate:48000},
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: type === "video" ? { width: 1280, height: 720, facingMode: "user" } : false,
+        audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 48000 },
       });
-      streamRef.current=stream;
-      attachLocalStream(stream,type);
-      const pc=new RTCPeerConnection(ICE_SERVERS);
-      peerRef.current=pc;
-      stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+      streamRef.current = stream;
+      attachLocalStream(stream, type);
+      const pc = new RTCPeerConnection(ICE_SERVERS);
+      peerRef.current = pc;
+      stream.getTracks().forEach(t => pc.addTrack(t, stream));
       buildOnTrack(pc);
-      const offer=await pc.createOffer({offerToReceiveAudio:true,offerToReceiveVideo:type==="video"});
+      const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: type === "video" });
       await pc.setLocalDescription(offer);
-      const cd=await addDoc(collection(db,"calls"),{callerId:user.uid,callerName:getUserName(user),receiverId:rid,type,status:"ringing",offer:{type:offer.type,sdp:offer.sdp},startTime:serverTimestamp()});
-      const oc=collection(db,"calls",cd.id,"offerCandidates");
-      const ac=collection(db,"calls",cd.id,"answerCandidates");
-      pc.onicecandidate=async e=>{if(e.candidate)await addDoc(oc,e.candidate.toJSON());};
-      onSnapshot(ac,snap=>snap.docChanges().forEach(ch=>{
-        if(ch.type==="added"){const d=ch.doc.data();if(pc.remoteDescription)pc.addIceCandidate(new RTCIceCandidate(d)).catch(console.error);else iceQueue.current.push(d);}
+      const cd = await addDoc(collection(db, "calls"), { callerId: user.uid, callerName: getUserName(user), receiverId: rid, type, status: "ringing", offer: { type: offer.type, sdp: offer.sdp }, startTime: serverTimestamp() });
+      const oc = collection(db, "calls", cd.id, "offerCandidates");
+      const ac = collection(db, "calls", cd.id, "answerCandidates");
+      pc.onicecandidate = async e => { if (e.candidate) await addDoc(oc, e.candidate.toJSON()); };
+      onSnapshot(ac, snap => snap.docChanges().forEach(ch => {
+        if (ch.type === "added") { const d = ch.doc.data(); if (pc.remoteDescription) pc.addIceCandidate(new RTCIceCandidate(d)).catch(console.error); else iceQueue.current.push(d); }
       }));
-      pc.onconnectionstatechange=()=>{if(pc.connectionState==="failed"||pc.connectionState==="disconnected")endCall();};
-      setActiveCall({id:cd.id,callerId:user.uid,callerName:getUserName(user),receiverId:rid,type,status:"ringing"});
-    }catch(e){console.error(e);alert("Camera/mic access failed.");}
+      pc.onconnectionstatechange = () => { if (pc.connectionState === "failed" || pc.connectionState === "disconnected") endCall(); };
+      setActiveCall({ id: cd.id, callerId: user.uid, callerName: getUserName(user), receiverId: rid, type, status: "ringing" });
+    } catch (e) { console.error(e); alert("Camera/mic access failed."); }
   };
 
-  const acceptCall=async()=>{
-    if(!incomingCall||!user)return;
+  const acceptCall = async () => {
+    if (!incomingCall || !user) return;
     callTypeRef.current = incomingCall.type;
-    try{
-      const stream=await navigator.mediaDevices.getUserMedia({
-        video:incomingCall.type==="video"?{width:1280,height:720,facingMode:"user"}:false,
-        audio:{echoCancellation:true,noiseSuppression:true,sampleRate:48000},
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: incomingCall.type === "video" ? { width: 1280, height: 720, facingMode: "user" } : false,
+        audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 48000 },
       });
-      streamRef.current=stream;
-      attachLocalStream(stream,incomingCall.type);
-      const pc=new RTCPeerConnection(ICE_SERVERS);
-      peerRef.current=pc;
-      stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+      streamRef.current = stream;
+      attachLocalStream(stream, incomingCall.type);
+      const pc = new RTCPeerConnection(ICE_SERVERS);
+      peerRef.current = pc;
+      stream.getTracks().forEach(t => pc.addTrack(t, stream));
       buildOnTrack(pc);
-      for(const c of iceQueue.current)
+      for (const c of iceQueue.current)
         await pc.addIceCandidate(new RTCIceCandidate(c)).catch(console.error);
-      iceQueue.current=[];
+      iceQueue.current = [];
       await pc.setRemoteDescription(new RTCSessionDescription(incomingCall.offer));
-      const answer=await pc.createAnswer();
+      const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      await updateDoc(doc(db,"calls",incomingCall.id),{status:"accepted",answer:{type:answer.type,sdp:answer.sdp}});
-      const oc=collection(db,"calls",incomingCall.id,"offerCandidates");
-      const ac=collection(db,"calls",incomingCall.id,"answerCandidates");
-      pc.onicecandidate=async e=>{if(e.candidate)await addDoc(ac,e.candidate.toJSON());};
-      onSnapshot(oc,snap=>snap.docChanges().forEach(ch=>{
-        if(ch.type==="added"){const d=ch.doc.data();if(pc.remoteDescription)pc.addIceCandidate(new RTCIceCandidate(d)).catch(console.error);else iceQueue.current.push(d);}
+      await updateDoc(doc(db, "calls", incomingCall.id), { status: "accepted", answer: { type: answer.type, sdp: answer.sdp } });
+      const oc = collection(db, "calls", incomingCall.id, "offerCandidates");
+      const ac = collection(db, "calls", incomingCall.id, "answerCandidates");
+      pc.onicecandidate = async e => { if (e.candidate) await addDoc(ac, e.candidate.toJSON()); };
+      onSnapshot(oc, snap => snap.docChanges().forEach(ch => {
+        if (ch.type === "added") { const d = ch.doc.data(); if (pc.remoteDescription) pc.addIceCandidate(new RTCIceCandidate(d)).catch(console.error); else iceQueue.current.push(d); }
       }));
-      pc.onconnectionstatechange=()=>{if(pc.connectionState==="failed"||pc.connectionState==="disconnected")endCall();};
-      setActiveCall({...incomingCall,status:"accepted"});
+      pc.onconnectionstatechange = () => { if (pc.connectionState === "failed" || pc.connectionState === "disconnected") endCall(); };
+      setActiveCall({ ...incomingCall, status: "accepted" });
       setIncomingCall(null);
       stopRing();
-    }catch(e){console.error(e);rejectCall();}
+    } catch (e) { console.error(e); rejectCall(); }
   };
 
-  const rejectCall=async()=>{
-    if(!incomingCall)return;
+  const rejectCall = async () => {
+    if (!incomingCall) return;
     stopRing();
-    await updateDoc(doc(db,"calls",incomingCall.id),{status:"rejected",endTime:serverTimestamp()});
-    await addDoc(collection(db,"callHistory"),{callerId:incomingCall.callerId,callerName:incomingCall.callerName,receiverId:incomingCall.receiverId,receiverName:getUserName(user),type:incomingCall.type,status:"rejected",timestamp:serverTimestamp(),participants:[incomingCall.callerId,incomingCall.receiverId]});
+    await updateDoc(doc(db, "calls", incomingCall.id), { status: "rejected", endTime: serverTimestamp() });
+    await addDoc(collection(db, "callHistory"), { callerId: incomingCall.callerId, callerName: incomingCall.callerName, receiverId: incomingCall.receiverId, receiverName: getUserName(user), type: incomingCall.type, status: "rejected", timestamp: serverTimestamp(), participants: [incomingCall.callerId, incomingCall.receiverId] });
     setIncomingCall(null);
   };
 
-  const endCall=async()=>{
+  const endCall = async () => {
     stopRing();
-    streamRef.current?.getTracks().forEach(t=>t.stop());
+    streamRef.current?.getTracks().forEach(t => t.stop());
     peerRef.current?.close();
-    if(localVideoRef.current)  localVideoRef.current.srcObject  = null;
-    if(remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-    if(localAudioRef.current)  localAudioRef.current.srcObject  = null;
-    if(remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
-    if(activeCall){
-      try{
-        const snap=await getDoc(doc(db,"calls",activeCall.id));
-        if(snap.exists()){
-          const data=snap.data();
-          if(data.status!=="ended"&&data.status!=="rejected")
-            await updateDoc(doc(db,"calls",activeCall.id),{status:"ended",endTime:serverTimestamp()});
-          const dur=data.startTime?.toMillis()?Math.floor((Date.now()-data.startTime.toMillis())/1000):0;
-          await addDoc(collection(db,"callHistory"),{callerId:activeCall.callerId,callerName:activeCall.callerName,receiverId:activeCall.receiverId,receiverName:getUserName(users.find(u=>u.uid===activeCall.receiverId)),type:activeCall.type,status:activeCall.status==="accepted"?"completed":"missed",duration:dur,timestamp:serverTimestamp(),participants:[activeCall.callerId,activeCall.receiverId]});
+    if (localVideoRef.current) localVideoRef.current.srcObject = null;
+    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+    if (localAudioRef.current) localAudioRef.current.srcObject = null;
+    if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
+    if (activeCall) {
+      try {
+        const snap = await getDoc(doc(db, "calls", activeCall.id));
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.status !== "ended" && data.status !== "rejected")
+            await updateDoc(doc(db, "calls", activeCall.id), { status: "ended", endTime: serverTimestamp() });
+          const dur = data.startTime?.toMillis() ? Math.floor((Date.now() - data.startTime.toMillis()) / 1000) : 0;
+          await addDoc(collection(db, "callHistory"), { callerId: activeCall.callerId, callerName: activeCall.callerName, receiverId: activeCall.receiverId, receiverName: getUserName(users.find(u => u.uid === activeCall.receiverId)), type: activeCall.type, status: activeCall.status === "accepted" ? "completed" : "missed", duration: dur, timestamp: serverTimestamp(), participants: [activeCall.callerId, activeCall.receiverId] });
         }
-      }catch(e){console.error(e);}
+      } catch (e) { console.error(e); }
     }
     clearInterval(timerRef.current);
-    streamRef.current=null; peerRef.current=null;
+    streamRef.current = null; peerRef.current = null;
     setActiveCall(null); setIsMuted(false); setIsVideoOff(false); setCallTimer(0);
   };
 
-  const fmtT=(s:number)=>{const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return h>0?`${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`:`${m}:${String(sec).padStart(2,"0")}`;};
+  const fmtT = (s: number) => { const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60; return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}` : `${m}:${String(sec).padStart(2, "0")}`; };
 
   // ── UPDATED: createGroup now adds admins field ────────────────────────────
-  const createGroup=async()=>{
-    if(!groupName.trim()||selectedMembers.length<2||!user)return;
-    const all=[...selectedMembers,user.uid];
-    const gr=await addDoc(collection(db,"groupChats"),{
-      groupName:groupName.trim(),
-      participants:all,
-      createdBy:user.uid,
-      admins:[user.uid], // ✅ creator is admin
-      createdAt:serverTimestamp(),
+  const createGroup = async () => {
+    if (!groupName.trim() || selectedMembers.length < 2 || !user) return;
+    const all = [...selectedMembers, user.uid];
+    const gr = await addDoc(collection(db, "groupChats"), {
+      groupName: groupName.trim(),
+      participants: all,
+      createdBy: user.uid,
+      admins: [user.uid], // ✅ creator is admin
+      createdAt: serverTimestamp(),
     });
-    await addDoc(collection(db,"groupChats",gr.id,"messages"),{text:`${getUserName(user)} created "${groupName.trim()}"`,senderUid:"system",senderName:"System",createdAt:serverTimestamp(),readBy:all});
-    setGroupName("");setSelectedMembers([]);setShowCreateGroup(false);
-    setSelectedChat({id:gr.id,participants:all,isGroup:true,groupName:groupName.trim(),createdBy:user.uid,admins:[user.uid]});
+    await addDoc(collection(db, "groupChats", gr.id, "messages"), { text: `${getUserName(user)} created "${groupName.trim()}"`, senderUid: "system", senderName: "System", createdAt: serverTimestamp(), readBy: all });
+    setGroupName(""); setSelectedMembers([]); setShowCreateGroup(false);
+    setSelectedChat({ id: gr.id, participants: all, isGroup: true, groupName: groupName.trim(), createdBy: user.uid, admins: [user.uid] });
   };
 
-  const getChatName=(c:Chat)=>{if(c.isGroup)return c.groupName||"Group";const ou=users.find(u=>u.uid===c.participants.find(p=>p!==user?.uid));return ou?.name||ou?.email||"Unknown";};
-  const getChatOU=(c:Chat)=>users.find(u=>u.uid===c.participants.find(p=>p!==user?.uid));
-  const getUnread=(id:string)=>(!user?0:chats.find(c=>c.id===id)?.unreadCount?.[user.uid]||0);
-  const getOUSt=(c:Chat):UserStatus=>{if(c.isGroup)return"offline";const ou=getChatOU(c);if(!ou)return"offline";return userStatuses[ou.uid]?.status||"offline";};
+  const getChatName = (c: Chat) => { if (c.isGroup) return c.groupName || "Group"; const ou = users.find(u => u.uid === c.participants.find(p => p !== user?.uid)); return ou?.name || ou?.email || "Unknown"; };
+  const getChatOU = (c: Chat) => users.find(u => u.uid === c.participants.find(p => p !== user?.uid));
+  const getUnread = (id: string) => (!user ? 0 : chats.find(c => c.id === id)?.unreadCount?.[user.uid] || 0);
+  const getOUSt = (c: Chat): UserStatus => { if (c.isGroup) return "offline"; const ou = getChatOU(c); if (!ou) return "offline"; return userStatuses[ou.uid]?.status || "offline"; };
 
-  const filteredChats=chats.filter(c=>{
-    if(activeTab==="direct"&&c.isGroup)return false;
-    if(activeTab==="groups"&&!c.isGroup)return false;
-    if(!searchQuery)return true;
-    const q=searchQuery.toLowerCase();
-    if(c.isGroup)return c.groupName?.toLowerCase().includes(q);
-    const ou=getChatOU(c);return ou?.name?.toLowerCase().includes(q)||ou?.email?.toLowerCase().includes(q);
-  }).sort((a,b)=>{
-    if(a.lastMessageTime&&b.lastMessageTime) return(b.lastMessageTime?.toMillis()||0)-(a.lastMessageTime?.toMillis()||0);
-    if(a.lastMessageTime)return-1;if(b.lastMessageTime)return 1;
+  const filteredChats = chats.filter(c => {
+    if (activeTab === "direct" && c.isGroup) return false;
+    if (activeTab === "groups" && !c.isGroup) return false;
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    if (c.isGroup) return c.groupName?.toLowerCase().includes(q);
+    const ou = getChatOU(c); return ou?.name?.toLowerCase().includes(q) || ou?.email?.toLowerCase().includes(q);
+  }).sort((a, b) => {
+    if (a.lastMessageTime && b.lastMessageTime) return (b.lastMessageTime?.toMillis() || 0) - (a.lastMessageTime?.toMillis() || 0);
+    if (a.lastMessageTime) return -1; if (b.lastMessageTime) return 1;
     return getChatName(a).localeCompare(getChatName(b));
   });
 
-  const availGroups=useMemo(()=>{
-    const G=[
-      {key:"available",label:"Available",      color:"#22c55e",items:[] as Chat[]},
-      {key:"busy",     label:"Busy",            color:"#ef4444",items:[] as Chat[]},
-      {key:"lunch",    label:"Out for Lunch 🍽️",color:"#a855f7",items:[] as Chat[]},
-      {key:"brb",      label:"Be Right Back",   color:"#f59e0b",items:[] as Chat[]},
-      {key:"away",     label:"Away",            color:"#f59e0b",items:[] as Chat[]},
-      {key:"dnd",      label:"Do Not Disturb",  color:"#ef4444",items:[] as Chat[]},
-      {key:"offline",  label:"Offline",         color:"#9ca3af",items:[] as Chat[]},
-      {key:"groups",   label:"Group Chats",     color:"#0891b2",items:[] as Chat[]},
+  const availGroups = useMemo(() => {
+    const G = [
+      { key: "available", label: "Available", color: "#22c55e", items: [] as Chat[] },
+      { key: "busy", label: "Busy", color: "#ef4444", items: [] as Chat[] },
+      { key: "lunch", label: "Out for Lunch 🍽️", color: "#a855f7", items: [] as Chat[] },
+      { key: "brb", label: "Be Right Back", color: "#f59e0b", items: [] as Chat[] },
+      { key: "away", label: "Away", color: "#f59e0b", items: [] as Chat[] },
+      { key: "dnd", label: "Do Not Disturb", color: "#ef4444", items: [] as Chat[] },
+      { key: "offline", label: "Offline", color: "#9ca3af", items: [] as Chat[] },
+      { key: "groups", label: "Group Chats", color: "#0891b2", items: [] as Chat[] },
     ];
-    filteredChats.forEach(c=>{
-      if(c.isGroup){G[7].items.push(c);return;}
-      const st=getOUSt(c);
-      const g=G.find(g=>g.key===st)||G[6];
+    filteredChats.forEach(c => {
+      if (c.isGroup) { G[7].items.push(c); return; }
+      const st = getOUSt(c);
+      const g = G.find(g => g.key === st) || G[6];
       g.items.push(c);
     });
-    return G.filter(g=>g.items.length>0);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[filteredChats,userStatuses]);
+    return G.filter(g => g.items.length > 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredChats, userStatuses]);
 
-  const toggleGrp=(key:string)=>setCollapsedGroups(p=>{const n=new Set(p);n.has(key)?n.delete(key):n.add(key);return n;});
-  const otherCallUser=useMemo(()=>{
-    if(!activeCall)return null;
-    return users.find(u=>u.uid===(activeCall.callerId===user?.uid?activeCall.receiverId:activeCall.callerId))??null;
-  },[users,activeCall,user]);
+  const toggleGrp = (key: string) => setCollapsedGroups(p => { const n = new Set(p); n.has(key) ? n.delete(key) : n.add(key); return n; });
+  const otherCallUser = useMemo(() => {
+    if (!activeCall) return null;
+    return users.find(u => u.uid === (activeCall.callerId === user?.uid ? activeCall.receiverId : activeCall.callerId)) ?? null;
+  }, [users, activeCall, user]);
 
   // ── JSX ───────────────────────────────────────────────────────────────────
-  return(
+  return (
     <>
       <style>{CSS}</style>
-      <input ref={fileRef} type="file" className="sr-only" onChange={e=>e.target.files?.[0]&&setSelectedFile(e.target.files[0])}/>
+      <input ref={fileRef} type="file" className="sr-only" onChange={e => e.target.files?.[0] && setSelectedFile(e.target.files[0])} />
       {/* Hidden avatar file input for group settings */}
-      <input ref={avatarFileRef} type="file" accept="image/*" className="sr-only" onChange={e=>{if(e.target.files?.[0])changeGroupAvatar(e.target.files[0]);}}/>
+      <input ref={avatarFileRef} type="file" accept="image/*" className="sr-only" onChange={e => { if (e.target.files?.[0]) changeGroupAvatar(e.target.files[0]); }} />
 
       {/* ── HIDDEN AUDIO ELEMENTS ── */}
-      <audio ref={localAudioRef}  autoPlay muted style={{display:"none"}}/>
-      <audio ref={remoteAudioRef} autoPlay       style={{display:"none"}}/>
+      <audio ref={localAudioRef} autoPlay muted style={{ display: "none" }} />
+      <audio ref={remoteAudioRef} autoPlay style={{ display: "none" }} />
 
       {/* ── INCOMING CALL ── */}
-      {incomingCall&&(
+      {incomingCall && (
         <div className="zc-incoming">
           <div className="zc-inc-card">
-            {(()=>{const c=users.find(u=>u.uid===incomingCall.callerId);const[g1,g2]=avGrad(incomingCall.callerName);
-              return c?.profilePhoto?<div className="zc-inc-av"><img src={c.profilePhoto} alt=""/></div>:<div className="zc-inc-av" style={{background:`linear-gradient(135deg,${g1},${g2})`}}>{initials(incomingCall.callerName)}</div>;})()}
-            <div style={{fontSize:19,fontWeight:700,color:"#1a1d23",marginBottom:3}}>{incomingCall.callerName}</div>
-            <div style={{fontSize:12.5,color:"#6b7280"}}>Incoming {incomingCall.type} call</div>
-            <div className="zc-inc-dots"><div className="zc-inc-dot"/><div className="zc-inc-dot"/><div className="zc-inc-dot"/></div>
+            {(() => {
+              const c = users.find(u => u.uid === incomingCall.callerId); const [g1, g2] = avGrad(incomingCall.callerName);
+              return c?.profilePhoto ? <div className="zc-inc-av"><img src={c.profilePhoto} alt="" /></div> : <div className="zc-inc-av" style={{ background: `linear-gradient(135deg,${g1},${g2})` }}>{initials(incomingCall.callerName)}</div>;
+            })()}
+            <div style={{ fontSize: 19, fontWeight: 700, color: "#1a1d23", marginBottom: 3 }}>{incomingCall.callerName}</div>
+            <div style={{ fontSize: 12.5, color: "#6b7280" }}>Incoming {incomingCall.type} call</div>
+            <div className="zc-inc-dots"><div className="zc-inc-dot" /><div className="zc-inc-dot" /><div className="zc-inc-dot" /></div>
             <div className="zc-inc-btns">
-              <button className="zc-inc-btn rej" onClick={rejectCall}><svg width="26" height="26" fill="none" stroke="#ef4444" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z"/></svg></button>
-              <button className="zc-inc-btn acc" onClick={acceptCall}><svg width="26" height="26" fill="none" stroke="#16a34a" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg></button>
+              <button className="zc-inc-btn rej" onClick={rejectCall}><svg width="26" height="26" fill="none" stroke="#ef4444" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" /></svg></button>
+              <button className="zc-inc-btn acc" onClick={acceptCall}><svg width="26" height="26" fill="none" stroke="#16a34a" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg></button>
             </div>
           </div>
         </div>
       )}
 
       {/* ── ACTIVE CALL ── */}
-      {activeCall&&(
+      {activeCall && (
         <div className="zc-call-ov">
           <div className="zc-call-main">
-            {activeCall.type==="video"
-              ? <video ref={remoteVideoRef} autoPlay playsInline style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+            {activeCall.type === "video"
+              ? <video ref={remoteVideoRef} autoPlay playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               : <div className="zc-call-audio-center">
-                  {otherCallUser?.profilePhoto
-                    ?<div style={{width:120,height:120,borderRadius:28,overflow:"hidden"}}><img src={otherCallUser.profilePhoto} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/></div>
-                    :<div style={{width:120,height:120,borderRadius:28,background:`linear-gradient(135deg,${avGrad(getUserName(otherCallUser))[0]},${avGrad(getUserName(otherCallUser))[1]})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:44,fontWeight:800,color:"#fff"}}>{initials(getUserName(otherCallUser))}</div>
-                  }
-                  <div style={{color:"#fff",fontSize:22,fontWeight:700,fontFamily:"'DM Sans',sans-serif"}}>{getUserName(otherCallUser)}</div>
-                  <div style={{color:"rgba(255,255,255,.45)",fontSize:14,fontFamily:"'DM Sans',sans-serif"}}>{activeCall.status==="ringing"?"Calling…":fmtT(callTimer)}</div>
-                </div>
+                {otherCallUser?.profilePhoto
+                  ? <div style={{ width: 120, height: 120, borderRadius: 28, overflow: "hidden" }}><img src={otherCallUser.profilePhoto} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="" /></div>
+                  : <div style={{ width: 120, height: 120, borderRadius: 28, background: `linear-gradient(135deg,${avGrad(getUserName(otherCallUser))[0]},${avGrad(getUserName(otherCallUser))[1]})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 44, fontWeight: 800, color: "#fff" }}>{initials(getUserName(otherCallUser))}</div>
+                }
+                <div style={{ color: "#fff", fontSize: 22, fontWeight: 700, fontFamily: "'DM Sans',sans-serif" }}>{getUserName(otherCallUser)}</div>
+                <div style={{ color: "rgba(255,255,255,.45)", fontSize: 14, fontFamily: "'DM Sans',sans-serif" }}>{activeCall.status === "ringing" ? "Calling…" : fmtT(callTimer)}</div>
+              </div>
             }
-            {activeCall.type==="video"&&(
-              <div style={{position:"absolute",bottom:16,right:16,width:180,height:135,borderRadius:12,overflow:"hidden",border:"2px solid rgba(255,255,255,.2)"}}>
-                <video ref={localVideoRef} autoPlay playsInline muted style={{width:"100%",height:"100%",objectFit:"cover"}}/>
-                {isVideoOff&&<div style={{position:"absolute",inset:0,background:"#161b22",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,color:"rgba(255,255,255,.4)",fontFamily:"'DM Sans',sans-serif"}}>Camera off</div>}
+            {activeCall.type === "video" && (
+              <div style={{ position: "absolute", bottom: 16, right: 16, width: 180, height: 135, borderRadius: 12, overflow: "hidden", border: "2px solid rgba(255,255,255,.2)" }}>
+                <video ref={localVideoRef} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                {isVideoOff && <div style={{ position: "absolute", inset: 0, background: "#161b22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "rgba(255,255,255,.4)", fontFamily: "'DM Sans',sans-serif" }}>Camera off</div>}
               </div>
             )}
-            <div className="zc-call-badge">{activeCall.status==="ringing"?"Calling…":fmtT(callTimer)}</div>
+            <div className="zc-call-badge">{activeCall.status === "ringing" ? "Calling…" : fmtT(callTimer)}</div>
           </div>
           <div className="zc-call-bar">
-            <button className={`zc-cbtn ${isMuted?"act":"neu"}`} onClick={()=>{streamRef.current?.getAudioTracks().forEach(t=>t.enabled=!t.enabled);setIsMuted(p=>!p);}}>
+            <button className={`zc-cbtn ${isMuted ? "act" : "neu"}`} onClick={() => { streamRef.current?.getAudioTracks().forEach(t => t.enabled = !t.enabled); setIsMuted(p => !p); }}>
               {isMuted
-                ?<svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 005.12 2.12M15 9.34V4a3 3 0 00-5.94-.6"/><path d="M17 16.95A7 7 0 015 12v-2m14 0v2a7 7 0 01-.11 1.23M12 19v3M8 23h8"/></svg>
-                :<svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
+                ? <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="1" y1="1" x2="23" y2="23" /><path d="M9 9v3a3 3 0 005.12 2.12M15 9.34V4a3 3 0 00-5.94-.6" /><path d="M17 16.95A7 7 0 015 12v-2m14 0v2a7 7 0 01-.11 1.23M12 19v3M8 23h8" /></svg>
+                : <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" /><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8" /></svg>
               }
             </button>
-            {activeCall.type==="video"&&(
-              <button className={`zc-cbtn ${isVideoOff?"act":"neu"}`} onClick={()=>{streamRef.current?.getVideoTracks().forEach(t=>t.enabled=!t.enabled);setIsVideoOff(p=>!p);}}>
+            {activeCall.type === "video" && (
+              <button className={`zc-cbtn ${isVideoOff ? "act" : "neu"}`} onClick={() => { streamRef.current?.getVideoTracks().forEach(t => t.enabled = !t.enabled); setIsVideoOff(p => !p); }}>
                 {isVideoOff
-                  ?<svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M16 16l4.553 2.276A1 1 0 0022 17.382v-6.764a1 1 0 00-1.447-.894L16 12"/><rect x="2" y="6" width="14" height="12" rx="2"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                  :<svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                  ? <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M16 16l4.553 2.276A1 1 0 0022 17.382v-6.764a1 1 0 00-1.447-.894L16 12" /><rect x="2" y="6" width="14" height="12" rx="2" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+                  : <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                 }
               </button>
             )}
-            <button className="zc-cbtn end" onClick={endCall}><svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z"/></svg></button>
+            <button className="zc-cbtn end" onClick={endCall}><svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" /></svg></button>
           </div>
         </div>
       )}
 
       {/* ── CREATE GROUP MODAL ── */}
-      {showCreateGroup&&(
-        <div className="zc-mbk" onClick={e=>e.target===e.currentTarget&&setShowCreateGroup(false)}>
+      {showCreateGroup && (
+        <div className="zc-mbk" onClick={e => e.target === e.currentTarget && setShowCreateGroup(false)}>
           <div className="zc-modal">
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
-              <div style={{fontSize:15,fontWeight:700,color:"#1a1d23"}}>Create Group Chat</div>
-              <button style={{background:"none",border:"none",cursor:"pointer",color:"#9aa0ad",fontSize:20}} onClick={()=>setShowCreateGroup(false)}>×</button>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1d23" }}>Create Group Chat</div>
+              <button style={{ background: "none", border: "none", cursor: "pointer", color: "#9aa0ad", fontSize: 20 }} onClick={() => setShowCreateGroup(false)}>×</button>
             </div>
             <div className="zc-mlbl">Group Name</div>
-            <input className="zc-mi" placeholder="e.g. Project Alpha" value={groupName} onChange={e=>setGroupName(e.target.value)}/>
+            <input className="zc-mi" placeholder="e.g. Project Alpha" value={groupName} onChange={e => setGroupName(e.target.value)} />
             <div className="zc-mlbl">Members ({selectedMembers.length} selected)</div>
             <div className="zc-mlist">
-              {users.filter(u=>u.uid!==user?.uid).map(u=>{const sel=selectedMembers.includes(u.uid);const[g1,g2]=avGrad(getUserName(u));
-                return(<div key={u.uid} className={`zc-mitm${sel?" sel":""}`} onClick={()=>setSelectedMembers(p=>sel?p.filter(x=>x!==u.uid):[...p,u.uid])}>
-                  <div className={`zc-chk${sel?" on":""}`}>{sel&&<svg width="9" height="7" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6"/></svg>}</div>
-                  <div className="zc-av" style={{background:`linear-gradient(135deg,${g1},${g2})`,width:28,height:28,borderRadius:8,fontSize:10}}>{initials(getUserName(u))}</div>
-                  <div style={{fontSize:13,fontWeight:600,color:"#1a1d23"}}>{u.name||u.email}</div>
-                </div>);})}
+              {users.filter(u => u.uid !== user?.uid).map(u => {
+                const sel = selectedMembers.includes(u.uid); const [g1, g2] = avGrad(getUserName(u));
+                return (<div key={u.uid} className={`zc-mitm${sel ? " sel" : ""}`} onClick={() => setSelectedMembers(p => sel ? p.filter(x => x !== u.uid) : [...p, u.uid])}>
+                  <div className={`zc-chk${sel ? " on" : ""}`}>{sel && <svg width="9" height="7" fill="none" stroke="#fff" strokeWidth="2.5" viewBox="0 0 10 8"><path d="M1 4l3 3 5-6" /></svg>}</div>
+                  <div className="zc-av" style={{ background: `linear-gradient(135deg,${g1},${g2})`, width: 28, height: 28, borderRadius: 8, fontSize: 10 }}>{initials(getUserName(u))}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1d23" }}>{u.name || u.email}</div>
+                </div>);
+              })}
             </div>
             <div className="zc-mfooter">
-              <button className="zc-btn ghost" onClick={()=>{setShowCreateGroup(false);setGroupName("");setSelectedMembers([]);}}>Cancel</button>
-              <button className="zc-btn primary" disabled={!groupName.trim()||selectedMembers.length<2} onClick={createGroup}>Create Group</button>
+              <button className="zc-btn ghost" onClick={() => { setShowCreateGroup(false); setGroupName(""); setSelectedMembers([]); }}>Cancel</button>
+              <button className="zc-btn primary" disabled={!groupName.trim() || selectedMembers.length < 2} onClick={createGroup}>Create Group</button>
             </div>
           </div>
         </div>
       )}
 
       {/* ── GROUP SETTINGS MODAL ── */}
-      {showGroupSettings&&groupData&&(
-        <div className="zc-mbk" onClick={e=>e.target===e.currentTarget&&setShowGroupSettings(false)}>
+      {showGroupSettings && groupData && (
+        <div className="zc-mbk" onClick={e => e.target === e.currentTarget && setShowGroupSettings(false)}>
           <div className="zc-modal">
             {/* Header */}
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
-              <div style={{fontSize:15,fontWeight:700,color:"#1a1d23"}}>Group Settings</div>
-              <button style={{background:"none",border:"none",cursor:"pointer",color:"#9aa0ad",fontSize:20,lineHeight:1}} onClick={()=>setShowGroupSettings(false)}>×</button>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1d23" }}>Group Settings</div>
+              <button style={{ background: "none", border: "none", cursor: "pointer", color: "#9aa0ad", fontSize: 20, lineHeight: 1 }} onClick={() => setShowGroupSettings(false)}>×</button>
             </div>
 
             {/* Group Avatar */}
-            <div style={{display:"flex",flexDirection:"column",alignItems:"center",margin:"12px 0 4px"}}>
-              <div style={{position:"relative",cursor:"pointer"}} onClick={()=>avatarFileRef.current?.click()}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", margin: "12px 0 4px" }}>
+              <div style={{ position: "relative", cursor: "pointer" }} onClick={() => avatarFileRef.current?.click()}>
                 <div className="zc-av" style={{
-                  background:groupData.groupAvatar?"transparent":`linear-gradient(135deg,#0891b2,#22d3ee)`,
-                  width:64,height:64,borderRadius:16,fontSize:22,
+                  background: groupData.groupAvatar ? "transparent" : `linear-gradient(135deg,#0891b2,#22d3ee)`,
+                  width: 64, height: 64, borderRadius: 16, fontSize: 22,
                 }}>
-                  {groupData.groupAvatar?<img src={groupData.groupAvatar} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:initials(groupData.groupName||"G")}
+                  {groupData.groupAvatar ? <img src={groupData.groupAvatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : initials(groupData.groupName || "G")}
                 </div>
-                {isAdmin&&<div style={{position:"absolute",bottom:-4,right:-4,width:20,height:20,borderRadius:"50%",background:"#e8512a",border:"2px solid #fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff"}}>✏️</div>}
+                {isAdmin && <div style={{ position: "absolute", bottom: -4, right: -4, width: 20, height: 20, borderRadius: "50%", background: "#e8512a", border: "2px solid #fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#fff" }}>✏️</div>}
               </div>
             </div>
 
             {/* Group Name */}
             <div className="zc-mlbl">Group Name</div>
             {isAdmin
-              ?<input className="zc-mi" defaultValue={groupData.groupName} onBlur={e=>renameGroup(e.target.value)} placeholder="Group name"/>
-              :<div style={{fontSize:14,fontWeight:600,color:"#1a1d23",padding:"8px 0"}}>{groupData.groupName}</div>
+              ? <input className="zc-mi" defaultValue={groupData.groupName} onBlur={e => renameGroup(e.target.value)} placeholder="Group name" />
+              : <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1d23", padding: "8px 0" }}>{groupData.groupName}</div>
             }
 
             {/* Members */}
-            <div className="zc-mlbl" style={{marginTop:14}}>
-              Members ({groupData.participants?.length||0})
+            <div className="zc-mlbl" style={{ marginTop: 14 }}>
+              Members ({groupData.participants?.length || 0})
             </div>
             <div className="zc-mlist">
-              {(groupData.participants||[]).map((uid:string)=>{
-                const u=users.find(x=>x.uid===uid);
-                const uName=u?.name||u?.email||"Unknown";
-                const isUserAdmin=groupData.admins?.includes(uid);
-                const isSelf=uid===user?.uid;
-                const[g1,g2]=avGrad(uName);
-                return(
+              {(groupData.participants || []).map((uid: string) => {
+                const u = users.find(x => x.uid === uid);
+                const uName = u?.name || u?.email || "Unknown";
+                const isUserAdmin = groupData.admins?.includes(uid);
+                const isSelf = uid === user?.uid;
+                const [g1, g2] = avGrad(uName);
+                return (
                   <div key={uid} className="zc-gs-member">
-                    <div className="zc-av" style={{background:`linear-gradient(135deg,${g1},${g2})`,width:32,height:32,borderRadius:9,fontSize:11,flexShrink:0}}>
-                      {u?.profilePhoto?<img src={u.profilePhoto} alt=""/>:initials(uName)}
+                    <div className="zc-av" style={{ background: `linear-gradient(135deg,${g1},${g2})`, width: 32, height: 32, borderRadius: 9, fontSize: 11, flexShrink: 0 }}>
+                      {u?.profilePhoto ? <img src={u.profilePhoto} alt="" /> : initials(uName)}
                     </div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:13,fontWeight:600,color:"#1a1d23",display:"flex",alignItems:"center",gap:5}}>
-                        {uName}{isSelf&&<span style={{fontSize:10,color:"#9aa0ad"}}>(you)</span>}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1d23", display: "flex", alignItems: "center", gap: 5 }}>
+                        {uName}{isSelf && <span style={{ fontSize: 10, color: "#9aa0ad" }}>(you)</span>}
                       </div>
-                      {isUserAdmin&&<div style={{fontSize:10.5,color:"#f59e0b",fontWeight:700,marginTop:1}}>👑 Admin</div>}
+                      {isUserAdmin && <div style={{ fontSize: 10.5, color: "#f59e0b", fontWeight: 700, marginTop: 1 }}>👑 Admin</div>}
                     </div>
-                    {isAdmin&&!isSelf&&(
-                      <div style={{display:"flex",gap:5,flexShrink:0}}>
+                    {isAdmin && !isSelf && (
+                      <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
                         <button
                           className="zc-gs-mbtn admin"
-                          onClick={()=>toggleAdmin(uid)}
-                          title={isUserAdmin?"Remove admin":"Make admin"}
+                          onClick={() => toggleAdmin(uid)}
+                          title={isUserAdmin ? "Remove admin" : "Make admin"}
                         >
-                          {isUserAdmin?"- Admin":"+ Admin"}
+                          {isUserAdmin ? "- Admin" : "+ Admin"}
                         </button>
                         <button
                           className="zc-gs-mbtn remove"
-                          onClick={()=>removeMember(uid)}
+                          onClick={() => removeMember(uid)}
                           title="Remove from group"
                         >
                           Remove
@@ -982,22 +986,22 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
             </div>
 
             {/* Add Member — admins only */}
-            {isAdmin&&(()=>{
-              const nonMembers=users.filter(u=>!(groupData.participants||[]).includes(u.uid));
-              if(nonMembers.length===0)return null;
-              return(
+            {isAdmin && (() => {
+              const nonMembers = users.filter(u => !(groupData.participants || []).includes(u.uid));
+              if (nonMembers.length === 0) return null;
+              return (
                 <>
-                  <div className="zc-mlbl" style={{marginTop:14}}>Add Member</div>
+                  <div className="zc-mlbl" style={{ marginTop: 14 }}>Add Member</div>
                   <div className="zc-gs-add-list">
-                    {nonMembers.map(u=>{
-                      const uName=getUserName(u);const[g1,g2]=avGrad(uName);
-                      return(
-                        <div key={u.uid} className="zc-gs-add-item" onClick={()=>addMember(u.uid)}>
-                          <div className="zc-av" style={{background:`linear-gradient(135deg,${g1},${g2})`,width:28,height:28,borderRadius:8,fontSize:10,flexShrink:0}}>
-                            {u.profilePhoto?<img src={u.profilePhoto} alt=""/>:initials(uName)}
+                    {nonMembers.map(u => {
+                      const uName = getUserName(u); const [g1, g2] = avGrad(uName);
+                      return (
+                        <div key={u.uid} className="zc-gs-add-item" onClick={() => addMember(u.uid)}>
+                          <div className="zc-av" style={{ background: `linear-gradient(135deg,${g1},${g2})`, width: 28, height: 28, borderRadius: 8, fontSize: 10, flexShrink: 0 }}>
+                            {u.profilePhoto ? <img src={u.profilePhoto} alt="" /> : initials(uName)}
                           </div>
                           <span>{uName}</span>
-                          <span style={{fontSize:18,color:"#22c55e"}}>➕</span>
+                          <span style={{ fontSize: 18, color: "#22c55e" }}>➕</span>
                         </div>
                       );
                     })}
@@ -1007,12 +1011,12 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
             })()}
 
             {/* Footer actions */}
-            <div className="zc-mfooter" style={{justifyContent:"space-between"}}>
+            <div className="zc-mfooter" style={{ justifyContent: "space-between" }}>
               <button className="zc-btn danger" onClick={leaveGroup}>
                 🚪 Leave Group
               </button>
-              {isAdmin&&(
-                <button className="zc-btn primary" onClick={deleteGroup} style={{background:"#ef4444"}}>
+              {isAdmin && (
+                <button className="zc-btn primary" onClick={deleteGroup} style={{ background: "#ef4444" }}>
                   🗑 Delete Group
                 </button>
               )}
@@ -1033,57 +1037,57 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
         </div> */}
 
         {/* ── CHATS TAB ── */}
-        {tab==="chats"&&(
+        {tab === "chats" && (
           <>
             <div className="zc-panel">
               <div className="zc-panel-hd">
                 <div className="zc-panel-title-row">
                   <div className="zc-panel-title">Chats</div>
-                  <button className="zc-icon-btn" onClick={()=>setShowCreateGroup(true)} title="New group">
-                    <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg>
+                  <button className="zc-icon-btn" onClick={() => setShowCreateGroup(true)} title="New group">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" /></svg>
                   </button>
                 </div>
                 <div className="zc-search-wrap">
-                  <svg className="zc-search-ico" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-                  <input className="zc-search" placeholder="Search chats" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}/>
+                  <svg className="zc-search-ico" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
+                  <input className="zc-search" placeholder="Search chats" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                 </div>
                 <div className="zc-tabs">
-                  {(["all","direct","groups"] as const).map(t=>(
-                    <button key={t} className={`zc-tab${activeTab===t?" on":""}`} onClick={()=>setActiveTab(t)}>{t.charAt(0).toUpperCase()+t.slice(1)}</button>
+                  {(["all", "direct", "groups"] as const).map(t => (
+                    <button key={t} className={`zc-tab${activeTab === t ? " on" : ""}`} onClick={() => setActiveTab(t)}>{t.charAt(0).toUpperCase() + t.slice(1)}</button>
                   ))}
                 </div>
               </div>
               <div className="zc-chat-list">
-                {availGroups.length===0&&<div style={{padding:"28px 14px",textAlign:"center",fontSize:13,color:"#9aa0ad"}}>No chats found</div>}
-                {availGroups.map(group=>{
-                  const collapsed=collapsedGroups.has(group.key);
-                  return(
+                {availGroups.length === 0 && <div style={{ padding: "28px 14px", textAlign: "center", fontSize: 13, color: "#9aa0ad" }}>No chats found</div>}
+                {availGroups.map(group => {
+                  const collapsed = collapsedGroups.has(group.key);
+                  return (
                     <div key={group.key}>
-                      <div className="zc-group-divider" onClick={()=>toggleGrp(group.key)}>
-                        <div style={{width:8,height:8,borderRadius:"50%",background:group.color,flexShrink:0}}/>
-                        <div className="zc-group-label" style={{color:group.color}}>{group.label}</div>
-                        <div className="zc-group-count" style={{background:group.color+"20",color:group.color}}>{group.items.length}</div>
-                        <div className={`zc-group-arrow${collapsed?"":" open"}`}>▶</div>
+                      <div className="zc-group-divider" onClick={() => toggleGrp(group.key)}>
+                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: group.color, flexShrink: 0 }} />
+                        <div className="zc-group-label" style={{ color: group.color }}>{group.label}</div>
+                        <div className="zc-group-count" style={{ background: group.color + "20", color: group.color }}>{group.items.length}</div>
+                        <div className={`zc-group-arrow${collapsed ? "" : " open"}`}>▶</div>
                       </div>
-                      {!collapsed&&group.items.map(c=>{
-                        const ou=getChatOU(c);const name=getChatName(c);const unread=getUnread(c.id);
-                        const st=getOUSt(c);const stCfg=STATUS_CONFIG[st];const[g1,g2]=avGrad(name);
-                        return(
-                          <div key={c.id} className={`zc-chat-item${selectedChat?.id===c.id?" on":""}`} onClick={()=>setSelectedChat(c)}>
-                            <div style={{position:"relative",flexShrink:0}}>
-                              <div className="zc-av" style={{background:c.isGroup?`linear-gradient(135deg,#0891b2,#22d3ee)`:`linear-gradient(135deg,${g1},${g2})`,width:38,height:38,borderRadius:10,fontSize:13}}>
-                                {c.groupAvatar?<img src={c.groupAvatar} alt=""/>:ou?.profilePhoto?<img src={ou.profilePhoto} alt=""/>:initials(name)}
+                      {!collapsed && group.items.map(c => {
+                        const ou = getChatOU(c); const name = getChatName(c); const unread = getUnread(c.id);
+                        const st = getOUSt(c); const stCfg = STATUS_CONFIG[st]; const [g1, g2] = avGrad(name);
+                        return (
+                          <div key={c.id} className={`zc-chat-item${selectedChat?.id === c.id ? " on" : ""}`} onClick={() => setSelectedChat(c)}>
+                            <div style={{ position: "relative", flexShrink: 0 }}>
+                              <div className="zc-av" style={{ background: c.isGroup ? `linear-gradient(135deg,#0891b2,#22d3ee)` : `linear-gradient(135deg,${g1},${g2})`, width: 38, height: 38, borderRadius: 10, fontSize: 13 }}>
+                                {c.groupAvatar ? <img src={c.groupAvatar} alt="" /> : ou?.profilePhoto ? <img src={ou.profilePhoto} alt="" /> : initials(name)}
                               </div>
-                              {!c.isGroup&&<div className="zc-sdot" style={{width:10,height:10,background:stCfg.color,border:"2px solid #fff",bottom:-2,right:-2}}/>}
+                              {!c.isGroup && <div className="zc-sdot" style={{ width: 10, height: 10, background: stCfg.color, border: "2px solid #fff", bottom: -2, right: -2 }} />}
                             </div>
                             <div className="zc-chat-meta">
                               <div className="zc-chat-name">
                                 {name}
-                                {!c.isGroup&&st==="available"&&<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>}
+                                {!c.isGroup && st === "available" && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="3"><path d="M20 6L9 17l-5-5" /></svg>}
                               </div>
-                              {c.lastMessage&&<div className="zc-chat-preview">{c.lastMessage}</div>}
+                              {c.lastMessage && <div className="zc-chat-preview">{c.lastMessage}</div>}
                             </div>
-                            {unread>0&&<div className="zc-unread">{unread>9?"9+":unread}</div>}
+                            {unread > 0 && <div className="zc-unread">{unread > 9 ? "9+" : unread}</div>}
                           </div>
                         );
                       })}
@@ -1095,64 +1099,64 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
 
             {/* ── CONVERSATION AREA ── */}
             {!selectedChat
-              ?<div className="zc-main">
+              ? <div className="zc-main">
                 <div className="zc-empty">
                   <div className="zc-empty-ico">💬</div>
-                  <div style={{fontSize:16,fontWeight:700,color:"#374151"}}>Select a conversation</div>
-                  <div style={{fontSize:13,color:"#9aa0ad"}}>Choose a chat or create a group</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#374151" }}>Select a conversation</div>
+                  <div style={{ fontSize: 13, color: "#9aa0ad" }}>Choose a chat or create a group</div>
                 </div>
               </div>
-              :<div className="zc-main">
+              : <div className="zc-main">
                 <div className="zc-conv-hd">
                   <div className="zc-conv-hd-left">
-                    {(()=>{
-                      const ou=getChatOU(selectedChat);const name=getChatName(selectedChat);
-                      const st=getOUSt(selectedChat);const stCfg=STATUS_CONFIG[st];const[g1,g2]=avGrad(name);
-                      return(<>
-                        <div style={{position:"relative"}}>
-                          <div className="zc-av" style={{background:selectedChat.isGroup?`linear-gradient(135deg,#0891b2,#22d3ee)`:`linear-gradient(135deg,${g1},${g2})`,width:36,height:36,borderRadius:10,fontSize:12}}>
-                            {selectedChat.groupAvatar?<img src={selectedChat.groupAvatar} alt=""/>:ou?.profilePhoto?<img src={ou.profilePhoto} alt=""/>:initials(name)}
+                    {(() => {
+                      const ou = getChatOU(selectedChat); const name = getChatName(selectedChat);
+                      const st = getOUSt(selectedChat); const stCfg = STATUS_CONFIG[st]; const [g1, g2] = avGrad(name);
+                      return (<>
+                        <div style={{ position: "relative" }}>
+                          <div className="zc-av" style={{ background: selectedChat.isGroup ? `linear-gradient(135deg,#0891b2,#22d3ee)` : `linear-gradient(135deg,${g1},${g2})`, width: 36, height: 36, borderRadius: 10, fontSize: 12 }}>
+                            {selectedChat.groupAvatar ? <img src={selectedChat.groupAvatar} alt="" /> : ou?.profilePhoto ? <img src={ou.profilePhoto} alt="" /> : initials(name)}
                           </div>
-                          {!selectedChat.isGroup&&<div className="zc-sdot" style={{width:10,height:10,background:stCfg.color,border:"2px solid #fff",bottom:-2,right:-2}}/>}
+                          {!selectedChat.isGroup && <div className="zc-sdot" style={{ width: 10, height: 10, background: stCfg.color, border: "2px solid #fff", bottom: -2, right: -2 }} />}
                         </div>
                         <div>
                           <div className="zc-conv-name">{name}</div>
-                          <div className="zc-conv-sub" style={{color:typing.length>0?"#e8512a":stCfg.color}}>
-                            {typing.length>0?`${typing.join(", ")} ${typing.length===1?"is":"are"} typing…`:selectedChat.isGroup?`${selectedChat.participants.length} members`:stCfg.label}
+                          <div className="zc-conv-sub" style={{ color: typing.length > 0 ? "#e8512a" : stCfg.color }}>
+                            {typing.length > 0 ? `${typing.join(", ")} ${typing.length === 1 ? "is" : "are"} typing…` : selectedChat.isGroup ? `${selectedChat.participants.length} members` : stCfg.label}
                           </div>
                         </div>
                       </>);
                     })()}
                   </div>
-                  <div style={{display:"flex",gap:2,alignItems:"center"}}>
-                    {!selectedChat.isGroup&&(
+                  <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
+                    {!selectedChat.isGroup && (
                       <>
-                        <button className="zc-hd-btn" title="Audio call" onClick={()=>initiateCall("audio")}><svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg></button>
-                        <button className="zc-hd-btn" title="Video call" onClick={()=>initiateCall("video")}><svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg></button>
+                        <button className="zc-hd-btn" title="Audio call" onClick={() => initiateCall("audio")}><svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg></button>
+                        <button className="zc-hd-btn" title="Video call" onClick={() => initiateCall("video")}><svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg></button>
                       </>
                     )}
                     {/* ── GROUP SETTINGS BUTTON ── */}
-                    {selectedChat.isGroup&&(
-                      <button className="zc-hd-btn" title="Group settings" onClick={()=>setShowGroupSettings(true)}>
+                    {selectedChat.isGroup && (
+                      <button className="zc-hd-btn" title="Group settings" onClick={() => setShowGroupSettings(true)}>
                         <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                          <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
-                          <circle cx="9" cy="7" r="4"/>
-                          <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+                          <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                          <circle cx="9" cy="7" r="4" />
+                          <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
                         </svg>
                       </button>
                     )}
-                    <div ref={dotsRef} style={{position:"relative"}}>
-                      <button className="zc-hd-btn" title="More" onClick={()=>setShowDots(p=>!p)}>
-                        <svg width="17" height="17" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+                    <div ref={dotsRef} style={{ position: "relative" }}>
+                      <button className="zc-hd-btn" title="More" onClick={() => setShowDots(p => !p)}>
+                        <svg width="17" height="17" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
                       </button>
-                      {showDots&&(
-                        <div className="zc-dd" style={{width:185,top:38,right:0}}>
+                      {showDots && (
+                        <div className="zc-dd" style={{ width: 185, top: 38, right: 0 }}>
                           <div className="zc-ds">
-                            {[{e:"🔍",l:"Search in chat"},{e:"📌",l:"Pin conversation"},{e:"🔕",l:"Mute notifications"},{e:"📁",l:"View files"},{e:"👤",l:"View profile"},
-                              ...(selectedChat.isGroup?[{e:"⚙️",l:"Group settings",fn:()=>setShowGroupSettings(true)}]:[])].map(item=>(
-                              <div key={item.l} className="zc-di" onClick={()=>{setShowDots(false);(item as any).fn?.();}}><span style={{fontSize:13}}>{item.e}</span>{item.l}</div>
+                            {[{ e: "🔍", l: "Search in chat" }, { e: "📌", l: "Pin conversation" }, { e: "🔕", l: "Mute notifications" }, { e: "📁", l: "View files" }, { e: "👤", l: "View profile" },
+                            ...(selectedChat.isGroup ? [{ e: "⚙️", l: "Group settings", fn: () => setShowGroupSettings(true) }] : [])].map(item => (
+                              <div key={item.l} className="zc-di" onClick={() => { setShowDots(false); (item as any).fn?.(); }}><span style={{ fontSize: 13 }}>{item.e}</span>{item.l}</div>
                             ))}
-                            <div className="zc-di red" onClick={()=>{setShowDots(false);setSelectedChat(null);}}><span style={{fontSize:13}}>🚪</span>Close chat</div>
+                            <div className="zc-di red" onClick={() => { setShowDots(false); setSelectedChat(null); }}><span style={{ fontSize: 13 }}>🚪</span>Close chat</div>
                           </div>
                         </div>
                       )}
@@ -1162,72 +1166,72 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
 
                 {/* ── MESSAGES ── */}
                 <div className="zc-msgs">
-                  {messages.length===0&&<div style={{textAlign:"center",padding:"32px 0",fontSize:13,color:"#9aa0ad"}}>No messages yet — say hello! 👋</div>}
-                  {messages.map((m,i)=>{
-                    const mine=m.senderUid===user?.uid;const isSystem=m.senderUid==="system";
-                    const showAv=i===0||messages[i-1]?.senderUid!==m.senderUid;
-                    const isRead=(m.readBy?.length||0)>1;
-                    const su=users.find(u=>u.uid===m.senderUid);const[sg1,sg2]=avGrad(m.senderName||"?");
-                    if(isSystem)return<div key={m.id} className="zc-sys-msg"><span className="zc-sys-pill">{m.text}</span></div>;
-                    return(
-                      <div key={m.id} className={`zc-msg-row${mine?" mine":""}`} style={{alignItems:"flex-end"}}>
-                        {!mine&&(showAv
-                          ?<div style={{width:30,height:30,borderRadius:8,flexShrink:0,overflow:"hidden"}}><div className="zc-msg-av-ph" style={{background:`linear-gradient(135deg,${sg1},${sg2})`}}>{su?.profilePhoto?<img src={su.profilePhoto} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>:initials(m.senderName||"?")}</div></div>
-                          :<div style={{width:30,flexShrink:0}}/>
+                  {messages.length === 0 && <div style={{ textAlign: "center", padding: "32px 0", fontSize: 13, color: "#9aa0ad" }}>No messages yet — say hello! 👋</div>}
+                  {messages.map((m, i) => {
+                    const mine = m.senderUid === user?.uid; const isSystem = m.senderUid === "system";
+                    const showAv = i === 0 || messages[i - 1]?.senderUid !== m.senderUid;
+                    const isRead = (m.readBy?.length || 0) > 1;
+                    const su = users.find(u => u.uid === m.senderUid); const [sg1, sg2] = avGrad(m.senderName || "?");
+                    if (isSystem) return <div key={m.id} className="zc-sys-msg"><span className="zc-sys-pill">{m.text}</span></div>;
+                    return (
+                      <div key={m.id} className={`zc-msg-row${mine ? " mine" : ""}`} style={{ alignItems: "flex-end" }}>
+                        {!mine && (showAv
+                          ? <div style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, overflow: "hidden" }}><div className="zc-msg-av-ph" style={{ background: `linear-gradient(135deg,${sg1},${sg2})` }}>{su?.profilePhoto ? <img src={su.profilePhoto} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="" /> : initials(m.senderName || "?")}</div></div>
+                          : <div style={{ width: 30, flexShrink: 0 }} />
                         )}
-                        <div className="zc-msg-content" style={{alignItems:mine?"flex-end":"flex-start"}}>
-                          {selectedChat.isGroup&&!mine&&showAv&&<div className="zc-msg-sender">{su?.name||m.senderName}</div>}
-                          {editingMsgId===m.id&&mine
-                            ?<div className="zc-edit-wrap">
-                              <textarea className="zc-edit-ta" value={editText} onChange={e=>setEditText(e.target.value)} autoFocus rows={2}/>
+                        <div className="zc-msg-content" style={{ alignItems: mine ? "flex-end" : "flex-start" }}>
+                          {selectedChat.isGroup && !mine && showAv && <div className="zc-msg-sender">{su?.name || m.senderName}</div>}
+                          {editingMsgId === m.id && mine
+                            ? <div className="zc-edit-wrap">
+                              <textarea className="zc-edit-ta" value={editText} onChange={e => setEditText(e.target.value)} autoFocus rows={2} />
                               <div className="zc-edit-btns">
-                                <button className="zc-btn ghost" style={{padding:"4px 12px",fontSize:12}} onClick={()=>{setEditingMsgId(null);setEditText("");}}>Cancel</button>
-                                <button className="zc-btn primary" style={{padding:"4px 12px",fontSize:12}} onClick={saveEdit}>Save</button>
+                                <button className="zc-btn ghost" style={{ padding: "4px 12px", fontSize: 12 }} onClick={() => { setEditingMsgId(null); setEditText(""); }}>Cancel</button>
+                                <button className="zc-btn primary" style={{ padding: "4px 12px", fontSize: 12 }} onClick={saveEdit}>Save</button>
                               </div>
                             </div>
-                            :<div className={`zc-bubble ${mine?"mine":"them"}`}>
-                              {mine&&<div className="zc-msg-actions">
-                                <button className="zc-act-btn" onClick={()=>{setEditingMsgId(m.id);setEditText(m.text||"");}}>✏️</button>
-                                <button className="zc-act-btn" style={{color:"#ef4444"}} onClick={()=>confirm("Delete?")&&deleteMsg(m.id)}>🗑️</button>
+                            : <div className={`zc-bubble ${mine ? "mine" : "them"}`}>
+                              {mine && <div className="zc-msg-actions">
+                                <button className="zc-act-btn" onClick={() => { setEditingMsgId(m.id); setEditText(m.text || ""); }}>✏️</button>
+                                <button className="zc-act-btn" style={{ color: "#ef4444" }} onClick={() => confirm("Delete?") && deleteMsg(m.id)}>🗑️</button>
                               </div>}
-                              {m.text&&<p style={{margin:0}}>{m.text}</p>}
-                              {m.imageUrl&&<img src={m.imageUrl} style={{maxHeight:180,borderRadius:8,marginTop:m.text?6:0,cursor:"pointer"}} onClick={()=>window.open(m.imageUrl,"_blank")} alt=""/>}
-                              {m.fileUrl&&!m.imageUrl&&<a href={m.fileUrl} target="_blank" rel="noopener noreferrer" className={`zc-bfile ${mine?"mine":"them"}`}><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg><span style={{fontSize:12.5}}>{m.fileName}</span></a>}
-                              {m.isEdited&&<span style={{fontSize:10,opacity:.6,display:"block",marginTop:2}}>(edited)</span>}
+                              {m.text && <p style={{ margin: 0 }}>{m.text}</p>}
+                              {m.imageUrl && <img src={m.imageUrl} style={{ maxHeight: 180, borderRadius: 8, marginTop: m.text ? 6 : 0, cursor: "pointer" }} onClick={() => window.open(m.imageUrl, "_blank")} alt="" />}
+                              {m.fileUrl && !m.imageUrl && <a href={m.fileUrl} target="_blank" rel="noopener noreferrer" className={`zc-bfile ${mine ? "mine" : "them"}`}><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg><span style={{ fontSize: 12.5 }}>{m.fileName}</span></a>}
+                              {m.isEdited && <span style={{ fontSize: 10, opacity: .6, display: "block", marginTop: 2 }}>(edited)</span>}
                             </div>
                           }
                           <div className="zc-msg-meta">
-                            <span className="zc-msg-time">{m.createdAt?.toDate?.()?.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})||"Now"}</span>
-                            {mine&&<span style={{fontSize:11,color:isRead?"#22c55e":"#9aa0ad"}}>{isRead?"✓✓":m.status==="delivered"?"✓✓":"✓"}</span>}
+                            <span className="zc-msg-time">{m.createdAt?.toDate?.()?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) || "Now"}</span>
+                            {mine && <span style={{ fontSize: 11, color: isRead ? "#22c55e" : "#9aa0ad" }}>{isRead ? "✓✓" : m.status === "delivered" ? "✓✓" : "✓"}</span>}
                           </div>
                         </div>
                       </div>
                     );
                   })}
-                  <div ref={msgsEnd}/>
+                  <div ref={msgsEnd} />
                 </div>
 
                 {/* ── INPUT ── */}
                 <div className="zc-input-area">
-                  {selectedFile&&(
+                  {selectedFile && (
                     <div className="zc-file-prev">
-                      <svg width="13" height="13" fill="none" stroke="#6b7280" strokeWidth="2" viewBox="0 0 24 24"><path d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
-                      <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{selectedFile.name}</span>
-                      <button style={{background:"none",border:"none",cursor:"pointer",color:"#9aa0ad",fontSize:16,lineHeight:1}} onClick={()=>setSelectedFile(null)}>×</button>
+                      <svg width="13" height="13" fill="none" stroke="#6b7280" strokeWidth="2" viewBox="0 0 24 24"><path d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selectedFile.name}</span>
+                      <button style={{ background: "none", border: "none", cursor: "pointer", color: "#9aa0ad", fontSize: 16, lineHeight: 1 }} onClick={() => setSelectedFile(null)}>×</button>
                     </div>
                   )}
                   <div className="zc-input-row">
-                    <button className="zc-inp-btn attach" onClick={()=>fileRef.current?.click()}>
-                      <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                    <button className="zc-inp-btn attach" onClick={() => fileRef.current?.click()}>
+                      <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
                     </button>
                     <textarea className="zc-input-box" placeholder="Type a message…" value={text} rows={1} disabled={uploading}
-                      onChange={e=>{setText(e.target.value);handleTyping();}}
-                      onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendText();}}}
+                      onChange={e => { setText(e.target.value); handleTyping(); }}
+                      onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendText(); } }}
                     />
-                    <button className="zc-inp-btn send" disabled={(!text.trim()&&!selectedFile)||uploading} onClick={sendText}>
+                    <button className="zc-inp-btn send" disabled={(!text.trim() && !selectedFile) || uploading} onClick={sendText}>
                       {uploading
-                        ?<svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{animation:"spin 1s linear infinite"}}><style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity=".25"/><path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg>
-                        :<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                        ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ animation: "spin 1s linear infinite" }}><style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity=".25" /><path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>
+                        : <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" /></svg>
                       }
                     </button>
                   </div>
@@ -1238,12 +1242,12 @@ export default function TeamsStyleChat({ users }: { users: User[] }) {
         )}
 
         {/* ── CALLS TAB ── */}
-        {tab==="calls"&&(
-          <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:"#f0f2f5"}}>
-            <div style={{textAlign:"center",color:"#9aa0ad"}}>
-              <div style={{width:72,height:72,borderRadius:20,background:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,margin:"0 auto 16px",boxShadow:"0 4px 16px rgba(0,0,0,.08)"}}>📞</div>
-              <div style={{fontSize:16,fontWeight:700,color:"#374151",marginBottom:6}}>Calls</div>
-              <div style={{fontSize:13}}>Use the Calls module for call history and dialer</div>
+        {tab === "calls" && (
+          <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", background: "#f0f2f5" }}>
+            <div style={{ textAlign: "center", color: "#9aa0ad" }}>
+              <div style={{ width: 72, height: 72, borderRadius: 20, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, margin: "0 auto 16px", boxShadow: "0 4px 16px rgba(0,0,0,.08)" }}>📞</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#374151", marginBottom: 6 }}>Calls</div>
+              <div style={{ fontSize: 13 }}>Use the Calls module for call history and dialer</div>
             </div>
           </div>
         )}

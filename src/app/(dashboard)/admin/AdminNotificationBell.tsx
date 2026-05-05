@@ -65,7 +65,7 @@ export default function AdminNotificationBell() {
 
       // Move to read notifications
       setReadNotifications((prev) => [notification, ...prev]);
-      
+
       // Remove from unread
       setNotifications((prev) =>
         prev.filter((n) => n.id !== notification.id)
@@ -122,7 +122,7 @@ export default function AdminNotificationBell() {
     });
   };
 
-  
+
   /* ================= GUARD ================= */
 
   if (!user?.uid || userData?.accountType !== "ADMIN") return null;
@@ -136,20 +136,18 @@ export default function AdminNotificationBell() {
       <div
         key={notification.id}
         onClick={() => !isRead && handleMarkAsRead(notification)}
-        className={`p-5 border-b border-slate-100 transition-all duration-200 ${
-          !isRead 
-            ? "hover:bg-gradient-to-r hover:from-blue-50 hover:to-transparent cursor-pointer group bg-white" 
+        className={`p-5 border-b border-slate-100 transition-all duration-200 ${!isRead
+            ? "hover:bg-gradient-to-r hover:from-blue-50 hover:to-transparent cursor-pointer group bg-white"
             : "bg-slate-50/50 opacity-75"
-        }`}
+          }`}
       >
         <div className="flex gap-4">
           {/* Avatar */}
           <div className="flex-shrink-0">
-            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg ${
-              !isRead 
-                ? "bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600" 
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg ${!isRead
+                ? "bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600"
                 : "bg-gradient-to-br from-slate-400 to-slate-500"
-            }`}>
+              }`}>
               {notification.employeeName?.charAt(0).toUpperCase() || "?"}
             </div>
           </div>
@@ -161,7 +159,7 @@ export default function AdminNotificationBell() {
               <p className="font-bold text-slate-800 text-base leading-tight">
                 {notification.employeeName}
               </p>
-              
+
               {!isRead && (
                 <div className="flex-shrink-0">
                   <span className="inline-block w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse"></span>
@@ -183,11 +181,10 @@ export default function AdminNotificationBell() {
                   {changedFields.map((field) => (
                     <span
                       key={field}
-                      className={`inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg font-medium ${
-                        !isRead
+                      className={`inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg font-medium ${!isRead
                           ? "bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 border border-blue-200"
                           : "bg-slate-200 text-slate-600 border border-slate-300"
-                      }`}
+                        }`}
                     >
                       <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -238,11 +235,10 @@ export default function AdminNotificationBell() {
         aria-label="Notifications"
       >
         <svg
-          className={`w-7 h-7 transition-colors ${
-            notifications.length > 0
+          className={`w-7 h-7 transition-colors ${notifications.length > 0
               ? "text-blue-600"
               : "text-slate-500 group-hover:text-slate-700"
-          }`}
+            }`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -270,11 +266,11 @@ export default function AdminNotificationBell() {
         <>
           {/* Backdrop overlay */}
           <div className="fixed inset-0 z-40 bg-black/5" onClick={() => setShowDropdown(false)}></div>
-          
+
           <div className="absolute right-0 mt-3 w-[560px] bg-white rounded-3xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
-            
+
             {/* Header - Larger with gradient */}
-           <div className="px-5 py-2 bg-gradient-to-r from-blue-200 to-indigo-500 border-b border-slate-200/60">
+            <div className="px-5 py-2 bg-gradient-to-r from-blue-200 to-indigo-500 border-b border-slate-200/60">
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <h3 className="font-bold text-2xl">
@@ -301,21 +297,19 @@ export default function AdminNotificationBell() {
               <div className="flex gap-2 mt-4">
                 <button
                   onClick={() => setActiveTab("unread")}
-                  className={`flex-1 px-4 py-2.5 rounded-xl font-semibold transition-all ${
-                    activeTab === "unread"
+                  className={`flex-1 px-4 py-2.5 rounded-xl font-semibold transition-all ${activeTab === "unread"
                       ? "bg-white text-blue-600 shadow-lg"
                       : "bg-white/10 text-white hover:bg-white/20"
-                  }`}
+                    }`}
                 >
                   Unread ({notifications.length})
                 </button>
                 <button
                   onClick={() => setActiveTab("read")}
-                  className={`flex-1 px-4 py-2.5 rounded-xl font-semibold transition-all ${
-                    activeTab === "read"
+                  className={`flex-1 px-4 py-2.5 rounded-xl font-semibold transition-all ${activeTab === "read"
                       ? "bg-white text-blue-600 shadow-lg"
                       : "bg-white/10 text-white hover:bg-white/20"
-                  }`}
+                    }`}
                 >
                   Read ({readNotifications.length})
                 </button>
@@ -363,7 +357,7 @@ export default function AdminNotificationBell() {
                       ) : (
                         /* Unread Notifications */
                         <div>
-                          {notifications.map((notification) => 
+                          {notifications.map((notification) =>
                             renderNotification(notification, false)
                           )}
                         </div>
@@ -401,7 +395,7 @@ export default function AdminNotificationBell() {
                       ) : (
                         /* Read Notifications */
                         <div>
-                          {readNotifications.map((notification) => 
+                          {readNotifications.map((notification) =>
                             renderNotification(notification, true)
                           )}
                         </div>

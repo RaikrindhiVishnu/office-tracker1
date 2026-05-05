@@ -867,7 +867,7 @@ function EmployeeDirectoryCard() {
     return (e.name ?? "").toLowerCase().includes(q) || (e.email ?? "").toLowerCase().includes(q) || (e.designation ?? "").toLowerCase().includes(q);
   });
   const onlineCount = onlineUserIds.size;
-  
+
 
   return (
     <div style={{ ...CARD, padding: 0, overflow: "hidden" }}>
@@ -998,7 +998,7 @@ function MyProjectsCard({ user }: { user: any }) {
         return onSnapshot(
           query(collection(db, "projects"), where(fieldName, "array-contains", value)),
           (snap) => { if (!unsubscribed) { setProjects(snap.docs.map((d) => ({ id: d.id, ...d.data() }))); setLoading(false); } },
-          () => {}
+          () => { }
         );
       } catch { return undefined; }
     };
@@ -1006,8 +1006,8 @@ function MyProjectsCard({ user }: { user: any }) {
     const timeout = setTimeout(async () => {
       if (!unsubscribed && loading) {
         for (const [field, val] of [["members", user.uid], ["assignedTo", user.email], ["uid", user.uid], ["assignedToEmail", user.email]] as [string, string][]) {
-          try { const snap = await getDocs(query(collection(db, "projects"), where(field, "array-contains", val))); if (!snap.empty && !unsubscribed) { setProjects(snap.docs.map((d) => ({ id: d.id, ...d.data() }))); setLoading(false); return; } } catch {}
-          try { const snap = await getDocs(query(collection(db, "projects"), where(field, "==", val))); if (!snap.empty && !unsubscribed) { setProjects(snap.docs.map((d) => ({ id: d.id, ...d.data() }))); setLoading(false); return; } } catch {}
+          try { const snap = await getDocs(query(collection(db, "projects"), where(field, "array-contains", val))); if (!snap.empty && !unsubscribed) { setProjects(snap.docs.map((d) => ({ id: d.id, ...d.data() }))); setLoading(false); return; } } catch { }
+          try { const snap = await getDocs(query(collection(db, "projects"), where(field, "==", val))); if (!snap.empty && !unsubscribed) { setProjects(snap.docs.map((d) => ({ id: d.id, ...d.data() }))); setLoading(false); return; } } catch { }
         }
         if (!unsubscribed) setLoading(false);
       }
@@ -1017,13 +1017,13 @@ function MyProjectsCard({ user }: { user: any }) {
 
   const STATUS_CONFIG: Record<string, { color: string; bg: string }> = {
     "In Progress": { color: T.accent, bg: T.accentLight },
-    "Completed":   { color: T.green, bg: T.greenLight },
-    "On Track":    { color: T.green, bg: T.greenLight },
-    "Review":      { color: T.orange, bg: T.orangeLight },
-    "In Review":   { color: T.orange, bg: T.orangeLight },
-    "Blocked":     { color: T.red, bg: T.redLight },
-    "Overdue":     { color: T.red, bg: T.redLight },
-    "Planning":    { color: T.text2, bg: "rgba(0,0,0,0.05)" },
+    "Completed": { color: T.green, bg: T.greenLight },
+    "On Track": { color: T.green, bg: T.greenLight },
+    "Review": { color: T.orange, bg: T.orangeLight },
+    "In Review": { color: T.orange, bg: T.orangeLight },
+    "Blocked": { color: T.red, bg: T.redLight },
+    "Overdue": { color: T.red, bg: T.redLight },
+    "Planning": { color: T.text2, bg: "rgba(0,0,0,0.05)" },
     "Not Started": { color: T.text2, bg: "rgba(0,0,0,0.05)" },
   };
 
@@ -1138,7 +1138,7 @@ const SmallNoticeTicker = ({ announcements }: { announcements?: { id: string; te
           <div style={{ display: "flex", gap: 40 }}>
             {announcements.map((a) => (
               <span key={a.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                 {a.text}
+                {a.text}
               </span>
             ))}
           </div>
@@ -1211,12 +1211,12 @@ export default function DashboardView({
       `}</style>
 
       {/* ── MODALS ── */}
-      {activeModal === "workUpdate"    && <Modal onClose={close}><WorkUpdateModal onClose={close} /></Modal>}
-      {activeModal === "applyLeave"    && <Modal onClose={close} wide><ApplyLeaveModal leaveType={leaveType} setLeaveType={setLeaveType} fromDate={fromDate} setFromDate={setFromDate} toDate={toDate} setToDate={setToDate} leaveReason={leaveReason} setLeaveReason={setLeaveReason} handleSubmitLeave={handleSubmitLeave} submitting={submitting} leaveMsg={leaveMsg} onClose={close} leaveData={employeeLeaveData} /></Modal>}
-      {activeModal === "holidays"      && <Modal onClose={close}><HolidaysModal onClose={close} /></Modal>}
-      {activeModal === "myLeaves"      && <Modal onClose={close} wide><MyLeavesModal user={user} onClose={close} /></Modal>}
+      {activeModal === "workUpdate" && <Modal onClose={close}><WorkUpdateModal onClose={close} /></Modal>}
+      {activeModal === "applyLeave" && <Modal onClose={close} wide><ApplyLeaveModal leaveType={leaveType} setLeaveType={setLeaveType} fromDate={fromDate} setFromDate={setFromDate} toDate={toDate} setToDate={setToDate} leaveReason={leaveReason} setLeaveReason={setLeaveReason} handleSubmitLeave={handleSubmitLeave} submitting={submitting} leaveMsg={leaveMsg} onClose={close} leaveData={employeeLeaveData} /></Modal>}
+      {activeModal === "holidays" && <Modal onClose={close}><HolidaysModal onClose={close} /></Modal>}
+      {activeModal === "myLeaves" && <Modal onClose={close} wide><MyLeavesModal user={user} onClose={close} /></Modal>}
       {activeModal === "notifications" && <Modal onClose={close} wide><ModalHeader emoji="🔔" title="Notifications" subtitle="Stay up to date" onClose={close} /><NotificationsView leaveNotifications={leaveNotifications} markNotificationAsRead={markLeaveNotifRead} queryNotifications={queryNotifications} markQueryNotificationAsRead={markQueryNotifRead} onClose={close} hideHeader={true} onGoToChat={(chatId) => { close(); onGoToChat?.(chatId); }} /></Modal>}
-      {activeModal === "help"          && <Modal onClose={close} wide><ModalHeader emoji="💬" title="Help & Support" subtitle="Raise a ticket or browse FAQs" onClose={close} /><HelpView /></Modal>}
+      {activeModal === "help" && <Modal onClose={close} wide><ModalHeader emoji="💬" title="Help & Support" subtitle="Raise a ticket or browse FAQs" onClose={close} /><HelpView /></Modal>}
 
       {/* ── HEADER ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4, marginBottom: 4, gap: 20, flexWrap: "wrap" }}>
@@ -1235,7 +1235,7 @@ export default function DashboardView({
         Col 2 (1fr)         : Leave Balance row 1    │ Directory spans cols 2-3 row 2 │ Projects spans cols 2-3 row 3
         Col 3 (1fr)         : Holidays row 1         │ (directory) │ (projects)
       */}
-       <div
+      <div
         className="dashboard-grid"
         style={{
           display: "grid",

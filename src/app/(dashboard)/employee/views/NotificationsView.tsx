@@ -13,6 +13,7 @@ type Leave = {
   fromDate: string;
   toDate: string;
   status: "Pending" | "Approved" | "Rejected";
+  notificationRead?: boolean;
 };
 
 type ChatNotif = {
@@ -33,6 +34,16 @@ type Props = {
   onClose?: () => void;
   /** When true: hides the built-in header (used inside DashboardView modal) */
   hideHeader?: boolean;
+  /** Optional: Pass chat notifications from parent to keep sync with header badge */
+  chatNotifications?: ChatNotif[];
+  /** Optional: Pass chat marking function from parent for optimistic sync */
+  markChatNotificationAsRead?: (id: string) => void;
+  /** Optional: Pass mark all read function from parent */
+  markAllNotificationsRead?: () => void;
+  /** Optional: Announcements from parent */
+  announcements?: { id: string; text: string }[];
+  /** Optional: Mark announcement as read */
+  markAnnouncementRead?: (id: string) => void;
   /** Called when user clicks a chat notification — e.g. switch to Chat tab */
   onGoToChat?: (chatId: string) => void;
 };
@@ -48,22 +59,38 @@ const XIcon = () => (
   </svg>
 );
 
+const CheckIcon = () => (
+  <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+  </svg>
+);
+
 export default function NotificationsView({
   leaveNotifications,
   markNotificationAsRead,
   queryNotifications = [],
   markQueryNotificationAsRead,
+  chatNotifications,
+  markChatNotificationAsRead,
+  markAllNotificationsRead,
+  announcements = [],
+  markAnnouncementRead,
   onClose,
   hideHeader = false,
   onGoToChat,
 }: Props) {
   const { user } = useAuth();
-  const [fadingItems, setFadingItems] = useState<Set<string>>(new Set());
   const [chatNotifs, setChatNotifs] = useState<ChatNotif[]>([]);
+  
+  // ✅ 1. THE SINGLE SOURCE OF TRUTH (Local sets to track "Read" status optimistically)
+  const [locallyReadLeave, setLocallyReadLeave] = useState<Set<string>>(new Set());
+  const [locallyReadQuery, setLocallyReadQuery] = useState<Set<string>>(new Set());
+  const [locallyReadChat, setLocallyReadChat] = useState<Set<string>>(new Set());
+  const [locallyReadAnnouncements, setLocallyReadAnnouncements] = useState<Set<string>>(new Set());
 
-  // ── Subscribe to unread chat notifications ──────────────────────────────────
+  // ── Subscribe to unread chat notifications (only if not provided by props) ───
   useEffect(() => {
-    if (!user) return;
+    if (!user || chatNotifications) return;
     const q = query(
       collection(db, "notifications"),
       where("toUid", "==", user.uid),
@@ -73,233 +100,263 @@ export default function NotificationsView({
     return onSnapshot(q, (snap) => {
       setChatNotifs(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ChatNotif)));
     });
-  }, [user]);
+  }, [user, chatNotifications]);
 
-  const markChatNotifRead = async (id: string) =>
-    updateDoc(doc(db, "notifications", id), { read: true });
+  const sourceChatNotifs = chatNotifications || chatNotifs;
 
-  const markAllChatRead = async () => {
-    const batch = writeBatch(db);
-    chatNotifs.forEach((n) => batch.update(doc(db, "notifications", n.id), { read: true }));
-    await batch.commit();
+  // ✅ 2. CALCULATE DERIVED STATES (Unread vs Already Read)
+  const unreadLeave = leaveNotifications.filter(l => l.notificationRead !== true && !locallyReadLeave.has(l.id));
+  const readLeave = leaveNotifications.filter(l => l.notificationRead === true || locallyReadLeave.has(l.id));
+
+  const unreadQuery = queryNotifications.filter(q => q.employeeUnread === true && !locallyReadQuery.has(q.id));
+  const readQuery = queryNotifications.filter(q => q.employeeUnread !== true || locallyReadQuery.has(q.id));
+
+  const unreadChat = sourceChatNotifs.filter(n => n.read !== true && !locallyReadChat.has(n.id));
+  const readChat = sourceChatNotifs.filter(n => n.read === true || locallyReadChat.has(n.id));
+
+  const unreadAnnouncements = announcements.filter(a => !locallyReadAnnouncements.has(a.id));
+  const readAnnouncements = announcements.filter(a => locallyReadAnnouncements.has(a.id));
+
+  const totalUnread = unreadLeave.length + unreadQuery.length + unreadChat.length + unreadAnnouncements.length;
+  const hasUnread = totalUnread > 0;
+
+  const markChatRead = async (id: string) => {
+    setLocallyReadChat(prev => new Set(prev).add(id));
+    if (markChatNotificationAsRead) markChatNotificationAsRead(id);
+    else await updateDoc(doc(db, "notifications", id), { read: true, isRead: true });
   };
-
-  // ── Totals ──────────────────────────────────────────────────────────────────
-  const totalCount = leaveNotifications.length + queryNotifications.length + chatNotifs.length;
-  const hasNone = totalCount === 0;
-
-  // ── Fade-out animation helper ───────────────────────────────────────────────
-  const fadeOut = (key: string, callback: () => void) => {
-    setFadingItems((prev) => new Set(prev).add(key));
-    setTimeout(() => {
-      callback();
-      setFadingItems((prev) => { const n = new Set(prev); n.delete(key); return n; });
-    }, 320);
-  };
-
-  const handleLeaveRead = (id: string) => fadeOut(`leave-${id}`, () => markNotificationAsRead(id));
-  const handleQueryRead = (id: string) => {
-    if (!markQueryNotificationAsRead) return;
-    fadeOut(`query-${id}`, () => markQueryNotificationAsRead(id));
-  };
-  const handleChatRead = (id: string) => fadeOut(`chat-${id}`, () => markChatNotifRead(id));
 
   const handleMarkAllRead = async () => {
-    leaveNotifications.forEach((l) => markNotificationAsRead(l.id));
-    queryNotifications.forEach((q) => markQueryNotificationAsRead?.(q.id));
-    await markAllChatRead();
+    setLocallyReadLeave(new Set([...Array.from(locallyReadLeave), ...leaveNotifications.map(l => l.id)]));
+    setLocallyReadQuery(new Set([...Array.from(locallyReadQuery), ...queryNotifications.map(q => q.id)]));
+    setLocallyReadChat(new Set([...Array.from(locallyReadChat), ...sourceChatNotifs.map(n => n.id)]));
+    setLocallyReadAnnouncements(new Set([...Array.from(locallyReadAnnouncements), ...announcements.map(a => a.id)]));
+
+    if (markAllNotificationsRead) {
+      markAllNotificationsRead();
+    } else {
+      unreadLeave.forEach(l => markNotificationAsRead(l.id));
+      unreadQuery.forEach(q => markQueryNotificationAsRead?.(q.id));
+      unreadAnnouncements.forEach(a => markAnnouncementRead?.(a.id));
+      const batch = writeBatch(db);
+      unreadChat.forEach(n => batch.update(doc(db, "notifications", n.id), { read: true, isRead: true }));
+      await batch.commit();
+    }
   };
 
-  const itemStyle = (key: string): React.CSSProperties => ({
-    transition: "opacity 0.32s ease, transform 0.32s ease",
-    opacity: fadingItems.has(key) ? 0 : 1,
-    transform: fadingItems.has(key) ? "translateX(60px)" : "translateX(0)",
-  });
+  const renderLeaveItem = (leave: Leave, isRead: boolean) => (
+    <div
+      key={leave.id}
+      className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
+        isRead 
+          ? "bg-gray-50 border-gray-100 opacity-60" 
+          : leave.status === "Approved" ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
+      }`}
+    >
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0 ${
+          isRead ? "bg-gray-100" : leave.status === "Approved" ? "bg-green-100" : "bg-red-100"
+        }`}>
+          {leave.status === "Approved" ? "✅" : "❌"}
+        </div>
+        <div className="min-w-0">
+          <p className={`font-semibold text-sm ${isRead ? "text-gray-500" : "text-gray-800"}`}>
+            {leave.leaveType} leave <span className={leave.status === "Approved" ? "text-green-600" : "text-red-600"}>{leave.status}</span>
+          </p>
+          <p className="text-[11px] text-gray-500 mt-0.5">
+            📅 {parseLocalDate(leave.fromDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} – {parseLocalDate(leave.toDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+          </p>
+        </div>
+      </div>
+      {!isRead && (
+        <button
+          onClick={() => {
+            setLocallyReadLeave(prev => new Set(prev).add(leave.id));
+            markNotificationAsRead(leave.id);
+          }}
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-white hover:bg-red-100 border border-gray-200 text-gray-400 hover:text-red-600 transition-colors shadow-sm"
+        >
+          <XIcon />
+        </button>
+      )}
+    </div>
+  );
 
-  // ── Body (shared between modal and standalone) ──────────────────────────────
-  const body = (
-    <div className="px-6 py-5 space-y-6 max-h-[70vh] overflow-y-auto">
+  const renderQueryItem = (q: any, isRead: boolean) => (
+    <div
+      key={q.id}
+      className={`flex items-start justify-between p-4 rounded-xl border transition-all ${
+        isRead ? "bg-gray-50 border-gray-100 opacity-60" : "bg-purple-50 border-purple-200"
+      }`}
+    >
+      <div className="flex items-start gap-3 flex-1 min-w-0">
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0 ${isRead ? "bg-gray-100" : "bg-purple-100"}`}>💬</div>
+        <div className="flex-1 min-w-0">
+          <p className={`font-semibold text-sm ${isRead ? "text-gray-500" : "text-gray-800"}`}>Query Reply</p>
+          <p className="text-[11px] text-purple-700 font-medium truncate">{q.subject}</p>
+        </div>
+      </div>
+      {!isRead && (
+        <button
+          onClick={() => {
+            setLocallyReadQuery(prev => new Set(prev).add(q.id));
+            markQueryNotificationAsRead?.(q.id);
+          }}
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-white hover:bg-purple-100 border border-gray-200 text-gray-400 hover:text-purple-600 transition-colors shadow-sm mt-0.5"
+        >
+          <XIcon />
+        </button>
+      )}
+    </div>
+  );
 
-      {/* Empty state */}
-      {hasNone && (
-        <div className="flex flex-col items-center justify-center py-16">
-          <div className="text-6xl mb-4">🔕</div>
-          <p className="text-lg font-semibold text-gray-500">All caught up!</p>
-          <p className="text-sm text-gray-400 mt-1">No new notifications right now</p>
+  const renderChatItem = (n: ChatNotif, isRead: boolean) => (
+    <div
+      key={n.id}
+      className={`flex items-start justify-between p-4 rounded-xl border transition-all ${
+        isRead ? "bg-gray-50 border-gray-100 opacity-60" : "bg-blue-50 border-blue-200"
+      }`}
+    >
+      <button
+        className="flex items-start gap-3 flex-1 min-w-0 text-left"
+        onClick={() => {
+          markChatRead(n.id);
+          onGoToChat?.(n.chatId);
+        }}
+      >
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm ${
+          isRead ? "bg-gray-300" : "bg-linear-to-br from-blue-400 to-indigo-500"
+        }`}>
+          {n.fromName.charAt(0).toUpperCase()}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className={`font-semibold text-sm ${isRead ? "text-gray-500" : "text-gray-800"}`}>
+            {n.fromName} <span className="ml-0.5 font-normal text-blue-600">sent a message</span>
+          </p>
+          <p className="text-[11px] text-gray-600 truncate italic mt-0.5">&ldquo;{n.message}&rdquo;</p>
+        </div>
+      </button>
+      {!isRead && (
+        <button
+          onClick={() => markChatRead(n.id)}
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-white hover:bg-blue-100 border border-gray-200 text-gray-400 hover:text-blue-600 transition-colors shadow-sm mt-0.5"
+        >
+          <XIcon />
+        </button>
+      )}
+    </div>
+  );
+
+  const renderAnnouncementCard = (a: any, isRead: boolean) => (
+    <div
+      key={a.id}
+      className={`flex items-start justify-between p-4 rounded-xl border ${
+        isRead ? "bg-gray-50 border-gray-200 opacity-60" : "bg-yellow-50 border-yellow-200"
+      }`}
+    >
+      <div className="flex items-start gap-3 flex-1 min-w-0">
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl shrink-0 ${isRead ? "bg-gray-100" : "bg-yellow-400"}`}>
+          {isRead ? "✓" : "📣"}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className={`font-semibold text-sm ${isRead ? "text-gray-500" : "text-gray-800"}`}>New Announcement</p>
+          <p className="text-xs text-gray-400 mt-0.5 italic">&ldquo;{a.text}&rdquo;</p>
+        </div>
+      </div>
+      {!isRead && (
+        <button
+          onClick={() => {
+            setLocallyReadAnnouncements(prev => new Set(prev).add(a.id));
+            markAnnouncementRead?.(a.id);
+          }}
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-white hover:bg-yellow-100 border border-gray-200 text-gray-400 hover:text-yellow-600 transition-colors shadow-sm mt-0.5"
+        >
+          <XIcon />
+        </button>
+      )}
+    </div>
+  );
+
+  const content = (
+    <div className="px-6 py-5 space-y-8 max-h-[75vh] overflow-y-auto scrollbar-hide">
+      {hasUnread ? (
+        <div className="space-y-6">
+          {unreadChat.length > 0 && (
+            <section>
+              <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                New Messages <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+              </h3>
+              <div className="space-y-3">{unreadChat.map(n => renderChatItem(n, false))}</div>
+            </section>
+          )}
+
+          {unreadLeave.length > 0 && (
+            <section>
+              <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                Leave Status <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+              </h3>
+              <div className="space-y-3">{unreadLeave.map(l => renderLeaveItem(l, false))}</div>
+            </section>
+          )}
+
+          {unreadAnnouncements.length > 0 && (
+            <section>
+              <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                Announcements <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-pulse" />
+              </h3>
+              <div className="space-y-3">{unreadAnnouncements.map(a => renderAnnouncementCard(a, false))}</div>
+            </section>
+          )}
+
+          {unreadQuery.length > 0 && (
+            <section>
+              <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                Query Replies <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
+              </h3>
+              <div className="space-y-3">{unreadQuery.map(q => renderQueryItem(q, false))}</div>
+            </section>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center text-3xl mb-4">✨</div>
+          <p className="text-gray-900 font-bold">All caught up!</p>
+          <p className="text-xs text-gray-500 mt-1">No new notifications right now</p>
         </div>
       )}
 
-      {/* ── 1. LEAVE UPDATES ── */}
-      {leaveNotifications.length > 0 && (
-        <section>
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Leave Updates</span>
-            <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{leaveNotifications.length}</span>
-          </div>
-          <div className="space-y-3">
-            {leaveNotifications.map((leave) => (
-              <div
-                key={leave.id}
-                style={itemStyle(`leave-${leave.id}`)}
-                className={`flex items-center justify-between p-4 rounded-xl border ${
-                  leave.status === "Approved" ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
-                }`}
-              >
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className={`w-11 h-11 rounded-full flex items-center justify-center text-xl shrink-0 ${
-                    leave.status === "Approved" ? "bg-green-100" : "bg-red-100"
-                  }`}>
-                    {leave.status === "Approved" ? "✅" : "❌"}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-semibold text-gray-800 text-sm">
-                      Your <strong>{leave.leaveType}</strong> leave has been{" "}
-                      <span className={leave.status === "Approved" ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
-                        {leave.status}
-                      </span>
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      📅{" "}
-                      {parseLocalDate(leave.fromDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                      {" – "}
-                      {parseLocalDate(leave.toDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleLeaveRead(leave.id)}
-                  title="Mark as read"
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white hover:bg-red-100 border border-gray-200 transition-colors text-gray-400 hover:text-red-600 shrink-0 ml-3 shadow-sm"
-                >
-                  <XIcon />
-                </button>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ── 2. QUERY REPLIES ── */}
-      {queryNotifications.length > 0 && (
-        <section>
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Query Replies</span>
-            <span className="bg-purple-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{queryNotifications.length}</span>
-          </div>
-          <div className="space-y-3">
-            {queryNotifications.map((q: any) => (
-              <div
-                key={q.id}
-                style={itemStyle(`query-${q.id}`)}
-                className="flex items-start justify-between p-4 rounded-xl bg-purple-50 border border-purple-200"
-              >
-                <div className="flex items-start gap-3 flex-1 min-w-0">
-                  <div className="w-11 h-11 rounded-full bg-purple-100 flex items-center justify-center text-xl shrink-0">💬</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-800 text-sm">Admin replied to your query</p>
-                    <p className="text-xs text-purple-700 font-medium mt-0.5 truncate">Subject: {q.subject}</p>
-                    {q.adminReply && (
-                      <div className="mt-2 px-3 py-2 bg-white border border-purple-200 rounded-lg">
-                        <p className="text-sm text-gray-700 italic line-clamp-3">&ldquo;{q.adminReply}&rdquo;</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleQueryRead(q.id)}
-                  title="Mark as read"
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white hover:bg-purple-100 border border-gray-200 transition-colors text-gray-400 hover:text-purple-600 shrink-0 ml-3 shadow-sm mt-0.5"
-                >
-                  <XIcon />
-                </button>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ── 3. CHAT MESSAGES ── */}
-      {chatNotifs.length > 0 && (
-        <section>
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">New Messages</span>
-            <span className="bg-blue-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{chatNotifs.length}</span>
-          </div>
-          <div className="space-y-3">
-            {chatNotifs.map((n) => (
-              <div
-                key={n.id}
-                style={itemStyle(`chat-${n.id}`)}
-                className="flex items-start justify-between p-4 rounded-xl bg-blue-50 border border-blue-200"
-              >
-                {/* Clickable area → go to chat */}
-                <button
-                  className="flex items-start gap-3 flex-1 min-w-0 text-left"
-                  onClick={() => {
-                    handleChatRead(n.id);
-                    onGoToChat?.(n.chatId);
-                  }}
-                >
-                  <div className="w-11 h-11 rounded-full bg-linear-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold text-lg shrink-0 shadow-sm">
-                    {n.fromName.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-800 text-sm">
-                      {n.fromName}
-                      <span className="ml-1 font-normal text-blue-600">sent you a message</span>
-                    </p>
-                    <p className="text-xs text-gray-600 mt-0.5 truncate italic">&ldquo;{n.message}&rdquo;</p>
-                    {n.timestamp && (
-                      <p className="text-[10px] text-gray-400 mt-1">
-                        🕐{" "}
-                        {n.timestamp?.toDate?.()?.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
-                      </p>
-                    )}
-                    {onGoToChat && (
-                      <span className="inline-block mt-1.5 text-[10px] font-bold text-blue-500 hover:text-blue-700">
-                        Open chat →
-                      </span>
-                    )}
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => handleChatRead(n.id)}
-                  title="Mark as read"
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white hover:bg-blue-100 border border-gray-200 transition-colors text-gray-400 hover:text-blue-600 shrink-0 ml-3 shadow-sm mt-0.5"
-                >
-                  <XIcon />
-                </button>
-              </div>
-            ))}
+      {(readLeave.length > 0 || readQuery.length > 0 || readChat.length > 0 || readAnnouncements.length > 0) && (
+        <section className="pt-4 border-t border-gray-100">
+          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Already Read</h3>
+          <div className="space-y-2.5">
+            {readChat.map(n => renderChatItem(n, true))}
+            {readAnnouncements.map(a => renderAnnouncementCard(a, true))}
+            {readLeave.map(l => renderLeaveItem(l, true))}
+            {readQuery.map(q => renderQueryItem(q, true))}
           </div>
         </section>
       )}
     </div>
   );
 
-  // ── Standalone notifications page ───────────────────────────────────────────
   if (!hideHeader) {
     return (
-      <div className="flex justify-center px-2">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
-          <div className="flex items-start justify-between px-6 pt-6 pb-4 border-b border-gray-100">
+      <div className="flex justify-center p-4">
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden border border-gray-100">
+          <div className="flex items-center justify-between px-6 pt-6 pb-4 bg-linear-to-b from-gray-50 to-white border-b border-gray-100">
             <div>
               <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                 🔔 Notifications
-                {totalCount > 0 && (
-                  <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{totalCount}</span>
+                {totalUnread > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{totalUnread}</span>
                 )}
               </h2>
-              <p className="text-sm text-gray-500 mt-0.5">
-                {hasNone ? "You're all caught up!" : `${totalCount} unread notification${totalCount !== 1 ? "s" : ""}`}
-              </p>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {!hasNone && (
+            <div className="flex items-center gap-2">
+              {hasUnread && (
                 <button
                   onClick={handleMarkAllRead}
-                  className="text-xs font-bold text-gray-400 hover:text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="text-xs font-bold text-blue-600 hover:text-blue-800 px-3 py-1.5 rounded-xl hover:bg-blue-50 transition-all"
                 >
                   Mark all read
                 </button>
@@ -307,36 +364,36 @@ export default function NotificationsView({
               {onClose && (
                 <button
                   onClick={onClose}
-                  className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors text-gray-500 hover:text-gray-900"
+                  className="w-9 h-9 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors text-gray-500"
                 >
                   <XIcon />
                 </button>
               )}
             </div>
           </div>
-          {body}
+          {content}
         </div>
       </div>
     );
   }
 
-  // ── Inside DashboardView modal (hideHeader=true) ────────────────────────────
+  // Dashboard modal style
   return (
     <div className="overflow-hidden">
       <div className="flex items-center justify-between px-6 py-3 border-b border-gray-100 bg-gray-50/60">
-        <p className="text-sm text-gray-500">
-          {hasNone ? "You're all caught up!" : `${totalCount} unread notification${totalCount !== 1 ? "s" : ""}`}
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+          {totalUnread} New Alerts
         </p>
-        {!hasNone && (
+        {hasUnread && (
           <button
             onClick={handleMarkAllRead}
-            className="text-xs font-bold text-gray-400 hover:text-gray-700 px-3 py-1 rounded-lg hover:bg-gray-100 transition-colors"
+            className="text-xs font-bold text-blue-600 hover:text-blue-800 px-3 py-1 rounded-lg hover:bg-blue-50"
           >
             Mark all read
           </button>
         )}
       </div>
-      {body}
+      {content}
     </div>
   );
 }
