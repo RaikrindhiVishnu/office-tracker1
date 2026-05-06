@@ -372,7 +372,7 @@ function EditProjectModal({ open, onClose, project, users, onSaved }: {
             <div className="space-y-4">
               <h3 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-4">Team Management</h3>
               <div className="bg-gray-50/50 border border-gray-100 rounded-2xl p-4 space-y-4">
-                <MemberPicker label="Project Managers" users={users} currentUid={project?.createdBy} selected={form.selectedManagers} onChange={(s: string[]) => setForm(f => ({ ...f, selectedManagers: s }))} />
+                <MemberPicker label="Team Leads" users={users} currentUid={project?.createdBy} selected={form.selectedManagers} onChange={(s: string[]) => setForm(f => ({ ...f, selectedManagers: s }))} />
                 <div className="h-px bg-gray-100" />
                 <MemberPicker label="Team Members" users={users} currentUid={project?.createdBy} selected={form.selectedMembers} onChange={(s: string[]) => setForm(f => ({ ...f, selectedMembers: s }))} excludeUids={form.selectedManagers} />
               </div>
@@ -503,7 +503,7 @@ function ProjectModal({ open, onClose, user, users, onCreated }: {
             <div className="space-y-4">
               <h3 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-4">Team Members</h3>
               <div className="bg-gray-50/50 border border-gray-100 rounded-2xl p-4 space-y-4">
-                <MemberPicker label="Project Managers" users={users} currentUid={user?.uid} selected={form.selectedManagers} onChange={(s: string[]) => setForm(f => ({ ...f, selectedManagers: s }))} />
+                <MemberPicker label="Team Leads" users={users} currentUid={user?.uid} selected={form.selectedManagers} onChange={(s: string[]) => setForm(f => ({ ...f, selectedManagers: s }))} />
                 <div className="h-px bg-gray-100" />
                 <MemberPicker label="Team Members" users={users} currentUid={user?.uid} selected={form.selectedMembers} onChange={(s: string[]) => setForm(f => ({ ...f, selectedMembers: s }))} excludeUids={form.selectedManagers} />
               </div>
@@ -581,7 +581,18 @@ function TeamButton({ users, activeProject, user, projectColor }: { users: any[]
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                     <span style={{ fontSize: 13, fontWeight: 500, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
-                    {isPM && <span style={{ fontSize: 10, background: "#fef9c3", color: "#a16207", padding: "1px 6px", borderRadius: 4, fontWeight: 600 }}>PM</span>}
+                    {isPM && (
+                      <span style={{ 
+                        fontSize: 10, 
+                        background: u.accountType === "ADMIN" ? "#e0e7ff" : "#fef9c3", 
+                        color: u.accountType === "ADMIN" ? "#4338ca" : "#a16207", 
+                        padding: "1px 6px", 
+                        borderRadius: 4, 
+                        fontWeight: 600 
+                      }}>
+                        {u.accountType === "ADMIN" ? "Admin" : "Team Lead"}
+                      </span>
+                    )}
                   </div>
                   {isMe && <span style={{ fontSize: 11, color: bg, fontWeight: 600 }}>you</span>}
                 </div>
@@ -1370,7 +1381,11 @@ function TaskDetailModal({
             {canEdit && (
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  {isProjectManager && <span className="text-[10px] font-bold bg-yellow-400/20 text-yellow-200 px-2 py-0.5 rounded-full">👑 PM</span>}
+                  {isProjectManager && (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${user?.accountType === "ADMIN" ? "bg-indigo-500/20 text-indigo-200" : "bg-yellow-400/20 text-yellow-200"}`}>
+                      👑 {user?.accountType === "ADMIN" ? "Admin" : "Team Lead"}
+                    </span>
+                  )}
                   {!isProjectManager && canEdit && <span className="text-[10px] font-bold bg-white/20 text-white px-2 py-0.5 rounded-full">✏️ Your Task</span>}
                 </div>
                 <button onClick={handleSave} disabled={saving} className="px-3 py-1.5 text-xs font-bold bg-white/20 hover:bg-white/30 text-white rounded-lg transition disabled:opacity-50">
@@ -2061,7 +2076,12 @@ function ProjectsPage({ user, myProjects, onOpenProject, onCreateProject, onEdit
                     <div className="flex flex-col items-end gap-1">
                       <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${project.status === "Completed" ? "bg-green-100 text-green-700" : project.status === "In Progress" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>{project.status}</span>
                       {projPerms.isPM ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background: project.color || "#6366f1" }}>👑 PM</span>
+                        <span 
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${user?.accountType === "ADMIN" ? "bg-indigo-100 text-indigo-700" : "text-white"}`} 
+                          style={user?.accountType !== "ADMIN" ? { background: project.color || "#6366f1" } : {}}
+                        >
+                          👑 {user?.accountType === "ADMIN" ? "Admin" : "Team Lead"}
+                        </span>
                       ) : projPerms.isAdmin ? (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">⚙️ Admin</span>
                       ) : null}
@@ -2301,7 +2321,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
   };
 
   const handleMoveToSprint = async (task: Task, sprintId: string | null) => {
-    if (!isProjectManager) { showToast("Only PMs can move tasks between sprints"); return; }
+    if (!isProjectManager) { showToast("Only Team Leads can move tasks between sprints"); return; }
     await updateDoc(doc(db, "projectTasks", task.id), { sprintId: sprintId ?? null });
     const sprint = sprints.find(s => s.id === sprintId);
     await logActivity(activeProject.id, "moved to sprint", `"${task.title}" → ${sprint ? sprint.name : "Backlog"}`, task.id);
@@ -2375,7 +2395,14 @@ export default function ProjectManagement({ user, projects, users }: any) {
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full" style={{ background: projectColor }} />
               <h1 className="font-bold text-gray-900 text-sm">{activeProject.name}</h1>
-              {isProjectManager && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white ml-1" style={{ background: projectColor }}>👑 PM</span>}
+              {isProjectManager && (
+                <span 
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ml-1 ${user?.accountType === "ADMIN" ? "bg-indigo-100 text-indigo-700" : "text-white"}`} 
+                  style={user?.accountType !== "ADMIN" ? { background: projectColor } : {}}
+                >
+                  👑 {user?.accountType === "ADMIN" ? "Admin" : "Team Lead"}
+                </span>
+              )}
               {permissions.isAdmin && !permissions.isPM && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 ml-1">⚙️ Admin</span>}
             </div>
             <div className="flex items-center gap-4 ml-auto">

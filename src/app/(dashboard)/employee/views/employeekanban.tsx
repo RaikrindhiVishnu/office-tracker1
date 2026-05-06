@@ -741,11 +741,21 @@ export function KanbanBoard({
     const visibleStories = localTasks.filter(t => {
       if (t.ticketType !== "story") return false;
       const storyPassesFilter = filteredTasks.some(ft => ft.id === t.id);
+      
       const hasVisibleChildrenHere = filteredTasks.some(ft =>
         ft.parentStoryId === t.id && ft.status === col.id && ft.ticketType !== "story"
       );
-      if (t.status !== col.id && !hasVisibleChildrenHere) return false;
-      return storyPassesFilter || hasVisibleChildrenHere;
+      const hasVisibleChildrenAnywhere = filteredTasks.some(ft =>
+        ft.parentStoryId === t.id && ft.ticketType !== "story"
+      );
+
+      if (hasVisibleChildrenAnywhere) {
+        // If the story has tasks, only show it in columns where those tasks exist
+        return hasVisibleChildrenHere;
+      } else {
+        // If the story is empty, show it only in its primary status column
+        return t.status === col.id && storyPassesFilter;
+      }
     });
 
     const renderedAsChildren = new Set<string>();
