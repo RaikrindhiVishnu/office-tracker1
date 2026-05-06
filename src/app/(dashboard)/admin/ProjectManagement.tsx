@@ -92,11 +92,11 @@ const PRIORITY_CONFIG: Record<string, { color: string; bg: string; icon: string 
   Critical: { color: "#dc2626", bg: "#fef2f2", icon: "⚡" },
 };
 
-const TYPE_META: Record<string, { icon: string; color: string; label: string }> = {
-  story: { icon: "📘", color: "#3730a3", label: "Story" },
-  task: { icon: "🧩", color: "#0369a1", label: "Task" },
-  bug: { icon: "🐞", color: "#b91c1c", label: "Bug" },
-  defect: { icon: "🎯", color: "#b45309", label: "Defect" },
+const TYPE_META: Record<string, { icon: string; color: string; label: string; bg: string }> = {
+  story: { icon: "📘", color: "#3730a3", label: "Story", bg: "#eef2ff" },
+  task: { icon: "🧩", color: "#0369a1", label: "Task", bg: "#f0f9ff" },
+  bug: { icon: "🐞", color: "#b91c1c", label: "Bug", bg: "#fef2f2" },
+  defect: { icon: "🎯", color: "#b45309", label: "Defect", bg: "#fffbeb" },
 };
 
 function getColConfig(col: KanbanColumn, index: number) {
@@ -549,7 +549,25 @@ export default function AdminProjectManagement({ user, projects, users }: { user
   const [mf, setMf] = useState({ title: "", dueDate: "" });
 
   // ─── Task detail tab ───
-  const [taskDetailTab, setTaskDetailTab] = useState<"details" | "subtasks" | "files" | "images" | "links" | "deps" | "comments" | "logs" | "empsheet" | "history">("details");
+  const [taskDetailTab, setTaskDetailTab] = useState<"details" | "storytasks" | "subtasks" | "files" | "images" | "links" | "deps" | "comments" | "logs" | "empsheet" | "history">("details");
+  const [taskNavStack, setTaskNavStack] = useState<Task[]>([]);
+
+  const openTaskDetail = (t: Task) => {
+    if (activeTask) setTaskNavStack(prev => [...prev, activeTask]);
+    setActiveTask(t);
+    setTaskDetailTab("details");
+  };
+
+  const closeTaskDetail = () => {
+    if (taskNavStack.length > 0) {
+      const prev = taskNavStack[taskNavStack.length - 1];
+      setTaskNavStack(s => s.slice(0, -1));
+      setActiveTask(prev);
+    } else {
+      setActiveTask(null);
+      setTaskNavStack([]);
+    }
+  };
 
   // ─── Other UI state ───
   const [commentText, setCommentText] = useState("");
@@ -578,7 +596,8 @@ export default function AdminProjectManagement({ user, projects, users }: { user
 
   const projectPMs = activeProject ? getProjectManagers(activeProject) : [];
   const isProjectManager = projectPMs.includes(user.uid);
-  const canManage = isProjectManager || activeProject?.createdBy === user.uid;
+  const isAdmin = user?.accountType === "ADMIN";
+  const canManage = isAdmin || isProjectManager || activeProject?.createdBy === user.uid;
   const stories = tasks.filter(t => t.ticketType === "story");
 
   /* ── Firestore listeners ── */
@@ -981,12 +1000,14 @@ export default function AdminProjectManagement({ user, projects, users }: { user
     const isOverdue = activeTask.dueDate && new Date(activeTask.dueDate) < new Date() && activeTask.status !== doneColId;
 
     const TASK_TABS: [string, string][] = [
-      ["details", "📋"], ["subtasks", "✅"], ["images", "🖼️"], ["links", "🔗"],
+      ["details", "📋"],
+      ...(activeTask.ticketType === "story" ? [["storytasks", "🎯"] as [string, string]] : []),
+      ["subtasks", "✅"], ["images", "🖼️"], ["links", "🔗"],
       ["deps", "⛓️"], ["files", "📎"], ["comments", "💬"], ["logs", "⏱"],
       ["empsheet", "📝"], ["history", "📜"],
     ];
     const TAB_LABELS: Record<string, string> = {
-      details: "Details", subtasks: "Subtasks", images: "Images", links: "Links",
+      details: "Details", storytasks: "Tasks", subtasks: "Subtasks", images: "Images", links: "Links",
       deps: "Deps", files: "Files", comments: "Comments", logs: "Logs",
       empsheet: "My Work", history: "History",
     };
@@ -996,7 +1017,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
         {moveModal}
         <div className="fixed inset-0 z-[10001] flex items-stretch" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
 
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setActiveTask(null)} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeTaskDetail} />
           <div className="relative ml-auto w-full max-w-3xl h-full bg-white shadow-2xl flex flex-col overflow-hidden">
 
             {/* Header */}
@@ -1024,7 +1045,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                       <button onClick={() => handleDeleteTask(activeTask.id)}
                         className="inline-flex items-center px-2.5 py-1 rounded-lg bg-white/10 hover:bg-red-500/30 text-white/70 hover:text-white transition text-xs">🗑️ Delete</button>
                     )}
-                    <button onClick={() => setActiveTask(null)} className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition">✕</button>
+                    <button onClick={closeTaskDetail} className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition">✕</button>
                   </div>
                 </div>
                 <p className="text-xs font-bold text-white/70 tracking-wider">{activeTask?.taskCode || "—"}</p>
@@ -1087,18 +1108,6 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                       <p className="text-sm text-gray-700 leading-relaxed">{activeTask.description}</p>
                     </div>
                   )}
-                  {activeTask.ticketType === "story" && (
-                    <div className="bg-indigo-50 rounded-xl border border-indigo-100 p-4">
-                      <p className="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-2">Story Children</p>
-                      <div className="space-y-1">
-                        {tasks.filter(t => t.parentStoryId === activeTask.id).map(child => {
-                          const ctm = TYPE_META[child.ticketType || "task"];
-                          return (<button key={child.id} onClick={() => setActiveTask(child)} className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-indigo-100 transition text-left"><span>{ctm.icon}</span><span className="text-xs font-medium text-indigo-800 flex-1">{child.title}</span><span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "white", color: ctm.color }}>{child.status}</span></button>);
-                        })}
-                        {tasks.filter(t => t.parentStoryId === activeTask.id).length === 0 && (<p className="text-xs text-indigo-400">No children yet.</p>)}
-                      </div>
-                    </div>
-                  )}
                   <div className="grid grid-cols-2 gap-3">
                     {[
                       {
@@ -1138,16 +1147,17 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                       </div>
                     ))}
                   </div>
+
                   {activeTask.ticketType !== "story" && (
                     <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
                       <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Time Tracking</h3>
                       <div className="flex items-center gap-4">
-                        <ProgressRing pct={activeTask.estimatedHours ? Math.min(((activeTask.actualHours || 0) / activeTask.estimatedHours) * 100, 100) : 0} color={activeProject?.color || "#6366f1"} />
+                        <ProgressRing pct={activeTask.estimatedHours ? Math.min(((activeTask.actualHours || 0) / activeTask.estimatedHours) * 100, 100) : 0} color={activeProject!.color || "#6366f1"} />
                         <div className="flex-1">
                           <div className="grid grid-cols-3 gap-2 text-center mb-2">
                             <div><p className="text-lg font-black text-gray-900">{activeTask.estimatedHours || 0}h</p><p className="text-xs text-gray-400">Estimated</p></div>
                             <div><p className="text-lg font-black text-gray-900">{activeTask.actualHours || 0}h</p><p className="text-xs text-gray-400">Logged</p></div>
-                            <div><p className="text-lg font-black" style={{ color: activeProject?.color || "#6366f1" }}>{activeTask.storyPoints || 0}</p><p className="text-xs text-gray-400">Points</p></div>
+                            <div><p className="text-lg font-black" style={{ color: activeProject!.color || "#6366f1" }}>{activeTask.storyPoints || 0}</p><p className="text-xs text-gray-400">Points</p></div>
                           </div>
                           {canManage && (
                             <div className="flex gap-3">
@@ -1159,6 +1169,78 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* ─── STORY TASKS ─── */}
+              {taskDetailTab === "storytasks" && activeTask.ticketType === "story" && (
+                <div className="p-5 space-y-4">
+                  <div className="bg-indigo-50/50 rounded-xl border border-indigo-100 p-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-xs font-bold text-indigo-700 uppercase tracking-wider">Story Tasks</h3>
+                        <p className="text-[10px] text-indigo-400 mt-0.5">Tasks linked to this user story</p>
+                      </div>
+                      {canManage && (
+                        <button
+                          onClick={() => {
+                            setEditingTask(null);
+                            setQuickTaskStoryId(activeTask.id);
+                            setQuickTaskType("task");
+                            setShowTaskModal(true);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-[10px] font-bold rounded-lg hover:bg-indigo-700 transition shadow-sm shadow-indigo-200"
+                        >
+                          <span>+</span> Add Task
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-2.5">
+                      {tasks.filter(t => t.parentStoryId === activeTask.id).map(child => {
+                        const ctm = TYPE_META[child.ticketType || "task"] || TYPE_META.task;
+                        const childStatus = columns.find(c => c.id === child.status);
+                        const idx = columns.findIndex(c => c.id === child.status);
+                        const childStatusStyle = getColConfig(childStatus || { id: child.status, label: child.status }, idx >= 0 ? idx : 0);
+
+                        return (
+                          <div key={child.id} onClick={() => openTaskDetail(child)}
+                            className="group flex items-center gap-4 p-3.5 bg-white rounded-2xl border border-gray-100 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-300 cursor-pointer active:scale-[0.99]">
+                            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 shadow-sm transition-transform group-hover:scale-110" style={{ background: ctm.bg, color: ctm.color }}>
+                              {ctm.icon}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-gray-50 text-gray-400 group-hover:text-indigo-400 transition-colors">{child.taskCode || "TSK"}</span>
+                                <span className="text-[10px] font-bold text-gray-300 uppercase tracking-tighter">{ctm.label}</span>
+                              </div>
+                              <h4 className="text-sm font-bold text-gray-800 leading-tight group-hover:text-indigo-600 transition-colors">{child.title}</h4>
+                            </div>
+                            <div className="flex items-center gap-5 shrink-0">
+                              {child.assignedTo && (
+                                <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-gray-50/80 border border-gray-100 group-hover:bg-indigo-50 group-hover:border-indigo-100 transition-colors">
+                                  <Avatar name={child.assignedToName || "U"} size="xs" />
+                                  <span className="text-[11px] text-gray-600 font-bold hidden md:inline">{child.assignedToName?.split(" ")[0]}</span>
+                                </div>
+                              )}
+                              <div className="shrink-0 text-right min-w-[100px]">
+                                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tight shadow-sm" style={{ background: childStatusStyle.bg, color: childStatusStyle.color, border: `1px solid ${childStatusStyle.color}20` }}>
+                                  <span className="w-1.5 h-1.5 rounded-full mr-2" style={{ background: childStatusStyle.color }} />
+                                  {childStatus?.label || child.status}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {tasks.filter(t => t.parentStoryId === activeTask.id).length === 0 && (
+                        <div className="text-center py-12 bg-white rounded-2xl border-2 border-dashed border-gray-100">
+                          <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">🎯</div>
+                          <h4 className="text-sm font-bold text-gray-400 uppercase tracking-widest">No tasks yet</h4>
+                          <p className="text-xs text-gray-300 mt-1">Add tasks to this story to track progress</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1223,7 +1305,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                     task={activeTask as any}
                     allTasks={tasks.filter(t => t.ticketType !== "story")}
                     canManage={canManage}
-                    onTaskClick={setActiveTask}
+                    onTaskClick={openTaskDetail}
                     projectColor={activeProject?.color || "#6366f1"}
                   />
                 </div>
@@ -1325,9 +1407,49 @@ export default function AdminProjectManagement({ user, projects, users }: { user
   if (activeProject) {
     return (
       <div className="flex-1 flex flex-col min-h-0 bg-gray-50 overflow-hidden" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-        <style>{`@keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}} .hide-sb::-webkit-scrollbar{display:none;}.hide-sb{scrollbar-width:none;}`}</style>
+        <style>{`
+          @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+          @keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+          .modal-backdrop{animation:fadeIn 0.18s ease;}
+          .modal-panel{animation:slideUp 0.22s cubic-bezier(0.34,1.56,0.64,1);}
+          .hide-sb::-webkit-scrollbar{display:none;}.hide-sb{scrollbar-width:none;}
+        `}</style>
+
 
         {renderTaskDetailPanel()}
+
+        {/* Project Form Modal */}
+        {showProjectForm && (
+          <div className="fixed inset-0 z-[10002] flex items-center justify-center p-4 modal-backdrop" style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)" }}>
+            <div className="modal-panel bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden" style={{ border: "1px solid #e5e7eb" }}>
+              <div className="shrink-0 px-6 py-5 flex items-center justify-between border-b border-gray-100">
+                <div><h2 className="text-base font-semibold text-gray-900">{editingProject ? "Edit Project" : "Create New Project"}</h2><p className="text-xs text-gray-400 mt-0.5">{editingProject ? "Update project details" : "Fill in the details to set up your project"}</p></div>
+                <button onClick={() => { setShowProjectForm(false); setEditingProject(null); }} className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition text-sm">✕</button>
+              </div>
+              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+                <div><label className="text-xs font-medium text-gray-500 block mb-2">Project Color</label><div className="flex gap-2">{PROJECT_COLORS.map(c => <button key={c} onClick={() => setPf({ ...pf, color: c })} className="w-7 h-7 rounded-full transition-all hover:scale-110 shrink-0" style={{ background: c, outline: pf.color === c ? `2px solid ${c}` : "none", outlineOffset: "2px" }} />)}</div></div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div><label className="text-xs font-medium text-gray-500 block mb-1.5">Project Name <span className="text-red-400">*</span></label><input value={pf.name} onChange={e => setPf({ ...pf, name: e.target.value })} placeholder="e.g. Website Redesign" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 transition" /></div>
+                  <div><label className="text-xs font-medium text-gray-500 block mb-1.5">Client Name</label><input value={pf.clientName} onChange={e => setPf({ ...pf, clientName: e.target.value })} placeholder="e.g. Acme Corp" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 transition" /></div>
+                </div>
+                <div><label className="text-xs font-medium text-gray-500 block mb-1.5">Description</label><textarea value={pf.description} onChange={e => setPf({ ...pf, description: e.target.value })} placeholder="Brief project overview..." rows={2} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 transition resize-none" /></div>
+                <div className="grid grid-cols-2 gap-3">
+                  {[{ label: "Billing Type", child: <select value={pf.projectType} onChange={e => setPf({ ...pf, projectType: e.target.value as any })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none transition"><option value="Billing">Billing</option><option value="Non-Billing">Non-Billing</option></select> }, { label: "Payment Model", child: <select value={pf.billingType} onChange={e => setPf({ ...pf, billingType: e.target.value as any })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none transition"><option>Hourly</option><option>Fixed Cost</option><option>Internal</option></select> }, { label: "Priority", child: <select value={pf.priority} onChange={e => setPf({ ...pf, priority: e.target.value as any })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none transition">{["Low", "Medium", "High", "Critical"].map(p => <option key={p}>{p}</option>)}</select> }, { label: "Status", child: <select value={pf.status} onChange={e => setPf({ ...pf, status: e.target.value as any })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none transition">{["Not Started", "Planning", "In Progress", "On Hold", "Completed", "Cancelled"].map(s => <option key={s}>{s}</option>)}</select> }, { label: "Budget ($)", child: <input type="number" value={pf.budget} onChange={e => setPf({ ...pf, budget: e.target.value })} placeholder="0" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none transition" /> }, { label: "Start Date", child: <input type="date" value={pf.startDate} onChange={e => setPf({ ...pf, startDate: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none transition" /> }, { label: "End Date", child: <input type="date" value={pf.endDate} onChange={e => setPf({ ...pf, endDate: e.target.value })} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none transition" /> }].map(({ label, child }) => (<div key={label}><label className="text-xs font-medium text-gray-500 block mb-1.5">{label}</label>{child}</div>))}
+                </div>
+                <div className="border border-indigo-100 rounded-xl p-4 bg-indigo-50/40">
+                  <div className="flex items-center gap-2 mb-3"><span className="text-base">👑</span><div><p className="text-xs font-bold text-indigo-700">Project Managers</p><p className="text-[10px] text-indigo-400">PMs can create/edit/delete tasks, manage columns, and edit the project. You (creator) are always a PM.</p></div></div>
+                  <MemberPicker users={users} currentUid={user.uid} selected={pf.selectedManagers} onChange={(sel: string[]) => setPf({ ...pf, selectedManagers: sel })} label="Additional Project Managers" />
+                </div>
+                <MemberPicker users={users} currentUid={user.uid} selected={pf.selectedMembers} onChange={(sel: string[]) => setPf({ ...pf, selectedMembers: sel })} label="Team Members (view-only)" excludeUids={pf.selectedManagers} />
+              </div>
+              <div className="shrink-0 px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+                <button onClick={() => { setShowProjectForm(false); setEditingProject(null); }} className="inline-flex items-center px-4 py-2 text-sm text-gray-500 rounded-lg border border-gray-200 hover:bg-gray-50 transition">Cancel</button>
+                <button onClick={handleSaveProject} className="inline-flex items-center px-5 py-2 text-sm font-semibold text-white rounded-lg hover:opacity-90 transition" style={{ background: "#4f46e5" }}>{editingProject ? "Save Changes" : "Create Project"}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
 
 
         {/* Task Modal */}
@@ -1523,7 +1645,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col" style={{ minHeight: "260px" }}>
                     <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2 shrink-0"><span className="w-2 h-2 rounded-full" style={{ background: activeProject.color || "#6366f1" }} />Story Overview</h3>
-                    <div className="flex-1 overflow-y-auto space-y-2 pr-1">{stories.length === 0 ? <p className="text-xs text-gray-400 text-center py-4">No stories yet</p> : stories.map(story => { const children = tasks.filter(t => t.parentStoryId === story.id); const done = children.filter(t => t.status === doneColId).length; const pct = children.length ? Math.round((done / children.length) * 100) : 0; return (<div key={story.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={() => setActiveTask(story)}><span>📘</span><span className="text-xs font-semibold text-gray-700 flex-1 truncate">{story.title}</span><div className="w-16 bg-gray-100 rounded-full h-1.5 shrink-0"><div className="h-1.5 rounded-full" style={{ width: `${pct}%`, background: activeProject.color || "#6366f1" }} /></div><span className="text-xs font-bold text-gray-500 w-10 text-right shrink-0">{done}/{children.length}</span></div>); })}</div>
+                    <div className="flex-1 overflow-y-auto space-y-2 pr-1">{stories.length === 0 ? <p className="text-xs text-gray-400 text-center py-4">No stories yet</p> : stories.map(story => { const children = tasks.filter(t => t.parentStoryId === story.id); const done = children.filter(t => t.status === doneColId).length; const pct = children.length ? Math.round((done / children.length) * 100) : 0; return (<div key={story.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer" onClick={() => openTaskDetail(story)}><span>📘</span><span className="text-xs font-semibold text-gray-700 flex-1 truncate">{story.title}</span><div className="w-16 bg-gray-100 rounded-full h-1.5 shrink-0"><div className="h-1.5 rounded-full" style={{ width: `${pct}%`, background: activeProject.color || "#6366f1" }} /></div><span className="text-xs font-bold text-gray-500 w-10 text-right shrink-0">{done}/{children.length}</span></div>); })}</div>
                   </div>
                   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5" style={{ minHeight: "260px" }}>
                     <h3 className="text-sm font-bold text-gray-800 mb-4">📊 Type Breakdown</h3>

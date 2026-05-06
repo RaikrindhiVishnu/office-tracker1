@@ -982,7 +982,7 @@ function TaskDetailModal({
   task, onClose, columns, projectColor, projectName, currentUserId,
   isProjectManager, canDelete, users, onStatusChange, onSave,
   db: firestoreDb, storage: firebaseStorage, user,
-  sprints, onMoveToSprint, onEditTask,
+  sprints, onMoveToSprint, onEditTask, tasks, onAddChildToStory,
 }: {
   task: Task; onClose: () => void; columns: Column[]; projectColor: string; projectName: string;
   currentUserId: string; isProjectManager: boolean; canDelete: boolean; users: any[];
@@ -992,8 +992,10 @@ function TaskDetailModal({
   sprints: any[];
   onMoveToSprint: (task: Task, sprintId: string | null) => void;
   onEditTask: (task: Task) => void;
+  tasks: Task[];
+  onAddChildToStory: (story: Task, ticketType: TicketType) => void;
 }) {
-  const [taskTab, setTaskTab] = useState<"details" | "subtasks" | "files" | "comments" | "worklogs" | "empsheet">("details");
+  const [taskTab, setTaskTab] = useState<"details" | "storytasks" | "subtasks" | "files" | "comments" | "worklogs" | "empsheet">("details");
   const [comments, setComments] = useState<any[]>([]);
   const [taskFiles, setTaskFiles] = useState<any[]>([]);
   const [subtasks, setSubtasks] = useState<any[]>([]);
@@ -1113,8 +1115,11 @@ function TaskDetailModal({
   const totalLoggedHours = taskWorklogs.reduce((s, l) => s + l.hoursWorked, 0);
   const totalEmpHours = taskEmpEntries.reduce((s, e) => s + (e.hoursWorked || 0), 0);
 
+  const storyTasks = tasks.filter(t => t.parentStoryId === task.id);
+
   const TABS = [
     { id: "details", icon: "📋", label: "Details", badge: null },
+    ...(task.ticketType === "story" ? [{ id: "storytasks", icon: "🎯", label: "Tasks", badge: storyTasks.length > 0 ? String(storyTasks.length) : null }] : []),
     { id: "subtasks", icon: "✅", label: "Subtasks", badge: subtasks.length > 0 ? `${subtasksDone}/${subtasks.length}` : null },
     { id: "files", icon: "📎", label: "Files", badge: taskFiles.length > 0 ? String(taskFiles.length) : null },
     { id: "comments", icon: "💬", label: "Comments", badge: comments.length > 0 ? String(comments.length) : null },
@@ -1283,13 +1288,74 @@ function TaskDetailModal({
                 <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Subtask Progress</h3>
-                    <span className="text-xs font-bold" style={{ color: projectColor }}>{subtasksDone}/{subtasks.length} ({Math.round((subtasksDone / subtasks.length) * 100)}%)</span>
+                    <span className="text-xs font-bold" style={{ color: projectColor }}>{subtasks.filter(s => s.done).length}/{subtasks.length} ({Math.round((subtasks.filter(s => s.done).length / subtasks.length) * 100)}%)</span>
                   </div>
                   <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden border border-gray-50">
-                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(subtasksDone / subtasks.length) * 100}%`, background: subtasksDone === subtasks.length ? "#22c55e" : projectColor }} />
+                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(subtasks.filter(s => s.done).length / subtasks.length) * 100}%`, background: subtasks.filter(s => s.done).length === subtasks.length ? "#22c55e" : projectColor }} />
                   </div>
                 </div>
               )}
+
+            </div>
+          )}
+
+          {taskTab === "storytasks" && task.ticketType === "story" && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider">Story Tasks</h3>
+                  <p className="text-[10px] text-gray-400 font-bold">Associated tasks, bugs, and defects</p>
+                </div>
+                {isProjectManager && (
+                  <button
+                    onClick={() => onAddChildToStory(task, "task")}
+                    className="px-3 py-1.5 text-[10px] font-black bg-indigo-600 text-white rounded-lg shadow-sm hover:bg-indigo-700 transition-all flex items-center gap-1.5"
+                  >
+                    <span className="text-xs">+</span> Add Task
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                {tasks.filter(t => t.parentStoryId === task.id && t.ticketType !== "story").length === 0 ? (
+                  <div className="px-6 py-16 text-center bg-white rounded-3xl border-2 border-dashed border-gray-100">
+                    <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl">🎯</div>
+                    <h4 className="text-sm font-black text-gray-300 uppercase tracking-[0.2em]">No tasks found</h4>
+                    <p className="text-[10px] text-gray-400 font-bold mt-2 uppercase tracking-wider">Start by adding a new task to this story</p>
+                  </div>
+                ) : (
+                  tasks.filter(t => t.parentStoryId === task.id && t.ticketType !== "story").map(child => {
+                    const tc = TICKET_TYPES[child.ticketType || "task"];
+                    const colIdx = columns.findIndex(c => c.id === child.status);
+                    const cs = getColStyle(child.status, colIdx >= 0 ? colIdx : 0);
+                    return (
+                      <div key={child.id} onClick={() => onEditTask(child)} 
+                        className="group hover:bg-white hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-500 flex items-center gap-4 px-5 py-4 cursor-pointer rounded-2xl border border-transparent hover:border-gray-100 active:scale-[0.98]">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-110" style={{ background: tc.bg, color: tc.color, border: `1px solid ${tc.border}` }}>
+                          <span className="text-lg">{tc.icon}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-gray-50 text-gray-400 group-hover:text-indigo-500 group-hover:bg-indigo-50 transition-colors">{child.taskCode || "TSK"}</span>
+                            <span className="text-[10px] font-bold text-gray-300 uppercase tracking-tight">{tc.label}</span>
+                          </div>
+                          <h4 className="text-sm font-black text-gray-800 leading-tight group-hover:text-indigo-600 transition-colors">{child.title}</h4>
+                        </div>
+                        <div className="flex items-center gap-5 shrink-0">
+                          <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-gray-50/50 group-hover:bg-indigo-50/50 transition-colors">
+                            <Avatar name={child.assignedToName} size="xs" />
+                            <span className="text-[11px] font-black text-gray-600 hidden sm:inline">{child.assignedToName?.split(" ")[0] || "Unassigned"}</span>
+                          </div>
+                          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-gray-100 bg-white shadow-sm min-w-[110px] justify-center transition-all group-hover:border-indigo-100 group-hover:shadow-indigo-500/5">
+                            <div className="w-2 h-2 rounded-full shadow-sm" style={{ background: cs.color }} />
+                            <span className="text-[10px] font-black uppercase tracking-tighter" style={{ color: cs.color }}>{columns.find(c => c.id === child.status)?.label || child.status}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
           )}
 
@@ -1314,7 +1380,7 @@ function TaskDetailModal({
                       className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
                       title="Delete Subtask"
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/></svg>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" /></svg>
                     </button>
                   )}
                 </div>
@@ -1841,6 +1907,7 @@ function ProjectsPage({ user, myProjects, onOpenProject, onCreateProject, onEdit
    MAIN COMPONENT
 ═══════════════════════════════════════════ */
 export default function ProjectManagement({ user, projects, users }: any) {
+  const [viewStack, setViewStack] = useState<Task[]>([]);
   const [activeTab, setActiveTab] = useState<AppTab>("dashboard");
   const [activeProject, setActiveProject] = useState<any>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
@@ -1984,9 +2051,18 @@ export default function ProjectManagement({ user, projects, users }: any) {
   const handleSaveTask = async (updated: Task) => {
     await updateDoc(doc(db, "projectTasks", updated.id), { ...updated });
     setViewingTask(null);
+    if (viewStack.length > 0) {
+      const prev = viewStack[viewStack.length - 1];
+      setViewStack(s => s.slice(0, -1));
+      setViewingTask(prev);
+    }
   };
 
-  const handleEditTask = (task: Task) => { setViewingTask(null); setEditingTask(task); };
+  const handleEditTask = (task: Task) => {
+    if (viewingTask) setViewStack(prev => [...prev, viewingTask]);
+    setViewingTask(null);
+    setEditingTask(task);
+  };
 
   const handleSaveEditedTask = async (data: Partial<Task> & { childTickets?: any }) => {
     if (!editingTask?.id) return;
@@ -2333,7 +2409,14 @@ export default function ProjectManagement({ user, projects, users }: any) {
             allowedTypes={permissions.canCreateTypes} />
         )}
         {editingTask && (
-          <TaskModal open={!!editingTask} onClose={() => setEditingTask(null)} onSubmit={handleSaveEditedTask}
+          <TaskModal open={!!editingTask} onClose={() => {
+            setEditingTask(null);
+            if (viewStack.length > 0) {
+              const prev = viewStack[viewStack.length - 1];
+              setViewStack(s => s.slice(0, -1));
+              setViewingTask(prev);
+            }
+          }} onSubmit={handleSaveEditedTask}
             users={users} columns={columns} projectColor={projectColor}
             initialData={editingTask} stories={stories} currentUserId={user?.uid}
             isProjectManager={isProjectManager} allowedTypes={permissions.canCreateTypes} />
@@ -2347,6 +2430,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
             onStatusChange={handleStatusChange} onSave={handleSaveTask}
             db={db} storage={storage} user={user}
             sprints={sprints} onMoveToSprint={handleMoveToSprint} onEditTask={handleEditTask}
+            tasks={tasks} onAddChildToStory={handleAddChildToStory}
           />
         )}
         <SprintFormModal
