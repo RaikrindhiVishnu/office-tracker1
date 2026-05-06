@@ -43,7 +43,7 @@ export interface Task {
   done?: boolean; // for subtasks mostly
 }
 
-export const LABEL_COLORS: Record<string, { bg: string; text: string }> = {
+export const LABEL_COLORS: Record<string, { bg: string; text: string; border?: string }> = {
   green: { bg: "#4bce97", text: "#ffffff" },
   yellow: { bg: "#f5cd47", text: "#ffffff" },
   orange: { bg: "#fea362", text: "#ffffff" },
@@ -55,6 +55,19 @@ export const LABEL_COLORS: Record<string, { bg: string; text: string }> = {
   pink: { bg: "#e774bb", text: "#ffffff" },
   black: { bg: "#44546f", text: "#ffffff" },
 };
+
+export function getLabelStyle(colorValue: string) {
+  if (LABEL_COLORS[colorValue]) return LABEL_COLORS[colorValue];
+  // If it's a custom hex color
+  if (colorValue?.startsWith("#")) {
+    return {
+      bg: colorValue,
+      text: "#ffffff", // Default to white text for custom colors, or could add contrast check
+      border: "rgba(0,0,0,0.1)"
+    };
+  }
+  return LABEL_COLORS.green;
+}
 
 export const TICKET_TYPES: Record<string, { label: string; icon: string; color: string; bg: string; border: string; description: string }> = {
   story: { label: "Story", icon: "📘", color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", description: "A user story" },

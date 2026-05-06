@@ -35,7 +35,7 @@ import {
 import {
   KanbanBoard,
 } from "./employeekanban";
-import { Task, KanbanColumn, TicketType, TICKET_TYPES, LABEL_COLORS, TaskLabel, getPermissions, getColStyle } from "@/lib/kanbanUtils";
+import { Task, KanbanColumn, TicketType, TICKET_TYPES, LABEL_COLORS, TaskLabel, getPermissions, getColStyle, getLabelStyle } from "@/lib/kanbanUtils";
 
 /* ─── LOCAL TYPES (not needed in kanban file) ─── */
 type ViewMode = "kanban" | "list" | "timeline" | "logs" | "reports";
@@ -799,14 +799,14 @@ function LabelPicker({
              <div className="flex-1 overflow-y-auto p-3 space-y-1">
                 {labels.filter(l => l.title.toLowerCase().includes(search.toLowerCase())).map(label => {
                   const isSelected = selectedLabels.some(sl => sl.id === label.id);
-                  const color = LABEL_COLORS[label.color] || LABEL_COLORS.green;
+                  const style = getLabelStyle(label.color);
                   return (
                     <div key={label.id} className="flex items-center gap-2 group animate-in fade-in slide-in-from-top-1 duration-200">
                        <input type="checkbox" checked={isSelected} onChange={() => toggleLabel(label)} className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
                        <div 
                          onClick={() => toggleLabel(label)}
                          className="flex-1 px-3 py-1.5 rounded-lg text-[11px] font-black cursor-pointer transition flex items-center justify-between hover:opacity-90 active:scale-95"
-                         style={{ background: color.bg, color: color.text }}
+                         style={{ background: style.bg, color: style.text }}
                        >
                           {label.title}
                           {isSelected && <span className="text-[10px]">✓</span>}
@@ -821,18 +821,49 @@ function LabelPicker({
 
              <div className="p-3 border-t border-gray-100 bg-gray-50/50">
                 {creating ? (
-                   <div className="space-y-3 p-1">
-                      <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Label title (e.g. Frontend)..." className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none bg-white shadow-sm font-semibold" />
-                      <div className="grid grid-cols-5 gap-1.5">
-                         {Object.keys(LABEL_COLORS).map(c => (
-                           <div key={c} onClick={() => setNewColor(c)} className={`w-8 h-6 rounded-lg cursor-pointer border-2 transition-all hover:scale-110 active:scale-90 ${newColor === c ? "border-indigo-600 shadow-md" : "border-transparent"}`} style={{ background: LABEL_COLORS[c].bg }} />
-                         ))}
+                  <div className="space-y-4 p-1">
+                    <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Label title (e.g. Frontend)..." className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none bg-white shadow-sm font-semibold" />
+                    
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-1">Pick Color</p>
+                      <div className="flex flex-wrap gap-2 items-center">
+                        {Object.keys(LABEL_COLORS).map(c => (
+                          <div key={c} onClick={() => setNewColor(c)} className={`w-6 h-6 rounded-lg cursor-pointer border-2 transition-all hover:scale-110 active:scale-90 ${newColor === c ? "border-indigo-600 shadow-md scale-110" : "border-white"}`} style={{ background: LABEL_COLORS[c].bg }} />
+                        ))}
+                        
+                        {/* Custom Color Picker */}
+                        <div className="relative group">
+                          <input 
+                            type="color" 
+                            value={newColor.startsWith("#") ? newColor : "#6366f1"} 
+                            onChange={e => setNewColor(e.target.value)}
+                            className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                          />
+                          <div 
+                            className={`w-10 h-6 rounded-lg border-2 transition-all flex items-center justify-center text-[10px] ${newColor.startsWith("#") ? "border-indigo-600 shadow-md" : "border-gray-200"}`}
+                            style={{ background: newColor.startsWith("#") ? newColor : "#f3f4f6" }}
+                          >
+                            {newColor.startsWith("#") ? "✨" : "🎨"}
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex gap-2 pt-1">
-                         <button onClick={createLabel} disabled={!newTitle.trim()} className="flex-1 text-[10px] font-black uppercase tracking-wider py-2 bg-indigo-600 text-white rounded-xl shadow-sm disabled:opacity-40 transition-all hover:shadow-indigo-200 active:scale-95">Create</button>
-                         <button onClick={() => setCreating(false)} className="flex-1 text-[10px] font-black uppercase tracking-wider py-2 bg-white border border-gray-200 text-gray-600 rounded-xl shadow-sm transition-all hover:bg-gray-50 active:scale-95">Cancel</button>
+                    </div>
+
+                    {/* Preview */}
+                    <div className="p-2 bg-white rounded-xl border border-gray-100 flex items-center justify-center">
+                      <div 
+                        className="px-3 py-1 rounded-lg text-[10px] font-black transition-all"
+                        style={{ background: getLabelStyle(newColor).bg, color: getLabelStyle(newColor).text }}
+                      >
+                        {newTitle || "PREVIEW"}
                       </div>
-                   </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-1">
+                      <button onClick={createLabel} disabled={!newTitle.trim()} className="flex-1 text-[10px] font-black uppercase tracking-wider py-2.5 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-200 disabled:opacity-40 transition-all active:scale-95">Create Label</button>
+                      <button onClick={() => setCreating(false)} className="px-4 text-[10px] font-black uppercase tracking-wider py-2.5 bg-white border border-gray-200 text-gray-400 rounded-xl transition-all hover:bg-gray-50 active:scale-95">Cancel</button>
+                    </div>
+                  </div>
                 ) : (
                    <button onClick={() => setCreating(true)} className="w-full text-[10px] font-black uppercase tracking-widest py-2.5 border-2 border-dashed border-gray-200 text-gray-400 rounded-xl hover:border-indigo-200 hover:text-indigo-500 hover:bg-indigo-50/50 transition-all active:scale-95">
                      + Create new label

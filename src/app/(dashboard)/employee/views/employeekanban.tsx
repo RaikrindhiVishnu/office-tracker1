@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect, useMemo, Fragment } from "rea
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { createPortal } from "react-dom";
-import { Task, TaskLabel, TicketType, KanbanColumn, LABEL_COLORS, getPermissions, getColStyle } from "@/lib/kanbanUtils";
+import { Task, TaskLabel, TicketType, KanbanColumn, LABEL_COLORS, getPermissions, getColStyle, getLabelStyle } from "@/lib/kanbanUtils";
 
 /* ─── TYPES ─── */
 export type ViewMode = "board" | "swimlane";
@@ -449,7 +449,7 @@ export function KanbanBoard({
         {task.labels && task.labels.length > 0 && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", padding: "8px 12px 2px" }}>
             {task.labels.map(label => {
-              const color = LABEL_COLORS[label.color] || LABEL_COLORS.green;
+              const style = getLabelStyle(label.color);
               return (
                 <div
                   key={label.id}
@@ -460,7 +460,7 @@ export function KanbanBoard({
                     width: showLabelText ? "auto" : "44px", 
                     padding: showLabelText ? "2px 8px" : "0",
                     borderRadius: "100px", 
-                    background: color.bg, 
+                    background: style.bg, 
                     boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
                     display: "flex",
                     alignItems: "center",
@@ -471,7 +471,7 @@ export function KanbanBoard({
                   }}
                 >
                   {showLabelText && (
-                    <span style={{ fontSize: "9px", fontWeight: 900, color: color.text, textTransform: "uppercase", letterSpacing: "0.02em", whiteSpace: "nowrap" }}>
+                    <span style={{ fontSize: "9px", fontWeight: 900, color: style.text, textTransform: "uppercase", letterSpacing: "0.02em", whiteSpace: "nowrap" }}>
                       {label.title}
                     </span>
                   )}
@@ -623,7 +623,7 @@ export function KanbanBoard({
           {story.labels && story.labels.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginBottom: "8px" }}>
               {story.labels.map(label => {
-                const color = LABEL_COLORS[label.color] || LABEL_COLORS.green;
+                const style = getLabelStyle(label.color);
                 return (
                   <div 
                     key={label.id} 
@@ -634,7 +634,8 @@ export function KanbanBoard({
                       width: showLabelText ? "auto" : "44px", 
                       padding: showLabelText ? "2px 8px" : "0",
                       borderRadius: "100px", 
-                      background: color.bg,
+                      background: style.bg,
+                      boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -644,7 +645,7 @@ export function KanbanBoard({
                     }}
                   >
                     {showLabelText && (
-                      <span style={{ fontSize: "9px", fontWeight: 900, color: color.text, textTransform: "uppercase", letterSpacing: "0.02em", whiteSpace: "nowrap" }}>
+                      <span style={{ fontSize: "9px", fontWeight: 900, color: style.text, textTransform: "uppercase", letterSpacing: "0.02em", whiteSpace: "nowrap" }}>
                         {label.title}
                       </span>
                     )}
@@ -822,9 +823,11 @@ export function KanbanBoard({
                 {col.label.toUpperCase()}
               </span>
             )}
-            <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "100px", background: "white", color: cfg.color, border: `1px solid ${cfg.border}`, flexShrink: 0 }}>
-              {nonStoryCount}{col.wipLimit ? `/${col.wipLimit}` : ""}
-            </span>
+            {nonStoryCount > 0 && (
+              <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "100px", background: "white", color: cfg.color, border: `1px solid ${cfg.border}`, flexShrink: 0 }}>
+                {nonStoryCount}{col.wipLimit ? `/${col.wipLimit}` : ""}
+              </span>
+            )}
             {isProjectManager && (
               <>
                 <button onClick={() => toggleCol(col.id)} style={{ width: "20px", height: "20px", borderRadius: "5px", border: `1px solid ${cfg.border}`, background: "transparent", cursor: "pointer", fontSize: "10px", color: cfg.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>◀</button>
@@ -875,11 +878,10 @@ export function KanbanBoard({
           )}
         </div>
 
-        {/* Footer */}
         <div style={{ padding: "6px 12px", borderTop: `1px solid ${cfg.border}`, background: cfg.headerBg + "99", flexShrink: 0 }}>
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            <span style={{ fontSize: "10px", color: cfg.color + "99", fontWeight: 600 }}>{stats.totalPts} pts</span>
-            <span style={{ fontSize: "10px", color: cfg.color + "80" }}>{stats.myTasks} mine</span>
+            {stats.totalPts > 0 && <span style={{ fontSize: "10px", color: cfg.color + "99", fontWeight: 600 }}>{stats.totalPts} pts</span>}
+            {stats.myTasks > 0 && <span style={{ fontSize: "10px", color: cfg.color + "80" }}>{stats.myTasks} mine</span>}
             {stats.overdueCount > 0 && <span style={{ fontSize: "10px", color: "#ef4444", fontWeight: 700 }}>⚡ {stats.overdueCount} overdue</span>}
           </div>
         </div>
@@ -984,20 +986,22 @@ export function KanbanBoard({
                     >
                       {col.label.toUpperCase()}
                     </span>
-                    <span
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: 700,
-                        padding: "1px 7px",
-                        borderRadius: 100,
-                        background: "#fff",
-                        color: cfg.color,
-                        border: `1px solid ${cfg.border}`,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {count}
-                    </span>
+                    {count > 0 && (
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          padding: "1px 7px",
+                          borderRadius: 100,
+                          background: "#fff",
+                          color: cfg.color,
+                          border: `1px solid ${cfg.border}`,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {count}
+                      </span>
+                    )}
                   </div>
                 </div>
               );

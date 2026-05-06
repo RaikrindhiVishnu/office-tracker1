@@ -12,7 +12,7 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
-import { isInsideOffice } from "@/lib/location";
+// import { isInsideOffice } from "@/lib/location";
 // ← reuse the same mapping
 import { getRoleRedirect } from "@/lib/roleRouting";
    import { Eye, EyeOff } from "lucide-react";
@@ -44,6 +44,7 @@ function getTodayString(): string {
 }
 
 // ── Check approved WFH leave for today ───────────────────────────────────
+/*
 async function checkWFHApproved(uid: string): Promise<{ allowed: boolean; indexUrl?: string }> {
   const today = getTodayString();
   try {
@@ -73,8 +74,10 @@ async function checkWFHApproved(uid: string): Promise<{ allowed: boolean; indexU
     return { allowed: false };
   }
 }
+*/
 
 // ── Get GPS position ──────────────────────────────────────────────────────
+/*
 function getCurrentPosition(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -88,6 +91,7 @@ function getCurrentPosition(): Promise<GeolocationPosition> {
     });
   });
 }
+*/
 
 // ─────────────────────────────────────────────────────────────────────────
 //  COMPONENT
@@ -144,6 +148,7 @@ const department = (userData?.department ?? "").toString().trim().toUpperCase();
       }
 
       // STEP 4: Location check (employees only, no WFH approval)
+      /*
       if (role === "EMPLOYEE") {
         setStep("Checking work-from-home status...");
         const wfhResult = await checkWFHApproved(cred.user.uid);
@@ -184,6 +189,7 @@ const department = (userData?.department ?? "").toString().trim().toUpperCase();
           setStep("Location verified ✓");
         }
       }
+      */
 
       // STEP 5: Route by role using the same normalizeRole mapping as AuthContext
       setStep("Redirecting...");
@@ -199,10 +205,12 @@ const department = (userData?.department ?? "").toString().trim().toUpperCase();
       setStep("");
 
       if      (e.message === "INDEX_MISSING")     setError("A Firestore index is required. Click the button below to create it, then try logging in again.");
+      /*
       else if (e.message === "GEO_DENIED")        setError("📍 Location permission denied.\nPlease allow location access in your browser and try again.\nYou must be inside the office to log in.");
       else if (e.message === "GEO_NOT_SUPPORTED") setError("📍 Geolocation is not supported on this device or browser.");
       else if (e.message === "GEO_TIMEOUT")       setError("📍 Could not get your location (timeout). Please check your GPS signal and try again.");
       else if (e.message === "OUTSIDE_OFFICE")    setError("🚫 Login blocked.\nYou are outside office premises.\nYou must be within 100 meters of the office to log in.\nIf you're working from home, your WFH request must be approved first.");
+      */
       else if (e.message === "PROFILE_NOT_FOUND") setError("User profile not found. Please contact your administrator.");
       else if (e.message === "INVALID_ROLE")      setError("Your account has no valid role assigned. Contact admin.");
       else if (e.code === "auth/invalid-credential" || e.code === "auth/wrong-password") setError("Invalid email or password. Please try again.");
@@ -291,7 +299,8 @@ const department = (userData?.department ?? "").toString().trim().toUpperCase();
           </p>
         </div>
 
-        {/* Location policy notice */}
+        {/* Location policy notice (DISABLED) */}
+        {/*
         <div style={{
           background   : "#f0fdf4", border: "1px solid #bbf7d0",
           borderRadius : 12, padding: "10px 14px", marginBottom: 20,
@@ -303,6 +312,7 @@ const department = (userData?.department ?? "").toString().trim().toUpperCase();
             Approved WFH requests allow login from anywhere.
           </p>
         </div>
+        */}
 
         {/* Step indicator */}
         {loading && step && (
