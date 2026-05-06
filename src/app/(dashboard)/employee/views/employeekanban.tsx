@@ -809,7 +809,7 @@ export function KanbanBoard({
                 onClick={() => isProjectManager && (setEditingColId(col.id), setEditingColLabel(col.label), setEditingColWip(col.wipLimit || 0))}
                 title={isProjectManager ? "Click to rename" : col.label}
               >
-                {col.label}
+                {col.label.toUpperCase()}
               </span>
             )}
             <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "100px", background: "white", color: cfg.color, border: `1px solid ${cfg.border}`, flexShrink: 0 }}>
@@ -972,7 +972,7 @@ export function KanbanBoard({
                         minWidth: 0,
                       }}
                     >
-                      {col.label}
+                      {col.label.toUpperCase()}
                     </span>
                     <span
                       style={{
@@ -1284,7 +1284,7 @@ export function KanbanBoard({
                       }}
                     >
                       <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: cfg.dot }} />
-                      {col.label}
+                      {col.label.toUpperCase()}
                     </button>
                   );
                 })}
