@@ -1,6 +1,6 @@
 "use client";
 import { createPortal } from "react-dom";
-import type { Task } from "./KanbanBoard";
+import type { Task } from "@/lib/kanbanUtils";
 // =============================================================================
 // TYPES
 // =============================================================================
