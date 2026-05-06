@@ -34,7 +34,7 @@ import {
 import {
   KanbanBoard,
 } from "./employeekanban";
-import { Task, KanbanColumn, TicketType, TICKET_TYPES, LABEL_COLORS, TaskLabel } from "@/lib/kanbanUtils";
+import { Task, KanbanColumn, TicketType, TICKET_TYPES, LABEL_COLORS, TaskLabel, getPermissions, getColStyle } from "@/lib/kanbanUtils";
 
 /* ─── LOCAL TYPES (not needed in kanban file) ─── */
 type ViewMode = "kanban" | "list" | "timeline" | "logs" | "reports";
@@ -130,7 +130,7 @@ async function generateUniqueTaskCode(projectId: string, type: TicketType): Prom
 }
 
 /* ─── SHARED COMPONENTS ─── */
-const Avatar = ({ name, size = "sm", highlight = false }: { name?: string; size?: "xs" | "sm" | "md" | "lg"; highlight?: boolean }) => {
+const Avatar = ({ name, size = "sm", highlight = false }: { name?: string | null; size?: "xs" | "sm" | "md" | "lg"; highlight?: boolean }) => {
   const s = { xs: "w-6 h-6 text-[10px]", sm: "w-8 h-8 text-xs", md: "w-10 h-10 text-sm", lg: "w-12 h-12 text-base" };
   const colors = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6"];
   const bg = colors[(name?.charCodeAt(0) || 0) % colors.length];

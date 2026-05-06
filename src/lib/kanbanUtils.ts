@@ -104,6 +104,25 @@ export function canDragTask(user: any, task: any, project: any) {
   return isAdmin || isPM || task.assignedTo === user.uid;
 }
 
+export function getPermissions(user: any, project: any) {
+  const isAdmin = user?.accountType === "ADMIN";
+  const isPM = !!(
+    project?.projectManager === user?.uid ||
+    (Array.isArray(project?.projectManagers) && project.projectManagers.includes(user?.uid))
+  );
+  const fullControl = isAdmin || isPM;
+  const designation: string = user?.designation || "";
+  const isDevEngineer = ["Software Engineer", "Senior Software Engineer", "Frontend Engineer", "Backend Engineer", "Full Stack Engineer", "Android Developer", "Mobile App Developer", "DevOps Engineer"].some(d => designation.toLowerCase().includes(d.toLowerCase()));
+  const isFrontendEngineer = designation.toLowerCase().includes("frontend engineer");
+  const isQA = designation.toLowerCase().includes("qa");
+  let canCreateTypes: TicketType[] = ["task"];
+  if (fullControl) canCreateTypes = ["story", "task", "bug", "defect"];
+  else if (isFrontendEngineer) canCreateTypes = ["story", "task"];
+  else if (isDevEngineer) canCreateTypes = ["task"];
+  else if (isQA) canCreateTypes = ["task", "bug", "defect"];
+  return { isPM, isAdmin, fullControl, canCreateTypes, canEdit: fullControl, canDelete: fullControl, canAssign: fullControl };
+}
+
 export const statusColors: Record<string, string> = {
   todo: "#64748b",
   inprogress: "#2563eb",
@@ -111,3 +130,26 @@ export const statusColors: Record<string, string> = {
   done: "#16a34a",
   blocked: "#dc2626",
 };
+
+export const STATIC_COL_CONFIG: Record<string, { color: string; bg: string; border: string; headerBg: string; dot: string }> = {
+  todo: { color: "#64748b", bg: "#f8fafc", border: "#e2e8f0", headerBg: "#f1f5f9", dot: "#94a3b8" },
+  inprogress: { color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", headerBg: "#dbeafe", dot: "#3b82f6" },
+  review: { color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", headerBg: "#ede9fe", dot: "#8b5cf6" },
+  done: { color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0", headerBg: "#dcfce7", dot: "#22c55e" },
+  blocked: { color: "#dc2626", bg: "#fef2f2", border: "#fecaca", headerBg: "#fee2e2", dot: "#ef4444" },
+};
+
+export const DYNAMIC_PALETTE = [
+  { color: "#64748b", bg: "#f8fafc", border: "#e2e8f0", headerBg: "#f1f5f9", dot: "#94a3b8" },
+  { color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", headerBg: "#dbeafe", dot: "#3b82f6" },
+  { color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", headerBg: "#ede9fe", dot: "#8b5cf6" },
+  { color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0", headerBg: "#dcfce7", dot: "#22c55e" },
+  { color: "#dc2626", bg: "#fef2f2", border: "#fecaca", headerBg: "#fee2e2", dot: "#ef4444" },
+  { color: "#0891b2", bg: "#ecfeff", border: "#a5f3fc", headerBg: "#cffafe", dot: "#06b6d4" },
+  { color: "#d97706", bg: "#fffbeb", border: "#fde68a", headerBg: "#fef3c7", dot: "#f59e0b" },
+  { color: "#be185d", bg: "#fdf2f8", border: "#fbcfe8", headerBg: "#fce7f3", dot: "#ec4899" },
+];
+
+export function getColStyle(colId: string, index: number) {
+  return STATIC_COL_CONFIG[colId] ?? DYNAMIC_PALETTE[index % DYNAMIC_PALETTE.length];
+}
