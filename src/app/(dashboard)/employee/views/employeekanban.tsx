@@ -425,7 +425,7 @@ export function KanbanBoard({
       })).filter(g => g.tasks.length > 0);
     }
     if (groupBy === "story") {
-      const map = new Map<string, { label: string; avatar?: string; tasks: Task[] }>();
+      const map = new Map<string, { label: string; avatar?: string | null; tasks: Task[] }>();
       const stories = localTasks.filter(t => t.ticketType === "story");
       
       stories.forEach(s => map.set(s.id, { label: s.title, tasks: [] }));
