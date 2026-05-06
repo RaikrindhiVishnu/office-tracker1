@@ -1107,7 +1107,7 @@ const SmallNoticeTicker = ({ announcements }: { announcements?: { id: string; te
     <div style={{
       flex: "1",
       minWidth: "280px",
-      maxWidth: "500px",
+      maxWidth: "800px",
       background: "#eff6ff",
       borderRadius: "100px",
       padding: "8px 20px",
@@ -1219,7 +1219,7 @@ export default function DashboardView({
       {activeModal === "help" && <Modal onClose={close} wide><ModalHeader emoji="💬" title="Help & Support" subtitle="Raise a ticket or browse FAQs" onClose={close} /><HelpView /></Modal>}
 
       {/* ── HEADER ── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4, marginBottom: 4, gap: 20, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", marginTop: 4, marginBottom: 4, gap: 64, flexWrap: "wrap" }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: T.text, letterSpacing: "-0.04em", margin: 0, lineHeight: 1.2 }}>
             <span style={{ marginLeft: -6 }}>{greetEmoji}</span> {greeting}, {userName.split(" ")[0]}

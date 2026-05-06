@@ -24,7 +24,6 @@ interface ITAsset {
   id: string;
   name: string;
   type: AssetType;
-  serialNumber: string;
   assignedTo: string;
   department: string;
   status: AssetStatus;
@@ -37,12 +36,12 @@ interface ITAsset {
 const EMPTY_FORM = {
   name: "",
   type: "laptop" as AssetType,
-  serialNumber: "",
   assignedTo: "",
   department: "IT",
   status: "active" as AssetStatus,
   purchaseCost: 0,
   warrantyExpiry: "",
+  ownership: "Company",
 };
 
 const DEPARTMENTS = ["IT", "Engineering", "HR", "Finance", "Marketing", "Operations", "Sales"];
@@ -92,6 +91,7 @@ export default function ITAssetsPage() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [ownershipFilter, setOwnershipFilter] = useState("");
 
   // ─── Firebase: real-time listener ─────────────────────────────────────────
 
@@ -138,12 +138,12 @@ export default function ITAssetsPage() {
     setForm({
       name: asset.name,
       type: asset.type,
-      serialNumber: asset.serialNumber || "",
       assignedTo: asset.assignedTo || "",
       department: asset.department,
       status: asset.status,
       purchaseCost: asset.purchaseCost || 0,
       warrantyExpiry: asset.warrantyExpiry || "",
+      ownership: asset.ownership || "Company",
     });
     setRepairNote("");
     setRepairCost(0);
@@ -232,7 +232,11 @@ export default function ITAssetsPage() {
     if (statusFilter && a.status !== statusFilter) return false;
     if (search) {
       const q = search.toLowerCase();
-      if (!`${a.name} ${a.serialNumber} ${a.assignedTo} ${a.department}`.toLowerCase().includes(q)) return false;
+      if (!`${a.name} ${a.assignedTo} ${a.department}`.toLowerCase().includes(q)) return false;
+    }
+    if (ownershipFilter) {
+      const own = a.ownership || "Company";
+      if (own !== ownershipFilter) return false;
     }
     return true;
   });
@@ -309,7 +313,7 @@ export default function ITAssetsPage() {
       <div className="flex flex-wrap gap-3">
         <input
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-52 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="Search name, serial, user..."
+          placeholder="Search name, user, dept..."
           value={search} onChange={(e) => setSearch(e.target.value)}
         />
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
@@ -327,6 +331,12 @@ export default function ITAssetsPage() {
           <option value="under_repair">Under Repair</option>
           <option value="retired">Retired</option>
         </select>
+        <select value={ownershipFilter} onChange={(e) => setOwnershipFilter(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">All Ownership</option>
+          <option value="Company">Company</option>
+          <option value="Own">Own</option>
+        </select>
         <span className="text-sm text-gray-400 self-center ml-auto">{filtered.length} result{filtered.length !== 1 ? "s" : ""}</span>
       </div>
 
@@ -340,7 +350,7 @@ export default function ITAssetsPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                {["Name", "Type", "Serial #", "Dept", "Assigned To", "Owner", "Status", "Cost", "Expiry", "Actions"].map((h) => (
+                {["Name", "Type", "Dept", "Assigned To", "Owner", "Status", "Cost", "Expiry", "Actions"].map((h) => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -357,7 +367,6 @@ export default function ITAssetsPage() {
                     <td className="px-4 py-3">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${typeBadge(a.type)}`}>{a.type}</span>
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-500">{a.serialNumber || "—"}</td>
                     <td className="px-4 py-3 text-gray-600">{a.department}</td>
                     <td className="px-4 py-3 text-gray-600 text-xs">{a.assignedTo || "—"}</td>
                     <td className="px-4 py-3">
@@ -413,7 +422,7 @@ export default function ITAssetsPage() {
               </div>
 
               {/* Type + Status */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Type *</label>
                   <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -422,6 +431,14 @@ export default function ITAssetsPage() {
                     <option value="server">Server</option>
                     <option value="license">License</option>
                     <option value="software">Software</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Ownership</label>
+                  <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={form.ownership} onChange={(e) => setForm({ ...form, ownership: e.target.value })}>
+                    <option value="Company">Company</option>
+                    <option value="Own">Own</option>
                   </select>
                 </div>
                 <div>
@@ -434,16 +451,6 @@ export default function ITAssetsPage() {
                   </select>
                 </div>
               </div>
-
-              {/* Serial (hardware only) */}
-              {(form.type === "laptop" || form.type === "server") && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Serial Number</label>
-                  <input className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={form.serialNumber} onChange={(e) => setForm({ ...form, serialNumber: e.target.value })}
-                    placeholder="SN-XXXX-XXXX" />
-                </div>
-              )}
 
               {/* Department + Assigned To */}
               <div className="grid grid-cols-2 gap-3">
@@ -521,7 +528,7 @@ export default function ITAssetsPage() {
       {/* ── Quick Repair Modal ───────────────────────────────────────────── */}
       {repairTarget && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-md">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <div>
                 <h2 className="text-base font-semibold">Log Repair</h2>

@@ -135,217 +135,7 @@ async function generateUniqueTaskCode(projectId: string, type: TicketType): Prom
   return `${prefixMap[type]}-${String(count).padStart(3, "0")}`;
 }
 
-/* ══════════════════════════════════════════════
-   EDIT PROJECT MODAL
-══════════════════════════════════════════════ */
-function EditProjectModal({ open, onClose, project, onSaved }: {
-  open: boolean;
-  onClose: () => void;
-  project: any;
-  onSaved?: (updated: any) => void;
-}) {
-  const COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#0891b2"];
-  const [form, setForm] = useState({
-    name: project?.name || "",
-    description: project?.description || "",
-    clientName: project?.clientName || "",
-    status: project?.status || "Planning",
-    color: project?.color || COLORS[0],
-    endDate: project?.endDate || "",
-  });
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (open && project) {
-      setForm({
-        name: project.name || "",
-        description: project.description || "",
-        clientName: project.clientName || "",
-        status: project.status || "Planning",
-        color: project.color || COLORS[0],
-        endDate: project.endDate || "",
-      });
-    }
-  }, [open, project?.id]);
-
-  if (!open) return null;
-
-  const handleSave = async () => {
-    if (!form.name.trim()) return;
-    setSaving(true);
-    try {
-      const adminSnap = await getDocs(query(collection(db, "users"), where("accountType", "==", "ADMIN")));
-      const adminUids = adminSnap.docs.map(d => d.id);
-      await updateDoc(doc(db, "projects", project.id), {
-        ...form,
-        projectManagers: adminUids.length > 0 ? adminUids : project.projectManagers,
-        projectManager: adminUids[0] || project.projectManager,
-        updatedAt: serverTimestamp(),
-      });
-      onSaved?.({ ...project, ...form });
-      onClose();
-    } catch (err: any) {
-      alert("Failed to update project: " + err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between" style={{ background: `linear-gradient(135deg, ${form.color}15, ${form.color}05)` }}>
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-sm" style={{ background: form.color }}>{form.name?.[0]?.toUpperCase() || "P"}</div>
-            <div><h2 className="font-black text-gray-900 text-base">Edit Project</h2><p className="text-xs text-gray-400">Update project details</p></div>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition text-sm">✕</button>
-        </div>
-        <div className="px-6 py-5 space-y-4">
-          <div>
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Project Name <span className="text-red-400">*</span></label>
-            <input autoFocus value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Mobile App Redesign" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Description</label>
-            <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="What is this project about?" rows={2} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Client</label>
-              <input value={form.clientName} onChange={e => setForm(f => ({ ...f, clientName: e.target.value }))} placeholder="Client name" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Status</label>
-              <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
-                {["Planning", "In Progress", "On Hold", "Completed"].map(s => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">End Date</label>
-            <input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Color</label>
-            <div className="flex gap-2 flex-wrap">
-              {COLORS.map(c => (
-                <button key={c} onClick={() => setForm(f => ({ ...f, color: c }))} className="w-7 h-7 rounded-lg transition-transform hover:scale-110"
-                  style={{ background: c, outline: form.color === c ? `3px solid ${c}` : "none", outlineOffset: 2, transform: form.color === c ? "scale(1.15)" : "scale(1)" }} />
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-bold rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-100 transition">Cancel</button>
-          <button onClick={handleSave} disabled={!form.name.trim() || saving} className="px-5 py-2 text-sm font-bold rounded-xl text-white shadow-sm disabled:opacity-40 transition" style={{ background: `linear-gradient(135deg, ${form.color}, ${form.color}cc)` }}>
-            {saving ? "Saving..." : "Save Changes"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ─── PROJECT MODAL (create) ─── */
-function ProjectModal({ open, onClose, user, onCreated }: {
-  open: boolean; onClose: () => void; user: any; onCreated?: (project: any) => void;
-}) {
-  const COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#0891b2"];
-  const [form, setForm] = useState({ name: "", description: "", clientName: "", status: "Planning", color: COLORS[0], endDate: "" });
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!open) setForm({ name: "", description: "", clientName: "", status: "Planning", color: COLORS[0], endDate: "" });
-  }, [open]);
-
-  if (!open) return null;
-
-  const handleCreate = async () => {
-    if (!form.name.trim()) return;
-    setSaving(true);
-    try {
-      const adminSnap = await getDocs(query(collection(db, "users"), where("accountType", "==", "ADMIN")));
-      const adminUids = adminSnap.docs.map(d => d.id);
-      const allMembers = Array.from(new Set([user.uid, ...adminUids]));
-      const docRef = await addDoc(collection(db, "projects"), {
-        ...form,
-        members: allMembers,
-        projectManagers: adminUids.length > 0 ? adminUids : [user.uid],
-        projectManager: adminUids[0] || user.uid,
-        progress: 0,
-        createdBy: user.uid,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-      onCreated?.({ id: docRef.id, ...form, members: allMembers });
-      onClose();
-    } catch (err: any) {
-      alert("Failed to create project: " + err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between" style={{ background: `linear-gradient(135deg, ${form.color}15, ${form.color}05)` }}>
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-sm" style={{ background: form.color }}>{form.name?.[0]?.toUpperCase() || "P"}</div>
-            <div><h2 className="font-black text-gray-900 text-base">New Project</h2><p className="text-xs text-gray-400">Fill in the details below</p></div>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition text-sm">✕</button>
-        </div>
-        <div className="px-6 py-5 space-y-4">
-          <div>
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Project Name <span className="text-red-400">*</span></label>
-            <input autoFocus value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Mobile App Redesign" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Description</label>
-            <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="What is this project about?" rows={2} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Client</label>
-              <input value={form.clientName} onChange={e => setForm(f => ({ ...f, clientName: e.target.value }))} placeholder="Client name" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Status</label>
-              <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
-                {["Planning", "In Progress", "On Hold", "Completed"].map(s => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">End Date</label>
-            <input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Color</label>
-            <div className="flex gap-2 flex-wrap">
-              {COLORS.map(c => (
-                <button key={c} onClick={() => setForm(f => ({ ...f, color: c }))} className="w-7 h-7 rounded-lg transition-transform hover:scale-110"
-                  style={{ background: c, outline: form.color === c ? `3px solid ${c}` : "none", outlineOffset: 2, transform: form.color === c ? "scale(1.15)" : "scale(1)" }} />
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-bold rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-100 transition">Cancel</button>
-          <button onClick={handleCreate} disabled={!form.name.trim() || saving} className="px-5 py-2 text-sm font-bold rounded-xl text-white shadow-sm disabled:opacity-40 transition" style={{ background: `linear-gradient(135deg, ${form.color}, ${form.color}cc)` }}>
-            {saving ? "Creating..." : "Create Project"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ─── SHARED UI ─── */
+/* ─── SHARED COMPONENTS ─── */
 const Avatar = ({ name, size = "sm", highlight = false }: { name?: string; size?: "xs" | "sm" | "md" | "lg"; highlight?: boolean }) => {
   const s = { xs: "w-6 h-6 text-[10px]", sm: "w-8 h-8 text-xs", md: "w-10 h-10 text-sm", lg: "w-12 h-12 text-base" };
   const colors = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6"];
@@ -386,6 +176,326 @@ function PermissionToast({ message, onHide }: { message: string; onHide: () => v
     </div>
   );
 }
+
+function MemberPicker({ users, currentUid, selected, onChange, label = "Team Members", excludeUids = [] }: {
+  users: any[]; currentUid: string; selected: string[]; onChange: (s: string[]) => void;
+  label?: string; excludeUids?: string[];
+}) {
+  const [search, setSearch] = useState("");
+  const eligible = (users || []).filter((u: any) => u.uid !== currentUid && !excludeUids.includes(u.uid));
+  const filtered = eligible.filter((u: any) => {
+    const name = (u.displayName || u.name || u.email?.split("@")[0] || "").toLowerCase();
+    return name.includes(search.toLowerCase()) || (u.email || "").toLowerCase().includes(search.toLowerCase());
+  });
+  const toggle = (uid: string) => { onChange(selected.includes(uid) ? selected.filter(id => id !== uid) : [...selected, uid]); };
+  const getName = (u: any) => u.displayName || u.name || u.email?.split("@")[0] || "Unknown";
+  const colors = ["#6366f1", "#7c3aed", "#db2777", "#d97706", "#059669", "#0891b2", "#dc2626", "#16a34a"];
+  return (
+    <div className="mt-4 first:mt-0">
+      <div className="flex items-center justify-between mb-2">
+        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{label}</label>
+        {selected.length > 0 && <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{selected.length} selected</span>}
+      </div>
+      <div className="relative mb-2">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]">🔍</span>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search team..."
+          className="w-full border border-gray-100 bg-white rounded-xl pl-8 pr-3 py-2 text-[11px] focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all" />
+      </div>
+      <div className="border border-gray-100 rounded-2xl overflow-hidden bg-white/50">
+        <div className="max-h-24 overflow-y-auto divide-y divide-gray-50">
+          {filtered.length === 0
+            ? <div className="py-4 text-center text-[10px] text-gray-400">No members found</div>
+            : filtered.map((u: any) => {
+              const name = getName(u); const checked = selected.includes(u.uid);
+              const colorIdx = (name.charCodeAt(0) || 0) % colors.length;
+              return (
+                <div key={u.uid} onClick={() => toggle(u.uid)}
+                  className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-all ${checked ? "bg-indigo-50/50" : "hover:bg-white"}`}>
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0 shadow-sm" style={{ background: colors[colorIdx] }}>{name[0]?.toUpperCase()}</div>
+                  <div className="flex-1 min-w-0"><p className="text-[11px] font-bold text-gray-800 truncate">{name}</p><p className="text-[9px] text-gray-400 truncate">{u.email}</p></div>
+                  <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition-all ${checked ? "bg-indigo-600 border-indigo-600" : "border-gray-200 bg-white"}`}>
+                    {checked && <span className="text-white text-[8px] font-bold">✓</span>}
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   EDIT PROJECT MODAL
+══════════════════════════════════════════════ */
+function EditProjectModal({ open, onClose, project, users, onSaved }: {
+  open: boolean;
+  onClose: () => void;
+  project: any;
+  users: any[];
+  onSaved?: (updated: any) => void;
+}) {
+  const COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#0891b2"];
+  const [form, setForm] = useState({
+    name: project?.name || "",
+    description: project?.description || "",
+    clientName: project?.clientName || "",
+    status: project?.status || "Planning",
+    color: project?.color || COLORS[0],
+    endDate: project?.endDate || "",
+    selectedManagers: (project?.projectManagers || []).filter((uid: string) => uid !== project?.createdBy) as string[],
+    selectedMembers: (project?.members || []).filter((uid: string) => !project?.projectManagers?.includes(uid) && uid !== project?.createdBy) as string[],
+  });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open && project) {
+      setForm({
+        name: project.name || "",
+        description: project.description || "",
+        clientName: project.clientName || "",
+        status: project.status || "Planning",
+        color: project.color || COLORS[0],
+        endDate: project.endDate || "",
+        selectedManagers: (project.projectManagers || []).filter((uid: string) => uid !== project.createdBy),
+        selectedMembers: (project.members || []).filter((uid: string) => !project.projectManagers?.includes(uid) && uid !== project.createdBy),
+      });
+    }
+  }, [open, project?.id]);
+
+  if (!open) return null;
+
+  const handleSave = async () => {
+    if (!form.name.trim()) return;
+    setSaving(true);
+    try {
+      const pms = [...new Set([project.createdBy, ...form.selectedManagers])];
+      const members = [...new Set([project.createdBy, ...pms, ...form.selectedMembers])];
+
+      await updateDoc(doc(db, "projects", project.id), {
+        name: form.name,
+        description: form.description,
+        clientName: form.clientName,
+        status: form.status,
+        color: form.color,
+        endDate: form.endDate,
+        projectManagers: pms,
+        projectManager: pms[0],
+        members: members,
+        updatedAt: serverTimestamp(),
+      });
+      onSaved?.({ ...project, ...form, members, projectManagers: pms });
+      onClose();
+    } catch (err: any) {
+      alert("Failed to update project: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden border border-white/20">
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between" style={{ background: `linear-gradient(135deg, ${form.color}15, ${form.color}05)` }}>
+          <div className="flex items-center gap-4">
+            <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-white font-black text-lg shadow-lg" style={{ background: form.color }}>{form.name?.[0]?.toUpperCase() || "P"}</div>
+            <div>
+              <h2 className="font-black text-gray-900 text-lg">Edit Project</h2>
+              <p className="text-xs text-gray-400">Update project identity and team</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-all hover:rotate-90">✕</button>
+        </div>
+
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <h3 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-4">Basic Information</h3>
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-1.5">Project Name <span className="text-red-400">*</span></label>
+                <input autoFocus value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Mobile App Redesign" className="w-full text-sm border border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-1.5">Description</label>
+                <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="What is this project about?" rows={3} className="w-full text-sm border border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none transition-all" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-1.5">Client</label>
+                  <input value={form.clientName} onChange={e => setForm(f => ({ ...f, clientName: e.target.value }))} placeholder="Client name" className="w-full text-sm border border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-1.5">Status</label>
+                  <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="w-full text-sm border border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white transition-all">
+                    {["Planning", "In Progress", "On Hold", "Completed"].map(s => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-1.5">End Date</label>
+                  <input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} className="w-full text-sm border border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-1.5">Theme Color</label>
+                  <div className="flex gap-2.5 flex-wrap pt-1">
+                    {COLORS.map(c => (
+                      <button key={c} onClick={() => setForm(f => ({ ...f, color: c }))} className="w-6 h-6 rounded-lg transition-all hover:scale-110 shadow-sm"
+                        style={{ background: c, outline: form.color === c ? `3px solid ${c}` : "none", outlineOffset: 2, transform: form.color === c ? "scale(1.1)" : "scale(1)" }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-4">Team Management</h3>
+              <div className="bg-gray-50/50 border border-gray-100 rounded-2xl p-4 space-y-4">
+                <MemberPicker label="Project Managers" users={users} currentUid={project?.createdBy} selected={form.selectedManagers} onChange={(s: string[]) => setForm(f => ({ ...f, selectedManagers: s }))} />
+                <div className="h-px bg-gray-100" />
+                <MemberPicker label="Team Members" users={users} currentUid={project?.createdBy} selected={form.selectedMembers} onChange={(s: string[]) => setForm(f => ({ ...f, selectedMembers: s }))} excludeUids={form.selectedManagers} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-5 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
+          <button onClick={onClose} className="px-6 py-2.5 text-sm font-bold rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-100 transition-all">Cancel</button>
+          <button onClick={handleSave} disabled={!form.name.trim() || saving} className="px-8 py-2.5 text-sm font-black rounded-xl text-white shadow-xl shadow-indigo-200 disabled:opacity-40 transition-all hover:translate-y-[-1px] active:translate-y-[0px]" style={{ background: `linear-gradient(135deg, ${form.color}, ${form.color}cc)` }}>
+            {saving ? "Saving Changes..." : "Save Changes"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── PROJECT MODAL (create) ─── */
+function ProjectModal({ open, onClose, user, users, onCreated }: {
+  open: boolean; onClose: () => void; user: any; users: any[]; onCreated?: (project: any) => void;
+}) {
+  const COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#0891b2"];
+  const [form, setForm] = useState({ name: "", description: "", clientName: "", status: "Planning", color: COLORS[0], endDate: "", selectedManagers: [] as string[], selectedMembers: [] as string[] });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) setForm({ name: "", description: "", clientName: "", status: "Planning", color: COLORS[0], endDate: "", selectedManagers: [], selectedMembers: [] });
+  }, [open]);
+
+  if (!open) return null;
+
+  const handleCreate = async () => {
+    if (!form.name.trim()) return;
+    setSaving(true);
+    try {
+      const pms = [...new Set([user.uid, ...form.selectedManagers])];
+      const members = [...new Set([user.uid, ...pms, ...form.selectedMembers])];
+
+      const docRef = await addDoc(collection(db, "projects"), {
+        name: form.name,
+        description: form.description,
+        clientName: form.clientName,
+        status: form.status,
+        color: form.color,
+        endDate: form.endDate,
+        members: members,
+        projectManagers: pms,
+        projectManager: pms[0] || user.uid,
+        progress: 0,
+        createdBy: user.uid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      onCreated?.({ id: docRef.id, ...form, members: members, projectManagers: pms });
+      onClose();
+    } catch (err: any) {
+      alert("Failed to create project: " + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden border border-white/20">
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between" style={{ background: `linear-gradient(135deg, ${form.color}15, ${form.color}05)` }}>
+          <div className="flex items-center gap-4">
+            <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-white font-black text-lg shadow-lg" style={{ background: form.color }}>{form.name?.[0]?.toUpperCase() || "P"}</div>
+            <div>
+              <h2 className="font-black text-gray-900 text-lg">New Project</h2>
+              <p className="text-xs text-gray-400">Initialize a new project and team</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-all hover:rotate-90">✕</button>
+        </div>
+
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <h3 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-4">Project Details</h3>
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-1.5">Project Name <span className="text-red-400">*</span></label>
+                <input autoFocus value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Mobile App Redesign" className="w-full text-sm border border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-1.5">Description</label>
+                <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="What is this project about?" rows={3} className="w-full text-sm border border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none transition-all" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-1.5">Client</label>
+                  <input value={form.clientName} onChange={e => setForm(f => ({ ...f, clientName: e.target.value }))} placeholder="Client name" className="w-full text-sm border border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-1.5">Status</label>
+                  <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="w-full text-sm border border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white transition-all">
+                    {["Planning", "In Progress", "On Hold", "Completed"].map(s => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-1.5">End Date</label>
+                  <input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} className="w-full text-sm border border-gray-100 bg-gray-50/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-all" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-1.5">Theme Color</label>
+                  <div className="flex gap-2.5 flex-wrap pt-1">
+                    {COLORS.map(c => (
+                      <button key={c} onClick={() => setForm(f => ({ ...f, color: c }))} className="w-6 h-6 rounded-lg transition-all hover:scale-110 shadow-sm"
+                        style={{ background: c, outline: form.color === c ? `3px solid ${c}` : "none", outlineOffset: 2, transform: form.color === c ? "scale(1.1)" : "scale(1)" }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] mb-4">Team Members</h3>
+              <div className="bg-gray-50/50 border border-gray-100 rounded-2xl p-4 space-y-4">
+                <MemberPicker label="Project Managers" users={users} currentUid={user?.uid} selected={form.selectedManagers} onChange={(s: string[]) => setForm(f => ({ ...f, selectedManagers: s }))} />
+                <div className="h-px bg-gray-100" />
+                <MemberPicker label="Team Members" users={users} currentUid={user?.uid} selected={form.selectedMembers} onChange={(s: string[]) => setForm(f => ({ ...f, selectedMembers: s }))} excludeUids={form.selectedManagers} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-5 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
+          <button onClick={onClose} className="px-6 py-2.5 text-sm font-bold rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-100 transition-all">Cancel</button>
+          <button onClick={handleCreate} disabled={!form.name.trim() || saving} className="px-8 py-2.5 text-sm font-black rounded-xl text-white shadow-xl shadow-indigo-200 disabled:opacity-40 transition-all hover:translate-y-[-1px] active:translate-y-[0px]" style={{ background: `linear-gradient(135deg, ${form.color}, ${form.color}cc)` }}>
+            {saving ? "Initializing Project..." : "Create Project"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
 
 function TeamButton({ users, activeProject, user, projectColor }: { users: any[]; activeProject: any; user: any; projectColor: string }) {
   const [open, setOpen] = useState(false);
@@ -2388,11 +2498,11 @@ export default function ProjectManagement({ user, projects, users }: any) {
         )}
       </div>
 
-      <ProjectModal open={showProjectModal} onClose={() => setShowProjectModal(false)} user={user}
+      <ProjectModal open={showProjectModal} onClose={() => setShowProjectModal(false)} user={user} users={users}
         onCreated={(newProject) => { setActiveProject(newProject); setViewMode("kanban"); }} />
       {editingProject && (
         <EditProjectModal open={!!editingProject} onClose={() => setEditingProject(null)}
-          project={editingProject} onSaved={() => setEditingProject(null)} />
+          project={editingProject} users={users} onSaved={() => setEditingProject(null)} />
       )}
     </div>
   );
