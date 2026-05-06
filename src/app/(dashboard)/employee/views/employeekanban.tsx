@@ -405,7 +405,7 @@ export function KanbanBoard({
   /* ── Swimlane groups ── */
   const swimlaneGroups = useMemo(() => {
     if (groupBy === "assignee") {
-      const map = new Map<string, { label: string; avatar?: string; tasks: Task[] }>();
+      const map = new Map<string, { label: string; avatar?: string | null; tasks: Task[] }>();
       map.set("unassigned", { label: "Unassigned", tasks: [] });
       filteredTasks.forEach(t => {
         const key = t.assignedTo || "unassigned";
