@@ -4,34 +4,11 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { createPortal } from "react-dom";
+import { TaskLabel, LABEL_COLORS, TicketType, Task, KanbanColumn } from "@/lib/kanbanUtils";
 
 /* ─── TYPES ─── */
-export type TicketType = "story" | "task" | "bug" | "defect";
 export type ViewMode = "board" | "swimlane";
 export type GroupBy = "assignee" | "priority" | "type" | "story";
-
-export interface KanbanColumn {
-  id: string;
-  label: string;
-  color?: string;
-  bg?: string;
-  border?: string;
-  wipLimit?: number;
-}
-
-export interface Task {
-  id: string; title: string; description?: string; projectId: string;
-  sprintId?: string | null; assignedTo?: string | null; assignedToName?: string | null;
-  assignedDate?: string; dueDate?: string; priority: string; status: string;
-  estimatedHours?: number; actualHours?: number; storyPoints?: number;
-  tags?: string[];
-  ticketType?: TicketType;
-  parentStoryId?: string | null;
-  parentStoryTitle?: string;
-  taskCode?: string;
-  completedAt?: string;
-  createdBy: string; createdAt: any;
-}
 
 /* ─── TICKET TYPE CONFIG ─── */
 export const TICKET_TYPES: Record<TicketType, { label: string; icon: string; color: string; bg: string; border: string; description: string }> = {
@@ -321,16 +298,141 @@ function BulkActionBar({ count, columns, projectColor, onDelete, onMove, onClear
   );
 }
 
+export function LabelPicker({
+  selectedLabels = [],
+  onChange,
+  projectId,
+  disabled = false,
+  canManage = true, // Admin can always manage
+}: {
+  selectedLabels: TaskLabel[];
+  onChange: (labels: TaskLabel[]) => void;
+  projectId: string;
+  disabled?: boolean;
+  canManage?: boolean;
+}) {
+  const [labels, setLabels] = useState<TaskLabel[]>([]);
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newColor, setNewColor] = useState("green");
+
+  useEffect(() => {
+    if (!projectId) return;
+    const q = query(collection(db, "projectLabels"), where("projectId", "==", projectId));
+    return onSnapshot(q, (snap) => {
+      setLabels(snap.docs.map(d => ({ id: d.id, ...d.data() } as TaskLabel)));
+    });
+  }, [projectId]);
+
+  const toggleLabel = (label: TaskLabel) => {
+    const exists = selectedLabels.some(l => l.id === label.id);
+    if (exists) {
+      onChange(selectedLabels.filter(l => l.id !== label.id));
+    } else {
+      onChange([...selectedLabels, label]);
+    }
+  };
+
+  const createLabel = async () => {
+    if (!newTitle.trim()) return;
+    const { addDoc, serverTimestamp } = await import("firebase/firestore");
+    await addDoc(collection(db, "projectLabels"), {
+      projectId,
+      title: newTitle.trim(),
+      color: newColor,
+      createdAt: serverTimestamp(),
+    });
+    setNewTitle("");
+    setCreating(false);
+  };
+
+  return (
+    <div className="relative">
+      <button 
+        disabled={disabled}
+        onClick={(e) => { e.preventDefault(); setIsOpen(!isOpen); }} 
+        className={`text-xs font-bold px-3 py-1.5 rounded-lg border border-gray-200 bg-white flex items-center gap-2 transition shadow-sm ${disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-50"}`}
+      >
+        🏷️ Labels {selectedLabels.length > 0 && <span className="bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full text-[9px] font-black">{selectedLabels.length}</span>}
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-[10002]" onClick={() => setIsOpen(false)} />
+          <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[10003] overflow-hidden flex flex-col max-h-[400px]">
+             <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Labels</span>
+                <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-gray-600 transition">✕</button>
+             </div>
+             
+             <div className="p-3">
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search labels..." className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-100 bg-gray-50/50" />
+             </div>
+
+             <div className="flex-1 overflow-y-auto p-3 space-y-1">
+                {labels.filter(l => l.title.toLowerCase().includes(search.toLowerCase())).map(label => {
+                  const isSelected = selectedLabels.some(sl => sl.id === label.id);
+                  const color = LABEL_COLORS[label.color] || LABEL_COLORS.green;
+                  return (
+                    <div key={label.id} className="flex items-center gap-2 group animate-in fade-in slide-in-from-top-1 duration-200">
+                       <input type="checkbox" checked={isSelected} onChange={() => toggleLabel(label)} className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
+                       <div 
+                         onClick={() => toggleLabel(label)}
+                         className="flex-1 px-3 py-1.5 rounded-lg text-[11px] font-black cursor-pointer transition flex items-center justify-between hover:opacity-90 active:scale-95"
+                         style={{ background: color.bg, color: color.text }}
+                       >
+                          {label.title}
+                          {isSelected && <span className="text-[10px]">✓</span>}
+                       </div>
+                    </div>
+                  );
+                })}
+                {labels.length === 0 && !creating && (
+                  <p className="text-[10px] text-center text-gray-400 py-4 italic font-medium">No labels found.</p>
+                )}
+             </div>
+
+             <div className="p-3 border-t border-gray-100 bg-gray-50/50">
+                {creating ? (
+                   <div className="space-y-3 p-1">
+                      <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Label title..." className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none bg-white shadow-sm font-semibold" />
+                      <div className="grid grid-cols-5 gap-1.5">
+                         {Object.keys(LABEL_COLORS).map(c => (
+                           <div key={c} onClick={() => setNewColor(c)} className={`w-8 h-6 rounded-lg cursor-pointer border-2 transition-all hover:scale-110 active:scale-90 ${newColor === c ? "border-indigo-600 shadow-md" : "border-transparent"}`} style={{ background: LABEL_COLORS[c].bg }} />
+                         ))}
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                         <button onClick={createLabel} disabled={!newTitle.trim()} className="flex-1 text-[10px] font-black uppercase tracking-wider py-2 bg-indigo-600 text-white rounded-xl shadow-sm disabled:opacity-40 transition-all hover:shadow-indigo-200 active:scale-95">Create</button>
+                         <button onClick={() => setCreating(false)} className="flex-1 text-[10px] font-black uppercase tracking-wider py-2 bg-white border border-gray-200 text-gray-600 rounded-xl shadow-sm transition-all hover:bg-gray-50 active:scale-95">Cancel</button>
+                      </div>
+                   </div>
+                ) : (
+                   <button onClick={() => setCreating(true)} className="w-full text-[10px] font-black uppercase tracking-widest py-2.5 border-2 border-dashed border-gray-200 text-gray-400 rounded-xl hover:border-indigo-200 hover:text-indigo-500 hover:bg-indigo-50/50 transition-all active:scale-95">
+                     + Create new label
+                   </button>
+                )}
+             </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ─── TASK MODAL ─── */
 export function TaskModal({
   open, onClose, onSubmit, users, columns, projectColor,
   stories, defaultStoryId, defaultTicketType, existingTasks = [], editingTask,
+  projectId,
 }: {
   open: boolean; onClose: () => void;
   onSubmit: (f: any, editingTask?: Task | null) => void;
   users: any[]; columns: KanbanColumn[]; projectColor: string;
   stories?: Task[]; defaultStoryId?: string; defaultTicketType?: string;
   existingTasks?: Task[]; editingTask?: Task | null;
+  projectId?: string;
 }) {
   const getAutoCode = (ticketType: string) => generateTaskCode(ticketType, existingTasks);
   const [f, setF] = useState({
@@ -339,6 +441,7 @@ export function TaskModal({
     ticketType: defaultTicketType || "task",
     parentStoryId: defaultStoryId || "",
     taskCode: getAutoCode(defaultTicketType || "task"),
+    labels: [] as TaskLabel[],
   });
   const [taskCodeManual, setTaskCodeManual] = useState(false);
 
@@ -352,6 +455,7 @@ export function TaskModal({
         storyPoints: editingTask.storyPoints?.toString() || "3",
         tags: editingTask.tags?.join(",") || "", ticketType: editingTask.ticketType || "task",
         parentStoryId: editingTask.parentStoryId || "", taskCode: editingTask.taskCode || "",
+        labels: editingTask.labels || [],
       });
     }
   }, [editingTask]);
@@ -410,7 +514,14 @@ export function TaskModal({
             <span className="text-xl">{TYPE_META[f.ticketType as TicketType]?.icon || "🧩"}</span>
             <h3 className="font-bold text-white text-sm">{editingTask ? "Edit Task" : `Create ${TYPE_META[f.ticketType as TicketType]?.label || "Task"}`}</h3>
           </div>
-          <button onClick={onClose} className="text-white/70 hover:text-white w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center">✕</button>
+          <div className="flex items-center gap-3">
+             <LabelPicker 
+                projectId={projectId || ""} 
+                selectedLabels={f.labels || []} 
+                onChange={(labels) => setF(prev => ({ ...prev, labels }))} 
+             />
+             <button onClick={onClose} className="text-white/70 hover:text-white w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center">✕</button>
+          </div>
         </div>
         <div className="p-5 space-y-3 max-h-[72vh] overflow-y-auto">
           <div className="flex gap-2">
@@ -537,6 +648,7 @@ export function KanbanBoard({
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [dragColId, setDragColId] = useState<string | null>(null);
   const [dragColOverId, setDragColOverId] = useState<string | null>(null);
+  const [showLabelText, setShowLabelText] = useState(false);
   const [draggingColIdx, setDraggingColIdx] = useState<number | null>(null);
 
   const [collapsedStories, setCollapsedStories] = useState<Set<string>>(new Set());
@@ -729,6 +841,19 @@ export function KanbanBoard({
             <div className="flex-1" />
             {pri && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: pri.bg, color: pri.text }}>{pri.label}</span>}
           </div>
+
+          {/* Labels for Story Card */}
+          {story.labels && story.labels.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {story.labels.map(label => {
+                const color = LABEL_COLORS[label.color] || LABEL_COLORS.green;
+                return (
+                  <div key={label.id} title={label.title} className="h-2 w-11 rounded-full shadow-sm" style={{ background: color.bg }} />
+                );
+              })}
+            </div>
+          )}
+
           <p className="text-sm font-bold text-indigo-900 leading-snug mb-2 line-clamp-2">{story.title}</p>
           {story.tags && story.tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mb-2">
@@ -813,7 +938,28 @@ export function KanbanBoard({
           cursor: canDragTask(currentUser, task, activeProject) ? "grab" : "default",
         }}
       >
-        <div className="px-3 pt-3 pb-2">
+        {/* Labels - Interactive Color Bars */}
+        {task.labels && task.labels.length > 0 && (
+          <div className="flex flex-wrap gap-1 px-3 pt-2">
+            {task.labels.map(label => {
+              const color = LABEL_COLORS[label.color] || LABEL_COLORS.green;
+              return (
+                <div
+                  key={label.id}
+                  title={label.title}
+                  onClick={e => { e.stopPropagation(); setShowLabelText(!showLabelText); }}
+                  className={`rounded-full shadow-sm transition-all flex items-center justify-center overflow-hidden cursor-pointer ${showLabelText ? "h-auto px-2 py-0.5" : "w-11 h-2"}`}
+                  style={{ background: color.bg }}
+                >
+                   {showLabelText && (
+                     <span className="text-[9px] font-black uppercase tracking-tighter whitespace-nowrap" style={{ color: color.text }}>{label.title}</span>
+                   )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <div className="px-3 pt-2 pb-2">
           <div className="flex items-center gap-1.5 mb-2">
             <div onClick={e => toggleSelect(task.id, e)}
               className={`w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center transition cursor-pointer ${isSelected ? "bg-indigo-600 border-indigo-600" : "border-gray-300 bg-white"}`}>

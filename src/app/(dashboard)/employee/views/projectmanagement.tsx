@@ -33,14 +33,8 @@ import {
 // ── Import KanbanBoard + shared types/utils from the extracted file ──
 import {
   KanbanBoard,
-  Task,
-  Column,
-  TicketType,
-  TICKET_TYPES,
-  getColStyle,
-  getPermissions,
-  canMoveTask,
 } from "./employeekanban";
+import { Task, KanbanColumn, TicketType, TICKET_TYPES, LABEL_COLORS, TaskLabel } from "@/lib/kanbanUtils";
 
 /* ─── LOCAL TYPES (not needed in kanban file) ─── */
 type ViewMode = "kanban" | "list" | "timeline" | "logs" | "reports";
@@ -99,7 +93,7 @@ interface DailyTask {
 }
 
 /* ─── CONSTANTS ─── */
-const DEFAULT_COLUMNS: Column[] = [
+const DEFAULT_COLUMNS: KanbanColumn[] = [
   { id: "todo", label: "To Do" },
   { id: "inprogress", label: "In Progress" },
   { id: "review", label: "Review" },
@@ -682,6 +676,132 @@ function SprintDropdown({
 }
 
 /* ═══════════════════════════════════════════
+   LABEL PICKER
+   - Image 2 style
+═══════════════════════════════════════════ */
+function LabelPicker({
+  selectedLabels = [],
+  onChange,
+  projectId,
+  disabled = false,
+  canManage = true,
+}: {
+  selectedLabels: TaskLabel[];
+  onChange: (labels: TaskLabel[]) => void;
+  projectId: string;
+  disabled?: boolean;
+  canManage?: boolean;
+}) {
+  const [labels, setLabels] = useState<TaskLabel[]>([]);
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newColor, setNewColor] = useState("green");
+
+  useEffect(() => {
+    if (!projectId) return;
+    const q = query(collection(db, "projectLabels"), where("projectId", "==", projectId));
+    return onSnapshot(q, (snap) => {
+      setLabels(snap.docs.map(d => ({ id: d.id, ...d.data() } as TaskLabel)));
+    });
+  }, [projectId]);
+
+  const toggleLabel = (label: TaskLabel) => {
+    const exists = selectedLabels.some(l => l.id === label.id);
+    if (exists) {
+      onChange(selectedLabels.filter(l => l.id !== label.id));
+    } else {
+      onChange([...selectedLabels, label]);
+    }
+  };
+
+  const createLabel = async () => {
+    if (!newTitle.trim()) return;
+    await addDoc(collection(db, "projectLabels"), {
+      projectId,
+      title: newTitle.trim(),
+      color: newColor,
+      createdAt: serverTimestamp(),
+    });
+    setNewTitle("");
+    setCreating(false);
+  };
+
+  return (
+    <div className="relative">
+      <button 
+        disabled={disabled}
+        onClick={(e) => { e.preventDefault(); setIsOpen(!isOpen); }} 
+        className={`text-xs font-bold px-3 py-1.5 rounded-lg border border-gray-200 bg-white flex items-center gap-2 transition shadow-sm ${disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-50"}`}
+      >
+        🏷️ Labels {selectedLabels.length > 0 && <span className="bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full text-[9px] font-black">{selectedLabels.length}</span>}
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-[10002]" onClick={() => setIsOpen(false)} />
+          <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[10003] overflow-hidden flex flex-col max-h-[400px]">
+             <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Labels</span>
+                <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-gray-600 transition">✕</button>
+             </div>
+             
+             <div className="p-3">
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search labels..." className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-100 bg-gray-50/50" />
+             </div>
+
+             <div className="flex-1 overflow-y-auto p-3 space-y-1">
+                {labels.filter(l => l.title.toLowerCase().includes(search.toLowerCase())).map(label => {
+                  const isSelected = selectedLabels.some(sl => sl.id === label.id);
+                  const color = LABEL_COLORS[label.color] || LABEL_COLORS.green;
+                  return (
+                    <div key={label.id} className="flex items-center gap-2 group animate-in fade-in slide-in-from-top-1 duration-200">
+                       <input type="checkbox" checked={isSelected} onChange={() => toggleLabel(label)} className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
+                       <div 
+                         onClick={() => toggleLabel(label)}
+                         className="flex-1 px-3 py-1.5 rounded-lg text-[11px] font-black cursor-pointer transition flex items-center justify-between hover:opacity-90 active:scale-95"
+                         style={{ background: color.bg, color: color.text }}
+                       >
+                          {label.title}
+                          {isSelected && <span className="text-[10px]">✓</span>}
+                       </div>
+                    </div>
+                  );
+                })}
+                {labels.length === 0 && !creating && (
+                  <p className="text-[10px] text-center text-gray-400 py-4 italic font-medium">No labels found. Create one below!</p>
+                )}
+             </div>
+
+             <div className="p-3 border-t border-gray-100 bg-gray-50/50">
+                {creating ? (
+                   <div className="space-y-3 p-1">
+                      <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Label title (e.g. Frontend)..." className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none bg-white shadow-sm font-semibold" />
+                      <div className="grid grid-cols-5 gap-1.5">
+                         {Object.keys(LABEL_COLORS).map(c => (
+                           <div key={c} onClick={() => setNewColor(c)} className={`w-8 h-6 rounded-lg cursor-pointer border-2 transition-all hover:scale-110 active:scale-90 ${newColor === c ? "border-indigo-600 shadow-md" : "border-transparent"}`} style={{ background: LABEL_COLORS[c].bg }} />
+                         ))}
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                         <button onClick={createLabel} disabled={!newTitle.trim()} className="flex-1 text-[10px] font-black uppercase tracking-wider py-2 bg-indigo-600 text-white rounded-xl shadow-sm disabled:opacity-40 transition-all hover:shadow-indigo-200 active:scale-95">Create</button>
+                         <button onClick={() => setCreating(false)} className="flex-1 text-[10px] font-black uppercase tracking-wider py-2 bg-white border border-gray-200 text-gray-600 rounded-xl shadow-sm transition-all hover:bg-gray-50 active:scale-95">Cancel</button>
+                      </div>
+                   </div>
+                ) : (
+                   <button onClick={() => setCreating(true)} className="w-full text-[10px] font-black uppercase tracking-widest py-2.5 border-2 border-dashed border-gray-200 text-gray-400 rounded-xl hover:border-indigo-200 hover:text-indigo-500 hover:bg-indigo-50/50 transition-all active:scale-95">
+                     + Create new label
+                   </button>
+                )}
+             </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
    TASK MODAL
 ═══════════════════════════════════════════ */
 function TaskModal({
@@ -690,7 +810,7 @@ function TaskModal({
 }: {
   open: boolean; onClose: () => void;
   onSubmit: (data: Partial<Task>) => Promise<void>;
-  users: any[]; columns: Column[]; projectColor: string;
+  users: any[]; columns: KanbanColumn[]; projectColor: string;
   initialData?: Partial<Task> | null;
   stories?: Task[];
   currentUserId?: string;
@@ -776,7 +896,14 @@ function TaskModal({
                 <p className="text-xs text-gray-400">{tc.description}</p>
               </div>
             </div>
-            <button onClick={onClose} className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition text-sm">✕</button>
+            <div className="flex items-center gap-3">
+              <LabelPicker 
+                projectId={form.projectId || ""} 
+                selectedLabels={form.labels || []} 
+                onChange={(labels) => setForm(f => ({ ...f, labels }))} 
+              />
+              <button onClick={onClose} className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition text-sm">✕</button>
+            </div>
           </div>
         </div>
 
@@ -847,7 +974,7 @@ function TaskModal({
               </select>
             </div>
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Column</label>
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">KanbanColumn</label>
               <select value={form.status || columns[0]?.id} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
                 {columns.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
               </select>
@@ -984,7 +1111,7 @@ function TaskDetailModal({
   db: firestoreDb, storage: firebaseStorage, user,
   sprints, onMoveToSprint, onEditTask, tasks, onAddChildToStory,
 }: {
-  task: Task; onClose: () => void; columns: Column[]; projectColor: string; projectName: string;
+  task: Task; onClose: () => void; columns: KanbanColumn[]; projectColor: string; projectName: string;
   currentUserId: string; isProjectManager: boolean; canDelete: boolean; users: any[];
   onStatusChange: (taskId: string, newStatus: string) => void;
   onSave: (updated: Task) => Promise<void>;
@@ -1136,52 +1263,75 @@ function TaskDetailModal({
         {/* Header */}
         <div style={{ background: `linear-gradient(135deg, ${projectColor} 0%, ${projectColor}cc 100%)` }}>
           <div className="p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg bg-white/20">{tc.icon}</div>
-                <div>
-                  <p className="text-xs font-semibold text-white/70">{projectName}</p>
-                  <p className="text-[10px] font-bold text-white/50">{tc.label} {task.taskCode && `· ${task.taskCode}`}</p>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg bg-white/20">{tc.icon}</div>
+                  <div>
+                    <p className="text-xs font-semibold text-white/70">{projectName}</p>
+                    <p className="text-[10px] font-bold text-white/50">{tc.label} {task.taskCode && `· ${task.taskCode}`}</p>
+                  </div>
+                </div>
+
+                <div className="flex-1 flex justify-center">
+                   <LabelPicker 
+                      projectId={task.projectId} 
+                      selectedLabels={localTask.labels || []} 
+                      disabled={!canEdit && !isProjectManager}
+                      canManage={true}
+                      onChange={async (labels) => {
+                        setLocalTask(t => ({ ...t, labels }));
+                        // Immediate save for labels as per standard Kanban UX
+                        if (canEdit || isProjectManager) {
+                          try {
+                            await updateDoc(doc(firestoreDb, "projectTasks", task.id), { labels });
+                          } catch (err) {
+                            console.error("Error saving labels:", err);
+                          }
+                        }
+                      }} 
+                   />
+                </div>
+
+                {/* Action bar */}
+                <div className="flex items-center gap-1.5">
+                  {isProjectManager && (
+                    <button onClick={() => setShowSprintMove(true)} title="Move to sprint"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition"
+                      style={{ background: currentSprint ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.15)", color: "white", border: "1px solid rgba(255,255,255,0.3)" }}
+                      onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.3)"}
+                      onMouseLeave={e => e.currentTarget.style.background = currentSprint ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.15)"}>
+                      🏃 {currentSprint ? currentSprint.name : "Sprint"}
+                    </button>
+                  )}
+                  {canEdit && (
+                    <button onClick={() => onEditTask(task)} title="Edit task"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition"
+                      style={{ background: "rgba(255,255,255,0.15)", color: "white", border: "1px solid rgba(255,255,255,0.25)" }}
+                      onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.28)"}
+                      onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}>
+                      ✏️ Edit
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button onClick={handleDelete} disabled={deleting} title="Delete task"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition disabled:opacity-50"
+                      style={{ background: "rgba(239,68,68,0.25)", color: "white", border: "1px solid rgba(239,68,68,0.4)" }}
+                      onMouseEnter={e => e.currentTarget.style.background = "rgba(239,68,68,0.4)"}
+                      onMouseLeave={e => e.currentTarget.style.background = "rgba(239,68,68,0.25)"}>
+                      🗑 {deleting ? "Deleting…" : "Delete"}
+                    </button>
+                  )}
+                  <button onClick={onClose} title="Close"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-white transition"
+                    style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.25)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.12)"}>
+                    ✕
+                  </button>
                 </div>
               </div>
-              {/* Action bar */}
-              <div className="flex items-center gap-1.5">
-                {isProjectManager && (
-                  <button onClick={() => setShowSprintMove(true)} title="Move to sprint"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition"
-                    style={{ background: currentSprint ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.15)", color: "white", border: "1px solid rgba(255,255,255,0.3)" }}
-                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.3)"}
-                    onMouseLeave={e => e.currentTarget.style.background = currentSprint ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.15)"}>
-                    🏃 {currentSprint ? currentSprint.name : "Sprint"}
-                  </button>
-                )}
-                {canEdit && (
-                  <button onClick={() => onEditTask(task)} title="Edit task"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition"
-                    style={{ background: "rgba(255,255,255,0.15)", color: "white", border: "1px solid rgba(255,255,255,0.25)" }}
-                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.28)"}
-                    onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}>
-                    ✏️ Edit
-                  </button>
-                )}
-                {canDelete && (
-                  <button onClick={handleDelete} disabled={deleting} title="Delete task"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition disabled:opacity-50"
-                    style={{ background: "rgba(239,68,68,0.25)", color: "white", border: "1px solid rgba(239,68,68,0.4)" }}
-                    onMouseEnter={e => e.currentTarget.style.background = "rgba(239,68,68,0.4)"}
-                    onMouseLeave={e => e.currentTarget.style.background = "rgba(239,68,68,0.25)"}>
-                    🗑 {deleting ? "Deleting…" : "Delete"}
-                  </button>
-                )}
-                <button onClick={onClose} title="Close"
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-white transition"
-                  style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)" }}
-                  onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.25)"}
-                  onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.12)"}>
-                  ✕
-                </button>
-              </div>
-            </div>
+
+
 
             {canEdit && (
               <div className="flex items-center justify-between mb-2">
@@ -1330,7 +1480,7 @@ function TaskDetailModal({
                     const cs = getColStyle(child.status, colIdx >= 0 ? colIdx : 0);
                     return (
                       <div key={child.id} onClick={() => onEditTask(child)} 
-                        className="group hover:bg-white hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-500 flex items-center gap-4 px-5 py-4 cursor-pointer rounded-2xl border border-transparent hover:border-gray-100 active:scale-[0.98]">
+                        className="group hover:bg-white hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-500 flex flex-wrap sm:flex-nowrap items-center gap-4 px-5 py-4 cursor-pointer rounded-2xl border border-transparent hover:border-gray-100 active:scale-[0.98]">
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-110" style={{ background: tc.bg, color: tc.color, border: `1px solid ${tc.border}` }}>
                           <span className="text-lg">{tc.icon}</span>
                         </div>
@@ -1341,14 +1491,14 @@ function TaskDetailModal({
                           </div>
                           <h4 className="text-sm font-black text-gray-800 leading-tight group-hover:text-indigo-600 transition-colors">{child.title}</h4>
                         </div>
-                        <div className="flex items-center gap-5 shrink-0">
+                        <div className="flex items-center gap-5 shrink-0 ml-auto sm:ml-0">
                           <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-gray-50/50 group-hover:bg-indigo-50/50 transition-colors">
                             <Avatar name={child.assignedToName} size="xs" />
-                            <span className="text-[11px] font-black text-gray-600 hidden sm:inline">{child.assignedToName?.split(" ")[0] || "Unassigned"}</span>
+                            <span className="text-[11px] font-black text-gray-600 hidden sm:inline truncate max-w-[80px]">{child.assignedToName?.split(" ")[0] || "Unassigned"}</span>
                           </div>
                           <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-gray-100 bg-white shadow-sm min-w-[110px] justify-center transition-all group-hover:border-indigo-100 group-hover:shadow-indigo-500/5">
                             <div className="w-2 h-2 rounded-full shadow-sm" style={{ background: cs.color }} />
-                            <span className="text-[10px] font-black uppercase tracking-tighter" style={{ color: cs.color }}>{columns.find(c => c.id === child.status)?.label || child.status}</span>
+                            <span className="text-[10px] font-black uppercase tracking-tighter truncate max-w-[80px]" style={{ color: cs.color }}>{columns.find(c => c.id === child.status)?.label || child.status}</span>
                           </div>
                         </div>
                       </div>
@@ -1609,7 +1759,7 @@ function EmployeeDailySheet({ user, projects }: { user: any; projects: any[] }) 
   const [tf, setTf] = useState({ projectId: "", taskTitle: "", description: "", hoursWorked: 1, workStatus: "Completed" as DailyTask["workStatus"], category: "Development" });
 
   const userName = user?.displayName || user?.email?.split("@")[0] || "";
-  const myProjects = projects?.filter(p => p.members?.includes(user?.uid)) || [];
+  const myProjects = projects?.filter(p => user?.accountType === "ADMIN" || p.members?.includes(user?.uid)) || [];
 
   const parsedYear = parseInt(viewMonth.split("-")[0], 10);
   const parsedMonth = parseInt(viewMonth.split("-")[1], 10) - 1;
@@ -1839,11 +1989,12 @@ function EmployeeDailySheet({ user, projects }: { user: any; projects: any[] }) 
 }
 
 /* ─── PROJECTS PAGE ─── */
-function ProjectsPage({ user, myProjects, onOpenProject, onCreateProject, onEditProject }: {
+function ProjectsPage({ user, myProjects, onOpenProject, onCreateProject, onEditProject, onDeleteProject }: {
   user: any; myProjects: any[];
   onOpenProject: (project: any) => void;
   onCreateProject: () => void;
   onEditProject: (project: any) => void;
+  onDeleteProject: (id: string) => void;
 }) {
   return (
     <div className="space-y-5">
@@ -1875,7 +2026,11 @@ function ProjectsPage({ user, myProjects, onOpenProject, onCreateProject, onEdit
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${project.status === "Completed" ? "bg-green-100 text-green-700" : project.status === "In Progress" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>{project.status}</span>
-                      {projPerms.fullControl && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background: project.color || "#6366f1" }}>👑 PM</span>}
+                      {projPerms.isPM ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background: project.color || "#6366f1" }}>👑 PM</span>
+                      ) : projPerms.isAdmin ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">⚙️ Admin</span>
+                      ) : null}
                     </div>
                   </div>
                   <p className="text-xs text-gray-400 line-clamp-2 mb-4 leading-relaxed">{project.description || "No description"}</p>
@@ -1890,6 +2045,9 @@ function ProjectsPage({ user, myProjects, onOpenProject, onCreateProject, onEdit
                     {project.endDate && <span className="text-xs text-gray-400">📅 {project.endDate}</span>}
                     <div className="flex items-center gap-2 ml-auto">
                       <button onClick={e => { e.stopPropagation(); onEditProject(project); }} className="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-semibold text-gray-400 hover:text-indigo-600 px-2 py-1 rounded-lg hover:bg-indigo-50 border border-transparent hover:border-indigo-100" title="Edit project">✏️ Edit</button>
+                      {projPerms.fullControl && (
+                        <button onClick={e => { e.stopPropagation(); onDeleteProject(project.id); }} className="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-semibold text-gray-400 hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50 border border-transparent hover:border-red-100" title="Delete project">🗑️ Delete</button>
+                      )}
                       <span className="text-xs font-semibold text-indigo-600 group-hover:underline">Open →</span>
                     </div>
                   </div>
@@ -1920,7 +2078,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
   const [allWorkLogs, setAllWorkLogs] = useState<WorkLog[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [milestones, setMilestones] = useState<any[]>([]);
-  const [columns, setColumns] = useState<Column[]>(DEFAULT_COLUMNS);
+  const [columns, setKanbanColumns] = useState<KanbanColumn[]>(DEFAULT_COLUMNS);
 
   const [filterPriority, setFilterPriority] = useState("all");
   const [filterTicketType, setFilterTicketType] = useState<"all" | TicketType>("all");
@@ -1942,7 +2100,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const showToast = (msg: string) => setToastMsg(msg);
 
-  const myProjects = projects?.filter((p: any) => p.members?.includes(user?.uid)) || [];
+  const myProjects = projects?.filter((p: any) => user?.accountType === "ADMIN" || p.members?.includes(user?.uid)) || [];
   const userName = user?.displayName || user?.email?.split("@")[0] || "";
   const projectColor = activeProject?.color || "#6366f1";
   const permissions = getPermissions(user, activeProject);
@@ -1952,6 +2110,15 @@ export default function ProjectManagement({ user, projects, users }: any) {
   const stories = tasks.filter(t => t.ticketType === "story");
 
   const handleAddChildToStory = (story: Task, ticketType: TicketType) => setQuickAddStory({ story, ticketType });
+
+  useEffect(() => {
+    if (viewingTask) {
+      const updated = tasks.find(t => t.id === viewingTask.id);
+      if (updated && updated !== viewingTask) {
+        setViewingTask(updated);
+      }
+    }
+  }, [tasks, viewingTask]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -1969,8 +2136,8 @@ export default function ProjectManagement({ user, projects, users }: any) {
     return onSnapshot(q, snap => {
       if (!snap.empty) {
         const data = snap.docs[0].data();
-        setColumns(Array.isArray(data.columns) && data.columns.length > 0 ? data.columns : DEFAULT_COLUMNS);
-      } else { setColumns(DEFAULT_COLUMNS); }
+        setKanbanColumns(Array.isArray(data.columns) && data.columns.length > 0 ? data.columns : DEFAULT_COLUMNS);
+      } else { setKanbanColumns(DEFAULT_COLUMNS); }
     });
   }, [activeProject?.id]);
 
@@ -1993,9 +2160,9 @@ export default function ProjectManagement({ user, projects, users }: any) {
     await addDoc(collection(db, "projectActivities"), { projectId, userId: user.uid, userName, action, description, taskId: taskId ?? null, createdAt: serverTimestamp() });
   };
 
-  const handleUpdateColumns = async (updated: Column[]) => {
+  const handleUpdateKanbanColumns = async (updated: KanbanColumn[]) => {
     if (!activeProject?.id || !isProjectManager) return;
-    setColumns(updated);
+    setKanbanColumns(updated);
     const q = query(collection(db, "projectColumns"), where("projectId", "==", activeProject.id));
     const snap = await getDocs(q);
     if (!snap.empty) await updateDoc(doc(db, "projectColumns", snap.docs[0].id), { columns: updated, updatedAt: serverTimestamp() });
@@ -2090,6 +2257,11 @@ export default function ProjectManagement({ user, projects, users }: any) {
     if (activeSprint?.id === sprint.id) setActiveSprint(null);
   };
 
+  const handleDeleteProject = async (id: string) => {
+    if (!confirm("Delete this project? This will remove the project but keep its tasks (you can delete tasks separately).")) return;
+    await deleteDoc(doc(db, "projects", id));
+  };
+
   const handleSubmitWorkLog = async () => {
     if (!wl.description.trim() || !wl.hoursWorked || !activeProject) return;
     const taskObj = tasks.find(t => t.id === wl.taskId);
@@ -2142,7 +2314,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
         {/* Top bar */}
         <div className="shrink-0 bg-white border-b border-gray-200 shadow-sm">
           <div className="px-6 py-3 flex items-center gap-4">
-            <button onClick={() => { setActiveProject(null); setActiveSprint(null); setViewMode("kanban"); setColumns(DEFAULT_COLUMNS); }} className="text-sm font-semibold text-gray-500 hover:text-gray-900 transition flex items-center gap-1">← Projects</button>
+            <button onClick={() => { setActiveProject(null); setActiveSprint(null); setViewMode("kanban"); setKanbanColumns(DEFAULT_COLUMNS); }} className="text-sm font-semibold text-gray-500 hover:text-gray-900 transition flex items-center gap-1">← Projects</button>
             <div className="w-px h-5 bg-gray-200" />
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full" style={{ background: projectColor }} />
@@ -2260,7 +2432,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
                 isProjectManager={isProjectManager}
                 onTaskClick={t => setViewingTask(t)}
                 onStatusChange={handleStatusChange}
-                onUpdateColumns={handleUpdateColumns}
+                onUpdateKanbanColumns={handleUpdateKanbanColumns}
                 onAddChildToStory={handleAddChildToStory}
                 onToast={showToast}
                 user={user}
@@ -2304,7 +2476,15 @@ export default function ProjectManagement({ user, projects, users }: any) {
                           <td className="px-4 py-3"><TicketBadge type={task.ticketType} size="xs" /></td>
                           <td className="px-4 py-3">
                             <p className="text-sm font-semibold text-gray-800 group-hover:text-indigo-700">{task.title}</p>
-                            {task.parentStoryTitle && <p className="text-[10px] text-purple-400 mt-0.5">📖 {task.parentStoryTitle}</p>}
+                            {task.labels && task.labels.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {task.labels.map(l => {
+                                  const lc = LABEL_COLORS[l.color] || LABEL_COLORS.green;
+                                  return <span key={l.id} className="text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-tighter" style={{ background: lc.bg, color: lc.text }}>{l.title}</span>
+                                })}
+                              </div>
+                            )}
+                            {task.parentStoryTitle && <p className="text-[10px] text-purple-400 mt-0.5 font-bold">📖 {task.parentStoryTitle}</p>}
                           </td>
                           <td className="px-4 py-3"><span className="text-xs font-semibold flex items-center gap-1" style={{ color: cc?.color }}><div className="w-1.5 h-1.5 rounded-full" style={{ background: cc?.color }} />{columns.find(c => c.id === task.status)?.label ?? task.status}</span></td>
                           <td className="px-4 py-3"><span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: pc?.bg, color: pc?.color }}>{pc?.icon} {task.priority}</span></td>
@@ -2542,6 +2722,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
             onOpenProject={(project) => { setActiveProject(project); setViewMode("kanban"); }}
             onCreateProject={() => setShowProjectModal(true)}
             onEditProject={(project) => setEditingProject(project)}
+            onDeleteProject={handleDeleteProject}
           />
         )}
 

@@ -10,8 +10,8 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 
-import { KanbanBoard, TaskModal } from "./KanbanBoard";
-import type { KanbanColumn, Task } from "./KanbanBoard";
+import { KanbanBoard, TaskModal, LabelPicker } from "./KanbanBoard";
+import { KanbanColumn, Task, LABEL_COLORS } from "@/lib/kanbanUtils";
 import { QuickFilter, QuickFilterState, EMPTY_FILTER, applyQuickFilter, countActiveFilters } from "./QuickFilter";
 
 // ─── All sprint-related imports now come from sprint.tsx ───
@@ -1041,6 +1041,17 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                       <button onClick={() => { setEditingTask(activeTask); setActiveTask(null); setShowTaskModal(true); }}
                         className="inline-flex items-center px-2.5 py-1 rounded-lg bg-white/10 hover:bg-blue-500/30 text-white text-xs transition">✏️ Edit</button>
                     )}
+                    <div className="mx-1">
+                      <LabelPicker 
+                        projectId={activeProject?.id || ""} 
+                        selectedLabels={activeTask.labels || []} 
+                        onChange={async (labels) => {
+                          setActiveTask(prev => prev ? { ...prev, labels } : prev);
+                          await updateDoc(doc(db, "projectTasks", activeTask.id), { labels });
+                          setTasks(prev => prev.map(t => t.id === activeTask.id ? { ...t, labels } : t));
+                        }} 
+                      />
+                    </div>
                     {canManage && (
                       <button onClick={() => handleDeleteTask(activeTask.id)}
                         className="inline-flex items-center px-2.5 py-1 rounded-lg bg-white/10 hover:bg-red-500/30 text-white/70 hover:text-white transition text-xs">🗑️ Delete</button>
@@ -1073,7 +1084,11 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                   </div>
                 )}
                 <div className="flex flex-wrap items-center gap-2">
-                  {pc && <span className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-md" style={{ background: pc.bg, color: pc.color }}>{pc.icon} {activeTask.priority}</span>}
+                   {pc && <span className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-md" style={{ background: pc.bg, color: pc.color }}>{pc.icon} {activeTask.priority}</span>}
+                  {activeTask.labels?.map(l => {
+                    const lc = LABEL_COLORS[l.color] || LABEL_COLORS.green;
+                    return <span key={l.id} className="text-[10px] px-2 py-0.5 rounded-md font-bold" style={{ background: lc.bg, color: lc.text }}>{l.title.toUpperCase()}</span>
+                  })}
                   {activeTask.tags?.map(tag => <span key={tag} className="text-xs px-2 py-0.5 rounded-md bg-white/20 text-white font-medium">#{tag}</span>)}
                   {activeTask.storyPoints && <span className="text-xs px-2 py-0.5 rounded-md bg-white/20 text-white font-medium">🎯 {activeTask.storyPoints}pt</span>}
                   {(activeTask as any).blockedBy?.length > 0 && (
@@ -1465,6 +1480,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
           defaultTicketType={quickTaskType}
           existingTasks={tasks}
           editingTask={editingTask}
+          projectId={activeProject?.id}
         />
 
         {/* Sprint Form Modal — from sprint.tsx */}
@@ -1909,13 +1925,13 @@ export default function AdminProjectManagement({ user, projects, users }: { user
             {projectsView === "grid" && projects?.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {projects?.map((project: any) => {
-                  const sc = STATUS_CONFIG[project.status]; const pc = PRIORITY_CONFIG[project.priority]; const accentColor = project.color || "#4f46e5"; const memberList = project.members?.slice(0, 5).map((uid: string) => users.find((u: any) => u.uid === uid)).filter(Boolean); const pms = getProjectManagers(project); const isPM = pms.includes(user.uid) || project.createdBy === user.uid;
+                  const sc = STATUS_CONFIG[project.status]; const pc = PRIORITY_CONFIG[project.priority]; const accentColor = project.color || "#4f46e5"; const memberList = project.members?.slice(0, 5).map((uid: string) => users.find((u: any) => u.uid === uid)).filter(Boolean); const pmsUids = getProjectManagers(project); const isExplicitPM = pmsUids.includes(user.uid) || project.createdBy === user.uid; const canManageProject = isAdmin || isExplicitPM;
                   return (
                     <div key={project.id} className="proj-card bg-white rounded-xl overflow-hidden cursor-pointer group" style={{ border: "1px solid #e5e7eb", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }} onClick={() => { setActiveProject(project); setViewMode("kanban"); }}>
                       <div className="p-4">
-                        <div className="flex items-start justify-between gap-2 mb-3"><div className="flex items-center gap-2.5 min-w-0"><div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold shrink-0" style={{ background: accentColor }}>{project.name[0]?.toUpperCase()}</div><div className="min-w-0"><h3 className="text-sm font-semibold text-gray-900 truncate leading-tight group-hover:text-indigo-700 transition">{project.name}</h3>{project.clientName && <p className="text-[11px] text-gray-400 truncate mt-0.5">{project.clientName}</p>}</div></div><div className="flex items-center gap-1.5 shrink-0">{isPM && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100">👑 PM</span>}<span className="text-[10px] font-medium px-2 py-0.5 rounded" style={{ background: sc?.bg, color: sc?.color }}>{project.status}</span></div></div>
+                        <div className="flex items-start justify-between gap-2 mb-3"><div className="flex items-center gap-2.5 min-w-0"><div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold shrink-0" style={{ background: accentColor }}>{project.name[0]?.toUpperCase()}</div><div className="min-w-0"><h3 className="text-sm font-semibold text-gray-900 truncate leading-tight group-hover:text-indigo-700 transition">{project.name}</h3>{project.clientName && <p className="text-[11px] text-gray-400 truncate mt-0.5">{project.clientName}</p>}</div></div><div className="flex items-center gap-1.5 shrink-0">{isExplicitPM ? <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100">👑 PM</span> : isAdmin ? <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100">⚙️ Admin</span> : null}<span className="text-[10px] font-medium px-2 py-0.5 rounded" style={{ background: sc?.bg, color: sc?.color }}>{project.status}</span></div></div>
                         <p className="text-xs text-gray-400 line-clamp-1 mb-3">{project.description || "No description."}</p>
-                        <div className="flex flex-wrap gap-1 mb-3">{project.projectType === "Billing" && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-100">Billing</span>}{project.billingType && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-50 text-gray-500 border border-gray-200">{project.billingType}</span>}<span className="text-[10px] px-1.5 py-0.5 rounded border" style={{ background: pc?.bg, color: pc?.color, borderColor: pc?.color + "30" }}>{project.priority}</span>{pms.length > 1 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-500 border border-indigo-100">👑 {pms.length} PMs</span>}{project.endDate && <span className="text-[10px] text-gray-400 ml-auto">Due {project.endDate}</span>}</div>
+                        <div className="flex flex-wrap gap-1 mb-3">{project.projectType === "Billing" && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-100">Billing</span>}{project.billingType && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-50 text-gray-500 border border-gray-200">{project.billingType}</span>}<span className="text-[10px] px-1.5 py-0.5 rounded border" style={{ background: pc?.bg, color: pc?.color, borderColor: pc?.color + "30" }}>{project.priority}</span>{pmsUids.length > 1 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-500 border border-indigo-100">👑 {pmsUids.length} PMs</span>}{project.endDate && <span className="text-[10px] text-gray-400 ml-auto">Due {project.endDate}</span>}</div>
                         <>
                           {/* ✅ CHANGE 2: Task / Story / Bug counts above progress bar */}
                           {(() => {
@@ -1951,6 +1967,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                               <span className="text-[10px] text-gray-400">Progress</span>
                               <span className="text-[10px] font-semibold" style={{ color: accentColor }}>{project.progress || 0}%</span>
                             </div>
+
                             <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
                               <div className="h-full rounded-full transition-all duration-500"
                                 style={{ width: `${project.progress || 0}%`, background: accentColor }} />
@@ -1958,7 +1975,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                           </div>
                         </>
 
-                        <div className="flex items-center justify-between"><div className="flex -space-x-1.5">{memberList?.map((u: any, i: number) => <div key={i} title={u?.email?.split("@")[0]} className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-white text-[9px] font-semibold" style={{ background: ["#6366f1", "#7c3aed", "#db2777", "#d97706", "#059669"][i % 5] }}>{u?.email?.[0]?.toUpperCase()}</div>)}{project.members?.length > 5 && <span className="text-[10px] text-gray-400 pl-2">+{project.members.length - 5}</span>}</div>{isPM && <div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all"><button onClick={e => { e.stopPropagation(); handleEditProject(project); }} className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 transition text-xs">✏️</button><button onClick={e => { e.stopPropagation(); handleDeleteProject(project.id); }} className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition text-xs">🗑️</button></div>}</div>
+                        <div className="flex items-center justify-between"><div className="flex -space-x-1.5">{memberList?.map((u: any, i: number) => <div key={i} title={u?.email?.split("@")[0]} className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-white text-[9px] font-semibold" style={{ background: ["#6366f1", "#7c3aed", "#db2777", "#d97706", "#059669"][i % 5] }}>{u?.email?.[0]?.toUpperCase()}</div>)}{project.members?.length > 5 && <span className="text-[10px] text-gray-400 pl-2">+{project.members.length - 5}</span>}</div>{canManageProject && <div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all"><button onClick={e => { e.stopPropagation(); handleEditProject(project); }} className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 transition text-xs">✏️</button><button onClick={e => { e.stopPropagation(); handleDeleteProject(project.id); }} className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition text-xs">🗑️</button></div>}</div>
                       </div>
                     </div>
                   );
@@ -1975,7 +1992,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                   <thead><tr className="border-b border-gray-100 bg-gray-50/70">{["Project", "Status", "Priority", "Type", "Progress", "PMs", "Members", "End Date", ""].map(h => <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{h}</th>)}</tr></thead>
                   <tbody>
                     {projects?.map((project: any) => {
-                      const sc = STATUS_CONFIG[project.status]; const pc = PRIORITY_CONFIG[project.priority]; const pms = getProjectManagers(project).map(uid => users.find((u: any) => u.uid === uid)).filter(Boolean); const isPM = getProjectManagers(project).includes(user.uid) || project.createdBy === user.uid;
+                      const sc = STATUS_CONFIG[project.status]; const pc = PRIORITY_CONFIG[project.priority]; const pms = getProjectManagers(project).map(uid => users.find((u: any) => u.uid === uid)).filter(Boolean); const isExplicitPM = getProjectManagers(project).includes(user.uid) || project.createdBy === user.uid; const canManageProject = isAdmin || isExplicitPM;
                       return (
                         <tr key={project.id} onClick={() => { setActiveProject(project); setViewMode("kanban"); }} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition group">
                           <td className="px-4 py-3"><div className="flex items-center gap-2.5"><div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: project.color || "#4f46e5" }}>{project.name[0]?.toUpperCase()}</div><div><p className="text-sm font-medium text-gray-800">{project.name}</p>{project.clientName && <p className="text-[11px] text-gray-400">{project.clientName}</p>}</div></div></td>
@@ -1986,7 +2003,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                           <td className="px-4 py-3"><div className="flex -space-x-1.5">{pms.slice(0, 3).map((u: any, i: number) => <div key={i} title={u.displayName || u.name || u.email?.split("@")[0]} className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-white text-[9px] font-semibold" style={{ background: ["#6366f1", "#7c3aed", "#db2777"][i % 3] }}>{(u.displayName || u.name || u.email)?.[0]?.toUpperCase()}</div>)}{pms.length > 3 && <span className="text-[10px] text-gray-400 pl-1">+{pms.length - 3}</span>}</div></td>
                           <td className="px-4 py-3"><div className="flex -space-x-1.5">{project.members?.slice(0, 4).map((uid: string, i: number) => { const m = users.find((u: any) => u.uid === uid); const mName = m?.displayName || m?.name || m?.email?.split("@")[0] || "?"; return <div key={i} title={mName} className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-white text-[9px] font-semibold" style={{ background: ["#6366f1", "#7c3aed", "#db2777", "#d97706"][i % 4] }}>{mName[0]?.toUpperCase()}</div>; })}</div></td>
                           <td className="px-4 py-3 text-xs text-gray-500">{project.endDate || "—"}</td>
-                          <td className="px-4 py-3">{isPM && <div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition"><button onClick={e => { e.stopPropagation(); handleEditProject(project); }} className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 text-xs">✏️</button><button onClick={e => { e.stopPropagation(); handleDeleteProject(project.id); }} className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 text-xs">🗑️</button></div>}</td>
+                          <td className="px-4 py-3">{canManageProject && <div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition"><button onClick={e => { e.stopPropagation(); handleEditProject(project); }} className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 text-xs">✏️</button><button onClick={e => { e.stopPropagation(); handleDeleteProject(project.id); }} className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 text-xs">🗑️</button></div>}</td>
                         </tr>
                       );
                     })}

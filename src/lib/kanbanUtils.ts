@@ -1,3 +1,61 @@
+export type TicketType = "story" | "task" | "bug" | "defect";
+
+export interface KanbanColumn {
+  id: string;
+  label: string;
+  wipLimit?: number;
+  color?: string;
+  bg?: string;
+  border?: string;
+}
+
+export interface TaskLabel {
+  id: string;
+  projectId: string;
+  title: string;
+  color: string;
+  createdAt?: any;
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  projectId: string;
+  sprintId?: string | null;
+  assignedTo?: string | null;
+  assignedToName?: string | null;
+  assignedDate?: string;
+  dueDate?: string;
+  priority: string;
+  status: string;
+  estimatedHours?: number;
+  actualHours?: number;
+  storyPoints?: number;
+  tags?: string[];
+  labels?: TaskLabel[];
+  ticketType?: TicketType;
+  parentStoryId?: string | null;
+  parentStoryTitle?: string;
+  taskCode?: string;
+  createdBy: string;
+  createdAt: any;
+  done?: boolean; // for subtasks mostly
+}
+
+export const LABEL_COLORS: Record<string, { bg: string; text: string }> = {
+  green: { bg: "#4bce97", text: "#ffffff" },
+  yellow: { bg: "#f5cd47", text: "#ffffff" },
+  orange: { bg: "#fea362", text: "#ffffff" },
+  red: { bg: "#f87168", text: "#ffffff" },
+  purple: { bg: "#9f8fef", text: "#ffffff" },
+  blue: { bg: "#579dff", text: "#ffffff" },
+  cyan: { bg: "#60c6d2", text: "#ffffff" },
+  lime: { bg: "#94c748", text: "#ffffff" },
+  pink: { bg: "#e774bb", text: "#ffffff" },
+  black: { bg: "#44546f", text: "#ffffff" },
+};
+
 export const TICKET_TYPES: Record<string, { label: string; icon: string; color: string; bg: string; border: string; description: string }> = {
   story: { label: "Story", icon: "📘", color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", description: "A user story" },
   task: { label: "Task", icon: "✅", color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", description: "A unit of work" },

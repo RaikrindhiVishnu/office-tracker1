@@ -4,41 +4,11 @@ import { useState, useRef, useCallback, useEffect, useMemo, Fragment } from "rea
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { createPortal } from "react-dom";
+import { Task, TaskLabel, TicketType, KanbanColumn, LABEL_COLORS } from "@/lib/kanbanUtils";
 
 /* ─── TYPES ─── */
-export type TicketType = "story" | "task" | "bug" | "defect";
 export type ViewMode = "board" | "swimlane";
 export type GroupBy = "assignee" | "priority" | "type" | "story";
-
-export interface Column {
-  id: string;
-  label: string;
-  wipLimit?: number;
-}
-
-export interface Task {
-  id: string;
-  title: string;
-  description?: string;
-  projectId: string;
-  sprintId?: string;
-  assignedTo?: string;
-  assignedToName?: string;
-  assignedDate?: string;
-  dueDate?: string;
-  priority: string;
-  status: string;
-  estimatedHours?: number;
-  actualHours?: number;
-  storyPoints?: number;
-  tags?: string[];
-  ticketType?: TicketType;
-  parentStoryId?: string;
-  parentStoryTitle?: string;
-  taskCode?: string;
-  createdBy: string;
-  createdAt: any;
-}
 
 /* ─── TICKET TYPE CONFIG ─── */
 export const TICKET_TYPES: Record<
@@ -99,6 +69,7 @@ function formatDate(d?: string) {
   const dt = new Date(d + "T12:00:00");
   return `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}`;
 }
+
 function isOverdue(dueDate?: string, status?: string) {
   return !!dueDate && new Date(dueDate) < new Date() && status !== "done";
 }
@@ -154,7 +125,7 @@ export function KanbanBoard({
   isProjectManager,
   onTaskClick,
   onStatusChange,
-  onUpdateColumns,
+  onUpdateKanbanColumns,
   onAddChildToStory,
   onToast,
   user,
@@ -162,13 +133,13 @@ export function KanbanBoard({
   toolbarPrefix,
 }: {
   tasks: Task[];
-  columns: Column[];
+  columns: KanbanColumn[];
   projectColor?: string;
   currentUserId: string;
   isProjectManager: boolean;
   onTaskClick: (t: Task) => void;
   onStatusChange: (taskId: string, newStatus: string) => void;
-  onUpdateColumns: (cols: Column[]) => Promise<void>;
+  onUpdateKanbanColumns: (cols: KanbanColumn[]) => Promise<void>;
   onAddChildToStory: (story: Task, ticketType: TicketType) => void;
   onToast: (msg: string) => void;
   user: any;
@@ -182,6 +153,7 @@ export function KanbanBoard({
   const [groupBy, setGroupBy] = useState<GroupBy>("assignee");
   const [localTasks, setLocalTasks] = useState<Task[]>(tasks);
   const [collapsedCols, setCollapsedCols] = useState<Set<string>>(new Set());
+  const [showLabelText, setShowLabelText] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [collapsedStories, setCollapsedStories] = useState<Set<string>>(new Set());
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
@@ -282,7 +254,7 @@ export function KanbanBoard({
     setCollapsedStories(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
   };
 
-  /* ── Column collapse ── */
+  /* ── KanbanColumn collapse ── */
   const toggleCol = (colId: string) => {
     setCollapsedCols(prev => { const s = new Set(prev); s.has(colId) ? s.delete(colId) : s.add(colId); return s; });
   };
@@ -386,13 +358,13 @@ export function KanbanBoard({
     onStatusChange(task.id, colId);
   }, [localTasks, user, activeProject, onStatusChange, onToast]);
 
-  /* ── Column CRUD ── */
+  /* ── KanbanColumn CRUD ── */
   const handleRenameCol = async (colId: string) => {
     if (!editingColLabel.trim()) { setEditingColId(null); return; }
     const updated = columns.map(c =>
       c.id === colId ? { ...c, label: editingColLabel.trim(), ...(editingColWip !== null ? { wipLimit: editingColWip } : {}) } : c
     );
-    await onUpdateColumns(updated);
+    await onUpdateKanbanColumns(updated);
     setEditingColId(null);
     setEditingColWip(null);
   };
@@ -400,19 +372,19 @@ export function KanbanBoard({
   const handleAddCol = async () => {
     if (!newColLabel.trim()) return;
     const id = newColLabel.trim().toLowerCase().replace(/\s+/g, "_") + "_" + Math.random().toString(36).slice(2, 8);
-    await onUpdateColumns([...columns, { id, label: newColLabel.trim() }]);
+    await onUpdateKanbanColumns([...columns, { id, label: newColLabel.trim() }]);
     setNewColLabel("");
     setAddingCol(false);
   };
 
   const handleDeleteCol = async (colId: string) => {
     const tasksInCol = localTasks.filter(t => t.status === colId);
-    if (tasksInCol.length > 0 && !confirm(`Column has ${tasksInCol.length} tasks. Delete anyway?`)) return;
-    await onUpdateColumns(columns.filter(c => c.id !== colId));
+    if (tasksInCol.length > 0 && !confirm(`KanbanColumn has ${tasksInCol.length} tasks. Delete anyway?`)) return;
+    await onUpdateKanbanColumns(columns.filter(c => c.id !== colId));
   };
 
   /* ── WIP helpers ── */
-  const getWipInfo = (col: Column) => {
+  const getWipInfo = (col: KanbanColumn) => {
     const lim = col.wipLimit ?? 0;
     const cnt = allColTasks(col.id).filter(t => t.ticketType !== "story").length;
     const exceeded = lim > 0 && cnt > lim;
@@ -420,7 +392,7 @@ export function KanbanBoard({
     return { cnt, lim, exceeded, nearLimit, pct: lim > 0 ? Math.min(cnt / lim, 1) : 0 };
   };
 
-  /* ── Column stats ── */
+  /* ── KanbanColumn stats ── */
   const colStats = (colId: string) => {
     const ct = allColTasks(colId);
     const totalPts = ct.reduce((s, t) => s + (t.storyPoints || 0), 0);
@@ -514,80 +486,117 @@ export function KanbanBoard({
         onMouseEnter={e => { if (!isDragging) (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)"; }}
         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 3px rgba(0,0,0,0.06)"; }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "7px", minWidth: 0 }}>
-          <div
-            onClick={e => toggleSelect(task.id, e)}
-            style={{
-              width: "14px", height: "14px", borderRadius: "3px",
-              border: `1.5px solid ${isSelected ? "#6366f1" : "#d1d5db"}`,
-              background: isSelected ? "#6366f1" : "#fff",
-              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-              flexShrink: 0, transition: "all 0.15s",
-            }}
-          >
-            {isSelected && <span style={{ color: "white", fontSize: "8px", fontWeight: 700, lineHeight: 1 }}>✓</span>}
+        {/* Labels - Interactive Color Bars */}
+        {task.labels && task.labels.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", padding: "8px 12px 2px" }}>
+            {task.labels.map(label => {
+              const color = LABEL_COLORS[label.color] || LABEL_COLORS.green;
+              return (
+                <div
+                  key={label.id}
+                  title={label.title}
+                  onClick={e => { e.stopPropagation(); setShowLabelText(!showLabelText); }}
+                  style={{ 
+                    height: showLabelText ? "auto" : "8px", 
+                    width: showLabelText ? "auto" : "44px", 
+                    padding: showLabelText ? "2px 8px" : "0",
+                    borderRadius: "100px", 
+                    background: color.bg, 
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease-in-out",
+                    overflow: "hidden"
+                  }}
+                >
+                  {showLabelText && (
+                    <span style={{ fontSize: "9px", fontWeight: 900, color: color.text, textTransform: "uppercase", letterSpacing: "0.02em", whiteSpace: "nowrap" }}>
+                      {label.title}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
-          <span style={{ fontSize: "10px", fontFamily: "monospace", fontWeight: 700, padding: "1px 5px", borderRadius: "4px", background: tm.bg, color: tm.color, flexShrink: 0 }}>
-            {task.taskCode || "TSK"}
-          </span>
-          <span style={{ fontSize: "12px", flexShrink: 0 }}>{tm.icon}</span>
-          {mine && (
-            <span style={{ fontSize: "9px", fontWeight: 800, padding: "1px 5px", borderRadius: "100px", background: projectColor + "20", color: projectColor, flexShrink: 0 }}>You</span>
-          )}
-          <div style={{ flex: 1, minWidth: 0 }} />
-          {pri && (
-            <div style={{ display: "flex", alignItems: "center", gap: "3px", flexShrink: 0 }}>
-              <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: pri.dot }} />
-              <span style={{ fontSize: "10px", color: pri.text, fontWeight: 600 }}>{pri.label}</span>
+        )}
+        <div style={{ padding: task.labels?.length ? "4px 12px 10px" : "10px 12px 10px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "7px", minWidth: 0 }}>
+            <div
+              onClick={e => toggleSelect(task.id, e)}
+              style={{
+                width: "14px", height: "14px", borderRadius: "3px",
+                border: `1.5px solid ${isSelected ? "#6366f1" : "#d1d5db"}`,
+                background: isSelected ? "#6366f1" : "#fff",
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0, transition: "all 0.15s",
+              }}
+            >
+              {isSelected && <span style={{ color: "white", fontSize: "8px", fontWeight: 700, lineHeight: 1 }}>✓</span>}
             </div>
-          )}
-        </div>
-        <p style={{ fontSize: "13px", fontWeight: 600, color: "#1f2937", lineHeight: 1.4, marginBottom: "5px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-          {task.title}
-        </p>
-        {task.description && (
-          <p style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "5px", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-            {task.description}
-          </p>
-        )}
-        {task.tags && task.tags.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginBottom: "6px" }}>
-            {task.tags.slice(0, 3).map(tag => (
-              <span key={tag} style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "100px", background: "#f3f4f6", color: "#6b7280", fontWeight: 500 }}>#{tag}</span>
-            ))}
-            {task.tags.length > 3 && <span style={{ fontSize: "10px", color: "#9ca3af" }}>+{task.tags.length - 3}</span>}
-          </div>
-        )}
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, overflow: "hidden" }}>
-          {task.assignedToName ? (
-            <>
-              <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: avatarColor(name), display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "9px", fontWeight: 700, flexShrink: 0 }} title={name}>
-                {avatarInitial(name)}
-              </div>
-              <span style={{ fontSize: "11px", color: "#4b5563", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{name}</span>
-            </>
-          ) : (
-            <>
-              <div style={{ width: "20px", height: "20px", borderRadius: "50%", border: "1.5px dashed #d1d5db", display: "flex", alignItems: "center", justifyContent: "center", color: "#d1d5db", fontSize: "9px", flexShrink: 0 }}>?</div>
-              <span style={{ fontSize: "11px", color: "#d1d5db", flex: 1, minWidth: 0 }}>Unassigned</span>
-            </>
-          )}
-          {dueFmt && (
-            <span style={{ fontSize: "10px", fontWeight: ovd ? 700 : 500, color: ovd ? "#ef4444" : "#9ca3af", flexShrink: 0 }}>
-              {ovd ? "⚡ " : ""}{dueFmt}
+            <span style={{ fontSize: "10px", fontFamily: "monospace", fontWeight: 700, padding: "1px 5px", borderRadius: "4px", background: tm.bg, color: tm.color, flexShrink: 0 }}>
+              {task.taskCode || "TSK"}
             </span>
-          )}
-          {task.storyPoints ? (
-            <span style={{ fontSize: "10px", padding: "1px 5px", borderRadius: "100px", background: "#f3f4f6", color: "#6b7280", flexShrink: 0 }}>{task.storyPoints}sp</span>
-          ) : null}
-          {task.estimatedHours ? (
-            <div style={{ display: "flex", alignItems: "center", gap: "3px", flexShrink: 0 }}>
-              <div style={{ width: "32px", height: "3px", borderRadius: "3px", background: "#f3f4f6", overflow: "hidden" }}>
-                <div style={{ height: "3px", borderRadius: "3px", background: "#6366f1", width: `${Math.min(((task.actualHours || 0) / task.estimatedHours) * 100, 100)}%` }} />
+            <span style={{ fontSize: "12px", flexShrink: 0 }}>{tm.icon}</span>
+            {mine && (
+              <span style={{ fontSize: "9px", fontWeight: 800, padding: "1px 5px", borderRadius: "100px", background: projectColor + "20", color: projectColor, flexShrink: 0 }}>You</span>
+            )}
+            <div style={{ flex: 1, minWidth: 0 }} />
+            {pri && (
+              <div style={{ display: "flex", alignItems: "center", gap: "3px", flexShrink: 0 }}>
+                <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: pri.dot }} />
+                <span style={{ fontSize: "10px", color: pri.text, fontWeight: 600 }}>{pri.label}</span>
               </div>
-              <span style={{ fontSize: "10px", color: "#9ca3af" }}>{task.actualHours || 0}h</span>
+            )}
+          </div>
+          <p style={{ fontSize: "13px", fontWeight: 600, color: "#1f2937", lineHeight: 1.4, marginBottom: "5px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+            {task.title}
+          </p>
+          {task.description && (
+            <p style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "5px", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+              {task.description}
+            </p>
+          )}
+          {task.tags && task.tags.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginBottom: "6px" }}>
+              {task.tags.slice(0, 3).map(tag => (
+                <span key={tag} style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "100px", background: "#f3f4f6", color: "#6b7280", fontWeight: 500 }}>#{tag}</span>
+              ))}
+              {task.tags.length > 3 && <span style={{ fontSize: "10px", color: "#9ca3af" }}>+{task.tags.length - 3}</span>}
             </div>
-          ) : null}
+          )}
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, overflow: "hidden" }}>
+            {task.assignedToName ? (
+              <>
+                <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: avatarColor(name), display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "9px", fontWeight: 700, flexShrink: 0 }} title={name}>
+                  {avatarInitial(name)}
+                </div>
+                <span style={{ fontSize: "11px", color: "#4b5563", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{name}</span>
+              </>
+            ) : (
+              <>
+                <div style={{ width: "20px", height: "20px", borderRadius: "50%", border: "1.5px dashed #d1d5db", display: "flex", alignItems: "center", justifyContent: "center", color: "#d1d5db", fontSize: "9px", flexShrink: 0 }}>?</div>
+                <span style={{ fontSize: "11px", color: "#d1d5db", flex: 1, minWidth: 0 }}>Unassigned</span>
+              </>
+            )}
+            {dueFmt && (
+              <span style={{ fontSize: "10px", fontWeight: ovd ? 700 : 500, color: ovd ? "#ef4444" : "#9ca3af", flexShrink: 0 }}>
+                {ovd ? "⚡ " : ""}{dueFmt}
+              </span>
+            )}
+            {task.storyPoints ? (
+              <span style={{ fontSize: "10px", padding: "1px 5px", borderRadius: "100px", background: "#f3f4f6", color: "#6b7280", flexShrink: 0 }}>{task.storyPoints}sp</span>
+            ) : null}
+            {task.estimatedHours ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "3px", flexShrink: 0 }}>
+                <div style={{ width: "32px", height: "3px", borderRadius: "3px", background: "#f3f4f6", overflow: "hidden" }}>
+                  <div style={{ height: "3px", borderRadius: "3px", background: "#6366f1", width: `${Math.min(((task.actualHours || 0) / task.estimatedHours) * 100, 100)}%` }} />
+                </div>
+                <span style={{ fontSize: "10px", color: "#9ca3af" }}>{task.actualHours || 0}h</span>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
     );
@@ -649,9 +658,43 @@ export function KanbanBoard({
               </div>
             )}
           </div>
-          <p style={{ fontSize: "13px", fontWeight: 700, color: "#3730a3", lineHeight: 1.4, marginBottom: "4px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-            {story.title}
-          </p>
+          <h3 style={{ fontSize: "14px", fontWeight: 800, color: "#312e81", lineHeight: 1.3, marginBottom: story.labels?.length ? "4px" : "8px" }}>{story.title}</h3>
+
+          {/* Labels for Story Card - Interactive */}
+          {story.labels && story.labels.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginBottom: "8px" }}>
+              {story.labels.map(label => {
+                const color = LABEL_COLORS[label.color] || LABEL_COLORS.green;
+                return (
+                  <div 
+                    key={label.id} 
+                    title={label.title} 
+                    onClick={e => { e.stopPropagation(); setShowLabelText(!showLabelText); }}
+                    style={{ 
+                      height: showLabelText ? "auto" : "8px", 
+                      width: showLabelText ? "auto" : "44px", 
+                      padding: showLabelText ? "2px 8px" : "0",
+                      borderRadius: "100px", 
+                      background: color.bg,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      transition: "all 0.15s ease-in-out",
+                      overflow: "hidden"
+                    }}
+                  >
+                    {showLabelText && (
+                      <span style={{ fontSize: "9px", fontWeight: 900, color: color.text, textTransform: "uppercase", letterSpacing: "0.02em", whiteSpace: "nowrap" }}>
+                        {label.title}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {story.tags && story.tags.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginBottom: "6px" }}>
               {story.tags.slice(0, 3).map(tag => (
@@ -728,7 +771,7 @@ export function KanbanBoard({
   };
 
   /* ══ COLUMN (board view) ══ */
-  const renderColumn = (col: Column, colIndex: number) => {
+  const renderKanbanColumn = (col: KanbanColumn, colIndex: number) => {
     const cfg = getColStyle(col.id, colIndex);
     const ct = colTasks(col.id);
     const stats = colStats(col.id);
@@ -1368,9 +1411,9 @@ export function KanbanBoard({
       {viewMode === "board" ? (
         <div style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden" }}>
           <div style={{ display: "flex", flex: 1, overflowX: "auto", overflowY: "hidden", height: "100%" }}>
-            {columns.map((col, i) => <Fragment key={col.id}>{renderColumn(col, i)}</Fragment>)}
+            {columns.map((col, i) => <Fragment key={col.id}>{renderKanbanColumn(col, i)}</Fragment>)}
 
-            {/* Add Column */}
+            {/* Add KanbanColumn */}
             {isProjectManager && (
               <div style={{ flexShrink: 0, width: "200px", borderRight: "1px dashed #e5e7eb", background: "#fafafa", display: "flex", flexDirection: "column" }}>
                 {addingCol ? (
@@ -1380,7 +1423,7 @@ export function KanbanBoard({
                       value={newColLabel}
                       onChange={e => setNewColLabel(e.target.value)}
                       onKeyDown={e => { if (e.key === "Enter") handleAddCol(); if (e.key === "Escape") setAddingCol(false); }}
-                      placeholder="Column name…"
+                      placeholder="KanbanColumn name…"
                       style={{ fontSize: "13px", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "7px 10px", outline: "none", background: "#fff" }}
                     />
                     <div style={{ display: "flex", gap: "6px" }}>
@@ -1395,7 +1438,7 @@ export function KanbanBoard({
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = "#9ca3af"; }}
                   >
                     <div style={{ width: "32px", height: "32px", borderRadius: "9px", border: "1.5px dashed currentColor", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", fontWeight: 300 }}>+</div>
-                    <span style={{ fontSize: "11px", fontWeight: 600, writingMode: "vertical-lr" }}>Add Column</span>
+                    <span style={{ fontSize: "11px", fontWeight: 600, writingMode: "vertical-lr" }}>Add KanbanColumn</span>
                   </button>
                 )}
               </div>
