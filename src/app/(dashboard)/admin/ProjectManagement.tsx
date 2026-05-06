@@ -65,13 +65,13 @@ interface UserSummaryItem { user: any; totalH: number; days: number; byProject: 
 
 /* ─── CONSTANTS ─── */
 const DEFAULT_COLUMNS: KanbanColumn[] = [
-  { id: "new_discussions", label: "New Discussions" },
-  { id: "dev_in_progress", label: "Dev In Progress" },
-  { id: "unit_testing", label: "Unit Testing" },
+  { id: "new", label: "New" },
+  { id: "dev_in_progress", label: "dev in progress" },
+  { id: "unit_testing", label: "Unit testing" },
   { id: "ready_for_qa", label: "Ready for QA" },
   { id: "testing_in_progress", label: "Testing In Progress" },
-  { id: "done", label: "Done" },
   { id: "reopened", label: "Reopened" },
+  { id: "done", label: "Done" },
 ];
 
 const PROJECT_COLORS = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#14b8a6"];
@@ -596,7 +596,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
 
   const projectPMs = activeProject ? getProjectManagers(activeProject) : [];
   const isProjectManager = projectPMs.includes(user.uid);
-  const isAdmin = user?.accountType === "ADMIN";
+  const isAdmin = user?.accountType === "ADMIN" || user?.accountType === "SUPERADMIN" || user?.accountType === "BUSINESSOWNER" || user?.accountType === "BUSINESS_OWNER";
   const canManage = isAdmin || isProjectManager || activeProject?.createdBy === user.uid;
   const stories = tasks.filter(t => t.ticketType === "story");
 
@@ -648,8 +648,8 @@ export default function AdminProjectManagement({ user, projects, users }: { user
   }, [activeTask]);
 
   /* ── Helpers ── */
-  const sendNotification = async (userId: string, type: string, title: string, message: string, projectId?: string, taskId?: string) => {
-    await addDoc(collection(db, "notifications"), { userId, type, title, message, projectId: projectId ?? null, taskId: taskId ?? null, read: false, createdAt: serverTimestamp() });
+  const sendNotification = async (toUid: string, type: string, title: string, message: string, projectId?: string, taskId?: string) => {
+    await addDoc(collection(db, "notifications"), { toUid, type, title, message, projectId: projectId ?? null, taskId: taskId ?? null, read: false, createdAt: serverTimestamp() });
   };
 
   // Updated logActivity — writes to BOTH collections

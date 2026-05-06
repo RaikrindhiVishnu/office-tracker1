@@ -1168,23 +1168,121 @@ export function KanbanBoard({
   /* ── Bulk action bar ── */
   const renderBulkBar = () => {
     if (selectedTasks.size === 0) return null;
-    return (
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 16px", background: "#eef2ff", borderBottom: "1px solid #c7d2fe", flexShrink: 0, flexWrap: "wrap" }}>
-        <span style={{ fontSize: "13px", fontWeight: 700, color: "#4338ca" }}>{selectedTasks.size} selected</span>
+    return createPortal(
+      <div style={{ 
+        position: "fixed", 
+        bottom: "32px", 
+        left: "50%", 
+        transform: "translateX(-50%)", 
+        zIndex: 10002,
+        display: "flex", 
+        alignItems: "center", 
+        gap: "12px", 
+        padding: "8px 10px", 
+        background: "#6366f1", 
+        borderRadius: "16px",
+        boxShadow: "0 10px 30px rgba(99, 102, 241, 0.4)",
+        border: "1px solid rgba(255,255,255,0.2)",
+        animation: "slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)"
+      }}>
+        <style>{`
+          @keyframes slideUp {
+            from { transform: translate(-50%, 100px); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+          }
+        `}</style>
+        
+        {/* Selection Pill */}
+        <div style={{ 
+          background: "rgba(255,255,255,0.2)", 
+          padding: "6px 14px", 
+          borderRadius: "12px", 
+          color: "white", 
+          fontSize: "13px", 
+          fontWeight: 800,
+          whiteSpace: "nowrap"
+        }}>
+          {selectedTasks.size} selected
+        </div>
+
+        <div style={{ width: "1px", height: "24px", background: "rgba(255,255,255,0.2)" }} />
+
+        {/* Move Button */}
         <div style={{ position: "relative" }}>
           <button
             onClick={() => setBulkMoveOpen(v => !v)}
-            style={{ fontSize: "12px", padding: "4px 10px", borderRadius: "6px", border: "1px solid #c7d2fe", background: "#fff", color: "#4338ca", cursor: "pointer", fontWeight: 600 }}
-          >Move to ▾</button>
+            style={{ 
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              fontSize: "13px", 
+              padding: "8px 16px", 
+              borderRadius: "12px", 
+              border: "none", 
+              background: "rgba(255,255,255,0.15)", 
+              color: "white", 
+              cursor: "pointer", 
+              fontWeight: 700,
+              transition: "all 0.2s"
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.25)"}
+            onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
+            </svg>
+            Move
+            <span style={{ fontSize: "10px", opacity: 0.8 }}>{bulkMoveOpen ? "▲" : "▼"}</span>
+          </button>
+          
           {bulkMoveOpen && (
             <>
-              <div style={{ position: "fixed", inset: 0, zIndex: 40 }} onClick={() => setBulkMoveOpen(false)} />
-              <div style={{ position: "absolute", top: "32px", left: 0, zIndex: 50, background: "#fff", borderRadius: "10px", boxShadow: "0 8px 24px rgba(0,0,0,0.12)", border: "1px solid #e5e7eb", overflow: "hidden", minWidth: "160px" }}>
+              <div style={{ position: "fixed", inset: 0, zIndex: -1 }} onClick={() => setBulkMoveOpen(false)} />
+              <div style={{ 
+                position: "absolute", 
+                bottom: "calc(100% + 12px)", 
+                left: "0", 
+                zIndex: 50, 
+                background: "#fff", 
+                borderRadius: "14px", 
+                boxShadow: "0 10px 40px rgba(0,0,0,0.15)", 
+                border: "1px solid #e5e7eb", 
+                overflow: "hidden", 
+                minWidth: "200px",
+                padding: "6px"
+              }}>
+                <div style={{ padding: "8px 12px 6px", fontSize: "10px", fontWeight: 800, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Move to column
+                </div>
                 {columns.map((col, i) => {
                   const cfg = getColStyle(col.id, i);
                   return (
                     <button key={col.id} onClick={() => bulkMove(col.id)}
-                      style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", padding: "8px 14px", fontSize: "13px", background: "none", border: "none", cursor: "pointer", color: cfg.color, fontWeight: 600 }}>
+                      style={{ 
+                        display: "flex", 
+                        alignItems: "center", 
+                        gap: "10px", 
+                        width: "100%", 
+                        padding: "10px 12px", 
+                        fontSize: "13px", 
+                        background: "none", 
+                        border: "none", 
+                        borderRadius: "8px",
+                        cursor: "pointer", 
+                        color: "#374151", 
+                        fontWeight: 600,
+                        textAlign: "left",
+                        transition: "all 0.2s"
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = cfg.headerBg;
+                        e.currentTarget.style.color = cfg.color;
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = "none";
+                        e.currentTarget.style.color = "#374151";
+                      }}
+                    >
                       <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: cfg.dot }} />
                       {col.label}
                     </button>
@@ -1194,14 +1292,58 @@ export function KanbanBoard({
             </>
           )}
         </div>
-        {["Critical", "High", "Medium", "Low"].map(p => (
-          <button key={p} onClick={() => bulkSetPriority(p)} style={{ fontSize: "12px", padding: "4px 8px", borderRadius: "6px", border: `1px solid ${PRI_CONFIG[p].dot}40`, background: PRI_CONFIG[p].bg, color: PRI_CONFIG[p].text, cursor: "pointer", fontWeight: 600 }}>
-            {p}
-          </button>
-        ))}
-        <button onClick={bulkDelete} style={{ fontSize: "12px", padding: "4px 10px", borderRadius: "6px", border: "1px solid #fca5a5", background: "#fef2f2", color: "#dc2626", cursor: "pointer", fontWeight: 600 }}>Delete</button>
-        <button onClick={() => setSelectedTasks(new Set())} style={{ fontSize: "12px", padding: "4px 10px", borderRadius: "6px", border: "1px solid #e5e7eb", background: "#fff", color: "#6b7280", cursor: "pointer", marginLeft: "auto" }}>Clear</button>
-      </div>
+
+        {/* Delete Button */}
+        <button 
+          onClick={bulkDelete} 
+          style={{ 
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            fontSize: "13px", 
+            padding: "8px 16px", 
+            borderRadius: "12px", 
+            border: "none", 
+            background: "#ef4444", 
+            color: "white", 
+            cursor: "pointer", 
+            fontWeight: 700,
+            transition: "all 0.2s",
+            boxShadow: "0 4px 12px rgba(239, 68, 68, 0.3)"
+          }}
+          onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
+          onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+          </svg>
+          Delete
+        </button>
+
+        <div style={{ width: "1px", height: "24px", background: "rgba(255,255,255,0.2)" }} />
+
+        {/* Clear/Close Button */}
+        <button 
+          onClick={() => setSelectedTasks(new Set())} 
+          style={{ 
+            width: "32px",
+            height: "32px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "16px", 
+            borderRadius: "10px", 
+            border: "none", 
+            background: "transparent", 
+            color: "rgba(255,255,255,0.7)", 
+            cursor: "pointer",
+            transition: "all 0.2s"
+          }}
+          onMouseEnter={e => e.currentTarget.style.color = "white"}
+          onMouseLeave={e => e.currentTarget.style.color = "rgba(255,255,255,0.7)"}
+        >✕</button>
+      </div>,
+      document.body
     );
   };
 

@@ -124,7 +124,7 @@ const sidebarItems: [ViewType, string, string][] = [
 
 // ── Main Dashboard ────────────────────────────────────────
 export default function ZohoStyleEmployeeDashboard() {
-  const { user, loading } = useAuth();
+  const { user, loading, userData } = useAuth();
   const router = useRouter();
 
   // ── ✅ NEW: MeetChat overlay state ──────────────────────
@@ -186,6 +186,7 @@ export default function ZohoStyleEmployeeDashboard() {
   const [todayBreaks, setTodayBreaks] = useState<Break[]>([]);
 
   const notifDropdownRef = useRef<HTMLDivElement>(null);
+  const mobileNotifDropdownRef = useRef<HTMLDivElement>(null);
   const year = calendarDate.getFullYear();
   const month = calendarDate.getMonth();
 
@@ -195,7 +196,10 @@ export default function ZohoStyleEmployeeDashboard() {
       // document.body.contains(e.target) will be false. We should NOT close the dropdown in this case.
       if (e.target && !document.body.contains(e.target as Node)) return;
 
-      if (notifDropdownRef.current && !notifDropdownRef.current.contains(e.target as Node))
+      const insideDesktop = notifDropdownRef.current && notifDropdownRef.current.contains(e.target as Node);
+      const insideMobile = mobileNotifDropdownRef.current && mobileNotifDropdownRef.current.contains(e.target as Node);
+
+      if (!insideDesktop && !insideMobile)
         setShowNotifDropdown(false);
     };
     // Use capture phase (true) to ensure this runs before React event handlers might remove the target element
@@ -681,7 +685,7 @@ export default function ZohoStyleEmployeeDashboard() {
                 <h1 className="text-sm font-bold capitalize truncate max-w-36 text-gray-900">📊 {activeView.replace(/-/g, " ")}</h1>
               </div>
               <div className="flex items-center gap-1">
-                <div className="relative" ref={notifDropdownRef}>
+                <div className="relative" ref={mobileNotifDropdownRef}>
                   <NavbarBreakStatus uid={user.uid} isCheckedIn={!!isCheckedIn} />
                   <button onClick={() => setShowNotifDropdown(prev => !prev)} className="relative p-1.5 hover:bg-gray-100 rounded-lg transition-all" aria-label="Notifications">
                     <svg className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
@@ -805,7 +809,7 @@ export default function ZohoStyleEmployeeDashboard() {
             )}
             {activeView === "attendance" && <EmployeeAttendanceView />}
             {activeView === "work-update" && <WorkUpdateView />}
-            {activeView === "projects" && <ProjectManagement user={user} projects={projects} users={users} />}
+            {activeView === "projects" && <ProjectManagement user={{ ...user, ...userData }} projects={projects} users={users} />}
             {activeView === "notifications" && (
               <UnifiedNotificationsView
                 chatNotifications={chatNotifications}

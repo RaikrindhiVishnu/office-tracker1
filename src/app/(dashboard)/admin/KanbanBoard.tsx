@@ -22,11 +22,13 @@ const TYPE_META = TICKET_TYPES;
 
 /* ─── CONSTANTS ─── */
 const STATIC_COL_CONFIG: Record<string, { color: string; bg: string; border: string; headerBg: string; dot: string }> = {
-  todo: { color: "#64748b", bg: "#f8fafc", border: "#e2e8f0", headerBg: "#f1f5f9", dot: "#94a3b8" },
-  inprogress: { color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", headerBg: "#dbeafe", dot: "#3b82f6" },
-  review: { color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", headerBg: "#ede9fe", dot: "#8b5cf6" },
+  new: { color: "#64748b", bg: "#f8fafc", border: "#e2e8f0", headerBg: "#f1f5f9", dot: "#94a3b8" },
+  dev_in_progress: { color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", headerBg: "#dbeafe", dot: "#3b82f6" },
+  unit_testing: { color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", headerBg: "#ede9fe", dot: "#8b5cf6" },
+  ready_for_qa: { color: "#0891b2", bg: "#ecfeff", border: "#a5f3fc", headerBg: "#cffafe", dot: "#06b6d4" },
+  testing_in_progress: { color: "#0d9488", bg: "#f0fdfa", border: "#99f6e4", headerBg: "#ccfbf1", dot: "#14b8a6" },
+  reopened: { color: "#dc2626", bg: "#fef2f2", border: "#fecaca", headerBg: "#fee2e2", dot: "#ef4444" },
   done: { color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0", headerBg: "#dcfce7", dot: "#22c55e" },
-  blocked: { color: "#dc2626", bg: "#fef2f2", border: "#fecaca", headerBg: "#fee2e2", dot: "#ef4444" },
 };
 
 const DYNAMIC_PALETTE = [
@@ -465,7 +467,7 @@ export function TaskModal({
     const t = defaultTicketType || "task";
     setF(prev => ({
       ...prev, ticketType: t, parentStoryId: defaultStoryId || "",
-      status: columns[0]?.id || "todo",
+      status: columns[0]?.id || "new",
       taskCode: taskCodeManual ? prev.taskCode : getAutoCode(t),
     }));
   }, [open, defaultTicketType, defaultStoryId, columns, editingTask]);

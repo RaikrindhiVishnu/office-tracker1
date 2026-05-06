@@ -989,7 +989,7 @@ export default function AdminPage() {
 
           {view === "Project Management" && (
             <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-0 overflow-hidden max-w-full flex-1 flex flex-col min-h-0">
-              <ProjectManagement user={user} projects={projects} users={users} />
+              <ProjectManagement user={{ ...user, ...userData }} projects={projects} users={users} />
             </div>
           )}
 

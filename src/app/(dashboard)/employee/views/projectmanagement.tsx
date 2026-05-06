@@ -21,6 +21,7 @@ import {
   doc,
   serverTimestamp,
   getDocs,
+  writeBatch,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
@@ -94,11 +95,13 @@ interface DailyTask {
 
 /* ─── CONSTANTS ─── */
 const DEFAULT_COLUMNS: KanbanColumn[] = [
-  { id: "todo", label: "To Do" },
-  { id: "inprogress", label: "In Progress" },
-  { id: "review", label: "Review" },
+  { id: "new", label: "New" },
+  { id: "dev_in_progress", label: "dev in progress" },
+  { id: "unit_testing", label: "Unit testing" },
+  { id: "ready_for_qa", label: "Ready for QA" },
+  { id: "testing_in_progress", label: "Testing In Progress" },
+  { id: "reopened", label: "Reopened" },
   { id: "done", label: "Done" },
-  { id: "blocked", label: "Blocked" },
 ];
 
 const PRIORITY_CONFIG: Record<string, { color: string; bg: string; icon: string }> = {
@@ -160,6 +163,19 @@ const TicketBadge = ({ type, size = "sm" }: { type?: TicketType; size?: "xs" | "
       {size === "sm" && <span>{cfg.label}</span>}
     </span>
   );
+};
+
+const sendNotification = async (toUid: string, type: string, title: string, message: string, projectId?: string, taskId?: string) => {
+  await addDoc(collection(db, "notifications"), { 
+    toUid, 
+    type, 
+    title, 
+    message, 
+    projectId: projectId ?? null, 
+    taskId: taskId ?? null, 
+    read: false, 
+    createdAt: serverTimestamp() 
+  });
 };
 
 function PermissionToast({ message, onHide }: { message: string; onHide: () => void }) {
@@ -278,6 +294,16 @@ function EditProjectModal({ open, onClose, project, users, onSaved }: {
         members: members,
         updatedAt: serverTimestamp(),
       });
+      
+      // Notify NEW members
+      const existingMembers = project.members || [];
+      const newMembers = members.filter((m: string) => !existingMembers.includes(m));
+      for (const m of newMembers) {
+        if (m !== project.createdBy) {
+          await sendNotification(m, "project_added", "Added to Project", `You've been added to "${form.name}"`, project.id);
+        }
+      }
+
       onSaved?.({ ...project, ...form, members, projectManagers: pms });
       onClose();
     } catch (err: any) {
@@ -401,6 +427,14 @@ function ProjectModal({ open, onClose, user, users, onCreated }: {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+
+      // Notify all members except the creator
+      for (const m of members) {
+        if (m !== user.uid) {
+          await sendNotification(m, "project_added", "Added to Project", `You've been added to "${form.name}"`, docRef.id);
+        }
+      }
+
       onCreated?.({ id: docRef.id, ...form, members: members, projectManagers: pms });
       onClose();
     } catch (err: any) {
@@ -741,7 +775,7 @@ function LabelPicker({
       {isOpen && (
         <>
           <div className="fixed inset-0 z-[10002]" onClick={() => setIsOpen(false)} />
-          <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[10003] overflow-hidden flex flex-col max-h-[400px]">
+          <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[10003] overflow-hidden flex flex-col max-h-[400px]">
              <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Labels</span>
                 <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-gray-600 transition">✕</button>
@@ -838,7 +872,7 @@ function TaskModal({
     const ticketType = initialData?.ticketType || allowed[0] || "task";
     setForm({
       title: "", description: "", priority: "Medium",
-      status: columns[0]?.id || "todo",
+      status: columns[0]?.id || "new",
       estimatedHours: 0, storyPoints: 0, tags: [],
       ticketType,
       parentStoryId: "", parentStoryTitle: "",
@@ -2178,6 +2212,17 @@ export default function ProjectManagement({ user, projects, users }: any) {
       ...(newStatus === "inprogress" ? { startedAt: serverTimestamp() } : {}),
       ...(newStatus === "done" ? { completedAt: serverTimestamp() } : {}),
     });
+
+    // If it's a story, move all its tasks too
+    if (task.ticketType === "story") {
+      const subTasks = tasks.filter(t => t.parentStoryId === taskId);
+      const batch = writeBatch(db);
+      subTasks.forEach(st => {
+        batch.update(doc(db, "projectTasks", st.id), { status: newStatus });
+      });
+      if (subTasks.length > 0) await batch.commit();
+    }
+
     await logActivity(activeProject.id, "moved task", `"${task.title}" → ${columns.find(c => c.id === newStatus)?.label ?? newStatus}`, taskId);
     const snap = await getDocs(query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id)));
     const all = snap.docs.map(d => d.data());
@@ -2195,6 +2240,11 @@ export default function ProjectManagement({ user, projects, users }: any) {
       createdAt: serverTimestamp(), actualHours: 0,
     });
     await logActivity(activeProject.id, "created task", `"${taskData.title}" (${taskData.ticketType || "task"})`, docRef.id);
+    
+    // Notify assignee
+    if (taskData.assignedTo && taskData.assignedTo !== user?.uid) {
+      await sendNotification(taskData.assignedTo, "task_assigned", "Task Assigned", `You've been assigned "${taskData.title}" in ${activeProject.name}`, activeProject.id, docRef.id);
+    }
     if (children && children.length > 0) {
       for (const child of children) {
         const childCode = await generateUniqueTaskCode(activeProject.id, child.ticketType || "task");
@@ -2202,7 +2252,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
           ...child, taskCode: childCode, projectId: activeProject.id,
           parentStoryId: docRef.id, parentStoryTitle: taskData.title,
           ticketType: child.ticketType || "task",
-          status: taskData.status || columns[0]?.id || "todo",
+          status: taskData.status || columns[0]?.id || "new",
           sprintId: activeSprint?.id || null,
           createdAt: serverTimestamp(), actualHours: 0,
         });
@@ -2240,6 +2290,12 @@ export default function ProjectManagement({ user, projects, users }: any) {
     Object.keys(updatePayload).forEach(key => { if (updatePayload[key] === undefined) delete updatePayload[key]; });
     await updateDoc(doc(db, "projectTasks", editingTask.id), updatePayload);
     setTasks(prev => prev.map(t => t.id === editingTask.id ? { ...t, ...updatePayload } : t));
+    
+    // Notify assignee if changed
+    if (updatePayload.assignedTo && updatePayload.assignedTo !== editingTask.assignedTo && updatePayload.assignedTo !== user?.uid) {
+      await sendNotification(updatePayload.assignedTo, "task_assigned", "Task Assigned", `You've been assigned "${data.title || editingTask.title}" in ${activeProject.name}`, activeProject.id, editingTask.id);
+    }
+
     await logActivity(activeProject.id, "edited task", `"${data.title || editingTask.title}"`, editingTask.id);
     setEditingTask(null);
   };
@@ -2577,7 +2633,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
         {showCreateModal && (
           <TaskModal open={showCreateModal} onClose={() => setShowCreateModal(false)} onSubmit={handleCreateTask}
             users={users} columns={columns} projectColor={projectColor}
-            initialData={{ status: columns[0]?.id || "todo", projectId: activeProject.id }}
+            initialData={{ status: columns[0]?.id || "new", projectId: activeProject.id }}
             stories={stories} currentUserId={user?.uid} isProjectManager={isProjectManager}
             allowedTypes={permissions.canCreateTypes} />
         )}

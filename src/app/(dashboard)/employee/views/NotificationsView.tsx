@@ -136,7 +136,7 @@ export default function UnifiedNotificationsView({
       const tb = b.timestamp?.toMillis?.() || new Date(b.timestamp).getTime() || 0;
       return tb - ta;
     });
-  }, [chatNotifications, leaveNotifications, queryNotifications, announcements]);
+  }, [chatNotifications, leaveNotifications, queryNotifications, announcements, dismissedAnnouncements]);
 
   // 2. Filter and Split (Unread vs Read)
   const activeItems = allNotifications.filter(n => !n.isDeleted && !locallyDeleted.has(n.id));
