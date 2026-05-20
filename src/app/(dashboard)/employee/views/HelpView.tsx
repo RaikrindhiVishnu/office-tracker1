@@ -12,6 +12,8 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
+import { triggerEmailNotification } from "@/lib/notifications";
+import { getDocs } from "firebase/firestore";
 
 const SUBJECT_LIMIT = 100;
 const MESSAGE_LIMIT = 1000;
@@ -428,6 +430,22 @@ export default function HelpView() {
       setSubject("");
       setMessage("");
       setMsg("✅ Query submitted successfully!");
+      
+      // Notify admins
+      try {
+        const adminsSnapshot = await getDocs(query(collection(db, "users"), where("accountType", "==", "ADMIN")));
+        const adminsData = adminsSnapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+        for (const admin of adminsData) {
+          if (admin.email) {
+            triggerEmailNotification(
+              admin.id,
+              `New HR Request: ${subject}`,
+              `An employee (${user.email}) has submitted a new query:\n\nTopic: ${subject}\nMessage:\n${message}\n\nPlease review and reply from the Admin Dashboard.`
+            );
+          }
+        }
+      } catch (err) { console.error("Failed to notify admins of query", err); }
+
       setTimeout(() => { setMsg(""); setTab("history"); }, 1600);
     } catch {
       setMsg("Something went wrong.");

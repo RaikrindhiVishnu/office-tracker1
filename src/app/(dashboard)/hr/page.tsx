@@ -7,7 +7,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@/context/AuthContext";
 import {
-  collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc,
+  collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc,
   serverTimestamp, query, where, orderBy, onSnapshot, writeBatch,
   Timestamp, limit,
 } from "firebase/firestore";
@@ -398,7 +398,47 @@ function HRDashboard() {
   setSending(false);
 };
 
-  const reply = async(qid:string,uid:string)=>{ if(!replyTxt.trim()) return; setReplying(true); const b=writeBatch(db); b.update(doc(db,"employeeQueries",qid),{reply:replyTxt.trim(),status:"resolved",adminUnread:false,repliedAt:serverTimestamp()}); await b.commit(); await addDoc(collection(db,"notifications"),{toUid:uid,title:"💬 Query Answered",message:replyTxt.trim().slice(0,120),read:false,createdAt:serverTimestamp()}); setReplyTo(null); setReplyTxt(""); setReplying(false); };
+  const reply = async (qid: string, uid: string) => {
+    if (!replyTxt.trim()) return;
+    setReplying(true);
+    const b = writeBatch(db);
+    b.update(doc(db, "employeeQueries", qid), {
+      reply: replyTxt.trim(),
+      status: "resolved",
+      adminUnread: false,
+      repliedAt: serverTimestamp()
+    });
+    await b.commit();
+    await addDoc(collection(db, "notifications"), {
+      toUid: uid,
+      title: "💬 Query Answered",
+      message: replyTxt.trim().slice(0, 120),
+      read: false,
+      createdAt: serverTimestamp()
+    });
+
+    try {
+      const empDoc = await getDoc(doc(db, "users", uid));
+      if (empDoc.exists()) {
+        const emp = empDoc.data() as any;
+        if (emp.email) {
+          triggerEmailNotification(
+            uid,
+            `HR Request Update`,
+            `Your query has been updated by the Admin.\n\nReply:\n${replyTxt.trim()}\n\nPlease check your portal for more details.`,
+            "success"
+          );
+        }
+        triggerPushNotification(uid, `HR Request Update`, `Admin has replied to your query.`);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
+    setReplyTo(null);
+    setReplyTxt("");
+    setReplying(false);
+  };
 
   const markRead = async()=>{ const b=writeBatch(db); notifs.filter(n=>!n.read).forEach(n=>b.update(doc(db,"notifications",n.id),{read:true})); await b.commit(); };
 

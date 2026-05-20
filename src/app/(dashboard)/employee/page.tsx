@@ -441,6 +441,22 @@ export default function ZohoStyleEmployeeDashboard() {
         status: "pending", adminReply: "", employeeUnread: false, adminUnread: true, createdAt: serverTimestamp(),
       });
       setQueryMsg("✅ Query submitted successfully"); setQuerySubject(""); setQueryMessage("");
+      
+      // Notify admins
+      try {
+        const adminsSnapshot = await getDocs(query(collection(db, "users"), where("accountType", "==", "ADMIN")));
+        const adminsData = adminsSnapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+        for (const admin of adminsData) {
+          if (admin.email) {
+            triggerEmailNotification(
+              admin.id,
+              `New HR Request: ${querySubject}`,
+              `An employee (${user.email}) has submitted a new query:\n\nTopic: ${querySubject}\nMessage:\n${queryMessage}\n\nPlease review and reply from the Admin Dashboard.`
+            );
+          }
+        }
+      } catch (err) { console.error("Failed to notify admins of query", err); }
+      
     } catch (error) { setQueryMsg("❌ Failed to submit query"); console.error(error); }
     finally { setQuerySubmitting(false); }
   };

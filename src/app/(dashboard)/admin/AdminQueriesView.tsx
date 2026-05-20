@@ -16,9 +16,10 @@ import {
 } from "lucide-react";
 import {
   collection, query, orderBy, onSnapshot,
-  updateDoc, deleteDoc, doc, serverTimestamp,
+  updateDoc, deleteDoc, doc, serverTimestamp, getDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { triggerEmailNotification, triggerPushNotification } from "@/lib/notifications";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -239,6 +240,26 @@ export default function AdminQueriesView() {
         repliedAt: serverTimestamp(),
         assignedTo: assignTo || null,
       });
+      
+      // Notify the employee
+      try {
+        const empDoc = await getDoc(doc(db, "users", drawer.employeeId));
+        if (empDoc.exists()) {
+          const emp = empDoc.data() as any;
+          if (emp.email) {
+            triggerEmailNotification(
+              drawer.employeeId,
+              `HR Request Update: ${drawer.subject}`,
+              `Your query "${drawer.subject}" has been updated by the Admin.\n\nReply:\n${replyText.trim()}\n\nPlease check your portal for more details.`,
+              "success"
+            );
+          }
+          triggerPushNotification(drawer.employeeId, `HR Request Update`, `Admin has replied to your query: ${drawer.subject}`);
+        }
+      } catch (err) {
+        console.error("Failed to notify employee", err);
+      }
+
       setReplyText("");
     } catch (e) {
       console.error(e);
