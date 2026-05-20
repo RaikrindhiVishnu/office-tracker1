@@ -832,6 +832,7 @@ interface StoryCardProps {
   activeProject: any;
   filteredTasks: Task[];
   isSelected: boolean;
+  selectedTasks: Set<string>;
   isCollapsed: boolean;
   overdue: boolean;
   dragTask: Task | null;
@@ -856,6 +857,7 @@ const StoryCard = memo(({
   activeProject,
   filteredTasks,
   isSelected,
+  selectedTasks,
   isCollapsed,
   overdue,
   dragTask,
@@ -1565,6 +1567,7 @@ export function KanbanBoard({
                     activeProject={activeProject}
                     filteredTasks={filteredTasks}
                     isSelected={selectedTasks.has(story.id)}
+                    selectedTasks={selectedTasks}
                     isCollapsed={collapsedStories.has(story.id)}
                     overdue={isOverdue(story.dueDate, story.status)}
                     dragTask={dragTask}
