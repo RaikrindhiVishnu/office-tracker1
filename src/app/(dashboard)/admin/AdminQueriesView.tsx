@@ -32,6 +32,7 @@ interface Reply {
 
 interface EmployeeQuery {
   id: string;
+  employeeId: string;
   employeeName: string;
   employeeEmail: string;
   department: string;
