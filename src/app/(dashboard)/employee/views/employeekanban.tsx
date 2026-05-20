@@ -264,6 +264,7 @@ interface StoryCardProps {
   colChildren: Task[];
   isSelected: boolean;
   isDragging: boolean;
+  draggingId: string | null;
   currentUserId: string;
   projectColor: string;
   user: any;
@@ -287,6 +288,7 @@ const StoryCard = memo(({
   colChildren,
   isSelected,
   isDragging,
+  draggingId,
   currentUserId,
   projectColor,
   user,
@@ -962,6 +964,7 @@ export function KanbanBoard({
               colChildren={filteredTasks.filter(t => t.parentStoryId === story.id && t.status === col.id && t.ticketType !== "story")}
               isSelected={selectedTasks.has(story.id)}
               isDragging={draggingId === story.id}
+              draggingId={draggingId}
               currentUserId={currentUserId}
               projectColor={projectColor}
               user={user}
