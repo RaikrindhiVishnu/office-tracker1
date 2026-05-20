@@ -1,7 +1,7 @@
 "use client";
 
 import { onAuthStateChanged } from "firebase/auth";
-import { logActivity } from "@/lib/notifications";
+import { logActivity, triggerPushNotification, triggerEmailNotification } from "@/lib/notifications";
 import NotificationBell from "@/components/NotificationBell";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -340,7 +340,24 @@ function HRDashboard() {
 
   const approveLeave = async(id:string,st:"Approved"|"Rejected",leave:LeaveRequest)=>{
     await setDoc(doc(db,"leaveRequests",id),{status:st,updatedAt:serverTimestamp()},{merge:true});
-    await addDoc(collection(db,"notifications"),{toUid:leave.uid,title:st==="Approved"?"✅ Leave Approved":"❌ Leave Rejected",message:`Your ${leave.leaveType} leave from ${leave.fromDate} to ${leave.toDate} has been ${st.toLowerCase()}.`,read:false,createdAt:serverTimestamp()});
+    // 🔔 Push + 📧 Email — NO addDoc to avoid duplicate bell entry
+    const dateRange = `${leave.fromDate} - ${leave.toDate}`;
+    const isApproved = st === "Approved";
+    triggerPushNotification(
+      leave.uid,
+      isApproved ? "Leave Approved ✓" : "Leave Request Rejected",
+      isApproved
+        ? `Your ${leave.leaveType} leave for ${dateRange} has been approved.`
+        : `Your ${leave.leaveType} leave for ${dateRange} has been rejected.`
+    ).catch(console.error);
+    triggerEmailNotification(
+      leave.uid,
+      isApproved ? "Leave Approved ✓" : "Leave Request Rejected",
+      isApproved
+        ? `Your ${leave.leaveType} leave for ${dateRange} has been approved.`
+        : `Your ${leave.leaveType} leave for ${dateRange} has been rejected.`,
+      isApproved ? "success" : "error"
+    ).catch(console.error);
     if(st==="Approved"){ const es=await getDoc(doc(db,"users",leave.uid)); if(es.exists()){ const b=es.data()?.leaveBalance||{}; const k=leave.leaveType==="Sick"?"sick":leave.leaveType==="Casual"?"casual":"annual"; if(typeof b[k]==="number"&&b[k]>0) await updateDoc(doc(db,"users",leave.uid),{[`leaveBalance.${k}`]:b[k]-1}); } }
     await loadLeaves();
     await logActivity({

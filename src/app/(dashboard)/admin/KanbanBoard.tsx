@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, memo, useCallback } from "react";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { createPortal } from "react-dom";
@@ -666,6 +666,326 @@ export function TaskModal({
   );
 }
 
+export const isOverdue = (dueDate?: string, status?: string) =>
+  !!dueDate && new Date(dueDate) < new Date() && status !== "done";
+
+export const formatDate = (d?: string) => {
+  if (!d) return null;
+  const dt = new Date(d + "T12:00:00");
+  return `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}`;
+};
+
+interface TaskCardProps {
+  task: Task;
+  colIdx: number;
+  isChild?: boolean;
+  currentUser: any;
+  activeProject: any;
+  isSelected: boolean;
+  isDragging: boolean;
+  showLabelText: boolean;
+  onToggleLabelText: () => void;
+  onTaskClick: (task: Task) => void;
+  toggleSelect: (id: string, e: React.MouseEvent) => void;
+  taskDragStart: (e: React.DragEvent, task: Task) => void;
+  taskDragEnd: (e: React.DragEvent) => void;
+  subtasks: any[];
+}
+
+const TaskCard = memo(({
+  task,
+  colIdx,
+  isChild,
+  currentUser,
+  activeProject,
+  isSelected,
+  isDragging,
+  showLabelText,
+  onToggleLabelText,
+  onTaskClick,
+  toggleSelect,
+  taskDragStart,
+  taskDragEnd,
+  subtasks,
+}: TaskCardProps) => {
+  const tm = TICKET_TYPES[task.ticketType || "task"] || TICKET_TYPES.task;
+  const pri = PRI_CONFIG[task.priority];
+  const overdue = isOverdue(task.dueDate, task.status);
+
+  return (
+    <div
+      draggable={canDragTask(currentUser, task, activeProject)}
+      onDragStart={e => { 
+        e.stopPropagation();
+        if (!canDragTask(currentUser, task, activeProject)) { e.preventDefault(); return; } 
+        taskDragStart(e, task); 
+      }}
+      onDragEnd={taskDragEnd}
+      onClick={() => onTaskClick(task)}
+      className={`rounded-xl border cursor-pointer group/card transition-all duration-150 ${isChild ? "mx-2 my-1.5" : "mx-2 my-2"}`}
+      style={{
+        background: isSelected ? "#eff6ff" : "#fff",
+        borderColor: isSelected ? "#6366f1" : overdue ? "#fca5a5" : "#e5e7eb",
+        borderWidth: isSelected ? "2px" : "1px",
+        boxShadow: isDragging ? "0 16px 40px rgba(0,0,0,0.2)" : "0 1px 4px rgba(0,0,0,0.06)",
+        transform: isDragging ? "scale(1.04) rotate(1deg)" : "scale(1)",
+        borderLeft: `3px solid ${tm.color}`,
+        opacity: isDragging ? 0.5 : 1,
+        cursor: canDragTask(currentUser, task, activeProject) ? "grab" : "default",
+      }}
+    >
+      {task.labels && task.labels.length > 0 && (
+        <div className="flex flex-wrap gap-1 px-3 pt-2">
+          {task.labels.map(label => {
+            const style = getLabelStyle(label.color);
+            return (
+              <div
+                key={label.id}
+                title={label.title}
+                onClick={e => { e.stopPropagation(); onToggleLabelText(); }}
+                className={`rounded-full shadow-sm transition-all flex items-center justify-center overflow-hidden cursor-pointer ${showLabelText ? "h-auto px-2 py-0.5" : "w-11 h-2"}`}
+                style={{ background: style.bg }}
+              >
+                 {showLabelText && (
+                   <span className="text-[9px] font-black uppercase tracking-tighter whitespace-nowrap" style={{ color: style.text }}>{label.title}</span>
+                 )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div className="px-3 pt-2 pb-2">
+        <div className="flex items-center gap-1.5 mb-2">
+          <div onClick={e => toggleSelect(task.id, e)}
+            className={`w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center transition cursor-pointer ${isSelected ? "bg-indigo-600 border-indigo-600" : "border-gray-300 bg-white"}`}>
+            {isSelected && <span className="text-white text-[8px] font-bold">✓</span>}
+          </div>
+          <span className="text-xs shrink-0">{tm.icon}</span>
+          <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded shrink-0" style={{ background: tm.bg, color: tm.color }}>{task.taskCode || "TSK-001"}</span>
+          <div className="flex-1" />
+          {pri && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: pri.bg, color: pri.text }}>{pri.label}</span>}
+        </div>
+        <p className="text-sm font-semibold text-gray-800 group-hover/card:text-indigo-700 transition leading-snug mb-2 line-clamp-2">{task.title}</p>
+        {task.description && <p className="text-[11px] text-gray-400 line-clamp-1 mb-2">{task.description}</p>}
+
+        {(() => {
+          if (subtasks.length === 0) return null;
+          const done = subtasks.filter(s => s.done).length;
+          const pct = Math.round((done / subtasks.length) * 100);
+          return (
+            <div className="mb-3 px-0.5">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">{done}/{subtasks.length} subtasks</span>
+                <span className="text-[9px] font-black text-indigo-600">{pct}%</span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-1 overflow-hidden border border-gray-50">
+                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: pct === 100 ? "#22c55e" : (activeProject?.color || "#6366f1") }} />
+              </div>
+            </div>
+          );
+        })()}
+        {task.tags && task.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {task.tags.slice(0, 2).map(tag => <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">#{tag}</span>)}
+            {task.tags.length > 2 && <span className="text-[10px] text-gray-400">+{task.tags.length - 2}</span>}
+          </div>
+        )}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            {task.assignedToName ? (
+              <div className="flex items-center gap-1.5 min-w-0">
+                <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0"
+                  style={{ background: avatarColor(cleanDisplayName(task.assignedToName)) }}>
+                  {avatarInitial(cleanDisplayName(task.assignedToName))}
+                </div>
+                <span className="text-[10px] font-semibold text-gray-600 truncate" style={{ maxWidth: "80px" }}>{cleanDisplayName(task.assignedToName)}</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <div className="w-5 h-5 rounded-full border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-300 text-[9px]">?</div>
+                <span className="text-[10px] text-gray-400">Unassigned</span>
+              </div>
+            )}
+            {formatDate(task.dueDate) && (
+              <span className={`text-[10px] font-medium shrink-0 ${overdue ? "text-red-500 font-bold" : "text-gray-400"}`}>
+                {overdue ? "⚡ " : ""}{formatDate(task.dueDate)}
+              </span>
+            )}
+          </div>
+          {task.estimatedHours && (
+            <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 ml-2 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">
+              <span>⏱</span>{task.estimatedHours}h
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+});
+TaskCard.displayName = "TaskCard";
+
+interface StoryCardProps {
+  story: Task;
+  colIdx: number;
+  columns: KanbanColumn[];
+  currentUser: any;
+  activeProject: any;
+  filteredTasks: Task[];
+  isSelected: boolean;
+  isCollapsed: boolean;
+  overdue: boolean;
+  dragTask: Task | null;
+  onTaskClick: (task: Task) => void;
+  toggleSelect: (id: string, e: React.MouseEvent) => void;
+  toggleStory: (id: string) => void;
+  canManage: boolean;
+  onCreateTask?: (storyId: string, type: TicketType) => void;
+  onOpenFloatingMenu: (storyId: string, rect: DOMRect) => void;
+  taskDragStart: (e: React.DragEvent, task: Task) => void;
+  taskDragEnd: (e: React.DragEvent) => void;
+  showLabelText: boolean;
+  onToggleLabelText: () => void;
+  subtasksByTaskId: Record<string, any[]>;
+}
+
+const StoryCard = memo(({
+  story,
+  colIdx,
+  columns,
+  currentUser,
+  activeProject,
+  filteredTasks,
+  isSelected,
+  isCollapsed,
+  overdue,
+  dragTask,
+  onTaskClick,
+  toggleSelect,
+  toggleStory,
+  canManage,
+  onCreateTask,
+  onOpenFloatingMenu,
+  taskDragStart,
+  taskDragEnd,
+  showLabelText,
+  onToggleLabelText,
+  subtasksByTaskId,
+}: StoryCardProps) => {
+  const allChildren = filteredTasks.filter(t => t.parentStoryId === story.id && t.ticketType !== "story");
+  const colChildren = allChildren.filter(t => t.status === columns[colIdx]?.id);
+  const doneCount = allChildren.filter(t => t.status === "done").length;
+  const pct = allChildren.length ? Math.round((doneCount / allChildren.length) * 100) : 0;
+  const pri = PRI_CONFIG[story.priority];
+
+  return (
+    <div className="mx-2 my-2 rounded-xl overflow-hidden transition-all duration-200"
+      style={{ background: isSelected ? "#eef2ff" : "#f5f3ff", border: `2px solid ${isSelected ? "#6366f1" : "#c4b5fd"}`, boxShadow: "0 2px 8px rgba(99,102,241,0.10)" }}>
+      <div
+        draggable={canDragTask(currentUser, story, activeProject)}
+        onDragStart={e => { 
+          e.stopPropagation();
+          if (!canDragTask(currentUser, story, activeProject)) { e.preventDefault(); return; } 
+          taskDragStart(e, story); 
+        }}
+        onDragEnd={taskDragEnd}
+        className="p-3" onClick={() => onTaskClick(story)}
+        style={{ cursor: canDragTask(currentUser, story, activeProject) ? "grab" : "default" }}
+      >
+        <div className="flex items-center gap-2 mb-2">
+          <div onClick={e => toggleSelect(story.id, e)}
+            className={`w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center transition cursor-pointer ${isSelected ? "bg-indigo-600 border-indigo-600" : "border-indigo-300 bg-white"}`}>
+            {isSelected && <span className="text-white text-[8px] font-bold">✓</span>}
+          </div>
+          <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded" style={{ background: "#ddd6fe", color: "#5b21b6" }}>{story.taskCode || "STR-001"}</span>
+          <span className="text-xs">📘</span>
+          <span className="text-[10px] font-bold text-indigo-400 bg-indigo-100 px-1.5 py-0.5 rounded-full">Story</span>
+          <div className="flex-1" />
+          {pri && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: pri.bg, color: pri.text }}>{pri.label}</span>}
+        </div>
+
+        {story.labels && story.labels.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {story.labels.map(label => {
+              const style = getLabelStyle(label.color);
+              return (
+                <div key={label.id} title={label.title} className="h-2 w-11 rounded-full shadow-sm" style={{ background: style.bg }} />
+              );
+            })}
+          </div>
+        )}
+
+        <p className="text-sm font-bold text-indigo-900 leading-snug mb-2 line-clamp-2">{story.title}</p>
+        {story.tags && story.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {story.tags.slice(0, 3).map(tag => <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-600 font-medium">#{tag}</span>)}
+          </div>
+        )}
+        <div className="mb-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] text-indigo-400 font-medium">{doneCount}/{allChildren.length} tasks</span>
+            <span className="text-[10px] font-bold text-indigo-600">{pct}%</span>
+          </div>
+          <div className="w-full bg-indigo-100 rounded-full h-1.5 overflow-hidden">
+            <div className="h-1.5 rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: pct === 100 ? "#22c55e" : "#6366f1" }} />
+          </div>
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            {story.assignedToName ? (
+              <div className="flex items-center gap-1.5 min-w-0">
+                <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0"
+                  style={{ background: avatarColor(cleanDisplayName(story.assignedToName)) }}>
+                  {avatarInitial(cleanDisplayName(story.assignedToName))}
+                </div>
+                <span className="text-[10px] font-semibold text-indigo-700 truncate" style={{ maxWidth: "90px" }}>{cleanDisplayName(story.assignedToName)}</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <div className="w-5 h-5 rounded-full border-2 border-dashed border-indigo-200 flex items-center justify-center text-indigo-300 text-[9px]">?</div>
+                <span className="text-[10px] text-indigo-300">Unassigned</span>
+              </div>
+            )}
+            {story.dueDate && <span className={`text-[10px] font-medium shrink-0 ${overdue ? "text-red-500" : "text-indigo-400"}`}>{overdue ? "⚠️ " : ""}{formatDate(story.dueDate)}</span>}
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button onClick={e => { e.stopPropagation(); toggleStory(story.id); }}
+              className="w-6 h-6 rounded-md bg-indigo-100 hover:bg-indigo-200 flex items-center justify-center text-indigo-600 transition text-[10px]">
+              {isCollapsed ? "▶" : "▼"}
+            </button>
+            {canManage && onCreateTask && (
+              <button onClick={e => { e.stopPropagation(); onOpenFloatingMenu(story.id, e.currentTarget.getBoundingClientRect()); }}
+                className="w-6 h-6 rounded-md bg-indigo-600 hover:bg-indigo-700 flex items-center justify-center text-white transition text-sm font-bold">+</button>
+            )}
+          </div>
+        </div>
+      </div>
+      {!isCollapsed && (
+        <div style={{ borderTop: "1px solid #ddd6fe", background: "#faf5ff" }}>
+          {colChildren.map(child => (
+            <TaskCard
+              key={child.id}
+              task={child}
+              colIdx={colIdx}
+              isChild
+              currentUser={currentUser}
+              activeProject={activeProject}
+              isSelected={selectedTasks.has(child.id)}
+              isDragging={dragTask?.id === child.id}
+              showLabelText={showLabelText}
+              onToggleLabelText={onToggleLabelText}
+              onTaskClick={onTaskClick}
+              toggleSelect={toggleSelect}
+              taskDragStart={taskDragStart}
+              taskDragEnd={taskDragEnd}
+              subtasks={subtasksByTaskId[child.id] || []}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+});
+StoryCard.displayName = "StoryCard";
 
 /* ══════════════════════════════════════════════
    MAIN KANBAN BOARD
@@ -708,6 +1028,12 @@ export function KanbanBoard({
   const [editingColId, setEditingColId] = useState<string | null>(null);
   const [editingLabelVal, setEditingLabelVal] = useState("");
 
+  const onOpenFloatingMenu = useCallback((storyId: string, rect: DOMRect) => {
+    setFloatingMenu({ storyId, top: rect.bottom + 6, left: rect.left });
+  }, []);
+
+  const onToggleLabelText = useCallback(() => setShowLabelText(p => !p), []);
+
   const [activeColorKey, setActiveColorKey] = useState<string | null>(null);
 
   const [filters, setFilters] = useState<FilterState>({
@@ -735,14 +1061,6 @@ export function KanbanBoard({
   }, [isFullscreen, activeColorKey]);
 
   /* ── helpers ── */
-  const isOverdue = (dueDate?: string, status?: string) =>
-    !!dueDate && new Date(dueDate) < new Date() && status !== "done";
-
-  const formatDate = (d?: string) => {
-    if (!d) return null;
-    const dt = new Date(d + "T12:00:00");
-    return `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}`;
-  };
 
   const filteredTasks = useMemo(() => tasks.filter(t => {
     if (filters.mine && t.assignedTo !== currentUser?.uid) return false;
@@ -764,14 +1082,14 @@ export function KanbanBoard({
   }, [tasks, filteredTasks]);
   const orphans = filteredTasks.filter(t => t.ticketType !== "story" && !t.parentStoryId);
 
-  const toggleStory = (id: string) => setCollapsedStories(p => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; });
-  const toggleCol = (id: string) => setCollapsedCols(p => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; });
-  const toggleGroup = (key: string) => setCollapsedGroups(p => { const s = new Set(p); s.has(key) ? s.delete(key) : s.add(key); return s; });
-  const toggleSelect = (id: string, e: React.MouseEvent) => {
+  const toggleStory = useCallback((id: string) => setCollapsedStories(p => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; }), []);
+  const toggleCol = useCallback((id: string) => setCollapsedCols(p => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; }), []);
+  const toggleGroup = useCallback((key: string) => setCollapsedGroups(p => { const s = new Set(p); s.has(key) ? s.delete(key) : s.add(key); return s; }), []);
+  const toggleSelect = useCallback((id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedTasks(p => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; });
-  };
-  const clearSelection = () => setSelectedTasks(new Set());
+  }, []);
+  const clearSelection = useCallback(() => setSelectedTasks(new Set()), []);
 
   /* ── column actions ── */
   const handleRenameColumn = (id: string) => {
@@ -808,17 +1126,19 @@ export function KanbanBoard({
   };
 
   /* ── drag task ── */
-  const handleTaskDragStart = (e: React.DragEvent, task: Task) => {
+  const handleTaskDragStart = useCallback((e: React.DragEvent, task: Task) => {
     setDragTask(task);
     e.dataTransfer.effectAllowed = "move";
     const target = e.currentTarget as HTMLElement;
     setTimeout(() => { if (target) target.style.opacity = "0.4"; }, 0);
-  };
-  const handleTaskDragEnd = (e: React.DragEvent) => {
+  }, []);
+
+  const handleTaskDragEnd = useCallback((e: React.DragEvent) => {
     (e.currentTarget as HTMLElement).style.opacity = "1";
     setDragTask(null); setDragOver(null);
-  };
-  const handleTaskDrop = (e: React.DragEvent, colId: string, newParentId?: string | null) => {
+  }, []);
+
+  const handleTaskDrop = useCallback((e: React.DragEvent, colId: string, newParentId?: string | null) => {
     e.preventDefault();
     if (dragTask) {
       const statusChanged = dragTask.status !== colId;
@@ -832,236 +1152,20 @@ export function KanbanBoard({
       }
     }
     setDragTask(null); setDragOver(null);
-  };
+  }, [dragTask, currentUser, activeProject, onStatusChange]);
+
+  const subtasksByTaskId = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    allSubtasks.forEach(s => {
+      if (!map[s.taskId]) map[s.taskId] = [];
+      map[s.taskId].push(s);
+    });
+    return map;
+  }, [allSubtasks]);
 
   /* ── bulk ── */
   const handleBulkMove = (colId: string) => { selectedTasks.forEach(id => onStatusChange(id, colId)); clearSelection(); };
   const handleBulkDelete = () => { selectedTasks.forEach(id => onStatusChange(id, "__DELETE__")); clearSelection(); setConfirmDelete(null); };
-
-  /* ══ STORY CARD ══ */
-  const StoryCard = ({ story, colIdx }: { story: Task; colIdx: number }) => {
-    const isCollapsed = collapsedStories.has(story.id);
-    const allChildren = filteredTasks.filter(t => t.parentStoryId === story.id && t.ticketType !== "story");
-    const colChildren = allChildren.filter(t => t.status === columns[colIdx]?.id);
-    const doneCount = allChildren.filter(t => t.status === "done").length;
-    const pct = allChildren.length ? Math.round((doneCount / allChildren.length) * 100) : 0;
-    const pri = PRI_CONFIG[story.priority];
-    const isSelected = selectedTasks.has(story.id);
-    const overdue = isOverdue(story.dueDate, story.status);
-
-    return (
-      <div className="mx-2 my-2 rounded-xl overflow-hidden transition-all duration-200"
-        style={{ background: isSelected ? "#eef2ff" : "#f5f3ff", border: `2px solid ${isSelected ? "#6366f1" : "#c4b5fd"}`, boxShadow: "0 2px 8px rgba(99,102,241,0.10)" }}>
-        <div
-          draggable={canDragTask(currentUser, story, activeProject)}
-          onDragStart={e => { 
-            e.stopPropagation(); // Prevent bubbling to parent containers
-            if (!canDragTask(currentUser, story, activeProject)) { e.preventDefault(); return; } 
-            handleTaskDragStart(e, story); 
-          }}
-          onDragEnd={handleTaskDragEnd}
-          className="p-3" onClick={() => onTaskClick(story)}
-          style={{ cursor: canDragTask(currentUser, story, activeProject) ? "grab" : "default" }}
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <div onClick={e => toggleSelect(story.id, e)}
-              className={`w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center transition cursor-pointer ${isSelected ? "bg-indigo-600 border-indigo-600" : "border-indigo-300 bg-white"}`}>
-              {isSelected && <span className="text-white text-[8px] font-bold">✓</span>}
-            </div>
-            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded" style={{ background: "#ddd6fe", color: "#5b21b6" }}>{story.taskCode || "STR-001"}</span>
-            <span className="text-xs">📘</span>
-            <span className="text-[10px] font-bold text-indigo-400 bg-indigo-100 px-1.5 py-0.5 rounded-full">Story</span>
-            <div className="flex-1" />
-            {pri && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: pri.bg, color: pri.text }}>{pri.label}</span>}
-          </div>
-
-          {/* Labels for Story Card */}
-          {story.labels && story.labels.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-2">
-              {story.labels.map(label => {
-                const style = getLabelStyle(label.color);
-                return (
-                  <div key={label.id} title={label.title} className="h-2 w-11 rounded-full shadow-sm" style={{ background: style.bg }} />
-                );
-              })}
-            </div>
-          )}
-
-          <p className="text-sm font-bold text-indigo-900 leading-snug mb-2 line-clamp-2">{story.title}</p>
-          {story.tags && story.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-2">
-              {story.tags.slice(0, 3).map(tag => <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-600 font-medium">#{tag}</span>)}
-            </div>
-          )}
-          <div className="mb-2">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] text-indigo-400 font-medium">{doneCount}/{allChildren.length} tasks</span>
-              <span className="text-[10px] font-bold text-indigo-600">{pct}%</span>
-            </div>
-            <div className="w-full bg-indigo-100 rounded-full h-1.5 overflow-hidden">
-              <div className="h-1.5 rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: pct === 100 ? "#22c55e" : "#6366f1" }} />
-            </div>
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              {story.assignedToName ? (
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0"
-                    style={{ background: avatarColor(cleanDisplayName(story.assignedToName)) }}>
-                    {avatarInitial(cleanDisplayName(story.assignedToName))}
-                  </div>
-                  <span className="text-[10px] font-semibold text-indigo-700 truncate" style={{ maxWidth: "90px" }}>{cleanDisplayName(story.assignedToName)}</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5">
-                  <div className="w-5 h-5 rounded-full border-2 border-dashed border-indigo-200 flex items-center justify-center text-indigo-300 text-[9px]">?</div>
-                  <span className="text-[10px] text-indigo-300">Unassigned</span>
-                </div>
-              )}
-              {story.dueDate && <span className={`text-[10px] font-medium shrink-0 ${overdue ? "text-red-500" : "text-indigo-400"}`}>{overdue ? "⚠️ " : ""}{formatDate(story.dueDate)}</span>}
-            </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button onClick={e => { e.stopPropagation(); toggleStory(story.id); }}
-                className="w-6 h-6 rounded-md bg-indigo-100 hover:bg-indigo-200 flex items-center justify-center text-indigo-600 transition text-[10px]">
-                {isCollapsed ? "▶" : "▼"}
-              </button>
-              {canManage && onCreateTask && (
-                <button onClick={e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setFloatingMenu({ storyId: story.id, top: r.bottom + 6, left: r.left }); }}
-                  className="w-6 h-6 rounded-md bg-indigo-600 hover:bg-indigo-700 flex items-center justify-center text-white transition text-sm font-bold">+</button>
-              )}
-            </div>
-          </div>
-        </div>
-        {!isCollapsed && (
-          <div style={{ borderTop: "1px solid #ddd6fe", background: "#faf5ff" }}>
-            {colChildren.map(child => <TaskCard key={child.id} task={child} colIdx={colIdx} isChild />)}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  /* ══ TASK CARD ══ */
-  const TaskCard = ({ task, colIdx, isChild }: { task: Task; colIdx: number; isChild?: boolean }) => {
-    const tm = TICKET_TYPES[task.ticketType || "task"] || TICKET_TYPES.task;
-    const pri = PRI_CONFIG[task.priority];
-    const isSelected = selectedTasks.has(task.id);
-    const isDragging = dragTask?.id === task.id;
-    const overdue = isOverdue(task.dueDate, task.status);
-
-    return (
-      <div
-        draggable={canDragTask(currentUser, task, activeProject)}
-        onDragStart={e => { 
-          e.stopPropagation(); // Ensure we only drag the task, not the story header
-          if (!canDragTask(currentUser, task, activeProject)) { e.preventDefault(); return; } 
-          handleTaskDragStart(e, task); 
-        }}
-        onDragEnd={handleTaskDragEnd}
-        onClick={() => onTaskClick(task)}
-        className={`rounded-xl border cursor-pointer group/card transition-all duration-150 ${isChild ? "mx-2 my-1.5" : "mx-2 my-2"}`}
-        style={{
-          background: isSelected ? "#eff6ff" : "#fff",
-          borderColor: isSelected ? "#6366f1" : overdue ? "#fca5a5" : "#e5e7eb",
-          borderWidth: isSelected ? "2px" : "1px",
-          boxShadow: isDragging ? "0 16px 40px rgba(0,0,0,0.2)" : "0 1px 4px rgba(0,0,0,0.06)",
-          transform: isDragging ? "scale(1.04) rotate(1deg)" : "scale(1)",
-          borderLeft: `3px solid ${tm.color}`,
-          opacity: isDragging ? 0.5 : 1,
-          cursor: canDragTask(currentUser, task, activeProject) ? "grab" : "default",
-        }}
-      >
-        {/* Labels - Interactive Color Bars */}
-        {task.labels && task.labels.length > 0 && (
-          <div className="flex flex-wrap gap-1 px-3 pt-2">
-            {task.labels.map(label => {
-              const style = getLabelStyle(label.color);
-              return (
-                <div
-                  key={label.id}
-                  title={label.title}
-                  onClick={e => { e.stopPropagation(); setShowLabelText(!showLabelText); }}
-                  className={`rounded-full shadow-sm transition-all flex items-center justify-center overflow-hidden cursor-pointer ${showLabelText ? "h-auto px-2 py-0.5" : "w-11 h-2"}`}
-                  style={{ background: style.bg }}
-                >
-                   {showLabelText && (
-                     <span className="text-[9px] font-black uppercase tracking-tighter whitespace-nowrap" style={{ color: style.text }}>{label.title}</span>
-                   )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-        <div className="px-3 pt-2 pb-2">
-          <div className="flex items-center gap-1.5 mb-2">
-            <div onClick={e => toggleSelect(task.id, e)}
-              className={`w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center transition cursor-pointer ${isSelected ? "bg-indigo-600 border-indigo-600" : "border-gray-300 bg-white"}`}>
-              {isSelected && <span className="text-white text-[8px] font-bold">✓</span>}
-            </div>
-            <span className="text-xs shrink-0">{tm.icon}</span>
-            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded shrink-0" style={{ background: tm.bg, color: tm.color }}>{task.taskCode || "TSK-001"}</span>
-            <div className="flex-1" />
-            {pri && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: pri.bg, color: pri.text }}>{pri.label}</span>}
-          </div>
-          <p className="text-sm font-semibold text-gray-800 group-hover/card:text-indigo-700 transition leading-snug mb-2 line-clamp-2">{task.title}</p>
-          {task.description && <p className="text-[11px] text-gray-400 line-clamp-1 mb-2">{task.description}</p>}
-
-          {/* Subtask Progress */}
-          {(() => {
-            const taskSubs = allSubtasks.filter(s => s.taskId === task.id);
-            if (taskSubs.length === 0) return null;
-            const done = taskSubs.filter(s => s.done).length;
-            const pct = Math.round((done / taskSubs.length) * 100);
-            return (
-              <div className="mb-3 px-0.5">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">{done}/{taskSubs.length} subtasks</span>
-                  <span className="text-[9px] font-black text-indigo-600">{pct}%</span>
-                </div>
-                <div className="w-full bg-gray-100 rounded-full h-1 overflow-hidden border border-gray-50">
-                  <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: pct === 100 ? "#22c55e" : (activeProject?.color || "#6366f1") }} />
-                </div>
-              </div>
-            );
-          })()}
-          {task.tags && task.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-2">
-              {task.tags.slice(0, 2).map(tag => <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">#{tag}</span>)}
-              {task.tags.length > 2 && <span className="text-[10px] text-gray-400">+{task.tags.length - 2}</span>}
-            </div>
-          )}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              {task.assignedToName ? (
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0"
-                    style={{ background: avatarColor(cleanDisplayName(task.assignedToName)) }}>
-                    {avatarInitial(cleanDisplayName(task.assignedToName))}
-                  </div>
-                  <span className="text-[10px] font-semibold text-gray-600 truncate" style={{ maxWidth: "80px" }}>{cleanDisplayName(task.assignedToName)}</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5">
-                  <div className="w-5 h-5 rounded-full border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-300 text-[9px]">?</div>
-                  <span className="text-[10px] text-gray-400">Unassigned</span>
-                </div>
-              )}
-              {formatDate(task.dueDate) && (
-                <span className={`text-[10px] font-medium shrink-0 ${overdue ? "text-red-500 font-bold" : "text-gray-400"}`}>
-                  {overdue ? "⚡ " : ""}{formatDate(task.dueDate)}
-                </span>
-              )}
-            </div>
-            {task.estimatedHours && (
-              <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 ml-2 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">
-                <span>⏱</span>{task.estimatedHours}h
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   /* ══ TOOLBAR ══ */
   const renderToolbar = () => (
@@ -1451,8 +1555,50 @@ export function KanbanBoard({
                   scrollbarWidth: "thin",
                 }}
               >
-                {visibleStories.map(story => <StoryCard key={story.id} story={story} colIdx={i} />)}
-                {colOrphans.map(task => <TaskCard key={task.id} task={task} colIdx={i} />)}
+                {visibleStories.map(story => (
+                  <StoryCard
+                    key={story.id}
+                    story={story}
+                    colIdx={i}
+                    columns={columns}
+                    currentUser={currentUser}
+                    activeProject={activeProject}
+                    filteredTasks={filteredTasks}
+                    isSelected={selectedTasks.has(story.id)}
+                    isCollapsed={collapsedStories.has(story.id)}
+                    overdue={isOverdue(story.dueDate, story.status)}
+                    dragTask={dragTask}
+                    onTaskClick={onTaskClick}
+                    toggleSelect={toggleSelect}
+                    toggleStory={toggleStory}
+                    canManage={canManage}
+                    onCreateTask={onCreateTask}
+                    onOpenFloatingMenu={onOpenFloatingMenu}
+                    taskDragStart={handleTaskDragStart}
+                    taskDragEnd={handleTaskDragEnd}
+                    showLabelText={showLabelText}
+                    onToggleLabelText={onToggleLabelText}
+                    subtasksByTaskId={subtasksByTaskId}
+                  />
+                ))}
+                {colOrphans.map(task => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    colIdx={i}
+                    currentUser={currentUser}
+                    activeProject={activeProject}
+                    isSelected={selectedTasks.has(task.id)}
+                    isDragging={dragTask?.id === task.id}
+                    showLabelText={showLabelText}
+                    onToggleLabelText={onToggleLabelText}
+                    onTaskClick={onTaskClick}
+                    toggleSelect={toggleSelect}
+                    taskDragStart={handleTaskDragStart}
+                    taskDragEnd={handleTaskDragEnd}
+                    subtasks={subtasksByTaskId[task.id] || []}
+                  />
+                ))}
                 {visibleStories.length === 0 && colOrphans.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-10 gap-2 text-gray-300">
                     <div

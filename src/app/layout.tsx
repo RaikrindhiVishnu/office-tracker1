@@ -1,5 +1,6 @@
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
+import FcmInitializer from "@/components/FcmInitializer";
 import Script from "next/script";
 
 export default function RootLayout({
@@ -17,7 +18,10 @@ export default function RootLayout({
           strategy="afterInteractive"
         />
 
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <FcmInitializer />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

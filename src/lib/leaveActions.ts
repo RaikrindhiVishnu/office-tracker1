@@ -9,9 +9,12 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-import { notifyLeaveApproved, notifyLeaveRejected } from "@/lib/notifications";
+// Use direct push+email triggers instead of createNotification to avoid
+// duplicates — the leaveRequests status change already appears in the bell.
+import { triggerPushNotification, triggerEmailNotification } from "@/lib/notifications";
 
 import type { LeaveRequest, LeaveBalance, LeaveType } from "@/types/leave";
+
 
 // ── Leave type → balance key mapping ─────────────────────────────
 const BALANCE_KEY: Partial<Record<LeaveType, keyof LeaveBalance>> = {
@@ -64,12 +67,19 @@ export async function approveLeaveRequest(
       });
     });
 
-    // 🔔 Notification (outside transaction)
-    await notifyLeaveApproved(
+    // 🔔 Push + 📧 Email (no createNotification — avoids duplicate bell entry)
+    const dateRange = `${request.fromDate} - ${request.toDate}`;
+    triggerPushNotification(
       request.uid,
-      `${request.fromDate} - ${request.toDate}`,
-      request.id
-    );
+      "Leave Approved ✓",
+      `Your leave request for ${dateRange} has been approved.`
+    ).catch(console.error);
+    triggerEmailNotification(
+      request.uid,
+      "Leave Approved ✓",
+      `Your leave request for ${dateRange} has been approved.`,
+      "success"
+    ).catch(console.error);
 
     return { success: true };
   } catch (err: any) {
@@ -95,13 +105,19 @@ export async function rejectLeaveRequest(
       ...(reason ? { rejectionReason: reason } : {}),
     });
 
-    // 🔔 Notification
-    await notifyLeaveRejected(
+    // 🔔 Push + 📧 Email (no createNotification — avoids duplicate bell entry)
+    const dateRange = `${request.fromDate} - ${request.toDate}`;
+    triggerPushNotification(
       request.uid,
-      `${request.fromDate} - ${request.toDate}`,
-      reason || "Rejected by HR",
-      request.id
-    );
+      "Leave Request Rejected",
+      `Your leave for ${dateRange} was rejected. Reason: ${reason || "Rejected by HR"}`
+    ).catch(console.error);
+    triggerEmailNotification(
+      request.uid,
+      "Leave Request Rejected",
+      `Your leave for ${dateRange} was rejected. Reason: ${reason || "Rejected by HR"}`,
+      "error"
+    ).catch(console.error);
 
     return { success: true };
   } catch (err: any) {

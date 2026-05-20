@@ -1,10 +1,127 @@
 // src/lib/notifications.ts
 
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import {
   collection, addDoc, updateDoc, doc, writeBatch, getDocs,
-  query, where, orderBy, onSnapshot, serverTimestamp,
+  query, where, orderBy, onSnapshot, serverTimestamp, getDoc,
 } from "firebase/firestore";
+
+// ── Helper: send browser push notification ────────────────────────────────────
+export async function triggerPushNotification(
+  userId: string,
+  title: string,
+  body: string,
+  icon?: string,
+  data?: Record<string, string>
+): Promise<boolean> {
+  try {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      console.warn("[Push] No authenticated user found. Push notification skipped.");
+      return false;
+    }
+
+    const idToken = await currentUser.getIdToken();
+
+    const response = await fetch("/api/notifications/send-push", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({ userId, title, body, icon, data }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[Push] Failed to trigger push notification:", errorText);
+      return false;
+    }
+
+    const resData = await response.json();
+    return resData.success === true;
+  } catch (error) {
+    console.error("[Push] Error calling push notification API:", error);
+    return false;
+  }
+}
+
+// ── Helper: send email notification to the user's registered email ────────────
+export async function triggerEmailNotification(
+  userId: string,
+  title: string,
+  message: string,
+  type: "success" | "error" | "warning" | "info" = "info"
+): Promise<boolean> {
+  try {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      console.warn("[Email] No authenticated user found. Email notification skipped.");
+      return false;
+    }
+
+    // Fetch user email — try root path first, then company path
+    let userEmail: string | null = null;
+    let userName = "";
+
+    const rootSnap = await getDoc(doc(db, "users", userId));
+    if (rootSnap.exists()) {
+      userEmail = (rootSnap.data().email as string) || null;
+      userName  = (rootSnap.data().name as string) || "";
+    }
+
+    // Fallback: try companies/{companyId}/users/{userId}
+    if (!userEmail) {
+      // Get companyId from the current user's token claims
+      const tokenResult = await currentUser.getIdTokenResult();
+      const companyId   = tokenResult.claims.companyId as string | undefined;
+      if (companyId) {
+        const companySnap = await getDoc(
+          doc(db, "companies", companyId, "users", userId)
+        );
+        if (companySnap.exists()) {
+          userEmail = (companySnap.data().email as string) || null;
+          userName  = (companySnap.data().name as string) || "";
+        }
+      }
+    }
+
+    if (!userEmail) {
+      console.warn("[Email] No email found for user:", userId);
+      return false;
+    }
+
+    const idToken = await currentUser.getIdToken();
+
+    const response = await fetch("/api/notifications/send-email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({
+        toEmail: userEmail,
+        toName: userName,
+        title,
+        message,
+        type,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[Email] Failed to send email notification:", errorText);
+      return false;
+    }
+
+    const resData = await response.json();
+    return resData.success === true;
+  } catch (error) {
+    console.error("[Email] Error sending email notification:", error);
+    return false;
+  }
+}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -74,6 +191,17 @@ export async function createNotification(params: CreateNotificationParams): Prom
     relatedDocId: params.relatedDocId || "",
     createdAt: serverTimestamp(),
   });
+
+  // 🔔 Desktop push notification
+  triggerPushNotification(params.userId, params.title, params.message).catch(err => {
+    console.error("[Push] Error triggering push notification:", err);
+  });
+
+  // 📧 Email notification
+  triggerEmailNotification(params.userId, params.title, params.message, params.type).catch(err => {
+    console.error("[Email] Error triggering email notification:", err);
+  });
+
   return ref.id;
 }
 
@@ -97,7 +225,18 @@ export async function createNotificationForMany(
     });
   });
   await batch.commit();
+
+  // 🔔 Desktop push + 📧 Email for all users
+  userIds.forEach((userId) => {
+    triggerPushNotification(userId, params.title, params.message).catch(err => {
+      console.error(`[Push] Error triggering push notification for user ${userId}:`, err);
+    });
+    triggerEmailNotification(userId, params.title, params.message, params.type).catch(err => {
+      console.error(`[Email] Error triggering email notification for user ${userId}:`, err);
+    });
+  });
 }
+
 
 // ─── Mark single notification as read ────────────────────────────────────────
 export async function markNotificationRead(notificationId: string): Promise<void> {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect, useMemo, Fragment } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo, Fragment, memo } from "react";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { createPortal } from "react-dom";
@@ -69,13 +69,420 @@ interface FilterState {
   assignee: string;
 }
 
+interface TaskCardProps {
+  task: Task;
+  isChild?: boolean;
+  user: any;
+  activeProject: any;
+  currentUserId: string;
+  projectColor: string;
+  isSelected: boolean;
+  isDragging: boolean;
+  showLabelText: boolean;
+  onToggleLabelText: () => void;
+  onTaskClick: (task: Task) => void;
+  toggleSelect: (id: string, e: React.MouseEvent) => void;
+  handleDragStart: (e: React.DragEvent, task: Task) => void;
+  handleDragEnd: (e: React.DragEvent) => void;
+}
+
+const TaskCard = memo(({
+  task,
+  isChild = false,
+  user,
+  activeProject,
+  currentUserId,
+  projectColor,
+  isSelected,
+  isDragging,
+  showLabelText,
+  onToggleLabelText,
+  onTaskClick,
+  toggleSelect,
+  handleDragStart,
+  handleDragEnd,
+}: TaskCardProps) => {
+  const tm = TYPE_META[task.ticketType || "task"] || TYPE_META.task;
+  const pri = PRI_CONFIG[task.priority];
+  const ovd = isOverdue(task.dueDate, task.status);
+  const dueFmt = formatDate(task.dueDate);
+  const mine = task.assignedTo === currentUserId;
+  const draggable = canMoveTask(user, task, activeProject);
+  const name = cleanName(task.assignedToName);
+
+  return (
+    <div
+      draggable={draggable}
+      onDragStart={e => { if (!draggable) { e.preventDefault(); return; } handleDragStart(e, task); }}
+      onDragEnd={handleDragEnd}
+      onClick={e => {
+        if (e.shiftKey) { toggleSelect(task.id, e); return; }
+        onTaskClick(task);
+      }}
+      style={{
+        background: isSelected ? "#eff6ff" : "#ffffff",
+        border: `1px solid ${isSelected ? "#6366f1" : ovd ? "#fca5a5" : "#e5e7eb"}`,
+        borderLeft: `3px solid ${tm.color}`,
+        borderRadius: "10px",
+        padding: "10px 10px 8px",
+        cursor: draggable ? "grab" : "default",
+        opacity: isDragging ? 0.35 : 1,
+        transform: isDragging ? "scale(0.97)" : "scale(1)",
+        transition: "box-shadow 0.15s, border-color 0.15s, transform 0.15s",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+        position: "relative",
+        display: "block",
+        minWidth: 0,
+        boxSizing: "border-box",
+        flexShrink: 0,
+      }}
+      onMouseEnter={e => { if (!isDragging) (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)"; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 3px rgba(0,0,0,0.06)"; }}
+    >
+      {/* Labels - Interactive Color Bars */}
+      {task.labels && task.labels.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", padding: "8px 12px 2px" }}>
+          {task.labels.map(label => {
+            const style = getLabelStyle(label.color);
+            return (
+              <div
+                key={label.id}
+                title={label.title}
+                onClick={e => { e.stopPropagation(); onToggleLabelText(); }}
+                style={{ 
+                  height: showLabelText ? "auto" : "8px", 
+                  width: showLabelText ? "auto" : "44px", 
+                  padding: showLabelText ? "2px 8px" : "0",
+                  borderRadius: "100px", 
+                  background: style.bg, 
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease-in-out",
+                  overflow: "hidden"
+                }}
+              >
+                {showLabelText && (
+                  <span style={{ fontSize: "9px", fontWeight: 900, color: style.text, textTransform: "uppercase", letterSpacing: "0.02em", whiteSpace: "nowrap" }}>
+                    {label.title}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div style={{ padding: task.labels?.length ? "4px 12px 10px" : "10px 12px 10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "7px", minWidth: 0 }}>
+          <div
+            onClick={e => toggleSelect(task.id, e)}
+            style={{
+              width: "14px", height: "14px", borderRadius: "3px",
+              border: `1.5px solid ${isSelected ? "#6366f1" : "#d1d5db"}`,
+              background: isSelected ? "#6366f1" : "#fff",
+              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0, transition: "all 0.15s",
+            }}
+          >
+            {isSelected && <span style={{ color: "white", fontSize: "8px", fontWeight: 700, lineHeight: 1 }}>✓</span>}
+          </div>
+          <span style={{ fontSize: "10px", fontFamily: "monospace", fontWeight: 700, padding: "1px 5px", borderRadius: "4px", background: tm.bg, color: tm.color, flexShrink: 0 }}>
+            {task.taskCode || "TSK"}
+          </span>
+          <span style={{ fontSize: "12px", flexShrink: 0 }}>{tm.icon}</span>
+          {mine && (
+            <span style={{ fontSize: "9px", fontWeight: 800, padding: "1px 5px", borderRadius: "100px", background: projectColor + "20", color: projectColor, flexShrink: 0 }}>You</span>
+          )}
+          <div style={{ flex: 1, minWidth: 0 }} />
+          {pri && (
+            <div style={{ display: "flex", alignItems: "center", gap: "3px", flexShrink: 0 }}>
+              <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: pri.dot }} />
+              <span style={{ fontSize: "10px", color: pri.text, fontWeight: 600 }}>{pri.label}</span>
+            </div>
+          )}
+        </div>
+        <p style={{ fontSize: "13px", fontWeight: 600, color: "#1f2937", lineHeight: 1.4, marginBottom: "5px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          {task.title}
+        </p>
+        {task.description && (
+          <p style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "5px", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+            {task.description}
+          </p>
+        )}
+        {task.tags && task.tags.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginBottom: "6px" }}>
+            {task.tags.slice(0, 3).map(tag => (
+              <span key={tag} style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "100px", background: "#f3f4f6", color: "#6b7280", fontWeight: 500 }}>#{tag}</span>
+            ))}
+            {task.tags.length > 3 && <span style={{ fontSize: "10px", color: "#9ca3af" }}>+{task.tags.length - 3}</span>}
+          </div>
+        )}
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, overflow: "hidden" }}>
+          {task.assignedToName ? (
+            <>
+              <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: avatarColor(name), display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "9px", fontWeight: 700, flexShrink: 0 }} title={name}>
+                {avatarInitial(name)}
+              </div>
+              <span style={{ fontSize: "11px", color: "#4b5563", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{name}</span>
+            </>
+          ) : (
+            <>
+              <div style={{ width: "20px", height: "20px", borderRadius: "50%", border: "1.5px dashed #d1d5db", display: "flex", alignItems: "center", justifyContent: "center", color: "#d1d5db", fontSize: "9px", flexShrink: 0 }}>?</div>
+              <span style={{ fontSize: "11px", color: "#d1d5db", flex: 1, minWidth: 0 }}>Unassigned</span>
+            </>
+          )}
+          {dueFmt && (
+            <span style={{ fontSize: "10px", fontWeight: ovd ? 700 : 500, color: ovd ? "#ef4444" : "#9ca3af", flexShrink: 0 }}>
+              {ovd ? "⚡ " : ""}{dueFmt}
+            </span>
+          )}
+          {task.storyPoints ? (
+            <span style={{ fontSize: "10px", padding: "1px 5px", borderRadius: "100px", background: "#f3f4f6", color: "#6b7280", flexShrink: 0 }}>{task.storyPoints}sp</span>
+          ) : null}
+          {task.estimatedHours ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "3px", flexShrink: 0 }}>
+              <div style={{ width: "32px", height: "3px", borderRadius: "3px", background: "#f3f4f6", overflow: "hidden" }}>
+                <div style={{ height: "3px", borderRadius: "3px", background: "#6366f1", width: `${Math.min(((task.actualHours || 0) / task.estimatedHours) * 100, 100)}%` }} />
+              </div>
+              <span style={{ fontSize: "10px", color: "#9ca3af" }}>{task.actualHours || 0}h</span>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+});
+TaskCard.displayName = "TaskCard";
+
+interface StoryCardProps {
+  story: Task;
+  colId: string;
+  isCollapsed: boolean;
+  allChildren: Task[];
+  colChildren: Task[];
+  isSelected: boolean;
+  isDragging: boolean;
+  currentUserId: string;
+  projectColor: string;
+  user: any;
+  activeProject: any;
+  permissions: any;
+  showLabelText: boolean;
+  onToggleLabelText: () => void;
+  onTaskClick: (task: Task) => void;
+  toggleSelect: (id: string, e: React.MouseEvent) => void;
+  toggleStory: (id: string, colId: string) => void;
+  onOpenStoryPopup: (storyId: string, rect: DOMRect) => void;
+  handleDragStart: (e: React.DragEvent, task: Task) => void;
+  handleDragEnd: (e: React.DragEvent) => void;
+}
+
+const StoryCard = memo(({
+  story,
+  colId,
+  isCollapsed,
+  allChildren,
+  colChildren,
+  isSelected,
+  isDragging,
+  currentUserId,
+  projectColor,
+  user,
+  activeProject,
+  permissions,
+  showLabelText,
+  onToggleLabelText,
+  onTaskClick,
+  toggleSelect,
+  toggleStory,
+  onOpenStoryPopup,
+  handleDragStart,
+  handleDragEnd,
+}: StoryCardProps) => {
+  const doneCount = allChildren.filter(t => t.status === "done").length;
+  const pct = allChildren.length ? Math.round((doneCount / allChildren.length) * 100) : 0;
+  const pri = PRI_CONFIG[story.priority];
+  const ovd = isOverdue(story.dueDate, story.status);
+  const mine = story.assignedTo === currentUserId;
+  const draggable = canMoveTask(user, story, activeProject);
+  const name = cleanName(story.assignedToName);
+
+  return (
+    <div style={{
+      borderRadius: "10px",
+      overflow: "hidden",
+      border: `${isSelected ? "2px" : "1px"} solid ${isSelected ? "#6366f1" : "#ddd6fe"}`,
+      background: isSelected ? "#eef2ff" : "#faf8ff",
+      opacity: isDragging ? 0.35 : 1,
+      transition: "all 0.2s",
+      display: "block",
+      minWidth: 0,
+      boxSizing: "border-box",
+      flexShrink: 0,
+    }}>
+      <div
+        draggable={draggable}
+        onDragStart={e => { if (!draggable) { e.preventDefault(); return; } handleDragStart(e, story); }}
+        onDragEnd={handleDragEnd}
+        onClick={e => { if (e.shiftKey) { toggleSelect(story.id, e); return; } onTaskClick(story); }}
+        style={{ padding: "10px 10px 8px", cursor: draggable ? "grab" : "default", borderLeft: "3px solid #7c3aed" }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "7px", minWidth: 0 }}>
+          <div
+            onClick={e => toggleSelect(story.id, e)}
+            style={{ width: "14px", height: "14px", borderRadius: "3px", border: `1.5px solid ${isSelected ? "#6366f1" : "#c4b5fd"}`, background: isSelected ? "#6366f1" : "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+          >
+            {isSelected && <span style={{ color: "white", fontSize: "8px", fontWeight: 700 }}>✓</span>}
+          </div>
+          <span style={{ fontSize: "10px", fontFamily: "monospace", fontWeight: 700, padding: "1px 5px", borderRadius: "4px", background: "#ede9fe", color: "#5b21b6", flexShrink: 0 }}>
+            {story.taskCode || "STR"}
+          </span>
+          <span style={{ fontSize: "12px" }}>📘</span>
+          <span style={{ fontSize: "10px", fontWeight: 700, color: "#6d28d9", background: "#ede9fe", padding: "1px 6px", borderRadius: "100px" }}>Story</span>
+          {mine && <span style={{ fontSize: "9px", fontWeight: 800, padding: "1px 5px", borderRadius: "100px", background: projectColor + "20", color: projectColor }}>You</span>}
+          <div style={{ flex: 1, minWidth: 0 }} />
+          {pri && (
+            <div style={{ display: "flex", alignItems: "center", gap: "3px", flexShrink: 0 }}>
+              <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: pri.dot }} />
+              <span style={{ fontSize: "10px", color: pri.text, fontWeight: 600 }}>{pri.label}</span>
+            </div>
+          )}
+        </div>
+        <h3 style={{ fontSize: "14px", fontWeight: 800, color: "#312e81", lineHeight: 1.3, marginBottom: story.labels?.length ? "4px" : "8px" }}>{story.title}</h3>
+
+        {/* Labels for Story Card - Interactive */}
+        {story.labels && story.labels.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginBottom: "8px" }}>
+            {story.labels.map(label => {
+              const style = getLabelStyle(label.color);
+              return (
+                <div 
+                  key={label.id} 
+                  title={label.title} 
+                  onClick={e => { e.stopPropagation(); onToggleLabelText(); }}
+                  style={{ 
+                    height: showLabelText ? "auto" : "8px", 
+                    width: showLabelText ? "auto" : "44px", 
+                    padding: showLabelText ? "2px 8px" : "0",
+                    borderRadius: "100px", 
+                    background: style.bg,
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease-in-out",
+                    overflow: "hidden"
+                  }}
+                >
+                  {showLabelText && (
+                    <span style={{ fontSize: "9px", fontWeight: 900, color: style.text, textTransform: "uppercase", letterSpacing: "0.02em", whiteSpace: "nowrap" }}>
+                      {label.title}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {story.tags && story.tags.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginBottom: "6px" }}>
+            {story.tags.slice(0, 3).map(tag => (
+              <span key={tag} style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "100px", background: "#ede9fe", color: "#6d28d9", fontWeight: 500 }}>#{tag}</span>
+            ))}
+          </div>
+        )}
+        <div style={{ marginBottom: "7px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "#8b5cf6", marginBottom: "3px" }}>
+            <span>{doneCount}/{allChildren.length} tasks</span>
+            <span style={{ fontWeight: 700 }}>{pct}%</span>
+          </div>
+          <div style={{ height: "4px", background: "#ede9fe", borderRadius: "4px", overflow: "hidden" }}>
+            <div style={{ height: "4px", borderRadius: "4px", width: `${pct}%`, background: pct === 100 ? "#22c55e" : "#6366f1", transition: "width 0.4s" }} />
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
+          {story.assignedToName ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "5px", flex: 1, minWidth: 0 }}>
+              <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: avatarColor(name), display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "9px", fontWeight: 700, flexShrink: 0 }}>
+                {avatarInitial(name)}
+              </div>
+              <span style={{ fontSize: "10px", fontWeight: 600, color: "#5b21b6", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{name}</span>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: "5px", flex: 1, minWidth: 0 }}>
+              <div style={{ width: "20px", height: "20px", borderRadius: "50%", border: "1.5px dashed #c4b5fd", display: "flex", alignItems: "center", justifyContent: "center", color: "#c4b5fd", fontSize: "9px" }}>?</div>
+              <span style={{ fontSize: "10px", color: "#c4b5fd" }}>Unassigned</span>
+            </div>
+          )}
+          {story.dueDate && (
+            <span style={{ fontSize: "10px", color: ovd ? "#ef4444" : "#8b5cf6", fontWeight: ovd ? 700 : 500, marginRight: "6px", flexShrink: 0 }}>
+              {ovd ? "⚡ " : ""}{formatDate(story.dueDate)}
+            </span>
+          )}
+          <button
+            onClick={e => { e.stopPropagation(); toggleStory(story.id, colId); }}
+            style={{ width: "22px", height: "22px", borderRadius: "6px", border: "1px solid #ddd6fe", background: "#ede9fe", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", color: "#6d28d9", marginRight: "4px", flexShrink: 0 }}
+          >
+            {isCollapsed ? "▶" : "▼"}
+          </button>
+          {(permissions.isAdmin || permissions.isPM || permissions.canCreateTypes.length > 0) && (
+            <div style={{ position: "relative", flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  onOpenStoryPopup(story.id, e.currentTarget.getBoundingClientRect());
+                }}
+                style={{ width: "22px", height: "22px", borderRadius: "6px", border: "none", background: projectColor, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "14px", fontWeight: 700 }}
+              >+</button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Children */}
+      {!isCollapsed && (
+        <div style={{ borderTop: "1px solid #ddd6fe", background: "#faf5ff", padding: "4px 0" }}>
+          {colChildren.map(child => (
+            <div key={child.id} style={{ margin: "3px 6px 3px 12px" }}>
+              <TaskCard
+                task={child}
+                isChild
+                user={user}
+                activeProject={activeProject}
+                currentUserId={currentUserId}
+                projectColor={projectColor}
+                isSelected={isSelected}
+                isDragging={draggingId === child.id}
+                showLabelText={showLabelText}
+                onToggleLabelText={onToggleLabelText}
+                onTaskClick={onTaskClick}
+                toggleSelect={toggleSelect}
+                handleDragStart={handleDragStart}
+                handleDragEnd={handleDragEnd}
+              />
+            </div>
+          ))}
+          {colChildren.length === 0 && (
+            <p style={{ textAlign: "center", fontSize: "10px", color: "#c4b5fd", padding: "8px", fontStyle: "italic" }}>No items in this column</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+});
+StoryCard.displayName = "StoryCard";
+
 /* ── Swimlane layout constants ── */
 const SWIMLANE_COL_WIDTH = 240;  // px — card column width
 const SWIMLANE_LABEL_WIDTH = 160; // px — left group label column
 
 /* ══════════════════════════════════════════════
    KANBAN BOARD COMPONENT
-══════════════════════════════════════════════ */
+   ══════════════════════════════════════════════ */
 export function KanbanBoard({
   tasks,
   columns,
@@ -127,6 +534,12 @@ export function KanbanBoard({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [allSubtasks, setAllSubtasks] = useState<any[]>([]);
+
+  const onOpenStoryPopup = useCallback((storyId: string, rect: DOMRect) => {
+    setStoryPopup(prev => prev?.storyId === storyId ? null : { storyId, top: rect.bottom + 6, left: rect.left - 138 });
+  }, []);
+
+  const onToggleLabelText = useCallback(() => setShowLabelText(p => !p), []);
 
   useEffect(() => {
     if (!activeProject?.id) return;
@@ -208,21 +621,21 @@ export function KanbanBoard({
   const activeFiltersCount = [filters.mine, filters.overdue, !!filters.priority, !!filters.type, !!filters.assignee].filter(Boolean).length;
 
   /* ── Story toggle ── */
-  const toggleStory = (storyId: string, colId: string) => {
+  const toggleStory = useCallback((storyId: string, colId: string) => {
     const key = `${storyId}::${colId}`;
     setCollapsedStories(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s; });
-  };
+  }, []);
 
   /* ── KanbanColumn collapse ── */
-  const toggleCol = (colId: string) => {
+  const toggleCol = useCallback((colId: string) => {
     setCollapsedCols(prev => { const s = new Set(prev); s.has(colId) ? s.delete(colId) : s.add(colId); return s; });
-  };
+  }, []);
 
   /* ── Selection ── */
-  const toggleSelect = (id: string, e: React.MouseEvent) => {
+  const toggleSelect = useCallback((id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedTasks(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
-  };
+  }, []);
 
   const selectAll = (colId: string) => {
     const ids = colTasks(colId).map(t => t.id);
@@ -404,331 +817,7 @@ export function KanbanBoard({
     return [];
   }, [filteredTasks, groupBy]);
 
-  /* ══ TASK CARD ══ */
-  const renderTaskCard = (task: Task, isChild: boolean = false) => {
-    const tm = TYPE_META[task.ticketType || "task"] || TYPE_META.task;
-    const pri = PRI_CONFIG[task.priority];
-    const isSelected = selectedTasks.has(task.id);
-    const isDragging = draggingId === task.id;
-    const ovd = isOverdue(task.dueDate, task.status);
-    const dueFmt = formatDate(task.dueDate);
-    const mine = task.assignedTo === currentUserId;
-    const draggable = canMoveTask(user, task, activeProject);
-    const name = cleanName(task.assignedToName);
 
-    return (
-      <div
-        draggable={draggable}
-        onDragStart={e => { if (!draggable) { e.preventDefault(); return; } handleDragStart(e, task); }}
-        onDragEnd={handleDragEnd}
-        onClick={e => {
-          if (e.shiftKey) { toggleSelect(task.id, e); return; }
-          onTaskClick(task);
-        }}
-        style={{
-          background: isSelected ? "#eff6ff" : "#ffffff",
-          border: `1px solid ${isSelected ? "#6366f1" : ovd ? "#fca5a5" : "#e5e7eb"}`,
-          borderLeft: `3px solid ${tm.color}`,
-          borderRadius: "10px",
-          padding: "10px 10px 8px",
-          cursor: draggable ? "grab" : "default",
-          opacity: isDragging ? 0.35 : 1,
-          transform: isDragging ? "scale(0.97)" : "scale(1)",
-          transition: "box-shadow 0.15s, border-color 0.15s, transform 0.15s",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-          position: "relative",
-          display: "block",
-          minWidth: 0,
-          boxSizing: "border-box",
-          flexShrink: 0,
-        }}
-        onMouseEnter={e => { if (!isDragging) (e.currentTarget as HTMLElement).style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)"; }}
-        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 3px rgba(0,0,0,0.06)"; }}
-      >
-        {/* Labels - Interactive Color Bars */}
-        {task.labels && task.labels.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", padding: "8px 12px 2px" }}>
-            {task.labels.map(label => {
-              const style = getLabelStyle(label.color);
-              return (
-                <div
-                  key={label.id}
-                  title={label.title}
-                  onClick={e => { e.stopPropagation(); setShowLabelText(!showLabelText); }}
-                  style={{ 
-                    height: showLabelText ? "auto" : "8px", 
-                    width: showLabelText ? "auto" : "44px", 
-                    padding: showLabelText ? "2px 8px" : "0",
-                    borderRadius: "100px", 
-                    background: style.bg, 
-                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    transition: "all 0.15s ease-in-out",
-                    overflow: "hidden"
-                  }}
-                >
-                  {showLabelText && (
-                    <span style={{ fontSize: "9px", fontWeight: 900, color: style.text, textTransform: "uppercase", letterSpacing: "0.02em", whiteSpace: "nowrap" }}>
-                      {label.title}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-        <div style={{ padding: task.labels?.length ? "4px 12px 10px" : "10px 12px 10px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "7px", minWidth: 0 }}>
-            <div
-              onClick={e => toggleSelect(task.id, e)}
-              style={{
-                width: "14px", height: "14px", borderRadius: "3px",
-                border: `1.5px solid ${isSelected ? "#6366f1" : "#d1d5db"}`,
-                background: isSelected ? "#6366f1" : "#fff",
-                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                flexShrink: 0, transition: "all 0.15s",
-              }}
-            >
-              {isSelected && <span style={{ color: "white", fontSize: "8px", fontWeight: 700, lineHeight: 1 }}>✓</span>}
-            </div>
-            <span style={{ fontSize: "10px", fontFamily: "monospace", fontWeight: 700, padding: "1px 5px", borderRadius: "4px", background: tm.bg, color: tm.color, flexShrink: 0 }}>
-              {task.taskCode || "TSK"}
-            </span>
-            <span style={{ fontSize: "12px", flexShrink: 0 }}>{tm.icon}</span>
-            {mine && (
-              <span style={{ fontSize: "9px", fontWeight: 800, padding: "1px 5px", borderRadius: "100px", background: projectColor + "20", color: projectColor, flexShrink: 0 }}>You</span>
-            )}
-            <div style={{ flex: 1, minWidth: 0 }} />
-            {pri && (
-              <div style={{ display: "flex", alignItems: "center", gap: "3px", flexShrink: 0 }}>
-                <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: pri.dot }} />
-                <span style={{ fontSize: "10px", color: pri.text, fontWeight: 600 }}>{pri.label}</span>
-              </div>
-            )}
-          </div>
-          <p style={{ fontSize: "13px", fontWeight: 600, color: "#1f2937", lineHeight: 1.4, marginBottom: "5px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-            {task.title}
-          </p>
-          {task.description && (
-            <p style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "5px", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-              {task.description}
-            </p>
-          )}
-          {task.tags && task.tags.length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginBottom: "6px" }}>
-              {task.tags.slice(0, 3).map(tag => (
-                <span key={tag} style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "100px", background: "#f3f4f6", color: "#6b7280", fontWeight: 500 }}>#{tag}</span>
-              ))}
-              {task.tags.length > 3 && <span style={{ fontSize: "10px", color: "#9ca3af" }}>+{task.tags.length - 3}</span>}
-            </div>
-          )}
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, overflow: "hidden" }}>
-            {task.assignedToName ? (
-              <>
-                <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: avatarColor(name), display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "9px", fontWeight: 700, flexShrink: 0 }} title={name}>
-                  {avatarInitial(name)}
-                </div>
-                <span style={{ fontSize: "11px", color: "#4b5563", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{name}</span>
-              </>
-            ) : (
-              <>
-                <div style={{ width: "20px", height: "20px", borderRadius: "50%", border: "1.5px dashed #d1d5db", display: "flex", alignItems: "center", justifyContent: "center", color: "#d1d5db", fontSize: "9px", flexShrink: 0 }}>?</div>
-                <span style={{ fontSize: "11px", color: "#d1d5db", flex: 1, minWidth: 0 }}>Unassigned</span>
-              </>
-            )}
-            {dueFmt && (
-              <span style={{ fontSize: "10px", fontWeight: ovd ? 700 : 500, color: ovd ? "#ef4444" : "#9ca3af", flexShrink: 0 }}>
-                {ovd ? "⚡ " : ""}{dueFmt}
-              </span>
-            )}
-            {task.storyPoints ? (
-              <span style={{ fontSize: "10px", padding: "1px 5px", borderRadius: "100px", background: "#f3f4f6", color: "#6b7280", flexShrink: 0 }}>{task.storyPoints}sp</span>
-            ) : null}
-            {task.estimatedHours ? (
-              <div style={{ display: "flex", alignItems: "center", gap: "3px", flexShrink: 0 }}>
-                <div style={{ width: "32px", height: "3px", borderRadius: "3px", background: "#f3f4f6", overflow: "hidden" }}>
-                  <div style={{ height: "3px", borderRadius: "3px", background: "#6366f1", width: `${Math.min(((task.actualHours || 0) / task.estimatedHours) * 100, 100)}%` }} />
-                </div>
-                <span style={{ fontSize: "10px", color: "#9ca3af" }}>{task.actualHours || 0}h</span>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  /* ══ STORY CARD ══ */
-  const renderStoryCard = (story: Task, colId: string) => {
-    const key = `${story.id}::${colId}`;
-    const isCollapsed = collapsedStories.has(key);
-    const allChildren = localTasks.filter(t => t.parentStoryId === story.id && t.ticketType !== "story");
-    const colChildren = filteredTasks.filter(t => t.parentStoryId === story.id && t.status === colId && t.ticketType !== "story");
-    const doneCount = allChildren.filter(t => t.status === "done").length;
-    const pct = allChildren.length ? Math.round((doneCount / allChildren.length) * 100) : 0;
-    const pri = PRI_CONFIG[story.priority];
-    const isSelected = selectedTasks.has(story.id);
-    const ovd = isOverdue(story.dueDate, story.status);
-    const mine = story.assignedTo === currentUserId;
-    const draggable = canMoveTask(user, story, activeProject);
-    const name = cleanName(story.assignedToName);
-
-    return (
-      <div style={{
-        borderRadius: "10px",
-        overflow: "hidden",
-        border: `${isSelected ? "2px" : "1px"} solid ${isSelected ? "#6366f1" : "#ddd6fe"}`,
-        background: isSelected ? "#eef2ff" : "#faf8ff",
-        opacity: draggingId === story.id ? 0.35 : 1,
-        transition: "all 0.2s",
-        display: "block",
-        minWidth: 0,
-        boxSizing: "border-box",
-        flexShrink: 0,
-      }}>
-        <div
-          draggable={draggable}
-          onDragStart={e => { if (!draggable) { e.preventDefault(); return; } handleDragStart(e, story); }}
-          onDragEnd={handleDragEnd}
-          onClick={e => { if (e.shiftKey) { toggleSelect(story.id, e); return; } onTaskClick(story); }}
-          style={{ padding: "10px 10px 8px", cursor: draggable ? "grab" : "default", borderLeft: "3px solid #7c3aed" }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "7px", minWidth: 0 }}>
-            <div
-              onClick={e => toggleSelect(story.id, e)}
-              style={{ width: "14px", height: "14px", borderRadius: "3px", border: `1.5px solid ${isSelected ? "#6366f1" : "#c4b5fd"}`, background: isSelected ? "#6366f1" : "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
-            >
-              {isSelected && <span style={{ color: "white", fontSize: "8px", fontWeight: 700 }}>✓</span>}
-            </div>
-            <span style={{ fontSize: "10px", fontFamily: "monospace", fontWeight: 700, padding: "1px 5px", borderRadius: "4px", background: "#ede9fe", color: "#5b21b6", flexShrink: 0 }}>
-              {story.taskCode || "STR"}
-            </span>
-            <span style={{ fontSize: "12px" }}>📘</span>
-            <span style={{ fontSize: "10px", fontWeight: 700, color: "#6d28d9", background: "#ede9fe", padding: "1px 6px", borderRadius: "100px" }}>Story</span>
-            {mine && <span style={{ fontSize: "9px", fontWeight: 800, padding: "1px 5px", borderRadius: "100px", background: projectColor + "20", color: projectColor }}>You</span>}
-            <div style={{ flex: 1, minWidth: 0 }} />
-            {pri && (
-              <div style={{ display: "flex", alignItems: "center", gap: "3px", flexShrink: 0 }}>
-                <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: pri.dot }} />
-                <span style={{ fontSize: "10px", color: pri.text, fontWeight: 600 }}>{pri.label}</span>
-              </div>
-            )}
-          </div>
-          <h3 style={{ fontSize: "14px", fontWeight: 800, color: "#312e81", lineHeight: 1.3, marginBottom: story.labels?.length ? "4px" : "8px" }}>{story.title}</h3>
-
-          {/* Labels for Story Card - Interactive */}
-          {story.labels && story.labels.length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginBottom: "8px" }}>
-              {story.labels.map(label => {
-                const style = getLabelStyle(label.color);
-                return (
-                  <div 
-                    key={label.id} 
-                    title={label.title} 
-                    onClick={e => { e.stopPropagation(); setShowLabelText(!showLabelText); }}
-                    style={{ 
-                      height: showLabelText ? "auto" : "8px", 
-                      width: showLabelText ? "auto" : "44px", 
-                      padding: showLabelText ? "2px 8px" : "0",
-                      borderRadius: "100px", 
-                      background: style.bg,
-                      boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      cursor: "pointer",
-                      transition: "all 0.15s ease-in-out",
-                      overflow: "hidden"
-                    }}
-                  >
-                    {showLabelText && (
-                      <span style={{ fontSize: "9px", fontWeight: 900, color: style.text, textTransform: "uppercase", letterSpacing: "0.02em", whiteSpace: "nowrap" }}>
-                        {label.title}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {story.tags && story.tags.length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginBottom: "6px" }}>
-              {story.tags.slice(0, 3).map(tag => (
-                <span key={tag} style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "100px", background: "#ede9fe", color: "#6d28d9", fontWeight: 500 }}>#{tag}</span>
-              ))}
-            </div>
-          )}
-          <div style={{ marginBottom: "7px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "#8b5cf6", marginBottom: "3px" }}>
-              <span>{doneCount}/{allChildren.length} tasks</span>
-              <span style={{ fontWeight: 700 }}>{pct}%</span>
-            </div>
-            <div style={{ height: "4px", background: "#ede9fe", borderRadius: "4px", overflow: "hidden" }}>
-              <div style={{ height: "4px", borderRadius: "4px", width: `${pct}%`, background: pct === 100 ? "#22c55e" : "#6366f1", transition: "width 0.4s" }} />
-            </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
-            {story.assignedToName ? (
-              <div style={{ display: "flex", alignItems: "center", gap: "5px", flex: 1, minWidth: 0 }}>
-                <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: avatarColor(name), display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "9px", fontWeight: 700, flexShrink: 0 }}>
-                  {avatarInitial(name)}
-                </div>
-                <span style={{ fontSize: "10px", fontWeight: 600, color: "#5b21b6", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{name}</span>
-              </div>
-            ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: "5px", flex: 1, minWidth: 0 }}>
-                <div style={{ width: "20px", height: "20px", borderRadius: "50%", border: "1.5px dashed #c4b5fd", display: "flex", alignItems: "center", justifyContent: "center", color: "#c4b5fd", fontSize: "9px" }}>?</div>
-                <span style={{ fontSize: "10px", color: "#c4b5fd" }}>Unassigned</span>
-              </div>
-            )}
-            {story.dueDate && (
-              <span style={{ fontSize: "10px", color: ovd ? "#ef4444" : "#8b5cf6", fontWeight: ovd ? 700 : 500, marginRight: "6px", flexShrink: 0 }}>
-                {ovd ? "⚡ " : ""}{formatDate(story.dueDate)}
-              </span>
-            )}
-            <button
-              onClick={e => { e.stopPropagation(); toggleStory(story.id, colId); }}
-              style={{ width: "22px", height: "22px", borderRadius: "6px", border: "1px solid #ddd6fe", background: "#ede9fe", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", color: "#6d28d9", marginRight: "4px", flexShrink: 0 }}
-            >
-              {isCollapsed ? "▶" : "▼"}
-            </button>
-            {(isProjectManager || permissions.canCreateTypes.length > 0) && (
-
-              <div style={{ position: "relative", flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                <button
-                  onClick={e => {
-                    e.stopPropagation();
-                    const r = e.currentTarget.getBoundingClientRect();
-                    setStoryPopup(prev => prev?.storyId === story.id ? null : { storyId: story.id, top: r.bottom + 6, left: r.left - 138 });
-                  }}
-                  style={{ width: "22px", height: "22px", borderRadius: "6px", border: "none", background: projectColor, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "14px", fontWeight: 700 }}
-                >+</button>
-              </div>
-            )}
-
-          </div>
-        </div>
-
-        {/* Children */}
-        {!isCollapsed && (
-          <div style={{ borderTop: "1px solid #ddd6fe", background: "#faf5ff", padding: "4px 0" }}>
-            {colChildren.map(child => (
-              <div key={child.id} style={{ margin: "3px 6px 3px 12px" }}>
-                {renderTaskCard(child, true)}
-              </div>
-            ))}
-            {colChildren.length === 0 && (
-              <p style={{ textAlign: "center", fontSize: "10px", color: "#c4b5fd", padding: "8px", fontStyle: "italic" }}>No items in this column</p>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  };
 
   /* ══ COLUMN (board view) ══ */
   const renderKanbanColumn = (col: KanbanColumn, colIndex: number) => {
@@ -864,10 +953,47 @@ export function KanbanBoard({
           )}
 
           {visibleStories.map(story => (
-            <Fragment key={story.id}>{renderStoryCard(story, col.id)}</Fragment>
+            <StoryCard
+              key={story.id}
+              story={story}
+              colId={col.id}
+              isCollapsed={collapsedStories.has(`${story.id}::${col.id}`)}
+              allChildren={localTasks.filter(t => t.parentStoryId === story.id && t.ticketType !== "story")}
+              colChildren={filteredTasks.filter(t => t.parentStoryId === story.id && t.status === col.id && t.ticketType !== "story")}
+              isSelected={selectedTasks.has(story.id)}
+              isDragging={draggingId === story.id}
+              currentUserId={currentUserId}
+              projectColor={projectColor}
+              user={user}
+              activeProject={activeProject}
+              permissions={permissions}
+              showLabelText={showLabelText}
+              onToggleLabelText={onToggleLabelText}
+              onTaskClick={onTaskClick}
+              toggleSelect={toggleSelect}
+              toggleStory={toggleStory}
+              onOpenStoryPopup={onOpenStoryPopup}
+              handleDragStart={handleDragStart}
+              handleDragEnd={handleDragEnd}
+            />
           ))}
           {colOrphans.map(task => (
-            <Fragment key={task.id}>{renderTaskCard(task)}</Fragment>
+            <TaskCard
+              key={task.id}
+              task={task}
+              user={user}
+              activeProject={activeProject}
+              currentUserId={currentUserId}
+              projectColor={projectColor}
+              isSelected={selectedTasks.has(task.id)}
+              isDragging={draggingId === task.id}
+              showLabelText={showLabelText}
+              onToggleLabelText={onToggleLabelText}
+              onTaskClick={onTaskClick}
+              toggleSelect={toggleSelect}
+              handleDragStart={handleDragStart}
+              handleDragEnd={handleDragEnd}
+            />
           ))}
 
           {visibleStories.length === 0 && colOrphans.length === 0 && (
@@ -1146,7 +1272,21 @@ export function KanbanBoard({
                                   minWidth: 0,
                                 }}
                               >
-                                {renderTaskCard(t)}
+                                <TaskCard
+                                  task={t}
+                                  user={user}
+                                  activeProject={activeProject}
+                                  currentUserId={currentUserId}
+                                  projectColor={projectColor}
+                                  isSelected={selectedTasks.has(t.id)}
+                                  isDragging={draggingId === t.id}
+                                  showLabelText={showLabelText}
+                                  onToggleLabelText={onToggleLabelText}
+                                  onTaskClick={onTaskClick}
+                                  toggleSelect={toggleSelect}
+                                  handleDragStart={handleDragStart}
+                                  handleDragEnd={handleDragEnd}
+                                />
                               </div>
                             ))
                           )}

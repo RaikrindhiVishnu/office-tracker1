@@ -24,6 +24,7 @@ import {
   Timestamp, getDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { triggerPushNotification, triggerEmailNotification } from "@/lib/notifications";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -543,18 +544,24 @@ export default function AdminLeaveRequests() {
       }
 
       if (req.uid) {
-        await addDoc(collection(db, "notifications"), {
-          toUid: req.uid,
-          fromName: "HR Admin",
-          fromUid: "hr_system",
-          type: "leave_update",
-          message: newStatus === "Approved"
-            ? `Your ${req.leaveType ?? ""} leave (${req.fromDate} – ${req.toDate}) has been approved ✅`
-            : `Your ${req.leaveType ?? ""} leave (${req.fromDate} – ${req.toDate}) has been rejected ❌`,
-          chatId: "",
-          read: false,
-          timestamp: serverTimestamp(),
-        });
+        // 🔔 Push + 📧 Email — no addDoc to avoid duplicate bell entry
+        const dateRange = `${req.fromDate} – ${req.toDate}`;
+        const isApproved = newStatus === "Approved";
+        triggerPushNotification(
+          req.uid,
+          isApproved ? "Leave Approved ✓" : "Leave Request Rejected",
+          isApproved
+            ? `Your ${req.leaveType ?? ""} leave for ${dateRange} has been approved.`
+            : `Your ${req.leaveType ?? ""} leave for ${dateRange} has been rejected.`
+        ).catch(console.error);
+        triggerEmailNotification(
+          req.uid,
+          isApproved ? "Leave Approved ✓" : "Leave Request Rejected",
+          isApproved
+            ? `Your ${req.leaveType ?? ""} leave for ${dateRange} has been approved.`
+            : `Your ${req.leaveType ?? ""} leave for ${dateRange} has been rejected.`,
+          isApproved ? "success" : "error"
+        ).catch(console.error);
       }
     } catch (e) {
       console.error("Update error:", e);
