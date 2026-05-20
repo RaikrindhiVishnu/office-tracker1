@@ -6,13 +6,14 @@ import Image from "next/image";
 import NavbarBreakStatus from "@/components/NavbarBreakStatus";
 import {
   collection, onSnapshot, query, orderBy, addDoc, serverTimestamp,
-  where, updateDoc, doc, setDoc, writeBatch,
+  where, updateDoc, doc, setDoc, writeBatch, getDocs,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from "@/context/AuthContext";
 import { auth, db, storage } from "@/lib/firebase";
 import { checkIn, checkOut, getTodayAttendance } from "@/lib/attendance";
 import { saveDailyUpdate } from "@/lib/dailyUpdates";
+import { triggerEmailNotification } from "@/lib/notifications";
 import EmployeeAttendanceView from "./views/EmployeeAttendanceView";
 
 import CallHistory from "@/components/CallHistory";
@@ -390,6 +391,21 @@ export default function ZohoStyleEmployeeDashboard() {
         leaveType, fromDate, toDate, reason: leaveReason.trim(),
         status: "Pending", notificationRead: false, createdAt: serverTimestamp(),
       });
+
+      try {
+        const adminsSnapshot = await getDocs(query(collection(db, "users"), where("accountType", "==", "ADMIN")));
+        const adminEmails = adminsSnapshot.docs.map(d => d.data().email).filter(Boolean);
+        for (const adminEmail of adminEmails) {
+          triggerEmailNotification({
+            toEmail: adminEmail,
+            subject: `New Leave Request: ${user.email?.split("@")[0] || "Employee"}`,
+            body: `A new leave request has been submitted by ${user.email}:\n\nType: ${leaveType}\nFrom: ${fromDate}\nTo: ${toDate}\nReason: ${leaveReason.trim()}\n\nPlease review it in the Admin Dashboard.`
+          });
+        }
+      } catch (err) {
+        console.error("Failed to send admin email", err);
+      }
+
       setLeaveMsg("✅ Request submitted");
       setFromDate(""); setToDate(""); setLeaveReason(""); setLeaveType("casual");
       setTimeout(() => setLeaveMsg(""), 2000);
