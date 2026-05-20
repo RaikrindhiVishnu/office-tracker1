@@ -394,7 +394,7 @@ export default function ZohoStyleEmployeeDashboard() {
 
       try {
         const adminsSnapshot = await getDocs(query(collection(db, "users"), where("accountType", "==", "ADMIN")));
-        const adminsData = adminsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        const adminsData = adminsSnapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
         for (const admin of adminsData) {
           if (admin.email) {
             triggerEmailNotification(
