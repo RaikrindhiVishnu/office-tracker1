@@ -13,7 +13,7 @@ import { useAuth } from "@/context/AuthContext";
 import { auth, db, storage } from "@/lib/firebase";
 import { checkIn, checkOut, getTodayAttendance } from "@/lib/attendance";
 import { saveDailyUpdate } from "@/lib/dailyUpdates";
-import { triggerEmailNotification } from "@/lib/notifications";
+import { triggerEmailNotification, triggerWhatsAppNotification } from "@/lib/notifications";
 import EmployeeAttendanceView from "./views/EmployeeAttendanceView";
 
 import CallHistory from "@/components/CallHistory";
@@ -394,16 +394,19 @@ export default function ZohoStyleEmployeeDashboard() {
 
       try {
         const adminsSnapshot = await getDocs(query(collection(db, "users"), where("accountType", "==", "ADMIN")));
-        const adminEmails = adminsSnapshot.docs.map(d => d.data().email).filter(Boolean);
-        for (const adminEmail of adminEmails) {
-          triggerEmailNotification({
-            toEmail: adminEmail,
-            subject: `New Leave Request: ${user.email?.split("@")[0] || "Employee"}`,
-            body: `A new leave request has been submitted by ${user.email}:\n\nType: ${leaveType}\nFrom: ${fromDate}\nTo: ${toDate}\nReason: ${leaveReason.trim()}\n\nPlease review it in the Admin Dashboard.`
-          });
+        const adminsData = adminsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        for (const admin of adminsData) {
+          if (admin.email) {
+            triggerEmailNotification(
+              admin.id,
+              `New Leave Request: ${user.email?.split("@")[0] || "Employee"}`,
+              `A new leave request has been submitted by ${user.email}:\n\nType: ${leaveType}\nFrom: ${fromDate}\nTo: ${toDate}\nReason: ${leaveReason.trim()}\n\nPlease review it in the Admin Dashboard.`
+            );
+          }
+          triggerWhatsAppNotification(admin.id, `*New Leave Request: ${user.email?.split("@")[0] || "Employee"}*\n\nType: ${leaveType}\nFrom: ${fromDate}\nTo: ${toDate}\nReason: ${leaveReason.trim()}\n\nPlease review it in the Admin Dashboard.`);
         }
       } catch (err) {
-        console.error("Failed to send admin email", err);
+        console.error("Failed to send admin email/whatsapp", err);
       }
 
       setLeaveMsg("✅ Request submitted");

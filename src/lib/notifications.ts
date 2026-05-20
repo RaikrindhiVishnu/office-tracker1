@@ -122,6 +122,42 @@ export async function triggerEmailNotification(
   }
 }
 
+// ── Helper: send WhatsApp notification ────────────────────────────────────────
+export async function triggerWhatsAppNotification(
+  userId: string,
+  message: string
+): Promise<boolean> {
+  try {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      console.warn("[WhatsApp] No authenticated user found. WhatsApp skipped.");
+      return false;
+    }
+
+    const idToken = await currentUser.getIdToken();
+
+    const response = await fetch("/api/notifications/send-whatsapp", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({ userId, message }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[WhatsApp] Failed to send WhatsApp notification:", errorText);
+      return false;
+    }
+
+    const resData = await response.json();
+    return resData.success === true;
+  } catch (error) {
+    console.error("[WhatsApp] Error sending WhatsApp notification:", error);
+    return false;
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES
@@ -202,6 +238,11 @@ export async function createNotification(params: CreateNotificationParams): Prom
     console.error("[Email] Error triggering email notification:", err);
   });
 
+  // 📱 WhatsApp notification
+  triggerWhatsAppNotification(params.userId, `*${params.title}*\n${params.message}`).catch(err => {
+    console.error("[WhatsApp] Error triggering WhatsApp notification:", err);
+  });
+
   return ref.id;
 }
 
@@ -233,6 +274,9 @@ export async function createNotificationForMany(
     });
     triggerEmailNotification(userId, params.title, params.message, params.type).catch(err => {
       console.error(`[Email] Error triggering email notification for user ${userId}:`, err);
+    });
+    triggerWhatsAppNotification(userId, `*${params.title}*\n${params.message}`).catch(err => {
+      console.error(`[WhatsApp] Error triggering WhatsApp notification for user ${userId}:`, err);
     });
   });
 }
