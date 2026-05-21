@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
     const adminUsers = usersList.filter((u: any) => u.accountType === "ADMIN" && u.email);
     const adminRecipients = [
-      { id: "admin_custom", email: "officetracker@gmail.com", name: "Admin" },
+      { id: "admin_custom", email: "officetracker1@gmail.com", name: "Admin" },
       ...adminUsers.map((a: any) => ({ id: a.id, email: a.email, name: a.name || "Admin" }))
     ];
     

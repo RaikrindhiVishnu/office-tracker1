@@ -21,10 +21,6 @@
     {
       "path": "/api/scheduler/attendance-summary",
       "schedule": "30 5 * * *"
-    },
-    {
-      "path": "/api/scheduler/attendance-summary",
-      "schedule": "40 13 20 5 *"
     }
   ]
 }
