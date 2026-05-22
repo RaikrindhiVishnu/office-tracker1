@@ -792,13 +792,7 @@ const TaskCard = memo(({
             {task.tags.length > 2 && <span className="text-[10px] text-gray-400">+{task.tags.length - 2}</span>}
           </div>
         )}
-        {task.images && task.images.length > 0 && (
-          <div className="flex gap-1 mb-2 overflow-x-auto">
-            {task.images.map((img: any, i: number) => (
-              <img key={i} src={img.url} alt="Uploaded" className="h-8 w-8 object-cover rounded-md shrink-0 border border-gray-100" />
-            ))}
-          </div>
-        )}
+
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             {task.assignedToName ? (

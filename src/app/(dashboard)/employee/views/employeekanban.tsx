@@ -221,13 +221,7 @@ const TaskCard = memo(({
             {task.tags.length > 3 && <span style={{ fontSize: "10px", color: "#9ca3af" }}>+{task.tags.length - 3}</span>}
           </div>
         )}
-        {task.images && task.images.length > 0 && (
-          <div style={{ display: "flex", gap: "4px", marginBottom: "6px", overflowX: "auto" }}>
-            {task.images.map((img: any, i: number) => (
-              <img key={i} src={img.url} alt="Uploaded" style={{ height: "30px", width: "30px", objectFit: "cover", borderRadius: "4px", flexShrink: 0 }} />
-            ))}
-          </div>
-        )}
+
         <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, overflow: "hidden" }}>
           {task.assignedToName ? (
             <>
