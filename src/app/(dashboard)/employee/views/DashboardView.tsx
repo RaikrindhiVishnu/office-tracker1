@@ -863,7 +863,7 @@ function SessionsCard({ user, sessions, formatTime, formatTotal, totalWorked }: 
           {weeklyData.map(({ day, h, active }) => {
             const heightPx = Math.round((h / maxH) * 40);
             return (
-              <div key={day} style={{ flex: 1, textAlign: "center", position: "relative", group: "true" }} title={`${h} hours`}>
+              <div key={day} style={{ flex: 1, textAlign: "center", position: "relative" }} className="group" title={`${h} hours`}>
                 <div style={{ height: Math.max(heightPx, 18), background: active ? T.accent : T.accentLight, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: active ? "#fff" : T.accent, transition: "height 0.3s ease" }}>{h}h</div>
                 <div style={{ fontSize: 9, color: T.text3, marginTop: 3 }}>{day}</div>
               </div>
