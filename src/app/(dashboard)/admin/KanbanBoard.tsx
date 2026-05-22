@@ -5,6 +5,7 @@ import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { createPortal } from "react-dom";
 import { TaskLabel, LABEL_COLORS, TicketType, Task, KanbanColumn, getLabelStyle } from "@/lib/kanbanUtils";
+import { QuickImageUpload } from "./sprint";
 
 /* ─── TYPES ─── */
 export type ViewMode = "board" | "swimlane";
@@ -763,6 +764,7 @@ const TaskCard = memo(({
           <span className="text-xs shrink-0">{tm.icon}</span>
           <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded shrink-0" style={{ background: tm.bg, color: tm.color }}>{task.taskCode || "TSK-001"}</span>
           <div className="flex-1" />
+
           {pri && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: pri.bg, color: pri.text }}>{pri.label}</span>}
         </div>
         <p className="text-sm font-semibold text-gray-800 group-hover/card:text-indigo-700 transition leading-snug mb-2 line-clamp-2">{task.title}</p>
@@ -788,6 +790,13 @@ const TaskCard = memo(({
           <div className="flex flex-wrap gap-1 mb-2">
             {task.tags.slice(0, 2).map(tag => <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">#{tag}</span>)}
             {task.tags.length > 2 && <span className="text-[10px] text-gray-400">+{task.tags.length - 2}</span>}
+          </div>
+        )}
+        {task.images && task.images.length > 0 && (
+          <div className="flex gap-1 mb-2 overflow-x-auto">
+            {task.images.map((img: any, i: number) => (
+              <img key={i} src={img.url} alt="Uploaded" className="h-8 w-8 object-cover rounded-md shrink-0 border border-gray-100" />
+            ))}
           </div>
         )}
         <div className="flex items-center justify-between">

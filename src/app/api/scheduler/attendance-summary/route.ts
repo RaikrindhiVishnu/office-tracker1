@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebaseAdmin";
 import { sendBatch } from "@/lib/emailSender";
 
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   const auth = req.headers.get("Authorization");
-  if (auth !== `Bearer ${process.env.SCHEDULER_SECRET}`)
+  
+  // Vercel Cron automatically sends a Bearer token using CRON_SECRET, 
+  // but we also support the custom SCHEDULER_SECRET if configured.
+  const isValidCron = auth === `Bearer ${process.env.CRON_SECRET}` || auth === `Bearer ${process.env.SCHEDULER_SECRET}`;
+  
+  if (!isValidCron) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const db = adminDb;
   const todayISO = new Date().toISOString().slice(0, 10);
@@ -102,8 +108,4 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, ...report });
-}
-
-export async function GET() {
-  return NextResponse.json({ status: "Attendance scheduler active", time: new Date().toISOString() });
 }

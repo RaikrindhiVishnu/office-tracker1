@@ -775,6 +775,72 @@ interface TaskImagesProps {
   projectColor: string;
 }
 
+export function QuickImageUpload({ taskId, projectId, projectColor }: { taskId: string, projectId: string, projectColor: string }) {
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Only image files are allowed");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Max image size is 5MB");
+      return;
+    }
+    try {
+      setUploading(true);
+      const storageRef = ref(
+        storage,
+        `taskImages/${projectId}/${taskId}/${Date.now()}_${file.name}`
+      );
+      const snap = await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(snap.ref);
+      const image: TaskImage = {
+        url,
+        name: file.name,
+        uploadedBy: "",
+        uploadedAt: new Date().toISOString(),
+      };
+      await updateDoc(doc(db, "projectTasks", taskId), {
+        images: arrayUnion(image),
+      });
+      // Optionally show a toast, but an alert works for simplicity
+    } catch (err: any) {
+      alert(`Upload failed: ${err.message}`);
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  return (
+    <label 
+      onClick={(e) => e.stopPropagation()}
+      title="Upload Bug Image"
+      style={{
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "22px",
+        height: "22px",
+        borderRadius: "6px",
+        background: projectColor + "15",
+        color: projectColor,
+        fontSize: "12px",
+        flexShrink: 0,
+        opacity: uploading ? 0.5 : 1,
+        transition: "all 0.2s"
+      }}
+    >
+      {uploading ? "..." : "+🖼️"}
+      <input type="file" className="hidden" accept="image/*" onChange={handleUpload} disabled={uploading} />
+    </label>
+  );
+}
+
 export function TaskImages({
   taskId,
   projectId,

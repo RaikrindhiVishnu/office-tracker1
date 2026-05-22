@@ -3,12 +3,13 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   collection, query, where, orderBy, onSnapshot,
-  limit, getDocs, updateDoc, doc, addDoc, serverTimestamp,
+  limit, getDocs, updateDoc, doc, addDoc, serverTimestamp, getDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import NotificationsView from "./NotificationsView";
 import HelpView from "./HelpView";
+import OrgChart from "@/components/OrgChart";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Props = {
@@ -96,7 +97,7 @@ function avatarColors(name: string): [string, string] {
   return AVATAR_PALETTES[((name ?? "A").charCodeAt(0) - 65 + 26) % AVATAR_PALETTES.length];
 }
 
-function Avatar({ name, size = 36, photo }: { name: string; size?: number; photo?: string }) {
+export function Avatar({ name, size = 36, photo }: { name: string; size?: number; photo?: string }) {
   const [bg, fg] = avatarColors(name);
   if (photo)
     return (
@@ -564,7 +565,7 @@ function EmployeeDetailsCard({ user, isCheckedIn, totalSeconds, formatTotal }: {
   ];
 
   return (
-    <div style={{ ...CARD, padding: 0, display: "flex", flexDirection: "column" }}>
+    <div className="hover-card" style={{ ...CARD, padding: 0, display: "flex", flexDirection: "column" }}>
       {/* Profile header */}
       <div style={{ background: "linear-gradient(135deg, #f0f4ff 0%, #e8f0fb 100%)", padding: "24px 20px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 14 }}>
         <div style={{ width: 60, height: 60, borderRadius: 16, background: T.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 800, color: "#fff", flexShrink: 0, boxShadow: "0 8px 16px -4px rgba(0,113,227,0.3)", border: "2px solid #fff" }}>
@@ -637,7 +638,7 @@ function LeaveBalanceCard({ user, onApplyLeave, onMyLeaves }: { user: any; onApp
   };
 
   return (
-    <div style={{ ...CARD }}>
+    <div className="hover-card" style={{ ...CARD }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <span style={CARD_LABEL}>Leave Balance</span>
         <button
@@ -711,7 +712,7 @@ function HolidaysCard({ onViewAll }: { onViewAll: () => void }) {
   };
 
   return (
-    <div style={{ ...CARD }}>
+    <div className="hover-card" style={{ ...CARD }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
         <span style={CARD_LABEL}>Upcoming Holidays</span>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -751,17 +752,64 @@ function HolidaysCard({ onViewAll }: { onViewAll: () => void }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // CARD 4 — Sessions  (col 1, row 3)
 // ═══════════════════════════════════════════════════════════════════════════════
-function SessionsCard({ sessions, formatTime, formatTotal, totalWorked }: { sessions: any[]; formatTime: (ts: any) => string; formatTotal: (min?: number) => string; totalWorked: number }) {
+function SessionsCard({ user, sessions, formatTime, formatTotal, totalWorked }: { user: any; sessions: any[]; formatTime: (ts: any) => string; formatTotal: (min?: number) => string; totalWorked: number }) {
   const safe = sessions ?? [];
-  const WEEK = [
-    { day: "M", h: 7, active: false }, { day: "T", h: 8, active: false },
-    { day: "W", h: 6, active: false }, { day: "Th", h: 7, active: false },
-    { day: "F", h: Math.floor(totalWorked / 60) || 3, active: true },
-  ];
-  const maxH = Math.max(...WEEK.map((w) => w.h));
+  const [weeklyData, setWeeklyData] = useState<{ day: string; h: number; active: boolean }[]>([
+    { day: "M", h: 0, active: false }, { day: "T", h: 0, active: false },
+    { day: "W", h: 0, active: false }, { day: "Th", h: 0, active: false },
+    { day: "F", h: 0, active: false }
+  ]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const now = new Date();
+    const dayOfWeek = now.getDay() || 7;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - dayOfWeek + 1);
+
+    const dates = Array.from({ length: 5 }).map((_, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const date = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${date}`;
+    });
+
+    const fetches = dates.map(dateStr => 
+      getDoc(doc(db, "attendance", `${user.uid}_${dateStr}`))
+    );
+
+    Promise.all(fetches).then((snaps) => {
+      const labels = ["M", "T", "W", "Th", "F"];
+      const yNow = now.getFullYear();
+      const mNow = String(now.getMonth() + 1).padStart(2, "0");
+      const dNow = String(now.getDate()).padStart(2, "0");
+      const todayStr = `${yNow}-${mNow}-${dNow}`;
+
+      const newData = snaps.map((snap, i) => {
+        const isToday = dates[i] === todayStr;
+        let mins = 0;
+        if (snap.exists()) {
+          mins = snap.data().totalMinutes || 0;
+        }
+        if (isToday) {
+          mins = totalWorked; // Override with live today data
+        }
+        return {
+          day: labels[i],
+          h: parseFloat((mins / 60).toFixed(1)), // Keep 1 decimal place if needed
+          active: isToday,
+        };
+      });
+      setWeeklyData(newData);
+    }).catch(err => console.error("Weekly chart error:", err));
+  }, [user, totalWorked]);
+
+  const maxH = Math.max(...weeklyData.map((w) => w.h), 8); // At least 8 to scale well
 
   return (
-    <div style={{ ...CARD }}>
+    <div className="hover-card" style={{ ...CARD }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
         <span style={CARD_LABEL}>Today's Sessions</span>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -812,11 +860,11 @@ function SessionsCard({ sessions, formatTime, formatTotal, totalWorked }: { sess
       <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid rgba(0,0,0,0.05)` }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" as const, color: T.text3, marginBottom: 8 }}>This Week</div>
         <div style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
-          {WEEK.map(({ day, h, active }) => {
+          {weeklyData.map(({ day, h, active }) => {
             const heightPx = Math.round((h / maxH) * 40);
             return (
-              <div key={day} style={{ flex: 1, textAlign: "center" }}>
-                <div style={{ height: heightPx, background: active ? T.accent : T.accentLight, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: active ? "#fff" : T.accent }}>{h}h</div>
+              <div key={day} style={{ flex: 1, textAlign: "center", position: "relative", group: "true" }} title={`${h} hours`}>
+                <div style={{ height: Math.max(heightPx, 18), background: active ? T.accent : T.accentLight, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: active ? "#fff" : T.accent, transition: "height 0.3s ease" }}>{h}h</div>
                 <div style={{ fontSize: 9, color: T.text3, marginTop: 3 }}>{day}</div>
               </div>
             );
@@ -837,6 +885,7 @@ function EmployeeDirectoryCard() {
   const [loading, setLoading] = useState(true);
   const [hovered, setHovered] = useState<string | null>(null);
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
+  const [showOrgChart, setShowOrgChart] = useState(false);
 
   useEffect(() => {
     const todayStr = new Date().toISOString().split("T")[0];
@@ -870,7 +919,7 @@ function EmployeeDirectoryCard() {
 
 
   return (
-    <div style={{ ...CARD, padding: 0, overflow: "hidden" }}>
+    <div className="hover-card" style={{ ...CARD, padding: 0, overflow: "hidden" }}>
       {/* Header */}
       <div style={{ padding: "18px 20px 12px", borderBottom: `1px solid rgba(0,0,0,0.05)`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
@@ -881,19 +930,32 @@ function EmployeeDirectoryCard() {
             <span style={{ fontSize: 10, fontWeight: 700, color: T.red, background: T.redLight, padding: "2px 9px", borderRadius: 6 }}>● {employees.length - onlineCount} Offline</span>
           </div>
         </div>
-        {/* Search */}
-        <div style={{ position: "relative", width: 220 }}>
-          <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", width: 12, height: 12, color: T.text3, pointerEvents: "none" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="m21 21-4.35-4.35" />
-          </svg>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or role…"
-            style={{ width: "100%", height: 32, border: `1px solid rgba(0,0,0,0.1)`, borderRadius: 8, padding: "0 10px 0 28px", fontSize: 12, fontFamily: T.font, color: T.text, background: "#FAFAFA", outline: "none" }}
-          />
+        {/* Search & Org Chart */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button 
+            onClick={() => setShowOrgChart(true)}
+            style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, padding: "6px 12px", borderRadius: 8, background: T.accentLight, color: T.accent, border: "none", cursor: "pointer", fontFamily: T.font, boxShadow: "0 2px 4px rgba(0,0,0,0.02)", whiteSpace: "nowrap" }}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+            Org Chart
+          </button>
+          <div style={{ position: "relative", width: 200 }}>
+            <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", width: 12, height: 12, color: T.text3, pointerEvents: "none" }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="m21 21-4.35-4.35" />
+            </svg>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name or role…"
+              style={{ width: "100%", height: 32, border: `1px solid rgba(0,0,0,0.1)`, borderRadius: 8, padding: "0 10px 0 28px", fontSize: 12, fontFamily: T.font, color: T.text, background: "#FAFAFA", outline: "none" }}
+            />
+          </div>
         </div>
       </div>
+
+      {showOrgChart && <OrgChart employees={employees} onClose={() => setShowOrgChart(false)} />}
 
       {/* Grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12, maxHeight: 300, overflowY: "auto", padding: "4px" }}>
@@ -1034,7 +1096,7 @@ function MyProjectsCard({ user }: { user: any }) {
   };
 
   return (
-    <div style={{ ...CARD }}>
+    <div className="hover-card" style={{ ...CARD }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
         <span style={CARD_LABEL}>My Projects</span>
         {projects.length > 0 && (
@@ -1205,8 +1267,26 @@ export default function DashboardView({
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 2px; }
         input::placeholder, textarea::placeholder { color: #AEAEB2; }
-        @media (max-width: 768px) {
+        @media (max-width: 1024px) {
           .dashboard-grid { grid-template-columns: 1fr !important; }
+          .right-col-grid { grid-column: 1 / -1 !important; grid-template-columns: 1fr !important; }
+          .full-mobile-card { grid-column: 1 / -1 !important; }
+        }
+        .hover-card {
+          transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        .hover-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 20px 40px -12px rgba(0,0,0,0.15) !important;
+          z-index: 10;
+        }
+        button {
+          transition: all 0.2s ease;
+        }
+        button:not(:disabled):hover {
+          transform: translateY(-2px);
+          filter: brightness(1.05);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
       `}</style>
 
@@ -1246,13 +1326,13 @@ export default function DashboardView({
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <EmployeeDetailsCard user={user} isCheckedIn={isCheckedIn} totalSeconds={totalSeconds} formatTotal={formatTotal} />
-          <SessionsCard sessions={sessions} formatTime={formatTime} formatTotal={formatTotal} totalWorked={totalWorked} />
+          <SessionsCard user={user} sessions={sessions} formatTime={formatTime} formatTotal={formatTotal} totalWorked={totalWorked} />
         </div>
-        <div style={{ gridColumn: "2 / 4", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          <LeaveBalanceCard user={user} onApplyLeave={() => setActiveModal("applyLeave")} onMyLeaves={() => setActiveModal("myLeaves")} />
-          <HolidaysCard onViewAll={() => setActiveModal("holidays")} />
-          <div style={{ gridColumn: "1 / 3" }}><EmployeeDirectoryCard /></div>
-          <div style={{ gridColumn: "1 / 3" }}><MyProjectsCard user={user} /></div>
+        <div className="right-col-grid" style={{ gridColumn: "2 / 4", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <div className="full-mobile-card"><LeaveBalanceCard user={user} onApplyLeave={() => setActiveModal("applyLeave")} onMyLeaves={() => setActiveModal("myLeaves")} /></div>
+          <div className="full-mobile-card"><HolidaysCard onViewAll={() => setActiveModal("holidays")} /></div>
+          <div className="full-mobile-card" style={{ gridColumn: "1 / 3" }}><EmployeeDirectoryCard /></div>
+          <div className="full-mobile-card" style={{ gridColumn: "1 / 3" }}><MyProjectsCard user={user} /></div>
         </div>
       </div>
     </div>

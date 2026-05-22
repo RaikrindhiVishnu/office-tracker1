@@ -29,6 +29,7 @@ import {
   SprintFormModal,
   MoveToSprintModal,
   SprintReports,
+  TaskImages,
 } from "../../admin/sprint";
 
 // ── Import KanbanBoard + shared types/utils from the extracted file ──
@@ -1198,7 +1199,7 @@ function TaskDetailModal({
   tasks: Task[];
   onAddChildToStory: (story: Task, ticketType: TicketType) => void;
 }) {
-  const [taskTab, setTaskTab] = useState<"details" | "storytasks" | "subtasks" | "files" | "comments" | "worklogs" | "empsheet">("details");
+  const [taskTab, setTaskTab] = useState<"details" | "storytasks" | "subtasks" | "images" | "files" | "comments" | "worklogs" | "empsheet">("details");
   const [comments, setComments] = useState<any[]>([]);
   const [taskFiles, setTaskFiles] = useState<any[]>([]);
   const [subtasks, setSubtasks] = useState<any[]>([]);

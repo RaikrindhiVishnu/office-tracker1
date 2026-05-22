@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect, useMemo, Fragment, memo } from "react";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { QuickImageUpload } from "../../admin/sprint";
 import { createPortal } from "react-dom";
 import { Task, TaskLabel, TicketType, KanbanColumn, LABEL_COLORS, getPermissions, getColStyle, getLabelStyle } from "@/lib/kanbanUtils";
 
@@ -196,6 +197,7 @@ const TaskCard = memo(({
             <span style={{ fontSize: "9px", fontWeight: 800, padding: "1px 5px", borderRadius: "100px", background: projectColor + "20", color: projectColor, flexShrink: 0 }}>You</span>
           )}
           <div style={{ flex: 1, minWidth: 0 }} />
+
           {pri && (
             <div style={{ display: "flex", alignItems: "center", gap: "3px", flexShrink: 0 }}>
               <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: pri.dot }} />
@@ -217,6 +219,13 @@ const TaskCard = memo(({
               <span key={tag} style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "100px", background: "#f3f4f6", color: "#6b7280", fontWeight: 500 }}>#{tag}</span>
             ))}
             {task.tags.length > 3 && <span style={{ fontSize: "10px", color: "#9ca3af" }}>+{task.tags.length - 3}</span>}
+          </div>
+        )}
+        {task.images && task.images.length > 0 && (
+          <div style={{ display: "flex", gap: "4px", marginBottom: "6px", overflowX: "auto" }}>
+            {task.images.map((img: any, i: number) => (
+              <img key={i} src={img.url} alt="Uploaded" style={{ height: "30px", width: "30px", objectFit: "cover", borderRadius: "4px", flexShrink: 0 }} />
+            ))}
           </div>
         )}
         <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, overflow: "hidden" }}>

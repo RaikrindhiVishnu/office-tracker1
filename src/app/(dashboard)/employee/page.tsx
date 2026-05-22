@@ -523,9 +523,9 @@ export default function ZohoStyleEmployeeDashboard() {
     <div className="h-screen flex bg-white overflow-hidden">
 
       {/* ── SIDEBAR ── (unchanged) */}
-      <aside className={`fixed lg:static inset-y-0 left-0 z-50 bg-[#1a2e45] text-white flex flex-col transform transition-all duration-300 ${sidebarCollapsed ? "w-16" : "w-64"} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+      <aside className={`fixed lg:static inset-y-0 left-0 z-50 bg-[#1a2e45] text-white flex flex-col transform transition-all duration-300 ${sidebarCollapsed ? "lg:w-16 w-64" : "w-64"} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
         <div className="p-4 flex items-center justify-between border-b border-white/10">
-          {!sidebarCollapsed && (
+          {(!sidebarCollapsed || mobileMenuOpen) && (
             <div className="flex items-center gap-2 ml-2">
               <Image src="/logo.svg" alt="TGY CRM Logo" width={90} height={70} className="object-contain" />
             </div>
@@ -537,7 +537,7 @@ export default function ZohoStyleEmployeeDashboard() {
           </button>
           <button onClick={() => setMobileMenuOpen(false)} className="lg:hidden p-2 hover:bg-white/10 rounded-lg">×</button>
         </div>
-        {!sidebarCollapsed && (
+        {(!sidebarCollapsed || mobileMenuOpen) && (
           <div className="px-3 py-2.5 border-b border-white/10">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full overflow-hidden shadow-lg shrink-0">
@@ -568,23 +568,23 @@ export default function ZohoStyleEmployeeDashboard() {
             <button key={id} onClick={() => { changeView(id); setMobileMenuOpen(false); }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 relative group ${activeView === id ? "bg-white/20 text-white shadow-sm border border-white/20" : "text-white/75 hover:bg-white/8 hover:text-white"
                 }`}
-              title={sidebarCollapsed ? label : undefined}
+              title={(sidebarCollapsed && !mobileMenuOpen) ? label : undefined}
             >
               {activeView === id && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-400 rounded-r-full" />}
               <span className={`text-base shrink-0 transition-transform duration-150 ${activeView === id ? "scale-110" : "group-hover:scale-105"}`}>{icon}</span>
-              {!sidebarCollapsed && <span className="text-sm font-medium truncate">{label}</span>}
+              {(!sidebarCollapsed || mobileMenuOpen) && <span className="text-sm font-medium truncate">{label}</span>}
               {id === "notifications" && totalNotifications > 0 && (
-                sidebarCollapsed
+                (sidebarCollapsed && !mobileMenuOpen)
                   ? <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
                   : <span className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full font-semibold shrink-0">{totalNotifications}</span>
               )}
-              {sidebarCollapsed && (
+              {(sidebarCollapsed && !mobileMenuOpen) && (
                 <div className="absolute left-full ml-2 px-2.5 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 shadow-lg">{label}</div>
               )}
             </button>
           ))}
         </nav>
-        {!sidebarCollapsed ? (
+        {(!sidebarCollapsed || mobileMenuOpen) ? (
           <button onClick={async () => { await signOut(auth); router.push("/login"); }} className="mx-3 mb-3 flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 rounded-lg hover:bg-white/20 transition text-sm">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
             <span className="font-medium">Logout</span>
@@ -602,7 +602,7 @@ export default function ZohoStyleEmployeeDashboard() {
       <div className="flex-1 flex flex-col overflow-hidden">
 
         {/* ── HEADER ── */}
-        <header className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-4 lg:px-8 shrink-0 sticky top-0 z-40">
+        <header className="min-h-[64px] h-auto lg:h-16 bg-white border-b border-gray-100 flex items-center justify-between px-2 lg:px-8 shrink-0 sticky top-0 z-40">
           <div className="hidden lg:flex items-center justify-between w-full h-full">
             <div className="flex items-center min-w-0 shrink-0">
               <h1 className="text-lg font-bold capitalize flex items-center gap-2 whitespace-nowrap text-gray-900">
@@ -711,7 +711,7 @@ export default function ZohoStyleEmployeeDashboard() {
 
 
           {/* Mobile header */}
-          <div className="lg:hidden px-3 py-2 space-y-1.5">
+          <div className="lg:hidden w-full py-3 space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <button onClick={() => setMobileMenuOpen(true)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-all" aria-label="Open menu">

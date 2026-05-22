@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, setPersistence, browserLocalPersistence, browserSessionPersistence } from "firebase/auth";
 import {
   doc,
   getDoc,
@@ -108,6 +108,7 @@ export default function LoginPage() {
   const [step,       setStep]       = useState<string>("");
   // Add this state near the other useState declarations
 const [showPassword, setShowPassword] = useState<boolean>(false);
+const [rememberMe, setRememberMe] = useState<boolean>(false);
   // ── Sign In ─────────────────────────────────────────────────────────────
   const handleLogin = async (): Promise<void> => {
     if (!email.trim() || !password.trim()) {
@@ -124,6 +125,7 @@ const [showPassword, setShowPassword] = useState<boolean>(false);
 
       // STEP 1: Firebase Auth
       setStep("Verifying credentials...");
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
       const cred = await signInWithEmailAndPassword(
         auth,
         email.trim().toLowerCase(),
@@ -432,6 +434,20 @@ const department = (userData?.department ?? "").toString().trim().toUpperCase();
   </button>
 )}
 </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 4px" }}>
+            <input
+              type="checkbox"
+              id="rememberMe"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              disabled={loading}
+              style={{ cursor: "pointer", width: 16, height: 16, accentColor: "#143d3d" }}
+            />
+            <label htmlFor="rememberMe" style={{ fontSize: 13, color: "#475569", cursor: "pointer", userSelect: "none", fontWeight: 500 }}>
+              Remember me
+            </label>
+          </div>
 
           <button
             onClick={handleLogin}
