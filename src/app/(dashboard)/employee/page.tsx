@@ -303,8 +303,9 @@ export default function ZohoStyleEmployeeDashboard() {
   }, []);
 
   useEffect(() => {
-    return onSnapshot(query(collection(db, "users")),
-      snap => setUsers(snap.docs.map(d => ({ uid: d.id, ...(d.data() as any) }))));
+    getDocs(query(collection(db, "users"))).then(snap => {
+      setUsers(snap.docs.map(d => ({ uid: d.id, ...(d.data() as any) })));
+    });
   }, []);
 
   useEffect(() => {

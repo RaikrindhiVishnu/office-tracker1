@@ -896,14 +896,76 @@ export default function AdminProjectManagement({ user, projects, users }: { user
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !activeTask || !activeProject) return;
-    if (file.size > 10 * 1024 * 1024) { alert("Max 10MB"); return; }
+    
+    // Firestore has a strict 1MB limit. Base64 adds ~33% overhead.
+    // Max raw file size should be ~700KB.
+    if (!file.type.startsWith("image/") && file.size > 700 * 1024) { 
+      alert("Non-image files must be under 700KB to store in the database. Please use smaller files."); 
+      return; 
+    }
+
     try {
       setUploading(true);
-      const sr = ref(storage, `projectFiles/${activeProject.id}/${activeTask.id}/${Date.now()}_${file.name}`);
-      const snap = await uploadBytes(sr, file);
-      const url = await getDownloadURL(snap.ref);
-      await addDoc(collection(db, "taskFiles"), { taskId: activeTask.id, projectId: activeProject.id, fileName: file.name, fileUrl: url, uploadedBy: user.uid, uploadedByName: user.email?.split("@")[0], createdAt: serverTimestamp() });
-    } catch (err: any) { alert(`Upload failed: ${err.message}`); } finally { setUploading(false); }
+      const reader = new FileReader();
+
+      if (file.type.startsWith("image/")) {
+        reader.onload = (ev) => {
+          const img = new window.Image();
+          img.onload = async () => {
+            const canvas = document.createElement("canvas");
+            let { width, height } = img;
+            const MAX_DIM = 800; // compress large images
+            if (width > height && width > MAX_DIM) {
+              height *= MAX_DIM / width;
+              width = MAX_DIM;
+            } else if (height > MAX_DIM) {
+              width *= MAX_DIM / height;
+              height = MAX_DIM;
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            ctx?.drawImage(img, 0, 0, width, height);
+            
+            const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+            await addDoc(collection(db, "taskFiles"), {
+              taskId: activeTask.id,
+              projectId: activeProject.id,
+              fileName: file.name,
+              fileUrl: compressedBase64,
+              uploadedBy: user.uid,
+              uploadedByName: user.email?.split("@")[0],
+              createdAt: serverTimestamp(),
+            });
+            setUploading(false);
+          };
+          img.src = ev.target?.result as string;
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // Fallback for non-images
+        reader.onload = async (ev) => {
+          const base64 = ev.target?.result as string;
+          if (base64) {
+            await addDoc(collection(db, "taskFiles"), {
+              taskId: activeTask.id,
+              projectId: activeProject.id,
+              fileName: file.name,
+              fileUrl: base64,
+              uploadedBy: user.uid,
+              uploadedByName: user.email?.split("@")[0],
+              createdAt: serverTimestamp(),
+            });
+          }
+          setUploading(false);
+        };
+        reader.onerror = () => {
+          alert("Failed to read file.");
+          setUploading(false);
+        };
+        reader.readAsDataURL(file);
+      }
+    } catch (err: any) { alert(`Upload failed: ${err.message}`); setUploading(false); }
   };
 
   const handleAddSubtask = async () => {
@@ -1042,14 +1104,14 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                         className="inline-flex items-center px-2.5 py-1 rounded-lg bg-white/10 hover:bg-blue-500/30 text-white text-xs transition">✏️ Edit</button>
                     )}
                     <div className="mx-1">
-                      <LabelPicker 
-                        projectId={activeProject?.id || ""} 
-                        selectedLabels={activeTask.labels || []} 
+                      <LabelPicker
+                        projectId={activeProject?.id || ""}
+                        selectedLabels={activeTask.labels || []}
                         onChange={async (labels) => {
                           setActiveTask(prev => prev ? { ...prev, labels } : prev);
                           await updateDoc(doc(db, "projectTasks", activeTask.id), { labels });
                           setTasks(prev => prev.map(t => t.id === activeTask.id ? { ...t, labels } : t));
-                        }} 
+                        }}
                       />
                     </div>
                     {canManage && (
@@ -1084,7 +1146,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                   </div>
                 )}
                 <div className="flex flex-wrap items-center gap-2">
-                   {pc && <span className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-md" style={{ background: pc.bg, color: pc.color }}>{pc.icon} {activeTask.priority}</span>}
+                  {pc && <span className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-md" style={{ background: pc.bg, color: pc.color }}>{pc.icon} {activeTask.priority}</span>}
                   {activeTask.labels?.map(l => {
                     const lc = LABEL_COLORS[l.color] || LABEL_COLORS.green;
                     return <span key={l.id} className="text-[10px] px-2 py-0.5 rounded-md font-bold" style={{ background: lc.bg, color: lc.text }}>{l.title.toUpperCase()}</span>

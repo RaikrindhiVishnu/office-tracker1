@@ -426,8 +426,6 @@ export default function AdminPage() {
     loadUsers();
     loadMessages();
     loadLeaveRequests();
-    const i = setInterval(loadDashboard, 60000);
-    return () => clearInterval(i);
   }, [loading, user]);
 
   const doCheckIn = async () => { if (!user) return; setBusyAttendance(true); await checkIn(user.uid); await loadAdminAttendance(); setBusyAttendance(false); };

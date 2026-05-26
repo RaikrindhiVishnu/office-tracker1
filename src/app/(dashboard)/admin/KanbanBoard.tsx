@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo, memo, useCallback } from "react";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, updateDoc, arrayUnion } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { createPortal } from "react-dom";
 import { TaskLabel, LABEL_COLORS, TicketType, Task, KanbanColumn, getLabelStyle } from "@/lib/kanbanUtils";
@@ -476,6 +476,7 @@ export function TaskModal({
     parentStoryId: defaultStoryId || "",
     taskCode: getAutoCode(defaultTicketType || "task"),
     labels: [] as TaskLabel[],
+    imageUrl: "",
   });
   const [taskCodeManual, setTaskCodeManual] = useState(false);
 
@@ -490,6 +491,7 @@ export function TaskModal({
         tags: editingTask.tags?.join(",") || "", ticketType: editingTask.ticketType || "task",
         parentStoryId: editingTask.parentStoryId || "", taskCode: editingTask.taskCode || "",
         labels: editingTask.labels || [],
+        imageUrl: editingTask.imageUrl || "",
       });
     }
   }, [editingTask]);
@@ -647,6 +649,12 @@ export function TaskModal({
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" />
             </div>
           </div>
+          {f.imageUrl && (
+            <div className="mt-3">
+              <label className="text-xs font-medium text-gray-500 block mb-1">Attached Bug Image</label>
+              <img src={f.imageUrl} alt="Bug screenshot" className="w-full h-auto max-h-64 object-contain rounded-lg border border-gray-200 bg-gray-50" />
+            </div>
+          )}
           <div>
             <label className="text-xs font-medium text-gray-500 block mb-1">Tags <span className="text-gray-300">(comma-separated)</span></label>
             <input value={f.tags} onChange={e => setF({ ...f, tags: e.target.value })} placeholder="design, frontend, api"
@@ -713,6 +721,51 @@ const TaskCard = memo(({
   const pri = PRI_CONFIG[task.priority];
   const overdue = isOverdue(task.dueDate, task.status);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new window.Image();
+      img.onload = async () => {
+        const canvas = document.createElement("canvas");
+        let { width, height } = img;
+        const MAX_DIM = 800;
+        if (width > height && width > MAX_DIM) {
+          height *= MAX_DIM / width;
+          width = MAX_DIM;
+        } else if (height > MAX_DIM) {
+          width *= MAX_DIM / height;
+          height = MAX_DIM;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+        try {
+          const image = {
+            url: compressedBase64,
+            name: file.name,
+            uploadedBy: "",
+            uploadedAt: new Date().toISOString(),
+          };
+          await updateDoc(doc(db, "projectTasks", task.id), { 
+            images: arrayUnion(image),
+            imageUrl: compressedBase64 // Keep this for the details panel fallback if needed
+          });
+        } catch (err) {
+          console.error("Error uploading image:", err);
+        }
+      };
+      img.src = ev.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div
       draggable={canDragTask(currentUser, task, activeProject)}
@@ -763,6 +816,20 @@ const TaskCard = memo(({
           </div>
           <span className="text-xs shrink-0">{tm.icon}</span>
           <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded shrink-0" style={{ background: tm.bg, color: tm.color }}>{task.taskCode || "TSK-001"}</span>
+          
+          {task.ticketType === "bug" && (
+            <>
+              <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} onClick={(e) => e.stopPropagation()} />
+              <button 
+                onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }} 
+                className="w-5 h-5 flex items-center justify-center rounded-md bg-red-50 text-red-600 hover:bg-red-100 font-bold text-xs shrink-0 transition" 
+                title="Add Bug Image"
+              >
+                +
+              </button>
+            </>
+          )}
+
           <div className="flex-1" />
 
           {pri && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0" style={{ background: pri.bg, color: pri.text }}>{pri.label}</span>}

@@ -167,15 +167,15 @@ const TicketBadge = ({ type, size = "sm" }: { type?: TicketType; size?: "xs" | "
 };
 
 const sendNotification = async (toUid: string, type: string, title: string, message: string, projectId?: string, taskId?: string) => {
-  await addDoc(collection(db, "notifications"), { 
-    toUid, 
-    type, 
-    title, 
-    message, 
-    projectId: projectId ?? null, 
-    taskId: taskId ?? null, 
-    read: false, 
-    createdAt: serverTimestamp() 
+  await addDoc(collection(db, "notifications"), {
+    toUid,
+    type,
+    title,
+    message,
+    projectId: projectId ?? null,
+    taskId: taskId ?? null,
+    read: false,
+    createdAt: serverTimestamp()
   });
 };
 
@@ -295,7 +295,7 @@ function EditProjectModal({ open, onClose, project, users, onSaved }: {
         members: members,
         updatedAt: serverTimestamp(),
       });
-      
+
       // Notify NEW members
       const existingMembers = project.members || [];
       const newMembers = members.filter((m: string) => !existingMembers.includes(m));
@@ -583,13 +583,13 @@ function TeamButton({ users, activeProject, user, projectColor }: { users: any[]
                   <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                     <span style={{ fontSize: 13, fontWeight: 500, color: "#111827", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
                     {isPM && (
-                      <span style={{ 
-                        fontSize: 10, 
-                        background: u.accountType === "ADMIN" ? "#e0e7ff" : "#fef9c3", 
-                        color: u.accountType === "ADMIN" ? "#4338ca" : "#a16207", 
-                        padding: "1px 6px", 
-                        borderRadius: 4, 
-                        fontWeight: 600 
+                      <span style={{
+                        fontSize: 10,
+                        background: u.accountType === "ADMIN" ? "#e0e7ff" : "#fef9c3",
+                        color: u.accountType === "ADMIN" ? "#4338ca" : "#a16207",
+                        padding: "1px 6px",
+                        borderRadius: 4,
+                        fontWeight: 600
                       }}>
                         {u.accountType === "ADMIN" ? "Admin" : "Team Lead"}
                       </span>
@@ -776,9 +776,9 @@ function LabelPicker({
 
   return (
     <div className="relative">
-      <button 
+      <button
         disabled={disabled}
-        onClick={(e) => { e.preventDefault(); setIsOpen(!isOpen); }} 
+        onClick={(e) => { e.preventDefault(); setIsOpen(!isOpen); }}
         className={`text-xs font-bold px-3 py-1.5 rounded-lg border border-gray-200 bg-white flex items-center gap-2 transition shadow-sm ${disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-50"}`}
       >
         🏷️ Labels {selectedLabels.length > 0 && <span className="bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full text-[9px] font-black">{selectedLabels.length}</span>}
@@ -788,89 +788,89 @@ function LabelPicker({
         <>
           <div className="fixed inset-0 z-[10002]" onClick={() => setIsOpen(false)} />
           <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[10003] overflow-hidden flex flex-col max-h-[400px]">
-             <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
-                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Labels</span>
-                <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-gray-600 transition">✕</button>
-             </div>
-             
-             <div className="p-3">
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search labels..." className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-100 bg-gray-50/50" />
-             </div>
+            <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Labels</span>
+              <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-gray-600 transition">✕</button>
+            </div>
 
-             <div className="flex-1 overflow-y-auto p-3 space-y-1">
-                {labels.filter(l => l.title.toLowerCase().includes(search.toLowerCase())).map(label => {
-                  const isSelected = selectedLabels.some(sl => sl.id === label.id);
-                  const style = getLabelStyle(label.color);
-                  return (
-                    <div key={label.id} className="flex items-center gap-2 group animate-in fade-in slide-in-from-top-1 duration-200">
-                       <input type="checkbox" checked={isSelected} onChange={() => toggleLabel(label)} className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
-                       <div 
-                         onClick={() => toggleLabel(label)}
-                         className="flex-1 px-3 py-1.5 rounded-lg text-[11px] font-black cursor-pointer transition flex items-center justify-between hover:opacity-90 active:scale-95"
-                         style={{ background: style.bg, color: style.text }}
-                       >
-                          {label.title}
-                          {isSelected && <span className="text-[10px]">✓</span>}
-                       </div>
+            <div className="p-3">
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search labels..." className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-100 bg-gray-50/50" />
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-3 space-y-1">
+              {labels.filter(l => l.title.toLowerCase().includes(search.toLowerCase())).map(label => {
+                const isSelected = selectedLabels.some(sl => sl.id === label.id);
+                const style = getLabelStyle(label.color);
+                return (
+                  <div key={label.id} className="flex items-center gap-2 group animate-in fade-in slide-in-from-top-1 duration-200">
+                    <input type="checkbox" checked={isSelected} onChange={() => toggleLabel(label)} className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
+                    <div
+                      onClick={() => toggleLabel(label)}
+                      className="flex-1 px-3 py-1.5 rounded-lg text-[11px] font-black cursor-pointer transition flex items-center justify-between hover:opacity-90 active:scale-95"
+                      style={{ background: style.bg, color: style.text }}
+                    >
+                      {label.title}
+                      {isSelected && <span className="text-[10px]">✓</span>}
                     </div>
-                  );
-                })}
-                {labels.length === 0 && !creating && (
-                  <p className="text-[10px] text-center text-gray-400 py-4 italic font-medium">No labels found. Create one below!</p>
-                )}
-             </div>
+                  </div>
+                );
+              })}
+              {labels.length === 0 && !creating && (
+                <p className="text-[10px] text-center text-gray-400 py-4 italic font-medium">No labels found. Create one below!</p>
+              )}
+            </div>
 
-             <div className="p-3 border-t border-gray-100 bg-gray-50/50">
-                {creating ? (
-                  <div className="space-y-4 p-1">
-                    <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Label title (e.g. Frontend)..." className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none bg-white shadow-sm font-semibold" />
-                    
-                    <div className="space-y-2">
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-1">Pick Color</p>
-                      <div className="flex flex-wrap gap-2 items-center">
-                        {Object.keys(LABEL_COLORS).map(c => (
-                          <div key={c} onClick={() => setNewColor(c)} className={`w-6 h-6 rounded-lg cursor-pointer border-2 transition-all hover:scale-110 active:scale-90 ${newColor === c ? "border-indigo-600 shadow-md scale-110" : "border-white"}`} style={{ background: LABEL_COLORS[c].bg }} />
-                        ))}
-                        
-                        {/* Custom Color Picker */}
-                        <div className="relative group">
-                          <input 
-                            type="color" 
-                            value={newColor.startsWith("#") ? newColor : "#6366f1"} 
-                            onChange={e => setNewColor(e.target.value)}
-                            className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                          />
-                          <div 
-                            className={`w-10 h-6 rounded-lg border-2 transition-all flex items-center justify-center text-[10px] ${newColor.startsWith("#") ? "border-indigo-600 shadow-md" : "border-gray-200"}`}
-                            style={{ background: newColor.startsWith("#") ? newColor : "#f3f4f6" }}
-                          >
-                            {newColor.startsWith("#") ? "✨" : "🎨"}
-                          </div>
+            <div className="p-3 border-t border-gray-100 bg-gray-50/50">
+              {creating ? (
+                <div className="space-y-4 p-1">
+                  <input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Label title (e.g. Frontend)..." className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none bg-white shadow-sm font-semibold" />
+
+                  <div className="space-y-2">
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-1">Pick Color</p>
+                    <div className="flex flex-wrap gap-2 items-center">
+                      {Object.keys(LABEL_COLORS).map(c => (
+                        <div key={c} onClick={() => setNewColor(c)} className={`w-6 h-6 rounded-lg cursor-pointer border-2 transition-all hover:scale-110 active:scale-90 ${newColor === c ? "border-indigo-600 shadow-md scale-110" : "border-white"}`} style={{ background: LABEL_COLORS[c].bg }} />
+                      ))}
+
+                      {/* Custom Color Picker */}
+                      <div className="relative group">
+                        <input
+                          type="color"
+                          value={newColor.startsWith("#") ? newColor : "#6366f1"}
+                          onChange={e => setNewColor(e.target.value)}
+                          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                        />
+                        <div
+                          className={`w-10 h-6 rounded-lg border-2 transition-all flex items-center justify-center text-[10px] ${newColor.startsWith("#") ? "border-indigo-600 shadow-md" : "border-gray-200"}`}
+                          style={{ background: newColor.startsWith("#") ? newColor : "#f3f4f6" }}
+                        >
+                          {newColor.startsWith("#") ? "✨" : "🎨"}
                         </div>
                       </div>
                     </div>
+                  </div>
 
-                    {/* Preview */}
-                    <div className="p-2 bg-white rounded-xl border border-gray-100 flex items-center justify-center">
-                      <div 
-                        className="px-3 py-1 rounded-lg text-[10px] font-black transition-all"
-                        style={{ background: getLabelStyle(newColor).bg, color: getLabelStyle(newColor).text }}
-                      >
-                        {newTitle || "PREVIEW"}
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2 pt-1">
-                      <button onClick={createLabel} disabled={!newTitle.trim()} className="flex-1 text-[10px] font-black uppercase tracking-wider py-2.5 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-200 disabled:opacity-40 transition-all active:scale-95">Create Label</button>
-                      <button onClick={() => setCreating(false)} className="px-4 text-[10px] font-black uppercase tracking-wider py-2.5 bg-white border border-gray-200 text-gray-400 rounded-xl transition-all hover:bg-gray-50 active:scale-95">Cancel</button>
+                  {/* Preview */}
+                  <div className="p-2 bg-white rounded-xl border border-gray-100 flex items-center justify-center">
+                    <div
+                      className="px-3 py-1 rounded-lg text-[10px] font-black transition-all"
+                      style={{ background: getLabelStyle(newColor).bg, color: getLabelStyle(newColor).text }}
+                    >
+                      {newTitle || "PREVIEW"}
                     </div>
                   </div>
-                ) : (
-                   <button onClick={() => setCreating(true)} className="w-full text-[10px] font-black uppercase tracking-widest py-2.5 border-2 border-dashed border-gray-200 text-gray-400 rounded-xl hover:border-indigo-200 hover:text-indigo-500 hover:bg-indigo-50/50 transition-all active:scale-95">
-                     + Create new label
-                   </button>
-                )}
-             </div>
+
+                  <div className="flex gap-2 pt-1">
+                    <button onClick={createLabel} disabled={!newTitle.trim()} className="flex-1 text-[10px] font-black uppercase tracking-wider py-2.5 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-200 disabled:opacity-40 transition-all active:scale-95">Create Label</button>
+                    <button onClick={() => setCreating(false)} className="px-4 text-[10px] font-black uppercase tracking-wider py-2.5 bg-white border border-gray-200 text-gray-400 rounded-xl transition-all hover:bg-gray-50 active:scale-95">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => setCreating(true)} className="w-full text-[10px] font-black uppercase tracking-widest py-2.5 border-2 border-dashed border-gray-200 text-gray-400 rounded-xl hover:border-indigo-200 hover:text-indigo-500 hover:bg-indigo-50/50 transition-all active:scale-95">
+                  + Create new label
+                </button>
+              )}
+            </div>
           </div>
         </>
       )}
@@ -974,10 +974,10 @@ function TaskModal({
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <LabelPicker 
-                projectId={form.projectId || ""} 
-                selectedLabels={form.labels || []} 
-                onChange={(labels) => setForm(f => ({ ...f, labels }))} 
+              <LabelPicker
+                projectId={form.projectId || ""}
+                selectedLabels={form.labels || []}
+                onChange={(labels) => setForm(f => ({ ...f, labels }))}
               />
               <button onClick={onClose} className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition text-sm">✕</button>
             </div>
@@ -1288,14 +1288,73 @@ function TaskDetailModal({
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 10 * 1024 * 1024) { alert("Max 10MB"); return; }
+
+    if (!file.type.startsWith("image/") && file.size > 700 * 1024) { 
+      alert("Non-image files must be under 700KB to store in the database. Please use smaller files."); 
+      return; 
+    }
+
     setUploading(true);
     try {
-      const sr = ref(firebaseStorage, `projectFiles/${task.projectId}/${task.id}/${Date.now()}_${file.name}`);
-      const snap = await uploadBytes(sr, file);
-      const url = await getDownloadURL(snap.ref);
-      await addDoc(collection(firestoreDb, "taskFiles"), { taskId: task.id, projectId: task.projectId, fileName: file.name, fileUrl: url, uploadedBy: currentUserId, uploadedByName: userName, createdAt: serverTimestamp() });
-    } catch (err: any) { alert(`Upload failed: ${err.message}`); } finally { setUploading(false); }
+      const reader = new FileReader();
+
+      if (file.type.startsWith("image/")) {
+        reader.onload = (ev) => {
+          const img = new window.Image();
+          img.onload = async () => {
+            const canvas = document.createElement("canvas");
+            let { width, height } = img;
+            const MAX_DIM = 800; // compress large images
+            if (width > height && width > MAX_DIM) {
+              height *= MAX_DIM / width;
+              width = MAX_DIM;
+            } else if (height > MAX_DIM) {
+              width *= MAX_DIM / height;
+              height = MAX_DIM;
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            ctx?.drawImage(img, 0, 0, width, height);
+            
+            const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+            await addDoc(collection(firestoreDb, "taskFiles"), {
+              taskId: task.id,
+              projectId: task.projectId,
+              fileName: file.name,
+              fileUrl: compressedBase64,
+              uploadedBy: currentUserId,
+              uploadedByName: userName,
+              createdAt: serverTimestamp(),
+            });
+            setUploading(false);
+          };
+          img.src = ev.target?.result as string;
+        };
+        reader.readAsDataURL(file);
+      } else {
+        reader.onload = async (ev) => {
+          const base64 = ev.target?.result as string;
+          if (base64) {
+            await addDoc(collection(firestoreDb, "taskFiles"), {
+              taskId: task.id,
+              projectId: task.projectId,
+              fileName: file.name,
+              fileUrl: base64,
+              uploadedBy: currentUserId,
+              uploadedByName: userName,
+              createdAt: serverTimestamp(),
+            });
+          }
+          setUploading(false);
+        };
+        reader.onerror = () => {
+          alert("Failed to read file.");
+          setUploading(false);
+        };
+        reader.readAsDataURL(file);
+      }
+    } catch (err: any) { alert(`Upload failed: ${err.message}`); setUploading(false); }
   };
 
   const handleSubmitWorkLog = async () => {
@@ -1325,6 +1384,7 @@ function TaskDetailModal({
     { id: "details", icon: "📋", label: "Details", badge: null },
     ...(task.ticketType === "story" ? [{ id: "storytasks", icon: "🎯", label: "Tasks", badge: storyTasks.length > 0 ? String(storyTasks.length) : null }] : []),
     { id: "subtasks", icon: "✅", label: "Subtasks", badge: subtasks.length > 0 ? `${subtasksDone}/${subtasks.length}` : null },
+    { id: "images", icon: "🖼️", label: "Images", badge: task.images && task.images.length > 0 ? String(task.images.length) : null },
     { id: "files", icon: "📎", label: "Files", badge: taskFiles.length > 0 ? String(taskFiles.length) : null },
     { id: "comments", icon: "💬", label: "Comments", badge: comments.length > 0 ? String(comments.length) : null },
     { id: "worklogs", icon: "⏱", label: "Logs", badge: taskWorklogs.length > 0 ? `${totalLoggedHours}h` : null },
@@ -1340,73 +1400,73 @@ function TaskDetailModal({
         {/* Header */}
         <div style={{ background: `linear-gradient(135deg, ${projectColor} 0%, ${projectColor}cc 100%)` }}>
           <div className="p-5">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg bg-white/20">{tc.icon}</div>
-                  <div>
-                    <p className="text-xs font-semibold text-white/70">{projectName}</p>
-                    <p className="text-[10px] font-bold text-white/50">{tc.label} {task.taskCode && `· ${task.taskCode}`}</p>
-                  </div>
-                </div>
-
-                <div className="flex-1 flex justify-center">
-                   <LabelPicker 
-                      projectId={task.projectId} 
-                      selectedLabels={localTask.labels || []} 
-                      disabled={!canEdit && !isProjectManager}
-                      canManage={true}
-                      onChange={async (labels) => {
-                        setLocalTask(t => ({ ...t, labels }));
-                        // Immediate save for labels as per standard Kanban UX
-                        if (canEdit || isProjectManager) {
-                          try {
-                            await updateDoc(doc(firestoreDb, "projectTasks", task.id), { labels });
-                          } catch (err) {
-                            console.error("Error saving labels:", err);
-                          }
-                        }
-                      }} 
-                   />
-                </div>
-
-                {/* Action bar */}
-                <div className="flex items-center gap-1.5">
-                  {isProjectManager && (
-                    <button onClick={() => setShowSprintMove(true)} title="Move to sprint"
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition"
-                      style={{ background: currentSprint ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.15)", color: "white", border: "1px solid rgba(255,255,255,0.3)" }}
-                      onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.3)"}
-                      onMouseLeave={e => e.currentTarget.style.background = currentSprint ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.15)"}>
-                      🏃 {currentSprint ? currentSprint.name : "Sprint"}
-                    </button>
-                  )}
-                  {canEdit && (
-                    <button onClick={() => onEditTask(task)} title="Edit task"
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition"
-                      style={{ background: "rgba(255,255,255,0.15)", color: "white", border: "1px solid rgba(255,255,255,0.25)" }}
-                      onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.28)"}
-                      onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}>
-                      ✏️ Edit
-                    </button>
-                  )}
-                  {canDelete && (
-                    <button onClick={handleDelete} disabled={deleting} title="Delete task"
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition disabled:opacity-50"
-                      style={{ background: "rgba(239,68,68,0.25)", color: "white", border: "1px solid rgba(239,68,68,0.4)" }}
-                      onMouseEnter={e => e.currentTarget.style.background = "rgba(239,68,68,0.4)"}
-                      onMouseLeave={e => e.currentTarget.style.background = "rgba(239,68,68,0.25)"}>
-                      🗑 {deleting ? "Deleting…" : "Delete"}
-                    </button>
-                  )}
-                  <button onClick={onClose} title="Close"
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-white transition"
-                    style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)" }}
-                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.25)"}
-                    onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.12)"}>
-                    ✕
-                  </button>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg bg-white/20">{tc.icon}</div>
+                <div>
+                  <p className="text-xs font-semibold text-white/70">{projectName}</p>
+                  <p className="text-[10px] font-bold text-white/50">{tc.label} {task.taskCode && `· ${task.taskCode}`}</p>
                 </div>
               </div>
+
+              <div className="flex-1 flex justify-center">
+                <LabelPicker
+                  projectId={task.projectId}
+                  selectedLabels={localTask.labels || []}
+                  disabled={!canEdit && !isProjectManager}
+                  canManage={true}
+                  onChange={async (labels) => {
+                    setLocalTask(t => ({ ...t, labels }));
+                    // Immediate save for labels as per standard Kanban UX
+                    if (canEdit || isProjectManager) {
+                      try {
+                        await updateDoc(doc(firestoreDb, "projectTasks", task.id), { labels });
+                      } catch (err) {
+                        console.error("Error saving labels:", err);
+                      }
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Action bar */}
+              <div className="flex items-center gap-1.5">
+                {isProjectManager && (
+                  <button onClick={() => setShowSprintMove(true)} title="Move to sprint"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition"
+                    style={{ background: currentSprint ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.15)", color: "white", border: "1px solid rgba(255,255,255,0.3)" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.3)"}
+                    onMouseLeave={e => e.currentTarget.style.background = currentSprint ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.15)"}>
+                    🏃 {currentSprint ? currentSprint.name : "Sprint"}
+                  </button>
+                )}
+                {canEdit && (
+                  <button onClick={() => onEditTask(task)} title="Edit task"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition"
+                    style={{ background: "rgba(255,255,255,0.15)", color: "white", border: "1px solid rgba(255,255,255,0.25)" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.28)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}>
+                    ✏️ Edit
+                  </button>
+                )}
+                {canDelete && (
+                  <button onClick={handleDelete} disabled={deleting} title="Delete task"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition disabled:opacity-50"
+                    style={{ background: "rgba(239,68,68,0.25)", color: "white", border: "1px solid rgba(239,68,68,0.4)" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "rgba(239,68,68,0.4)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "rgba(239,68,68,0.25)"}>
+                    🗑 {deleting ? "Deleting…" : "Delete"}
+                  </button>
+                )}
+                <button onClick={onClose} title="Close"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-white transition"
+                  style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.25)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.12)"}>
+                  ✕
+                </button>
+              </div>
+            </div>
 
 
 
@@ -1560,7 +1620,7 @@ function TaskDetailModal({
                     const colIdx = columns.findIndex(c => c.id === child.status);
                     const cs = getColStyle(child.status, colIdx >= 0 ? colIdx : 0);
                     return (
-                      <div key={child.id} onClick={() => onEditTask(child)} 
+                      <div key={child.id} onClick={() => onEditTask(child)}
                         className="group hover:bg-white hover:shadow-2xl hover:shadow-indigo-500/10 transition-all duration-500 flex flex-wrap sm:flex-nowrap items-center gap-4 px-5 py-4 cursor-pointer rounded-2xl border border-transparent hover:border-gray-100 active:scale-[0.98]">
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-110" style={{ background: tc.bg, color: tc.color, border: `1px solid ${tc.border}` }}>
                           <span className="text-lg">{tc.icon}</span>
@@ -1587,6 +1647,19 @@ function TaskDetailModal({
                   })
                 )}
               </div>
+            </div>
+          )}
+
+          {taskTab === "images" && (
+            <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+              <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider mb-4">Task Images</h3>
+              <TaskImages 
+                taskId={task.id} 
+                projectId={task.projectId} 
+                projectColor={projectColor} 
+                images={task.images || []}
+                canManage={canEdit || isProjectManager}
+              />
             </div>
           )}
 
@@ -2108,8 +2181,8 @@ function ProjectsPage({ user, myProjects, onOpenProject, onCreateProject, onEdit
                     <div className="flex flex-col items-end gap-1">
                       <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${project.status === "Completed" ? "bg-green-100 text-green-700" : project.status === "In Progress" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>{project.status}</span>
                       {projPerms.isPM ? (
-                        <span 
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${user?.accountType === "ADMIN" ? "bg-indigo-100 text-indigo-700" : "text-white"}`} 
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${user?.accountType === "ADMIN" ? "bg-indigo-100 text-indigo-700" : "text-white"}`}
                           style={user?.accountType !== "ADMIN" ? { background: project.color || "#6366f1" } : {}}
                         >
                           👑 {user?.accountType === "ADMIN" ? "Admin" : "Team Lead"}
@@ -2292,7 +2365,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
       createdAt: serverTimestamp(), actualHours: 0,
     });
     await logActivity(activeProject.id, "created task", `"${taskData.title}" (${taskData.ticketType || "task"})`, docRef.id);
-    
+
     // Notify assignee
     if (taskData.assignedTo && taskData.assignedTo !== user?.uid) {
       await sendNotification(taskData.assignedTo, "task_assigned", "Task Assigned", `You've been assigned "${taskData.title}" in ${activeProject.name}`, activeProject.id, docRef.id);
@@ -2342,7 +2415,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
     Object.keys(updatePayload).forEach(key => { if (updatePayload[key] === undefined) delete updatePayload[key]; });
     await updateDoc(doc(db, "projectTasks", editingTask.id), updatePayload);
     setTasks(prev => prev.map(t => t.id === editingTask.id ? { ...t, ...updatePayload } : t));
-    
+
     // Notify assignee if changed
     if (updatePayload.assignedTo && updatePayload.assignedTo !== editingTask.assignedTo && updatePayload.assignedTo !== user?.uid) {
       await sendNotification(updatePayload.assignedTo, "task_assigned", "Task Assigned", `You've been assigned "${data.title || editingTask.title}" in ${activeProject.name}`, activeProject.id, editingTask.id);
@@ -2428,8 +2501,8 @@ export default function ProjectManagement({ user, projects, users }: any) {
               <div className="w-2.5 h-2.5 rounded-full" style={{ background: projectColor }} />
               <h1 className="font-bold text-gray-900 text-sm">{activeProject.name}</h1>
               {isProjectManager && (
-                <span 
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ml-1 ${user?.accountType === "ADMIN" ? "bg-indigo-100 text-indigo-700" : "text-white"}`} 
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ml-1 ${user?.accountType === "ADMIN" ? "bg-indigo-100 text-indigo-700" : "text-white"}`}
                   style={user?.accountType !== "ADMIN" ? { background: projectColor } : {}}
                 >
                   👑 {user?.accountType === "ADMIN" ? "Admin" : "Team Lead"}

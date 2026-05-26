@@ -282,7 +282,7 @@ const handleSave = async () => {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[20000] flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
     >
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden border border-gray-200">
@@ -791,26 +791,48 @@ export function QuickImageUpload({ taskId, projectId, projectColor }: { taskId: 
     }
     try {
       setUploading(true);
-      const storageRef = ref(
-        storage,
-        `taskImages/${projectId}/${taskId}/${Date.now()}_${file.name}`
-      );
-      const snap = await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(snap.ref);
-      const image: TaskImage = {
-        url,
-        name: file.name,
-        uploadedBy: "",
-        uploadedAt: new Date().toISOString(),
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new window.Image();
+        img.onload = async () => {
+          const canvas = document.createElement("canvas");
+          let { width, height } = img;
+          const MAX_DIM = 800;
+          if (width > height && width > MAX_DIM) {
+            height *= MAX_DIM / width;
+            width = MAX_DIM;
+          } else if (height > MAX_DIM) {
+            width *= MAX_DIM / height;
+            height = MAX_DIM;
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, width, height);
+
+          const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+          const image: TaskImage = {
+            url: compressedBase64,
+            name: file.name,
+            uploadedBy: "",
+            uploadedAt: new Date().toISOString(),
+          };
+          await updateDoc(doc(db, "projectTasks", taskId), {
+            images: arrayUnion(image),
+          });
+          setUploading(false);
+        };
+        img.src = ev.target?.result as string;
       };
-      await updateDoc(doc(db, "projectTasks", taskId), {
-        images: arrayUnion(image),
-      });
-      // Optionally show a toast, but an alert works for simplicity
+      reader.onerror = () => {
+        alert("Failed to read file.");
+        setUploading(false);
+      };
+      reader.readAsDataURL(file);
     } catch (err: any) {
       alert(`Upload failed: ${err.message}`);
-    } finally {
       setUploading(false);
+    } finally {
       e.target.value = "";
     }
   };
@@ -864,25 +886,32 @@ export function TaskImages({
     }
     try {
       setUploading(true);
-      const storageRef = ref(
-        storage,
-        `taskImages/${projectId}/${taskId}/${Date.now()}_${file.name}`
-      );
-      const snap = await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(snap.ref);
-      const image: TaskImage = {
-        url,
-        name: file.name,
-        uploadedBy: "",
-        uploadedAt: new Date().toISOString(),
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const base64 = ev.target?.result as string;
+        if (base64) {
+          const image: TaskImage = {
+            url: base64,
+            name: file.name,
+            uploadedBy: "",
+            uploadedAt: new Date().toISOString(),
+          };
+          await updateDoc(doc(db, "projectTasks", taskId), {
+            images: arrayUnion(image),
+          });
+        }
+        setUploading(false);
       };
-      await updateDoc(doc(db, "projectTasks", taskId), {
-        images: arrayUnion(image),
-      });
+      reader.onerror = () => {
+        alert("Failed to read file.");
+        setUploading(false);
+      };
+      reader.readAsDataURL(file);
     } catch (err: any) {
       alert(`Upload failed: ${err.message}`);
-    } finally {
       setUploading(false);
+    } finally {
+      e.target.value = "";
     }
   };
 
@@ -1410,7 +1439,7 @@ const handleMove = async () => {
   
    return createPortal(
     <div
-      className="fixed inset-0 z-999 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[20000] flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
     > 
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-200">
@@ -1560,7 +1589,7 @@ export function BulkMoveSprintsModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[20000] flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
     >
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-200">

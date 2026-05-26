@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect, useMemo, Fragment, memo } from "react";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, updateDoc, arrayUnion } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { QuickImageUpload } from "../../admin/sprint";
 import { createPortal } from "react-dom";
@@ -111,6 +111,51 @@ const TaskCard = memo(({
   const draggable = canMoveTask(user, task, activeProject);
   const name = cleanName(task.assignedToName);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new window.Image();
+      img.onload = async () => {
+        const canvas = document.createElement("canvas");
+        let { width, height } = img;
+        const MAX_DIM = 800;
+        if (width > height && width > MAX_DIM) {
+          height *= MAX_DIM / width;
+          width = MAX_DIM;
+        } else if (height > MAX_DIM) {
+          width *= MAX_DIM / height;
+          height = MAX_DIM;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+        try {
+          const image = {
+            url: compressedBase64,
+            name: file.name,
+            uploadedBy: "",
+            uploadedAt: new Date().toISOString(),
+          };
+          await updateDoc(doc(db, "projectTasks", task.id), { 
+            images: arrayUnion(image),
+            imageUrl: compressedBase64 
+          });
+        } catch (err) {
+          console.error("Error uploading image:", err);
+        }
+      };
+      img.src = ev.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div
       draggable={draggable}
@@ -196,6 +241,23 @@ const TaskCard = memo(({
           {mine && (
             <span style={{ fontSize: "9px", fontWeight: 800, padding: "1px 5px", borderRadius: "100px", background: projectColor + "20", color: projectColor, flexShrink: 0 }}>You</span>
           )}
+
+          {task.ticketType === "bug" && (
+            <div style={{ position: "relative", flexShrink: 0 }}>
+              <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} onClick={(e) => e.stopPropagation()} />
+              <button 
+                onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }} 
+                style={{
+                  width: "16px", height: "16px", borderRadius: "4px", border: "none",
+                  background: "#fef2f2", color: "#dc2626", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "12px", fontWeight: 700, marginLeft: "2px",
+                }}
+                title="Add Bug Image"
+              >+</button>
+            </div>
+          )}
+
           <div style={{ flex: 1, minWidth: 0 }} />
 
           {pri && (

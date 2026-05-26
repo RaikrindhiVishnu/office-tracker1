@@ -41,6 +41,8 @@ export interface Task {
   createdBy: string;
   createdAt: any;
   done?: boolean; // for subtasks mostly
+  imageUrl?: string;
+  images?: any[];
 }
 
 export const LABEL_COLORS: Record<string, { bg: string; text: string; border?: string }> = {
