@@ -10,6 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 import NotificationsView from "./NotificationsView";
 import HelpView from "./HelpView";
 import OrgChart from "@/components/OrgChart";
+import { updateEmployeeData } from "@/lib/employeeSync";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Props = {
@@ -542,6 +543,8 @@ function HolidaysModal({ onClose }: { onClose: () => void }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 function EmployeeDetailsCard({ user, isCheckedIn, totalSeconds, formatTotal }: { user: any; isCheckedIn: boolean; totalSeconds: number; formatTotal: (min?: number) => string }) {
   const [profile, setProfile] = useState<any>(null);
+  const [savingResume, setSavingResume] = useState(false);
+
   useEffect(() => {
     if (!user?.uid) return;
     return onSnapshot(
@@ -549,6 +552,50 @@ function EmployeeDetailsCard({ user, isCheckedIn, totalSeconds, formatTotal }: {
       (snap) => { if (!snap.empty) setProfile(snap.docs[0].data()); }
     );
   }, [user]);
+
+  const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.uid) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Resume must be under 10MB");
+      return;
+    }
+
+    try {
+      setSavingResume(true);
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", "office_tracker_unsigned");
+
+      const res = await fetch(
+        "https://api.cloudinary.com/v1_1/dovcudjin/auto/upload",
+        { method: "POST", body: formData }
+      );
+
+      const data = await res.json();
+      if (!data.secure_url) {
+        throw new Error(data.error?.message || "Upload failed");
+      }
+
+      const resumeUrl = data.secure_url;
+
+      await updateEmployeeData({
+        userId: user.uid,
+        updates: { resumeUrl },
+        updatedBy: user.uid,
+        role: "employee",
+      });
+
+      alert("✅ Resume uploaded successfully. You can now view it.");
+    } catch (error) {
+      console.error(error);
+      alert("❌ Failed to upload resume");
+    } finally {
+      setSavingResume(false);
+      e.target.value = "";
+    }
+  };
 
   const name = profile?.name ?? profile?.displayName ?? user?.displayName ?? "Employee";
   const role = profile?.designation ?? profile?.role ?? "Employee";
@@ -593,6 +640,23 @@ function EmployeeDetailsCard({ user, isCheckedIn, totalSeconds, formatTotal }: {
             <span style={{ fontSize: 12, fontWeight: 500, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</span>
           </div>
         ))}
+
+        <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+          <label style={{ flex: 1, cursor: "pointer", background: T.accentLight, color: T.accent, padding: "8px", borderRadius: 8, textAlign: "center", fontSize: 12, fontWeight: 700, transition: "background 0.2s" }}>
+            {savingResume ? "Uploading..." : "Upload Resume"}
+            <input type="file" accept=".pdf,.doc,.docx" style={{ display: "none" }} onChange={handleResumeUpload} disabled={savingResume} />
+          </label>
+          {profile?.resumeUrl && (
+            <button 
+              onClick={() => {
+                window.open(`https://docs.google.com/viewer?url=${encodeURIComponent(profile.resumeUrl)}`, "_blank");
+              }} 
+              style={{ flex: 1, background: "#f1f5f9", color: "#475569", padding: "8px", borderRadius: 8, textAlign: "center", fontSize: 12, fontWeight: 700, border: "none", cursor: "pointer" }}
+            >
+              View Resume
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Status strip */}
