@@ -18,4 +18,5 @@ export interface Employee {
   lastUpdated?: any;
   sessions?: Session[];
   profilePhoto?: string;
+  resumeUrl?: string;
 }
