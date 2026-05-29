@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     // 2. Fetch all employees from Firestore
     const usersSnapshot = await adminDb
       .collection("users")
-      .where("role", "==", "employee")
+      .where("role", "==", "EMPLOYEE")
       .get();
 
     if (usersSnapshot.empty) {
