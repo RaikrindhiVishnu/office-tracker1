@@ -91,8 +91,8 @@ export default function ChatBot() {
           message: "Please introduce yourself and check my status. Be brief.", 
           context: { 
             ...context, 
-            uid: userData.uid, 
-            userEmail: userData.email 
+            uid: userData?.uid, 
+            userEmail: userData?.email 
           }
         }),
       });
@@ -126,8 +126,8 @@ export default function ChatBot() {
           message: userMsg, 
           context: { 
             ...context, 
-            uid: userData.uid, 
-            userEmail: userData.email 
+            uid: userData?.uid, 
+            userEmail: userData?.email 
           } 
         }),
       });
