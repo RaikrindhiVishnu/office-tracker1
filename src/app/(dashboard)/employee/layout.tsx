@@ -4,6 +4,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
+import ChatBot from "@/components/ChatBot";
+
 export default function EmployeeLayout({
   children,
 }: {
@@ -29,5 +31,10 @@ export default function EmployeeLayout({
 
   if (loading || !userData) return null;
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <ChatBot />
+    </>
+  );
 }

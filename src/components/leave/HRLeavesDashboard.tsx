@@ -25,7 +25,7 @@ import {
   updateDoc, doc, addDoc, serverTimestamp,
   Timestamp, getDoc,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -575,20 +575,34 @@ export default function AdminLeaveRequests() {
       }
 
       // 3. Write a notification so employee's bell shows it immediately
-      //    This matches the notifications collection the employee dashboard already listens to
       if (req.uid) {
+        const msg = newStatus === "Approved"
+            ? `Your ${req.leaveType ?? ""} leave (${req.fromDate} – ${req.toDate}) has been approved ✅`
+            : `Your ${req.leaveType ?? ""} leave (${req.fromDate} – ${req.toDate}) has been rejected ❌`;
+            
         await addDoc(collection(db, "notifications"), {
           toUid:     req.uid,
           fromName:  "HR Admin",
           fromUid:   "hr_system",
           type:      "leave_update",
-          message:   newStatus === "Approved"
-            ? `Your ${req.leaveType ?? ""} leave (${req.fromDate} – ${req.toDate}) has been approved ✅`
-            : `Your ${req.leaveType ?? ""} leave (${req.fromDate} – ${req.toDate}) has been rejected ❌`,
-          chatId:    "",       // not a chat notification
+          message:   msg,
+          chatId:    "",
           read:      false,
           timestamp: serverTimestamp(),
         });
+        
+        // Also trigger WhatsApp notification
+        const idToken = await auth.currentUser?.getIdToken() || "";
+        if (idToken) {
+           fetch("/api/notifications/send-whatsapp", {
+             method: "POST",
+             headers: {
+               "Content-Type": "application/json",
+               "Authorization": `Bearer ${idToken}`
+             },
+             body: JSON.stringify({ userId: req.uid, message: `Hi ${req.userName}, ` + msg })
+           }).catch(err => console.error("Failed to send WhatsApp notification", err));
+        }
       }
 
     } catch (e) {

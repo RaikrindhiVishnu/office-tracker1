@@ -12,6 +12,7 @@
     "@daily-co/daily-js": "^0.87.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
+    "@google/generative-ai": "^0.24.1",
     "@handsontable/react": "^16.2.0",
     "@hello-pangea/dnd": "^18.0.1",
     "@mui/material": "^7.3.8",

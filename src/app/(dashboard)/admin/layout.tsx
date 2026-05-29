@@ -4,6 +4,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
+import ChatBot from "@/components/ChatBot";
+
 export default function AdminLayout({
   children,
 }: {
@@ -48,5 +50,10 @@ export default function AdminLayout({
     return null;
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <ChatBot />
+    </>
+  );
 }
