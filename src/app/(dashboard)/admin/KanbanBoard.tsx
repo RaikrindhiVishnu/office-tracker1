@@ -1152,7 +1152,8 @@ export function KanbanBoard({
       return t.title.toLowerCase().includes(s) || (t.description || "").toLowerCase().includes(s) || (t.taskCode || "").toLowerCase().includes(s);
     }
     return true;
-  }), [tasks, filters, currentUser]);
+  });
+  }, [tasks, filters, currentUser, columns]);
 
   const stories = useMemo(() => {
     const sIds = new Set(filteredTasks.filter(t => t.ticketType === "story").map(t => t.id));
