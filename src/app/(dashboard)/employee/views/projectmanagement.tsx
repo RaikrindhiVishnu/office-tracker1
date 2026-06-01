@@ -1560,6 +1560,15 @@ function TaskDetailModal({
                   </p>
                 </div>
                 <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
+                  <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-2">Created By</p>
+                  <div className="flex items-center gap-2">
+                    <Avatar name={task.createdByName} size="xs" />
+                    <span className="text-sm font-semibold text-gray-700">
+                      {task.createdByName || "Unknown"}
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
                   <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-2">Story Points</p>
                   <p className="text-2xl font-black" style={{ color: projectColor }}>{task.storyPoints || 0}</p>
                 </div>
@@ -2302,7 +2311,10 @@ export default function ProjectManagement({ user, projects, users }: any) {
 
   useEffect(() => {
     if (!activeProject) return;
-    const u1 = onSnapshot(query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id)), s => setTasks(s.docs.map(d => ({ id: d.id, ...d.data() } as Task))));
+    const u1 = onSnapshot(query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id)), s => setTasks(s.docs.map(d => {
+      const data = d.data();
+      return { id: d.id, ...data, ticketType: (data.ticketType || "task").toLowerCase() } as Task;
+    })));
     const u2 = onSnapshot(query(collection(db, "sprints"), where("projectId", "==", activeProject.id), orderBy("createdAt", "desc")), s => setSprints(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const u3 = onSnapshot(query(collection(db, "projectActivities"), where("projectId", "==", activeProject.id), orderBy("createdAt", "desc")), s => setActivities(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const u4 = onSnapshot(query(collection(db, "workLogs"), where("projectId", "==", activeProject.id), orderBy("createdAt", "desc")), s => setAllWorkLogs(s.docs.map(d => ({ id: d.id, ...d.data() } as WorkLog))));
@@ -2362,6 +2374,8 @@ export default function ProjectManagement({ user, projects, users }: any) {
       ticketType: taskData.ticketType || "task",
       parentStoryId: taskData.parentStoryId || null,
       sprintId: activeSprint?.id || null,
+      createdBy: user.uid,
+      createdByName: user.displayName || user.name || user.email?.split("@")[0] || "Unknown",
       createdAt: serverTimestamp(), actualHours: 0,
     });
     await logActivity(activeProject.id, "created task", `"${taskData.title}" (${taskData.ticketType || "task"})`, docRef.id);
@@ -2379,6 +2393,8 @@ export default function ProjectManagement({ user, projects, users }: any) {
           ticketType: child.ticketType || "task",
           status: taskData.status || columns[0]?.id || "new",
           sprintId: activeSprint?.id || null,
+          createdBy: user.uid,
+          createdByName: user.displayName || user.name || user.email?.split("@")[0] || "Unknown",
           createdAt: serverTimestamp(), actualHours: 0,
         });
       }

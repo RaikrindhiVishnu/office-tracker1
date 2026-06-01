@@ -39,6 +39,7 @@ export interface Task {
   parentStoryTitle?: string;
   taskCode?: string;
   createdBy: string;
+  createdByName?: string | null;
   createdAt: any;
   done?: boolean; // for subtasks mostly
   imageUrl?: string;

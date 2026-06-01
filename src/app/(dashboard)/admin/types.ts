@@ -62,6 +62,7 @@ export interface ExtendedTask {
   parentStoryId?: string | null;
   taskCode?: string;
   createdBy: string;
+  createdByName?: string | null;
   createdAt: any;
   // NEW
   images?: TaskImage[];

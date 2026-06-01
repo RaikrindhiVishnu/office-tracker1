@@ -84,23 +84,17 @@ export default function ChatBot() {
     try {
       const context = await getUserContext();
 
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          message: "Please introduce yourself and check my status. Be brief.", 
-          context: { 
-            ...context, 
-            uid: userData?.uid, 
-            userEmail: userData?.email 
-          }
-        }),
-      });
-
-      const data = await res.json();
-      if (data.text) {
-        setMessages([{ role: "bot", text: data.text }]);
-      }
+      const greetings = [
+        "How can I help you today?",
+        "What's on your agenda for today?",
+        "How can I support you right now?",
+        "Is there anything specific you need help with?"
+      ];
+      const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+      
+      const greetingText = `Hello ${context.userName || "there"}! I'm **Tracker Bot**, your AI HR Assistant and Office Manager. Here is your current status for today:\n* **Attendance:** ${context.hasCheckedIn ? "Checked in" : "Not checked in yet"}\n* **Work Update:** ${context.hasWorkUpdate ? "Submitted" : "Not submitted yet"}\n\n${randomGreeting}`;
+      
+      setMessages([{ role: "bot", text: greetingText }]);
     } catch (err) {
       console.error(err);
     } finally {
@@ -123,7 +117,8 @@ export default function ChatBot() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          message: userMsg, 
+          message: userMsg,
+          history: messages,
           context: { 
             ...context, 
             uid: userData?.uid, 

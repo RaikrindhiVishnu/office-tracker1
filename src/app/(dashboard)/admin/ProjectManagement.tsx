@@ -619,7 +619,10 @@ export default function AdminProjectManagement({ user, projects, users }: { user
     const tq = activeSprint
       ? query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id), where("sprintId", "==", activeSprint.id))
       : query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id));
-    const u1 = onSnapshot(tq, s => setTasks(s.docs.map(d => ({ id: d.id, ...d.data() } as Task))));
+    const u1 = onSnapshot(tq, s => setTasks(s.docs.map(d => {
+      const data = d.data();
+      return { id: d.id, ...data, ticketType: (data.ticketType || "task").toLowerCase() } as Task;
+    })));
     const u2 = onSnapshot(query(collection(db, "sprints"), where("projectId", "==", activeProject.id), orderBy("createdAt", "desc")), s => setSprints(s.docs.map(d => ({ id: d.id, ...d.data() } as Sprint))));
     const u3 = onSnapshot(query(collection(db, "projectActivities"), where("projectId", "==", activeProject.id), orderBy("createdAt", "desc")), s => setActivities(s.docs.map(d => ({ id: d.id, ...d.data() }))));
     const u4 = onSnapshot(query(collection(db, "workLogs"), where("projectId", "==", activeProject.id), orderBy("createdAt", "desc")), s => setWorkLogs(s.docs.map(d => ({ id: d.id, ...d.data() } as WorkLog))));
@@ -766,6 +769,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
         sprintId: activeSprint?.id || null,
         assignedDate: data.assignedTo ? new Date().toISOString() : null,
         createdBy: user.uid,
+        createdByName: user.displayName || user.name || user.email?.split("@")[0] || "Unknown",
         createdAt: serverTimestamp(),
       };
 
@@ -1217,6 +1221,11 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                             : <div className="text-xs text-gray-700 px-2 py-1.5">{activeTask.dueDate || "—"}</div>
                         )
                       },
+                      {
+                        label: "Created By", content: (
+                          <div className="flex items-center gap-2 px-2 py-1"><Avatar name={activeTask.createdByName || "?"} size="xs" /><span className="text-xs text-gray-700">{activeTask.createdByName || "Unknown"}</span></div>
+                        )
+                      }
                     ].map(({ label, content }) => (
                       <div key={label} className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
                         <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-2">{label}</p>

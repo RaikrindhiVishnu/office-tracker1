@@ -5,6 +5,7 @@ export interface Task {
 
   projectId: string;
   createdBy: string;
+  createdByName?: string | null;
   createdAt: any;
 
   status?: string;

@@ -62,7 +62,7 @@ function today(): string {
 
 export async function POST(request: Request) {
   try {
-    const { message, context } = await request.json();
+    const { message, context, history = [] } = await request.json();
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -92,10 +92,16 @@ export async function POST(request: Request) {
       Keep your responses concise and formatted nicely using markdown if needed.
     `;
 
+    const formattedHistory = history.map((msg: any) => ({
+      role: msg.role === "bot" ? "model" : "user",
+      parts: [{ text: msg.text || "" }]
+    }));
+
     const chat = model.startChat({
       history: [
         { role: "user", parts: [{ text: systemInstruction }] },
         { role: "model", parts: [{ text: "Understood. I am ready to help." }] },
+        ...formattedHistory
       ],
     });
 
@@ -189,12 +195,13 @@ export async function POST(request: Request) {
 
           await adminDb.collection("projectTasks").add({
             projectId: args.projectId,
-            ticketType: args.ticketType,
+            ticketType: (args.ticketType || "task").toLowerCase(),
             title: args.title,
             description: args.description || "",
             priority: args.priority || "Medium",
             status: "new",
             createdBy: context.uid,
+            createdByName: context.userName || "Unknown",
             assignedTo: assignedTo,
             assignedToName: assignedToName,
             assignedDate: assignedTo ? today() : null,
