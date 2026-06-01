@@ -26,16 +26,25 @@ const applyLeaveDeclaration: FunctionDeclaration = {
 
 const logWorkUpdateDeclaration: FunctionDeclaration = {
   name: "logWorkUpdate",
-  description: "Save a daily work update or task progress for the employee.",
+  description: "Save a structured daily work update for the employee.",
   parameters: {
     type: SchemaType.OBJECT,
     properties: {
-      task: { type: SchemaType.STRING, description: "The title of the task worked on" },
-      notes: { type: SchemaType.STRING, description: "Additional details about progress or blockers" },
-      status: { type: SchemaType.STRING, description: "Status: In Progress, Completed, In Review" },
-      priority: { type: SchemaType.STRING, description: "Priority: Low, Medium, High" },
+      projectName: { type: SchemaType.STRING, description: "Name of the project they are working on (e.g., Office Tracker CRM, GLC)" },
+      module: { type: SchemaType.STRING, description: "Specific module or feature area (e.g., AI Chatbot, Region Validation)" },
+      todayTask: { type: SchemaType.STRING, description: "What the employee worked on today (professionally rewritten)" },
+      ticketType: { type: SchemaType.STRING, description: "Type of task: Task, Bug, Story, or Feature" },
+      status: { type: SchemaType.STRING, description: "Overall status (e.g., In Progress, Completed, Blocked, Delayed)" },
+      priority: { type: SchemaType.STRING, description: "Priority: Low, Medium, High, Critical" },
+      eta: { type: SchemaType.STRING, description: "Estimated time of arrival/completion (e.g., 2 Days, EOD, Tomorrow)" },
+      blockers: { type: SchemaType.STRING, description: "Categorized blockers (e.g., API Issues, Firebase Errors, Design Clarifications, or 'None')" },
+      completionPercent: { type: SchemaType.NUMBER, description: "Estimated completion percentage of current task (0-100)" },
+      productivity: { type: SchemaType.STRING, description: "Estimated productivity/mood based on tone (e.g., Good, Stressed, Normal, Burnout)" },
+      nextTask: { type: SchemaType.STRING, description: "What the employee plans to work on next" },
+      taskId: { type: SchemaType.STRING, description: "The ID of the project task they are updating, if any" },
+      hoursWorked: { type: SchemaType.NUMBER, description: "Number of hours they worked on this task today (default 8)" }
     },
-    required: ["task", "notes", "status"]
+    required: ["projectName", "module", "todayTask", "ticketType", "status", "priority", "eta", "blockers", "completionPercent", "productivity", "nextTask"]
   }
 };
 
@@ -56,13 +65,39 @@ const createProjectTaskDeclaration: FunctionDeclaration = {
   }
 };
 
+const updateProjectTaskDeclaration: FunctionDeclaration = {
+  name: "updateProjectTask",
+  description: "Update the status, priority, or assignee of an existing project task.",
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      taskId: { type: SchemaType.STRING, description: "The ID of the task to update" },
+      status: { type: SchemaType.STRING, description: "New status: open, in-progress, in-review" },
+      priority: { type: SchemaType.STRING, description: "New priority: Low, Medium, High, Critical" },
+    },
+    required: ["taskId"]
+  }
+};
+
+const closeProjectTaskDeclaration: FunctionDeclaration = {
+  name: "closeProjectTask",
+  description: "Mark a project task as closed/completed.",
+  parameters: {
+    type: SchemaType.OBJECT,
+    properties: {
+      taskId: { type: SchemaType.STRING, description: "The ID of the task to close" },
+    },
+    required: ["taskId"]
+  }
+};
+
 function today(): string {
   return new Date().toISOString().split("T")[0];
 }
 
 export async function POST(request: Request) {
   try {
-    const { message, context, history = [] } = await request.json();
+    const { message, context, history = [], base64Image } = await request.json();
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -73,29 +108,46 @@ export async function POST(request: Request) {
     const model = genAI.getGenerativeModel({ 
       model: "gemini-flash-lite-latest",
       tools: [{
-        functionDeclarations: [checkInDeclaration, applyLeaveDeclaration, logWorkUpdateDeclaration, createProjectTaskDeclaration]
+        functionDeclarations: [checkInDeclaration, applyLeaveDeclaration, logWorkUpdateDeclaration, createProjectTaskDeclaration, updateProjectTaskDeclaration, closeProjectTaskDeclaration]
       }]
     });
 
     const systemInstruction = `
-      You are an AI HR Assistant and Office Manager named "Tracker Bot" built directly into the Office Tracker application.
-      You are speaking with an employee named ${context?.userName || "there"}.
-      
-      Here is their current status for today:
-      - Have they checked in for attendance today? ${context?.hasCheckedIn ? "Yes" : "No"}
-      - Have they submitted their daily work update yet? ${context?.hasWorkUpdate ? "Yes" : "No"}
-      
-      Your goal is to be helpful, professional, and friendly. You have tools available to check them in, apply for leave, log their work updates, and create project tasks.
-      
-      ### DAILY STANDUP / WORK UPDATE INTERVIEW MODE
-      If the user is giving a work update or you are proactively asking for one, DO NOT just ask everything at once or call the logWorkUpdate tool immediately. Conduct a step-by-step conversational interview:
-      1. First, ask what they worked on yesterday or earlier today. Wait for their response.
-      2. Then, ask what they plan to work on next. Wait for their response.
-      3. Finally, ask "How is work going on? Are there any queries or blockers?" Wait for their response.
-      4. ONLY AFTER collecting all this information, summarize their answers into a complete work update and call the \`logWorkUpdate\` tool to save it. 
-      
-      If they ask about their projects, they are assigned to these projects: ${JSON.stringify(context?.assignedProjects || [])}. Use the 'id' field from this array when calling createProjectTask.
-      Keep your responses concise, conversational, and nicely formatted.
+      You are "Tracker Bot", a friendly AI assistant inside Office Tracker.
+      You are talking to ${context?.userName || "an employee"}.
+
+      ### CONTEXT
+      - Time: ${new Date().toLocaleString()}
+      - Checked In Today: ${context?.hasCheckedIn ? "Yes" : "No"}
+      - Work Update Submitted Today: ${context?.hasWorkUpdate ? "Yes" : "No"}
+      - Yesterday's Update: ${context?.yesterdaysUpdate ? JSON.stringify(context.yesterdaysUpdate) : "None"}
+      - Assigned Projects: ${JSON.stringify(context?.assignedProjects || [])}
+      - Assigned Tasks/Bugs: ${JSON.stringify(context?.assignedTasks || [])}
+
+      ### HOW TO BEHAVE
+      - Be SHORT, SIMPLE, and FRIENDLY. No long paragraphs. No heavy explanations.
+      - Ask ONLY 1 question at a time. Never ask multiple questions together.
+      - When listing tasks or info, use clean short bullet points. No IDs.
+      - Correct poor grammar silently when saving to database.
+      - Give a warm 1-line response before asking the next question.
+      - NEVER say "Got it." alone. Always add a small encouraging note.
+
+      ### WORK UPDATE (Human-Like Conversation Flow)
+      When the user submits a work update, have a warm, natural, interactive conversation. Collect details to log their update, asking questions conversationally ONE BY ONE:
+      1. Project & Task: Check their Assigned Projects and Assigned Tasks/Bugs. Ask them which project/task they worked on today (referring to their actual assigned items from context if any, otherwise listing the projects list names).
+      2. Progress & ETA Check: Ask how it's going and if they'll finish it within their original estimated time. Ask: "Is it completed, or still in progress? Do you think you'll hit your ETA, or do you need extra time/support?"
+      3. Dynamic Extension Check: If they say they need extra time, ask them how much extra time they need (revised ETA) and if they have any other work they are handling. Acknowledge it supportively.
+      4. Blockers: Ask if they have any blockers or tech issues holding them back.
+      5. Mood check: Warmly ask how they feel about their pace overall (e.g. "Good", "Normal", or "Stressed").
+      Once you have the details, execute the logWorkUpdate function immediately. Keep it conversational throughout.
+
+      ### TASK MANAGEMENT
+      - Create task → call createProjectTask
+      - Update task → call updateProjectTask  
+      - Mark done → call closeProjectTask
+
+      ### RULE
+      Keep every response under 3 lines unless listing tasks. Use markdown lightly.
     `;
 
     const formattedHistory = history.map((msg: any) => ({
@@ -111,7 +163,20 @@ export async function POST(request: Request) {
       ],
     });
 
-    const result = await chat.sendMessage(message);
+    const msgParts: any[] = [{ text: message }];
+    if (base64Image) {
+      // base64Image format: data:image/png;base64,iVBORw0K...
+      const mimeType = base64Image.split(";")[0].split(":")[1];
+      const base64Data = base64Image.split(",")[1];
+      msgParts.push({
+        inlineData: {
+          data: base64Data,
+          mimeType: mimeType
+        }
+      });
+    }
+
+    const result = await chat.sendMessage(msgParts);
     let text = result.response.text();
 
     const call = result.response.functionCalls()?.[0];
@@ -167,12 +232,86 @@ export async function POST(request: Request) {
             uid: context.uid,
             userEmail: context.userEmail || "",
             userName: context.userName || "Unknown",
-            task: args.task,
-            notes: args.notes,
-            status: args.status,
-            priority: args.priority || "Medium",
+            todayTask: args.todayTask || "",
+            nextTask: args.nextTask || "",
+            blockers: args.blockers || "None",
+            status: args.status || "Working Smoothly",
+            productivity: args.productivity || "Normal",
+            completionPercent: args.completionPercent || 0,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
           });
+          
+          if (args.taskId) {
+            // 1. Log to the project management kanban (workLogs)
+            await adminDb.collection("workLogs").add({
+              userId: context.uid,
+              userName: context.userName || context.userEmail || "Unknown",
+              taskId: args.taskId,
+              description: args.todayTask,
+              hoursWorked: args.hoursWorked || 8,
+              date: new Date().toISOString()
+            });
+
+            // 2. Update completion percent in the actual task
+            if (args.completionPercent) {
+              await adminDb.collection("projectTasks").doc(args.taskId).update({
+                progress: args.completionPercent
+              });
+            }
+
+            // 3. Log to the Employee Daily Sheets (dailyEntries)
+            try {
+              const pTaskSnap = await adminDb.collection("projectTasks").doc(args.taskId).get();
+              if (pTaskSnap.exists) {
+                const pTask = pTaskSnap.data() as any;
+                const proj = context.assignedProjects?.find((p: any) => p.id === pTask.projectId);
+                const projectName = proj ? proj.name : "Unknown Project";
+                
+                const newTaskEntry = {
+                  id: "auto-" + Date.now(),
+                  projectId: pTask.projectId || "",
+                  projectName: projectName,
+                  taskTitle: pTask.title || "",
+                  description: args.todayTask,
+                  hoursWorked: args.hoursWorked || 8,
+                  workStatus: args.status === "Completed" ? "Completed" : "In Progress",
+                  category: pTask.ticketType === "bug" ? "Bug Fixing" : "Development"
+                };
+
+                const todayStr = new Date().toISOString().split("T")[0];
+                const viewMonth = todayStr.substring(0, 7);
+                const qSnap = await adminDb.collection("dailyEntries")
+                  .where("userId", "==", context.uid)
+                  .where("date", "==", todayStr)
+                  .get();
+
+                if (qSnap.empty) {
+                  await adminDb.collection("dailyEntries").add({
+                    userId: context.uid,
+                    userName: context.userName || context.userEmail || "Unknown",
+                    userEmail: context.userEmail || "",
+                    date: todayStr,
+                    month: viewMonth,
+                    tasks: [newTaskEntry],
+                    totalHours: args.hoursWorked || 8,
+                    status: "draft",
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                  });
+                } else {
+                  const docId = qSnap.docs[0].id;
+                  const existingData = qSnap.docs[0].data();
+                  await adminDb.collection("dailyEntries").doc(docId).update({
+                    tasks: admin.firestore.FieldValue.arrayUnion(newTaskEntry),
+                    totalHours: (existingData.totalHours || 0) + (args.hoursWorked || 8),
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                  });
+                }
+              }
+            } catch (err) {
+              console.error("Failed to sync to Daily Sheets:", err);
+            }
+          }
+          
           funcResultData.message = "Successfully saved the work update.";
         }
         else if (call.name === "createProjectTask") {
@@ -234,7 +373,10 @@ export async function POST(request: Request) {
       text = funcResult.response.text();
     }
 
-    return NextResponse.json({ text });
+    return NextResponse.json({ 
+      text,
+      workUpdateLogged: !!(call && call.name === "logWorkUpdate")
+    });
   } catch (error: any) {
     console.error("Error in chat route:", error);
     return NextResponse.json(

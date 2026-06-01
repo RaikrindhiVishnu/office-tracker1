@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 @import "handsontable/dist/handsontable.full.min.css";
 
 /* ---------- GLOBAL COLOR & FONT LOCK ---------- */

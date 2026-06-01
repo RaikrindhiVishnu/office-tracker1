@@ -40,6 +40,7 @@ import AdminBreakView from "@/components/AdminBreakView";  // ← NEW
 import LeadsView from "./LeadsView"; // ← NEW CRM MODULE
 import InvoicesView from "./InvoicesView"; // ← NEW BILLING MODULE
 import ITAssetsView from "./it-assets/page"; // ← NEW ASSETS MODULE
+import AIInsightsView from "./AIInsightsView"; // ← NEW AI DASHBOARD
 import { Employee } from "@/types/Employee";
 import type { Session } from "@/types/Employee";
 import { EmployeeRow } from "@/types/EmployeeRow";
@@ -648,6 +649,12 @@ export default function AdminPage() {
           />
 
           <NavItem
+            icon={<svg className="w-5 h-5 text-fuchsia-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>}
+            label="AI Insights" active={view === "ai-insights"}
+            onClick={() => { setView("ai-insights"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
+          <NavItem
             icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>}
             label="Employees" active={view === "employees"}
             onClick={() => { setView("employees"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
@@ -996,10 +1003,11 @@ export default function AdminPage() {
           <IncomingCallListener />
           <MeetChatApp users={users} isOpen={showMeet} onClose={() => setShowMeet(false)} />
 
-          {view === "accounts" && <AccountsDashboard />}
-          {view === "leads" && <LeadsView />}
-          {view === "invoices" && <InvoicesView />}
-          {view === "it-assets" && <ITAssetsView />}
+          {view === "accounts" && <AccountsDashboard />}                                   
+          {view === "leads" && <LeadsView />}                                              
+          {view === "invoices" && <InvoicesView />}                                        
+          {view === "it-assets" && <ITAssetsView />}                                       
+          {view === "ai-insights" && <AIInsightsView />}
 
           {view === "leads" && <LeadsView />}
 

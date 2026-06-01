@@ -612,9 +612,17 @@ export default function EmployeeTodayPanel({ employee, adminUid, onClose }: Prop
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {updates.map(u => {
+                  {updates.map((u: any) => {
                     const cfg = STATUS_CFG[u.status] ?? STATUS_CFG["In Progress"];
-                    const pcfg = PRIORITY_CFG[u.priority] ?? PRIORITY_CFG["Medium"];
+                    const priority = u.priority || "Medium";
+                    const pcfg = PRIORITY_CFG[priority] ?? PRIORITY_CFG["Medium"];
+                    
+                    // Support both old schema and new AI structured schema
+                    const mainTask = u.todayTask || u.task || "Work Update";
+                    const nextTask = u.nextTask || "";
+                    const blockers = u.blockers && u.blockers !== "None" ? u.blockers : "";
+                    const notes = u.notes || "";
+                    
                     return (
                       <div key={u.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                         <div className={`h-1 w-full ${cfg.bg}`}/>
@@ -622,17 +630,24 @@ export default function EmployeeTodayPanel({ employee, adminUid, onClose }: Prop
                           <div className="flex items-start gap-3">
                             <span className="text-xl mt-0.5 shrink-0 text-indigo-500">{cfg.icon}</span>
                             <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-slate-800">{u.task}</p>
-                              {u.notes && (
-                                <p className="text-xs text-slate-500 mt-1 italic leading-relaxed">"{u.notes}"</p>
-                              )}
+                              <p className="font-semibold text-slate-800">{mainTask}</p>
+                              
+                              {notes && <p className="text-xs text-slate-500 mt-1 italic leading-relaxed">"{notes}"</p>}
+                              {nextTask && <p className="text-xs text-slate-600 mt-1"><span className="font-semibold text-slate-700">Next:</span> {nextTask}</p>}
+                              {blockers && <p className="text-xs text-red-500 mt-1"><span className="font-semibold text-red-600">Blocker:</span> {blockers}</p>}
+                              
                               <div className="flex items-center gap-2 mt-2 flex-wrap">
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.color}`}>
                                   {u.status}
                                 </span>
+                                {u.productivity && (
+                                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                                    {u.productivity}
+                                  </span>
+                                )}
                                 <span className="flex items-center gap-1 text-[10px] font-semibold">
                                   <span className={`w-1.5 h-1.5 rounded-full ${pcfg.dot}`}/>
-                                  <span className={pcfg.color}>{u.priority}</span>
+                                  <span className={pcfg.color}>{priority}</span>
                                 </span>
                                 <span className="text-[10px] text-slate-400 ml-auto">{fmtTime(u.createdAt)}</span>
                               </div>

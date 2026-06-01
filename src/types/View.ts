@@ -17,4 +17,5 @@ export type View =
   | "breakMonitor"
   | "leads"
   | "invoices"
-  | "it-assets";
+  | "it-assets"
+  | "ai-insights";
