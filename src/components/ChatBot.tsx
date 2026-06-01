@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { MessageCircle, X, Send, Bot } from "lucide-react";
+import { MessageCircle, X, Send, Bot, Mic, VolumeX, Volume2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { collection, query, where, getDocs } from "firebase/firestore";
@@ -21,6 +21,46 @@ export default function ChatBot() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [hasStarted, setHasStarted] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = true;
+      recognitionRef.current.onresult = (event: any) => {
+        let text = "";
+        for (let i = 0; i < event.results.length; i++) {
+          text += event.results[i][0].transcript;
+        }
+        setInput(text);
+      };
+      recognitionRef.current.onend = () => setIsListening(false);
+      recognitionRef.current.onerror = () => setIsListening(false);
+    }
+  }, []);
+
+  const toggleListen = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+    } else {
+      if (recognitionRef.current) {
+        setInput("");
+        recognitionRef.current.start();
+        setIsListening(true);
+      }
+    }
+  };
+
+  const speak = (text: string) => {
+    if (isMuted || !window.speechSynthesis) return;
+    const cleanText = text.replace(/[*_~`]/g, "");
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    window.speechSynthesis.speak(utterance);
+  };
 
   // Auto-scroll to bottom of chat
   useEffect(() => {
@@ -92,9 +132,14 @@ export default function ChatBot() {
       ];
       const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
       
-      const greetingText = `Hello ${context.userName || "there"}! I'm **Tracker Bot**, your AI HR Assistant and Office Manager. Here is your current status for today:\n* **Attendance:** ${context.hasCheckedIn ? "Checked in" : "Not checked in yet"}\n* **Work Update:** ${context.hasWorkUpdate ? "Submitted" : "Not submitted yet"}\n\n${randomGreeting}`;
+      let greetingText = `Hello ${context.userName || "there"}! I'm **Tracker Bot**, your AI HR Assistant and Office Manager. Here is your current status for today:\n* **Attendance:** ${context.hasCheckedIn ? "Checked in" : "Not checked in yet"}\n* **Work Update:** ${context.hasWorkUpdate ? "Submitted" : "Not submitted yet"}\n\n${randomGreeting}`;
       
+      if (!context.hasWorkUpdate) {
+        greetingText += "\n\n*Since you haven't submitted your update yet, what have you been working on today?*";
+      }
+
       setMessages([{ role: "bot", text: greetingText }]);
+      speak(greetingText);
     } catch (err) {
       console.error(err);
     } finally {
@@ -130,9 +175,12 @@ export default function ChatBot() {
       const data = await res.json();
       if (res.ok && data.text) {
         setMessages((prev) => [...prev, { role: "bot", text: data.text }]);
+        speak(data.text);
       } else {
         const errorMsg = data.details || data.error || "I'm having trouble connecting right now.";
-        setMessages((prev) => [...prev, { role: "bot", text: `I'm sorry, an error occurred: ${errorMsg}` }]);
+        const botError = `I'm sorry, an error occurred: ${errorMsg}`;
+        setMessages((prev) => [...prev, { role: "bot", text: botError }]);
+        speak(botError);
       }
     } catch (error: any) {
       console.error(error);
@@ -171,12 +219,24 @@ export default function ChatBot() {
                   </div>
                 </div>
               </div>
-              <button 
-                onClick={() => setIsOpen(false)}
-                className="text-white/80 hover:text-white transition-colors hover:bg-white/10 p-1.5 rounded-lg"
-              >
-                <X size={20} />
-              </button>
+              <div className="flex items-center gap-1">
+                <button 
+                  onClick={() => {
+                    setIsMuted(!isMuted);
+                    if (!isMuted) window.speechSynthesis?.cancel(); // Stop talking if muted mid-sentence
+                  }}
+                  className="text-white/80 hover:text-white transition-colors hover:bg-white/10 p-1.5 rounded-lg"
+                  title={isMuted ? "Unmute Bot" : "Mute Bot"}
+                >
+                  {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                </button>
+                <button 
+                  onClick={() => setIsOpen(false)}
+                  className="text-white/80 hover:text-white transition-colors hover:bg-white/10 p-1.5 rounded-lg"
+                >
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             {/* Messages Area */}
@@ -218,6 +278,14 @@ export default function ChatBot() {
                 }}
                 className="flex items-center gap-2 bg-slate-50 rounded-full border border-gray-200 px-2 py-1.5 focus-within:border-[#0b3a5a] focus-within:ring-1 focus-within:ring-[#0b3a5a]/20 transition-all shadow-sm"
               >
+                <button
+                  type="button"
+                  onClick={toggleListen}
+                  className={`${isListening ? "bg-red-500 hover:bg-red-600 animate-pulse text-white" : "bg-gray-100 hover:bg-gray-200 text-gray-500"} p-2 rounded-full transition-colors`}
+                  title="Speak to dictate"
+                >
+                  <Mic size={16} />
+                </button>
                 <input
                   type="text"
                   value={input}

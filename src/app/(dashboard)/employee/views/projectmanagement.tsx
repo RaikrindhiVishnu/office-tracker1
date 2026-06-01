@@ -1405,7 +1405,22 @@ function TaskDetailModal({
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg bg-white/20">{tc.icon}</div>
                 <div>
                   <p className="text-xs font-semibold text-white/70">{projectName}</p>
-                  <p className="text-[10px] font-bold text-white/50">{tc.label} {task.taskCode && `· ${task.taskCode}`}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-[10px] font-bold text-white/50 tracking-wider">
+                      {tc.label} {task.taskCode && `· ${task.taskCode}`}
+                    </p>
+                    <button 
+                      onClick={() => {
+                        const url = `${window.location.origin}${window.location.pathname}?tab=projects&projectId=${task.projectId}&taskId=${task.id}`;
+                        navigator.clipboard.writeText(url);
+                        alert("Link copied to clipboard!");
+                      }} 
+                      className="text-white/50 hover:text-white transition-colors" 
+                      title="Copy Link"
+                    >
+                      🔗
+                    </button>
+                  </div>
                 </div>
               </div>
 

@@ -68,6 +68,7 @@ interface FilterState {
   priority: string;
   type: string;
   assignee: string;
+  createdBy: string;
 }
 
 interface TaskCardProps {
@@ -618,7 +619,7 @@ export function KanbanBoard({
 
   /* ── Filter state ── */
   const [filters, setFilters] = useState<FilterState>({
-    search: "", mine: false, overdue: false, priority: "", type: "", assignee: "",
+    search: "", mine: false, overdue: false, priority: "", type: "", assignee: "", createdBy: ""
   });
 
   /* ── Drag state ── */
@@ -685,6 +686,7 @@ export function KanbanBoard({
       if (filters.priority && t.priority !== filters.priority) return false;
       if (filters.type && t.ticketType !== filters.type) return false;
       if (filters.assignee && t.assignedTo !== filters.assignee) return false;
+      if (filters.createdBy && t.createdBy !== filters.createdBy) return false;
       return true;
     });
   }, [localTasks, filters, currentUserId]);
@@ -1668,7 +1670,15 @@ export function KanbanBoard({
           <select value={filters.assignee} onChange={e => setFilters(f => ({ ...f, assignee: e.target.value }))}
             style={{ fontSize: "12px", padding: "6px 10px", borderRadius: "8px", border: `1px solid ${filters.assignee ? projectColor : "#e5e7eb"}`, background: filters.assignee ? projectColor + "10" : "#f9fafb", color: filters.assignee ? projectColor : "#4b5563", cursor: "pointer", fontWeight: 600, outline: "none" }}>
             <option value="">All assignees</option>
-            {allAssignees.map(([uid, name]) => <option key={uid} value={uid}>{cleanName(name)}</option>)}
+            {allAssignees.map(([uid, name]) => <option key={`assignee-${uid}`} value={uid}>{cleanName(name)}</option>)}
+          </select>
+        )}
+        
+        {allAssignees.length > 0 && (
+          <select value={filters.createdBy} onChange={e => setFilters(f => ({ ...f, createdBy: e.target.value }))}
+            style={{ fontSize: "12px", padding: "6px 10px", borderRadius: "8px", border: `1px solid ${filters.createdBy ? projectColor : "#e5e7eb"}`, background: filters.createdBy ? projectColor + "10" : "#f9fafb", color: filters.createdBy ? projectColor : "#4b5563", cursor: "pointer", fontWeight: 600, outline: "none" }}>
+            <option value="">All creators</option>
+            {allAssignees.map(([uid, name]) => <option key={`creator-${uid}`} value={uid}>{cleanName(name)}</option>)}
           </select>
         )}
 

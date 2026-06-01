@@ -873,10 +873,9 @@ export function TaskImages({
 }: TaskImagesProps) {
   const [uploading, setUploading] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFile = async (file: File) => {
     if (!file.type.startsWith("image/")) {
       alert("Only image files are allowed");
       return;
@@ -885,15 +884,15 @@ export function TaskImages({
       alert("Max image size is 5MB");
       return;
     }
+    setUploading(true);
     try {
-      setUploading(true);
       const reader = new FileReader();
       reader.onload = async (ev) => {
         const base64 = ev.target?.result as string;
         if (base64) {
           const image: TaskImage = {
             url: base64,
-            name: file.name,
+            name: file.name || `Pasted Image - ${new Date().toLocaleString()}`,
             uploadedBy: "",
             uploadedAt: new Date().toISOString(),
           };
@@ -911,7 +910,35 @@ export function TaskImages({
     } catch (err: any) {
       alert(`Upload failed: ${err.message}`);
       setUploading(false);
-    } finally {
+    }
+  };
+
+  useEffect(() => {
+    if (!canManage) return;
+
+    const handleGlobalPaste = async (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (!file) continue;
+          e.preventDefault();
+          await handleFile(file);
+          break;
+        }
+      }
+    };
+
+    window.addEventListener("paste", handleGlobalPaste as any);
+    return () => window.removeEventListener("paste", handleGlobalPaste as any);
+  }, [canManage, taskId]);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      await handleFile(file);
       e.target.value = "";
     }
   };
@@ -923,8 +950,26 @@ export function TaskImages({
     });
   };
 
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+  const onDragLeave = () => setIsDragging(false);
+  const onDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (!canManage) return;
+    const file = e.dataTransfer.files?.[0];
+    if (file) await handleFile(file);
+  };
+
   return (
-    <div>
+    <div 
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      className={`rounded-xl transition-colors ${isDragging ? "bg-indigo-50 border-2 border-indigo-400 border-dashed p-4 -m-4" : ""}`}
+    >
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
           Images ({images.length})
@@ -948,61 +993,61 @@ export function TaskImages({
         )}
       </div>
 
-      {images.length === 0 ? (
-        <div className="text-center py-6 text-gray-300 border-2 border-dashed border-gray-200 rounded-xl">
-          <div style={{ fontSize: 32 }} className="mb-1">
-            🖼️
-          </div>
-          <p className="text-xs">No images attached</p>
-          {canManage && (
-            <p className="text-xs text-gray-200 mt-1">
-              Click "Add Image" above
-            </p>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-3 gap-2">
-          {images.map((img, i) => (
-            <div
-              key={i}
-              className="relative group rounded-xl overflow-hidden border border-gray-100 aspect-square cursor-pointer"
-              onClick={() => setLightbox(img.url)}
-            >
-              <img
-                src={img.url}
-                alt={img.name}
-                className="w-full h-full object-cover transition group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+      <div className="grid grid-cols-3 gap-2">
+        {images.map((img, i) => (
+          <div
+            key={i}
+            className="relative group rounded-xl overflow-hidden border border-gray-100 aspect-square cursor-pointer"
+            onClick={() => setLightbox(img.url)}
+          >
+            <img
+              src={img.url}
+              alt={img.name}
+              className="w-full h-full object-cover transition group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setLightbox(img.url);
+                }}
+                className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-gray-700 text-xs hover:bg-white transition"
+              >
+                🔍
+              </button>
+              {canManage && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setLightbox(img.url);
+                    handleRemove(img);
                   }}
-                  className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center text-gray-700 text-xs hover:bg-white transition"
+                  className="w-8 h-8 rounded-full bg-red-500/90 flex items-center justify-center text-white text-xs hover:bg-red-500 transition"
                 >
-                  🔍
+                  🗑
                 </button>
-                {canManage && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemove(img);
-                    }}
-                    className="w-8 h-8 rounded-full bg-red-500/90 flex items-center justify-center text-white text-xs hover:bg-red-500 transition"
-                  >
-                    🗑
-                  </button>
-                )}
-              </div>
+              )}
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
+        
+        {canManage && (
+          <label className="relative flex flex-col items-center justify-center aspect-square rounded-xl border-2 border-dashed border-gray-200 hover:border-indigo-400 hover:bg-indigo-50/50 transition cursor-pointer text-gray-400 hover:text-indigo-500">
+            <span style={{ fontSize: 24 }} className="mb-2 opacity-50">📥</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-center px-2">Paste or drop<br/>image here</span>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleUpload}
+              className="hidden"
+              disabled={uploading}
+            />
+          </label>
+        )}
+      </div>
 
       {lightbox && (
         <div
-          className="fixed inset-0 z-100 flex items-center justify-center bg-black/80"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80"
           onClick={() => setLightbox(null)}
         >
           <img

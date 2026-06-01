@@ -549,6 +549,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
   const [viewMode, setViewMode] = useState<"dashboard" | "kanban" | "list" | "timeline" | "workload" | "reports" | "gantt" | "sprint_reports">("kanban");
   const [filterPriority, setFilterPriority] = useState("all");
   const [filterAssignee, setFilterAssignee] = useState("all");
+  const [filterCreatedBy, setFilterCreatedBy] = useState("all");
   const [filterType, setFilterType] = useState("all");
   const [search, setSearch] = useState("");
 
@@ -1017,6 +1018,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
       tasks.filter(t => {
         if (filterPriority !== "all" && t.priority !== filterPriority) return false;
         if (filterAssignee !== "all" && t.assignedTo !== filterAssignee) return false;
+        if (filterCreatedBy !== "all" && t.createdBy !== filterCreatedBy) return false;
         if (filterType !== "all" && t.ticketType !== filterType) return false;
         if (search && !t.title.toLowerCase().includes(search.toLowerCase()) && !t.taskCode?.toLowerCase().includes(search.toLowerCase())) return false;
         return true;
@@ -1661,7 +1663,11 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                 </select>
                 <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none">
                   <option value="all">All Assignees</option>
-                  {projectMembers.map((u: any) => <option key={u.uid} value={u.uid}>{u.displayName || u.name || u.email?.split("@")[0] || "Unknown"}</option>)}
+                  {projectMembers.map((u: any) => <option key={`assignee-${u.uid}`} value={u.uid}>{u.displayName || u.name || u.email?.split("@")[0] || "Unknown"}</option>)}
+                </select>
+                <select value={filterCreatedBy} onChange={e => setFilterCreatedBy(e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none">
+                  <option value="all">All Creators</option>
+                  {projectMembers.map((u: any) => <option key={`creator-${u.uid}`} value={u.uid}>{u.displayName || u.name || u.email?.split("@")[0] || "Unknown"}</option>)}
                 </select>
                 <select value={filterType} onChange={e => setFilterType(e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none">
                   <option value="all">All Types</option>
