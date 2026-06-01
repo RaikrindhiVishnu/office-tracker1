@@ -669,7 +669,13 @@ export function KanbanBoard({
 
   /* ── Filtered tasks ── */
   const filteredTasks = useMemo(() => {
-    return localTasks.filter(t => {
+    const validColumnIds = new Set(columns.map(c => c.id));
+    const fallbackStatus = columns.length > 0 ? columns[0].id : "new";
+
+    return localTasks.map(t => {
+      // Prevent tasks from disappearing if their status doesn't match any board column
+      return validColumnIds.has(t.status) ? t : { ...t, status: fallbackStatus };
+    }).filter(t => {
       if (filters.search) {
         const s = filters.search.toLowerCase();
         if (!(t.title.toLowerCase().includes(s) || (t.taskCode || "").toLowerCase().includes(s) || (t.description || "").toLowerCase().includes(s) || (t.tags || []).some(tag => tag.toLowerCase().includes(s)))) return false;

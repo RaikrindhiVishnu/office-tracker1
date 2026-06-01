@@ -2257,6 +2257,33 @@ export default function ProjectManagement({ user, projects, users }: any) {
   const [quickAddStory, setQuickAddStory] = useState<{ story: Task; ticketType: TicketType } | null>(null);
   const [viewingTask, setViewingTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [deepLinkTaskId, setDeepLinkTaskId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const pid = params.get("projectId");
+      const tid = params.get("taskId");
+      if (pid && tid) {
+        const p = projects?.find((x: any) => x.id === pid);
+        if (p) {
+          setActiveProject(p);
+          setDeepLinkTaskId(tid);
+          window.history.replaceState({}, "", window.location.pathname + "?tab=projects");
+        }
+      }
+    }
+  }, [projects]);
+
+  useEffect(() => {
+    if (deepLinkTaskId && tasks.length > 0) {
+      const t = tasks.find(x => x.id === deepLinkTaskId);
+      if (t) {
+        setViewingTask(t);
+        setDeepLinkTaskId(null);
+      }
+    }
+  }, [tasks, deepLinkTaskId]);
   const [showSprintModal, setShowSprintModal] = useState(false);
   const [editingSprint, setEditingSprint] = useState<any>(null);
   const [showProjectModal, setShowProjectModal] = useState(false);

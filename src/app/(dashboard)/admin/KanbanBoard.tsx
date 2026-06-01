@@ -1134,7 +1134,14 @@ export function KanbanBoard({
 
   /* ── helpers ── */
 
-  const filteredTasks = useMemo(() => tasks.filter(t => {
+  const filteredTasks = useMemo(() => {
+    const validColumnIds = new Set(columns.map(c => c.id));
+    const fallbackStatus = columns.length > 0 ? columns[0].id : "new";
+
+    return tasks.map(t => {
+      // Prevent tasks from disappearing if their status doesn't match any board column
+      return validColumnIds.has(t.status) ? t : { ...t, status: fallbackStatus };
+    }).filter(t => {
     if (filters.mine && t.assignedTo !== currentUser?.uid) return false;
     if (filters.overdue && !isOverdue(t.dueDate, t.status)) return false;
     if (filters.priority && t.priority !== filters.priority) return false;

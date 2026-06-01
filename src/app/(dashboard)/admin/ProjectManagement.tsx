@@ -495,7 +495,34 @@ function AdminCalendar({ entries, viewMonth, year, month }: { entries: DailyEntr
 export default function AdminProjectManagement({ user, projects, users }: { user: any; projects: any[]; users: any[] }) {
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [deepLinkTaskId, setDeepLinkTaskId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const pid = params.get("projectId");
+      const tid = params.get("taskId");
+      if (pid && tid) {
+        const p = projects?.find((x: any) => x.id === pid);
+        if (p) {
+          setActiveProject(p);
+          setDeepLinkTaskId(tid);
+          window.history.replaceState({}, "", window.location.pathname + "?tab=projects");
+        }
+      }
+    }
+  }, [projects]);
+
+  useEffect(() => {
+    if (deepLinkTaskId && tasks.length > 0) {
+      const t = tasks.find(x => x.id === deepLinkTaskId);
+      if (t) {
+        setActiveTask(t);
+        setDeepLinkTaskId(null);
+      }
+    }
+  }, [tasks, deepLinkTaskId]);
   const [sprints, setSprints] = useState<Sprint[]>([]);
   const [activeSprint, setActiveSprint] = useState<Sprint | null>(null);
   const [activities, setActivities] = useState<any[]>([]);
@@ -1125,7 +1152,14 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                     <button onClick={closeTaskDetail} className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition">✕</button>
                   </div>
                 </div>
-                <p className="text-xs font-bold text-white/70 tracking-wider">{activeTask?.taskCode || "—"}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-bold text-white/70 tracking-wider">{activeTask?.taskCode || "—"}</p>
+                  <button onClick={() => {
+                    const url = `${window.location.origin}${window.location.pathname}?tab=projects&projectId=${activeProject!.id}&taskId=${activeTask!.id}`;
+                    navigator.clipboard.writeText(url);
+                    alert("Link copied to clipboard!");
+                  }} className="text-white/70 hover:text-white" title="Copy Link">🔗</button>
+                </div>
                 <h2 className="text-xl font-bold text-white leading-snug mb-3">{activeTask.title}</h2>
                 <div className="flex items-center gap-2 flex-wrap mb-3">
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isOverdue ? "bg-red-50 text-red-600" : "bg-indigo-50 text-indigo-600"}`}>{isOverdue ? "⚠️ Overdue" : "🕒 On Track"}</span>
