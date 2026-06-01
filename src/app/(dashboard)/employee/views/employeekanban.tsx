@@ -639,7 +639,7 @@ export function KanbanBoard({
       if (e.key === "s" || e.key === "S") { e.preventDefault(); searchRef.current?.focus(); }
       if (e.key === "Escape") {
         if (isFullscreen) { setIsFullscreen(false); return; }
-        setFilters({ search: "", mine: false, overdue: false, priority: "", type: "", assignee: "" });
+        setFilters({ search: "", mine: false, overdue: false, priority: "", type: "", assignee: "", createdBy: "" });
         setSelectedTasks(new Set());
         setBulkMoveOpen(false);
         setStoryPopup(null);
@@ -1683,7 +1683,7 @@ export function KanbanBoard({
         )}
 
         {activeFiltersCount > 0 && (
-          <button onClick={() => setFilters({ search: "", mine: false, overdue: false, priority: "", type: "", assignee: "" })}
+          <button onClick={() => setFilters({ search: "", mine: false, overdue: false, priority: "", type: "", assignee: "", createdBy: "" })}
             style={{ fontSize: "12px", padding: "6px 10px", borderRadius: "8px", border: "1px solid #fca5a5", background: "#fef2f2", color: "#dc2626", cursor: "pointer", fontWeight: 600 }}>
             Clear {activeFiltersCount} filter{activeFiltersCount > 1 ? "s" : ""}
           </button>
