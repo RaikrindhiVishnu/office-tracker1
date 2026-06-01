@@ -1,5 +1,5 @@
 "use client";
-
+// Trigger deployment sync
 import { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, Bot, Mic, VolumeX, Volume2, Paperclip, ImageIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
