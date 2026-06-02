@@ -622,8 +622,13 @@ export default function ZohoStyleEmployeeDashboard() {
               ) : (
                 <button disabled={busy} onClick={doCheckIn} className="h-8 px-4 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-bold text-xs hover:scale-[1.02] active:scale-95 shadow-sm">Check In</button>
               )}
-              <button onClick={() => setShowCalendar(true)} className="p-2 hover:bg-gray-100 rounded-lg transition-all group" title="Calendar">
+              <button onClick={() => setShowCalendar(true)} className="p-2 hover:bg-gray-100 rounded-lg transition-all group relative" title="Calendar">
                 <img src="https://cdn-icons-png.flaticon.com/128/668/668278.png" alt="Calendar" className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" />
+                {todayBirthdayCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full border-2 border-white shadow-sm animate-bounce">
+                    {todayBirthdayCount}
+                  </span>
+                )}
               </button>
 
               {/* Notification bell */}

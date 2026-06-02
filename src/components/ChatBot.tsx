@@ -54,18 +54,43 @@ export default function ChatBot() {
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (SpeechRecognition) {
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.onresult = (event: any) => {
-        let text = "";
-        for (let i = 0; i < event.results.length; i++) {
-          text += event.results[i][0].transcript;
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true; // Stay active to give user time to speak
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+      
+      recognition.onresult = (event: any) => {
+        let interimTranscript = "";
+        let finalTranscript = "";
+        
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
         }
-        setInput(text);
+        
+        const transcript = finalTranscript || interimTranscript;
+        if (transcript) {
+          console.log("Speech recognized text:", transcript);
+          setInput(transcript);
+        }
       };
-      recognitionRef.current.onend = () => setIsListening(false);
-      recognitionRef.current.onerror = () => setIsListening(false);
+      
+      recognition.onend = () => {
+        console.log("Speech recognition ended");
+        setIsListening(false);
+      };
+      
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error, event);
+        setIsListening(false);
+      };
+      
+      recognitionRef.current = recognition;
+    } else {
+      console.warn("SpeechRecognition not supported in this browser");
     }
   }, []);
 
@@ -82,10 +107,26 @@ export default function ChatBot() {
   };
 
   const speak = (text: string) => {
-    if (isMuted || !window.speechSynthesis) return;
-    const cleanText = text.replace(/[*_~`]/g, "");
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    window.speechSynthesis.speak(utterance);
+    if (!window.speechSynthesis) {
+      console.warn("SpeechSynthesis not supported in this browser");
+      return;
+    }
+    console.log("Speak called. isMuted status:", isMuted);
+    if (isMuted) return;
+    
+    try {
+      window.speechSynthesis.cancel(); // Clear any queued utterances
+      const cleanText = text.replace(/[*_~`]/g, "");
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      
+      utterance.onstart = () => console.log("Speech started speaking");
+      utterance.onend = () => console.log("Speech finished speaking");
+      utterance.onerror = (e: any) => console.error("SpeechSynthesis error code:", e.error, e);
+      
+      window.speechSynthesis.speak(utterance);
+    } catch (err) {
+      console.error("Failed to run speechSynthesis:", err);
+    }
   };
 
   const handleImageAttach = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -1,28 +1,32 @@
 import admin from "firebase-admin";
 
-if (!admin.apps.length) {
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+try {
+  if (!admin.apps.length) {
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-  if (projectId && clientEmail && privateKey) {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId,
-        clientEmail,
-        privateKey: privateKey.replace(/\\n/g, "\n"),
-      }),
-    });
-  } else {
-    // Graceful fallback during build time or local dev without env variables
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: "mock-project-id",
-        clientEmail: "mock-email@example.com",
-        privateKey: "-----BEGIN PRIVATE KEY-----\nMOCK\n-----END PRIVATE KEY-----",
-      }),
-    });
+    if (projectId && clientEmail && privateKey) {
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId,
+          clientEmail,
+          privateKey: privateKey.replace(/^"|"$/g, "").replace(/\\n/g, "\n"),
+        }),
+      });
+    } else {
+      // Graceful fallback during build time or local dev without env variables
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId: "mock-project-id",
+          clientEmail: "mock-email@example.com",
+          privateKey: "-----BEGIN PRIVATE KEY-----\nMOCK\n-----END PRIVATE KEY-----",
+        }),
+      });
+    }
   }
+} catch (err) {
+  console.error("FIREBASE ADMIN INITIALIZATION ERROR:", err);
 }
 
 export const adminDb = admin.firestore();
