@@ -64,8 +64,8 @@ function InfoRow({ label, value, editing, onChange, type="text", options, last=f
   type?:string; options?:string[]; last?:boolean;
 }) {
   return (
-    <div className={`flex items-center gap-6 py-3 ${!last ? "border-b border-gray-100" : ""}`}>
-      <span className="w-44 shrink-0 text-sm text-gray-500">{label}</span>
+    <div className={`flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 py-3 ${!last ? "border-b border-gray-100" : ""}`}>
+      <span className="sm:w-44 shrink-0 text-sm text-gray-500">{label}</span>
       {!editing ? (
         <span className="text-sm font-semibold text-gray-800">{value || "—"}</span>
       ) : options ? (
@@ -232,16 +232,16 @@ export default function ProfileView() {
 
   if(!localData){
     return(
-      <div className="flex gap-5 p-6 max-w-6xl mx-auto">
-        <div className="w-56 shrink-0"><Skeleton height={520} borderRadius={20}/></div>
-        <div className="flex-1 space-y-4"><Skeleton height={52} borderRadius={12}/><Skeleton height={240} borderRadius={16}/><Skeleton height={200} borderRadius={16}/></div>
+      <div className="flex flex-col md:flex-row gap-5 p-6 max-w-6xl mx-auto">
+        <div className="w-full md:w-56 shrink-0"><Skeleton height={520} borderRadius={20}/></div>
+        <div className="flex-1 space-y-4 w-full"><Skeleton height={52} borderRadius={12}/><Skeleton height={240} borderRadius={16}/><Skeleton height={200} borderRadius={16}/></div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-[#EEF0F5]" style={{fontFamily:"'DM Sans','Segoe UI',system-ui,sans-serif"}}>
-      <div className="max-w-6xl mx-auto px-4 py-2 flex gap-4 items-start" style={{minHeight:"calc(100vh - 2.5rem)"}}>
+      <div className="max-w-6xl mx-auto px-4 py-2 flex flex-col md:flex-row gap-4 items-start min-h-[calc(100vh-2.5rem)]">
 
         {/* ══════════════════════════════════════════════════════
             LEFT SIDEBAR
@@ -249,8 +249,7 @@ export default function ProfileView() {
               never overflows the viewport
         ══════════════════════════════════════════════════════ */}
         <div
-          className="w-56 shrink-0 sticky top-4 flex flex-col gap-3"
-          style={{ height:"calc(100vh - 2.5rem)" }}
+          className="w-full md:w-56 shrink-0 md:sticky md:top-4 flex flex-col gap-3 md:h-[calc(100vh-2.5rem)]"
         >
 
           {/* Profile Card — flex column, bottom section scrolls */}
@@ -340,8 +339,7 @@ export default function ProfileView() {
             RIGHT CONTENT PANEL — independently scrollable
         ══════════════════════════════════════════════════════ */}
         <div
-          className="flex-1 min-w-0 overflow-y-auto"
-          style={{ height:"calc(100vh - 2.5rem)" }}
+          className="flex-1 min-w-0 overflow-y-auto w-full md:h-[calc(100vh-2.5rem)]"
         >
 
           {/* Tab bar */}

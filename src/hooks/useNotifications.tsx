@@ -1,26 +1,12 @@
 "use client";
 
-// src/hooks/useNotifications.ts + src/components/common/NotificationBell.tsx
-// Split into two exports from one file for convenience.
-// In your project, split into separate files if preferred.
+// src/hooks/useNotifications.tsx
+// Backwards-compatible hook and bell component wrapping global NotificationContext
 
-// ═══════════════════════════════════════════════════════════════
-//  HOOK  — src/hooks/useNotifications.ts
-// ═══════════════════════════════════════════════════════════════
-
-import { useState, useEffect } from "react";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
-  updateDoc,
-  doc,
-  writeBatch,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import type { Notification } from "@/types/leave";
+import { useState as useStateC } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { useNotifications as useGlobalNotifications } from "@/context/NotificationContext";
+import { Notification } from "@/lib/notifications";
 
 interface UseNotificationsReturn {
   notifications : Notification[];
@@ -31,50 +17,11 @@ interface UseNotificationsReturn {
 }
 
 export function useNotifications(uid: string | undefined): UseNotificationsReturn {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading,       setLoading]       = useState<boolean>(true);
-
-  useEffect(() => {
-    if (!uid) { setLoading(false); return; }
-
-    const q = query(
-      collection(db, "notifications"),
-      where("uid", "==", uid),
-      orderBy("createdAt", "desc")
-    );
-
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        setNotifications(
-          snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Notification, "id">) }))
-        );
-        setLoading(false);
-      },
-      (err) => {
-        console.error("useNotifications:", err);
-        setLoading(false);
-      }
-    );
-
-    return () => unsub();
-  }, [uid]);
-
-  async function markAsRead(id: string): Promise<void> {
-    await updateDoc(doc(db, "notifications", id), { read: true });
-  }
-
-  async function markAllRead(): Promise<void> {
-    const unread = notifications.filter((n) => !n.read);
-    if (!unread.length) return;
-    const batch = writeBatch(db);
-    unread.forEach((n) => batch.update(doc(db, "notifications", n.id), { read: true }));
-    await batch.commit();
-  }
+  const { notifications, unreadCount, loading, markAsRead, markAllRead } = useGlobalNotifications();
 
   return {
     notifications,
-    unreadCount : notifications.filter((n) => !n.read).length,
+    unreadCount,
     loading,
     markAsRead,
     markAllRead,
@@ -82,11 +29,8 @@ export function useNotifications(uid: string | undefined): UseNotificationsRetur
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  COMPONENT  — src/components/common/NotificationBell.tsx
+//  COMPONENT  — NotificationBell
 // ═══════════════════════════════════════════════════════════════
-
-import { useState as useStateC } from "react";
-import { useAuth } from "@/context/AuthContext";
 
 export function NotificationBell() {
   const { user } = useAuth();
@@ -95,7 +39,7 @@ export function NotificationBell() {
 
   const [open, setOpen] = useStateC<boolean>(false);
 
-  function formatTs(ts: Notification["createdAt"]): string {
+  function formatTs(ts: any): string {
     if (!ts?.toDate) return "";
     return ts.toDate().toLocaleString("en-IN", {
       day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
@@ -201,8 +145,8 @@ export function NotificationBell() {
                   style={{
                     padding    : "12px 16px",
                     borderBottom: "1px solid #f1f5f9",
-                    background : n.read ? "#fff" : "#f0fdf4",
-                    cursor     : n.read ? "default" : "pointer",
+                    background : n.isRead ? "#fff" : "#f0fdf4",
+                    cursor     : n.isRead ? "default" : "pointer",
                     transition : "background 0.2s",
                   }}
                 >

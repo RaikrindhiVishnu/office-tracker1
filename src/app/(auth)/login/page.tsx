@@ -4,7 +4,7 @@ import { useState } from "react";
 import { signInWithEmailAndPassword, setPersistence, browserLocalPersistence, browserSessionPersistence } from "firebase/auth";
 import {
   doc,
-  getDoc,
+  getDocFromServer,
   collection,
   query,
   where,
@@ -135,9 +135,11 @@ const [rememberMe, setRememberMe] = useState<boolean>(false);
       // STEP 2: Fetch user profile
       setStep("Loading your profile...");
       const userRef  = doc(db, "users", cred.user.uid);
-      const userSnap = await getDoc(userRef);
+      const userSnap = await getDocFromServer(userRef);
 
-      if (!userSnap.exists()) throw new Error("PROFILE_NOT_FOUND");
+      if (!userSnap.exists()) {
+        throw new Error(`PROFILE_NOT_FOUND_FOR_UID: ${cred.user.uid} (${cred.user.email})`);
+      }
 
       const userData    = userSnap.data();
       const role = (userData?.role ?? userData?.accountType ?? "").toString().trim().toUpperCase();
@@ -195,9 +197,26 @@ const department = (userData?.department ?? "").toString().trim().toUpperCase();
 
       // STEP 5: Route by role using the same normalizeRole mapping as AuthContext
       setStep("Redirecting...");
-      const destination = getRoleRedirect(role, department);
+      let destination = getRoleRedirect(role, department);
 
       if (!role) throw new Error("INVALID_ROLE");
+
+      // Check if redirect query parameter exists (e.g. ?redirect=/mobile)
+      let redirectUrl: string | null = null;
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        redirectUrl = params.get("redirect");
+      }
+
+      if (redirectUrl) {
+        destination = redirectUrl;
+      } else {
+        // Auto-redirect to mobile view if on mobile screen size
+        const isMobile = window.innerWidth < 768 || /Mobi|Android|iPhone/i.test(navigator.userAgent);
+        if (isMobile) {
+          destination = "/mobile";
+        }
+      }
 
       router.replace(destination);
 
@@ -207,18 +226,13 @@ const department = (userData?.department ?? "").toString().trim().toUpperCase();
       setStep("");
 
       if      (e.message === "INDEX_MISSING")     setError("A Firestore index is required. Click the button below to create it, then try logging in again.");
-      /*
-      else if (e.message === "GEO_DENIED")        setError("📍 Location permission denied.\nPlease allow location access in your browser and try again.\nYou must be inside the office to log in.");
-      else if (e.message === "GEO_NOT_SUPPORTED") setError("📍 Geolocation is not supported on this device or browser.");
-      else if (e.message === "GEO_TIMEOUT")       setError("📍 Could not get your location (timeout). Please check your GPS signal and try again.");
-      else if (e.message === "OUTSIDE_OFFICE")    setError("🚫 Login blocked.\nYou are outside office premises.\nYou must be within 100 meters of the office to log in.\nIf you're working from home, your WFH request must be approved first.");
-      */
-      else if (e.message === "PROFILE_NOT_FOUND") setError("User profile not found. Please contact your administrator.");
+      else if (e.message?.startsWith("PROFILE_NOT_FOUND_FOR_UID")) setError(`User profile not found in database.\nDetails: ${e.message}\nPlease contact your administrator.`);
       else if (e.message === "INVALID_ROLE")      setError("Your account has no valid role assigned. Contact admin.");
       else if (e.code === "auth/invalid-credential" || e.code === "auth/wrong-password") setError("Invalid email or password. Please try again.");
       else if (e.code === "auth/user-not-found")         setError("No account found with this email address.");
       else if (e.code === "auth/too-many-requests")      setError("Too many failed attempts. Account temporarily locked. Try again later.");
       else if (e.code === "auth/network-request-failed") setError("Network error. Please check your internet connection.");
+      else if (e.code === "unavailable")                 setError("🔌 Offline / Unreachable: Could not connect to the database. Please check your internet connection or verify your Firebase project is online.");
       else                                               setError("Login failed. Please try again.");
 
     } finally {

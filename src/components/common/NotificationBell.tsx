@@ -1,23 +1,13 @@
 "use client";
 
 // src/components/common/NotificationBell.tsx
-// ─────────────────────────────────────────────────────────────────────────────
-// Drop this anywhere in your navbar / header:
-//
-//   import NotificationBell from "@/components/common/NotificationBell";
-//   <NotificationBell userId={user.uid} />
-// ─────────────────────────────────────────────────────────────────────────────
+// Tailwind-styled header notification bell component consuming global NotificationContext
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import {
-  collection, query, where, orderBy,
-  onSnapshot, updateDoc, doc, writeBatch, getDocs,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { useNotifications } from "@/context/NotificationContext";
 import { Notification, NotificationType } from "@/lib/notifications";
 
 // ─── Icon colours per type ────────────────────────────────────────────────────
-
 const TYPE_CONFIG: Record<NotificationType, { dot: string; icon: string; label: string }> = {
   success: { dot: "bg-green-500",  icon: "✓", label: "text-green-600" },
   error:   { dot: "bg-red-500",    icon: "✕", label: "text-red-600"   },
@@ -25,8 +15,10 @@ const TYPE_CONFIG: Record<NotificationType, { dot: string; icon: string; label: 
   info:    { dot: "bg-blue-500",   icon: "i", label: "text-blue-600"  },
 };
 
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
+function timeAgo(dateVal: any): string {
+  if (!dateVal) return "";
+  const date = dateVal.toDate ? dateVal.toDate() : new Date(dateVal);
+  const diff = Date.now() - date.getTime();
   const m = Math.floor(diff / 60000);
   if (m < 1)  return "just now";
   if (m < 60) return `${m}m ago`;
@@ -36,31 +28,15 @@ function timeAgo(dateStr: string): string {
   return `${d}d ago`;
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 interface Props {
   userId: string;
 }
 
 export default function NotificationBell({ userId }: Props) {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const { notifications, unreadCount, markAsRead, markAllRead } = useNotifications();
   const [open, setOpen] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // ── Real-time listener ──────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!userId) return;
-    const q = query(
-      collection(db, "notifications"),
-      where("userId", "==", userId),
-      orderBy("createdAt", "desc")
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      setNotifications(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Notification)));
-    });
-    return () => unsub();
-  }, [userId]);
 
   // ── Close on outside click ──────────────────────────────────────────────────
   useEffect(() => {
@@ -73,30 +49,21 @@ export default function NotificationBell({ userId }: Props) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
-
-  // ── Mark single as read ─────────────────────────────────────────────────────
   const handleRead = useCallback(async (n: Notification) => {
     if (!n.isRead) {
-      await updateDoc(doc(db, "notifications", n.id), { isRead: true });
+      await markAsRead(n.id);
     }
-  }, []);
+  }, [markAsRead]);
 
-  // ── Mark all as read ────────────────────────────────────────────────────────
   const handleMarkAllRead = useCallback(async () => {
-    const unread = notifications.filter((n) => !n.isRead);
-    if (!unread.length) return;
     setMarkingAll(true);
     try {
-      const batch = writeBatch(db);
-      unread.forEach((n) => batch.update(doc(db, "notifications", n.id), { isRead: true }));
-      await batch.commit();
+      await markAllRead();
     } finally {
       setMarkingAll(false);
     }
-  }, [notifications]);
+  }, [markAllRead]);
 
-  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="relative" ref={dropdownRef}>
 
@@ -165,7 +132,7 @@ export default function NotificationBell({ userId }: Props) {
             ) : (
               <ul>
                 {notifications.map((n) => {
-                  const cfg = TYPE_CONFIG[n.type];
+                  const cfg = TYPE_CONFIG[n.type] || TYPE_CONFIG.info;
                   return (
                     <li key={n.id}>
                       <button
@@ -192,9 +159,9 @@ export default function NotificationBell({ userId }: Props) {
                           <p className={`text-xs mt-0.5 leading-relaxed ${n.isRead ? "text-gray-400" : "text-gray-600"}`}>
                             {n.message}
                           </p>
-                          {n.relatedCollection && (
-                            <span className="inline-block mt-1.5 text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
-                              {n.relatedCollection}
+                          {n.category && (
+                            <span className="inline-block mt-1.5 text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded capitalize">
+                              {n.category}
                             </span>
                           )}
                         </div>

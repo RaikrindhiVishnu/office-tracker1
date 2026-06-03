@@ -20,27 +20,11 @@ const P: Record<string, string> = {
   building: "M3 21h18M3 7l9-4 9 4M4 7v14M20 7v14M9 21V9h6v12",
   users: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75",
   dollar: "M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",
-  chart: "M18 20V10M12 20V4M6 20v-6",
-  bell: "M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0",
-  settings: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
   logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9",
-  plus: "M12 5v14M5 12h14",
-  search: "M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z",
   shield: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
-  trending: "M23 6l-9.5 9.5-5-5L1 18M17 6h6v6",
-  eye: "M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
-  edit: "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z",
-  check: "M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4 12 14.01l-3-3",
   x: "M18 6 6 18M6 6l12 12",
-  mail: "M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zM22 6l-10 7L2 6",
   activity: "M22 12h-4l-3 9L9 3l-3 9H2",
-  lock: "M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2zM7 11V7a5 5 0 0 1 10 0v4",
-  globe: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z",
-  chevD: "M6 9l6 6 6-6",
-  chevR: "M9 18l6-6-6-6",
-  tag: "M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82zM7 7h.01",
-  alert: "M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01",
-  zap: "M13 2 3 14h9l-1 8 10-12h-9l1-8z",
+  menu: "M3 12h18M3 6h18M3 18h18"
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -63,81 +47,58 @@ interface CompanyForm {
 
 // ── Color config ──────────────────────────────────────────────────────────────
 const planColor: Record<string, string> = { free: "#64748b", pro: "#3b82f6", enterprise: "#f59e0b" };
-const planBg: Record<string, string> = { free: "#f1f5f9", pro: "#eff6ff", enterprise: "#fffbeb" };
 const statusC: Record<string, string> = { active: "#10b981", suspended: "#ef4444", resolved: "#10b981", open: "#f59e0b" };
-const statusBg: Record<string, string> = { active: "#ecfdf5", suspended: "#fef2f2", resolved: "#ecfdf5", open: "#fffbeb" };
 const auditC: Record<string, string> = { create: "#10b981", suspend: "#ef4444", upgrade: "#3b82f6", alert: "#8b5cf6" };
 const auditBg: Record<string, string> = { create: "#ecfdf5", suspend: "#fef2f2", upgrade: "#eff6ff", alert: "#f5f3ff" };
 const roleC: Record<string, string> = { admin: "#8b5cf6", manager: "#3b82f6", hr: "#ec4899", finance: "#f59e0b", employee: "#10b981" };
-const roleBg: Record<string, string> = { admin: "#f5f3ff", manager: "#eff6ff", hr: "#fdf4ff", finance: "#fffbeb", employee: "#ecfdf5" };
 
 // ── Shared UI ─────────────────────────────────────────────────────────────────
 const Badge = ({ label, color, bg }: { label: string; color: string; bg?: string }) => (
   <span style={{
     background: bg || color + "15",
     color,
-    fontSize: 10,
-    fontWeight: 700,
-    padding: "2px 8px",
-    borderRadius: 20,
-    border: `1px solid ${color}30`,
-    whiteSpace: "nowrap",
-    textTransform: "capitalize",
-    display: "inline-block",
-  }}>
+  }} className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-current/20 whitespace-nowrap capitalize inline-block">
     {label}
   </span>
 );
 
 const Avatar = ({ name, size = 34, color = "#3b82f6" }: { name: string; size?: number; color?: string }) => (
   <div style={{
-    width: size, height: size, borderRadius: "50%",
+    width: size, height: size,
     background: color + "20",
     border: `1px solid ${color}40`,
-    display: "flex", alignItems: "center", justifyContent: "center",
-    fontSize: size * 0.38, fontWeight: 800, color, flexShrink: 0,
-  }}>
+    fontSize: size * 0.38, color,
+  }} className="rounded-full flex items-center justify-center font-extrabold shrink-0">
     {name?.[0]?.toUpperCase()}
   </div>
 );
 
 const StatCard = ({ icon, label, value, sub, accent = "#3b82f6", trend, iconBg }: any) => (
-  <div style={{
-    background: "#fff",
-    border: "1px solid #e2e8f0",
-    borderRadius: 14,
-    padding: "18px 20px",
-    display: "flex", flexDirection: "column", gap: 8,
-    boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-  }}>
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-      <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</span>
-      <div style={{
-        width: 32, height: 32, borderRadius: 8,
-        background: iconBg || accent + "12",
-        display: "flex", alignItems: "center", justifyContent: "center", color: accent,
-      }}>
+  <div className="bg-white border border-slate-200 rounded-2xl p-4 md:p-5 flex flex-col gap-2 shadow-sm">
+    <div className="flex items-center justify-between">
+      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{label}</span>
+      <div style={{ background: iconBg || accent + "12", color: accent }} className="w-8 h-8 rounded-lg flex items-center justify-center">
         <Ic p={P[icon]} s={16} />
       </div>
     </div>
-    <div style={{ fontSize: 24, fontWeight: 800, color: "#1e293b", lineHeight: 1 }}>{value}</div>
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-      {sub && <div style={{ fontSize: 11, color: "#94a3b8" }}>{sub}</div>}
-      {trend && <span style={{ fontSize: 10, fontWeight: 700, color: trend.startsWith("+") ? "#10b981" : "#ef4444" }}>{trend}</span>}
+    <div className="text-2xl font-extrabold text-slate-800 leading-none">{value}</div>
+    <div className="flex items-center justify-between">
+      {sub && <div className="text-[11px] text-slate-400">{sub}</div>}
+      {trend && <span className={`text-[10px] font-bold ${trend.startsWith("+") ? "text-emerald-500" : "text-rose-500"}`}>{trend}</span>}
     </div>
   </div>
 );
 
-function Modal({ title, subtitle, onClose, children, width = 460 }: any) {
+function Modal({ title, subtitle, onClose, children }: any) {
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.4)", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-      <div style={{ width, maxWidth: "95vw", background: "#fff", borderRadius: 16, padding: 24, boxShadow: "0 20px 50px rgba(0,0,0,0.15)", maxHeight: "90vh", overflowY: "auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
+      <div className="w-full max-w-[460px] bg-white rounded-2xl p-5 md:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-start mb-5">
           <div>
-            <h3 style={{ color: "#1e293b", fontSize: 18, fontWeight: 800, margin: 0 }}>{title}</h3>
-            {subtitle && <p style={{ color: "#94a3b8", fontSize: 12, margin: "2px 0 0" }}>{subtitle}</p>}
+            <h3 className="text-slate-800 text-lg font-extrabold m-0">{title}</h3>
+            {subtitle && <p className="text-slate-400 text-xs mt-0.5 mb-0">{subtitle}</p>}
           </div>
-          <button onClick={onClose} style={{ background: "#f1f5f9", border: "none", color: "#64748b", width: 28, height: 28, borderRadius: 6, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <button onClick={onClose} className="bg-slate-100 border-none text-slate-500 w-7 h-7 rounded-md cursor-pointer flex items-center justify-center hover:bg-slate-200 transition-colors">
             <Ic p={P.x} s={14} />
           </button>
         </div>
@@ -147,8 +108,8 @@ function Modal({ title, subtitle, onClose, children, width = 460 }: any) {
   );
 }
 
-const inp: CSSProperties = { width: "100%", padding: "9px 12px", background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 8, color: "#1e293b", fontSize: 13, boxSizing: "border-box", outline: "none" };
-const sel: CSSProperties = { ...inp, cursor: "pointer" };
+const inpClass = "w-full px-3 py-2 bg-slate-50 border-[1.5px] border-slate-200 rounded-lg text-slate-800 text-[13px] box-border outline-none focus:border-blue-500 transition-colors";
+const selClass = `${inpClass} cursor-pointer`;
 
 /* ================= MAIN COMPONENT ================= */
 export default function SuperAdminPage() {
@@ -158,6 +119,7 @@ export default function SuperAdminPage() {
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -190,41 +152,54 @@ export default function SuperAdminPage() {
     return () => { unsubCompanies(); unsubUsers(); unsubLogs(); };
   }, [user]);
 
-  if (loading) return <div style={{ padding: 40, textAlign: "center", fontWeight: 700, color: "#64748b" }}>Loading Workspace...</div>;
+  if (loading) return null;
 
   return (
-    <div style={{ display: "flex", height: "100vh", background: "#f8fafc", overflow: "hidden" }}>
-      {/* Sidebar */}
-      <div style={{ width: 250, background: "#0f172a", color: "#fff", display: "flex", flexDirection: "column" }}>
-        <div style={{ height: 64, display: "flex", alignItems: "center", gap: 10, padding: "0 20px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: "#3b82f6", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div className="flex flex-col md:flex-row h-screen bg-slate-50 overflow-hidden">
+      {/* Mobile Header */}
+      <div className="md:hidden flex items-center justify-between px-5 py-4 bg-slate-900 text-white shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center">
             <Ic p={P.shield} s={16} />
           </div>
-          <div style={{ fontWeight: 800, fontSize: 15 }}>WorkSphere <span style={{ color: "#3b82f6", fontSize: 9 }}>ROOT</span></div>
+          <div className="font-extrabold text-[15px]">WorkSphere <span className="text-blue-500 text-[9px]">ROOT</span></div>
         </div>
-        <div style={{ flex: 1, padding: "16px 12px", display: "flex", flexDirection: "column", gap: 2 }}>
+        <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="text-white bg-transparent border-none">
+          <Ic p={mobileMenuOpen ? P.x : P.menu} s={24} />
+        </button>
+      </div>
+
+      {/* Sidebar */}
+      <div className={`${mobileMenuOpen ? "flex" : "hidden"} md:flex absolute md:relative z-40 w-full md:w-[250px] h-[calc(100vh-64px)] md:h-full bg-slate-900 text-white flex-col transition-transform top-[64px] md:top-0 left-0`}>
+        <div className="hidden md:flex h-16 items-center gap-2.5 px-5 border-b border-white/5 shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center">
+            <Ic p={P.shield} s={16} />
+          </div>
+          <div className="font-extrabold text-[15px]">WorkSphere <span className="text-blue-500 text-[9px]">ROOT</span></div>
+        </div>
+        <div className="flex-1 p-3 md:p-4 flex flex-col gap-1 overflow-y-auto">
           {[
             { id: "overview", label: "Dashboard", icon: "grid" },
             { id: "companies", label: "Tenants", icon: "building", badge: companies.length },
             { id: "users", label: "Global Users", icon: "users", badge: allUsers.length },
             { id: "audit", label: "Audit Trail", icon: "activity" },
           ].map(m => (
-            <button key={m.id} onClick={() => setActiveTab(m.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 8, border: "none", background: activeTab === m.id ? "rgba(59,130,246,0.15)" : "transparent", color: activeTab === m.id ? "#3b82f6" : "#94a3b8", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+            <button key={m.id} onClick={() => { setActiveTab(m.id); setMobileMenuOpen(false); }} className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border-none cursor-pointer text-[13px] font-semibold transition-colors ${activeTab === m.id ? "bg-blue-500/15 text-blue-500" : "bg-transparent text-slate-400 hover:bg-white/5 hover:text-slate-300"}`}>
               <Ic p={P[m.icon] || ""} s={14} />
-              <span style={{ flex: 1, textAlign: "left" }}>{m.label}</span>
-              {m.badge != null && <span style={{ fontSize: 9, opacity: 0.8 }}>{m.badge}</span>}
+              <span className="flex-1 text-left">{m.label}</span>
+              {m.badge != null && <span className="text-[9px] opacity-80">{m.badge}</span>}
             </button>
           ))}
         </div>
-        <div style={{ padding: 16, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-          <button onClick={() => auth.signOut()} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, color: "#ef4444", background: "none", border: "none", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+        <div className="p-4 border-t border-white/5">
+          <button onClick={() => auth.signOut()} className="w-full flex items-center gap-2 text-rose-500 bg-transparent border-none cursor-pointer text-xs font-bold hover:text-rose-400 transition-colors">
             <Ic p={P.logout} s={14} /> Sign Out
           </button>
         </div>
       </div>
 
       {/* Content */}
-      <main style={{ flex: 1, overflowY: "auto", padding: "24px 32px" }}>
+      <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
         {activeTab === "overview" && <Overview companies={companies} allUsers={allUsers} auditLogs={auditLogs} onNav={setActiveTab} />}
         {activeTab === "companies" && <CompaniesView companies={companies} />}
         {activeTab === "users" && <UsersView users={allUsers} />}
@@ -238,40 +213,40 @@ export default function SuperAdminPage() {
 function Overview({ companies, allUsers, auditLogs, onNav }: any) {
   const mrr = companies.reduce((s: number, c: any) => s + (c.mrr || 0), 0);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16 }}>
+    <div className="flex flex-col gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon="building" label="Total Tenants" value={companies.length} accent="#3b82f6" />
         <StatCard icon="dollar" label="Monthly Rev" value={`₹${mrr.toLocaleString()}`} accent="#f59e0b" />
         <StatCard icon="users" label="Global Users" value={allUsers.length} accent="#8b5cf6" />
         <StatCard icon="activity" label="Avg Uptime" value="99.98%" accent="#10b981" />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: 20 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
-            <span style={{ fontWeight: 800, fontSize: 14 }}>Recent Tenants</span>
-            <button onClick={() => onNav("companies")} style={{ background: "none", border: "none", color: "#3b82f6", fontSize: 11, cursor: "pointer", fontWeight: 700 }}>View All</button>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white border border-slate-200 rounded-2xl p-5">
+          <div className="flex justify-between items-center mb-4">
+            <span className="font-extrabold text-[14px]">Recent Tenants</span>
+            <button onClick={() => onNav("companies")} className="bg-transparent border-none text-blue-500 text-[11px] font-bold cursor-pointer hover:underline">View All</button>
           </div>
           {companies.slice(0, 5).map((c: any) => (
-            <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: "1px solid #f8fafc" }}>
+            <div key={c.id} className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0">
               <Avatar name={c.name} size={32} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 13 }}>{c.name}</div>
-                <div style={{ fontSize: 10, color: "#94a3b8" }}>{c.plan} · {c.country}</div>
+              <div className="flex-1">
+                <div className="font-bold text-[13px]">{c.name}</div>
+                <div className="text-[10px] text-slate-400">{c.plan} · {c.country}</div>
               </div>
-              <div style={{ fontWeight: 800, color: "#f59e0b", fontSize: 12 }}>₹{(c.mrr || 0).toLocaleString()}</div>
+              <div className="font-extrabold text-amber-500 text-xs">₹{(c.mrr || 0).toLocaleString()}</div>
             </div>
           ))}
         </div>
 
-        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: 20 }}>
-          <span style={{ fontWeight: 800, fontSize: 14, display: "block", marginBottom: 16 }}>Recent Platform Events</span>
+        <div className="bg-white border border-slate-200 rounded-2xl p-5">
+          <span className="font-extrabold text-[14px] block mb-4">Recent Platform Events</span>
           {auditLogs.slice(0, 6).map((l: any) => (
-            <div key={l.id} style={{ display: "flex", gap: 10, padding: "8px 0", alignItems: "flex-start" }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: auditC[l.type] || "#cbd5e1", marginTop: 6 }} />
+            <div key={l.id} className="flex gap-2.5 py-2 items-start">
+              <div style={{ background: auditC[l.type] || "#cbd5e1" }} className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" />
               <div>
-                <div style={{ fontWeight: 700, fontSize: 12 }}>{l.action}</div>
-                <div style={{ fontSize: 10, color: "#94a3b8" }}>{l.target} · {l.time ? new Date(l.time).toLocaleTimeString() : "N/A"}</div>
+                <div className="font-bold text-xs text-slate-800">{l.action}</div>
+                <div className="text-[10px] text-slate-400">Target: {l.target} · {l.time ? new Date(l.time).toLocaleTimeString() : "N/A"}</div>
               </div>
             </div>
           ))}
@@ -305,30 +280,30 @@ function CompaniesView({ companies }: { companies: Company[] }) {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
         <div>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>Tenants</h2>
-          <p style={{ margin: "2px 0 0", color: "#94a3b8", fontSize: 12 }}>Manage all business subscriptions</p>
+          <h2 className="m-0 text-xl font-extrabold text-slate-800">Tenants</h2>
+          <p className="m-0 mt-0.5 text-slate-400 text-xs">Manage all business subscriptions</p>
         </div>
-        <button onClick={() => setShowCreate(true)} style={{ background: "#3b82f6", color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Provision New Tenant</button>
+        <button onClick={() => setShowCreate(true)} className="bg-blue-500 text-white border-none rounded-lg px-4 py-2 font-bold text-[13px] cursor-pointer hover:bg-blue-600 transition-colors shrink-0">Provision New Tenant</button>
       </div>
 
-      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-          <thead style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+      <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto shadow-sm">
+        <table className="w-full border-collapse text-[13px] min-w-[600px]">
+          <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
-              {["Company", "Owner Email", "Plan", "MRR", "Status"].map(h => <th key={h} style={{ padding: "12px 20px", textAlign: "left", fontSize: 10, color: "#94a3b8", textTransform: "uppercase" }}>{h}</th>)}
+              {["Company", "Owner Email", "Plan", "MRR", "Status"].map(h => <th key={h} className="p-3 md:px-5 md:py-3 text-left text-[10px] text-slate-400 uppercase font-bold">{h}</th>)}
             </tr>
           </thead>
           <tbody>
             {companies.map(c => (
-              <tr key={c.id} style={{ borderBottom: "1px solid #f8fafc" }}>
-                <td style={{ padding: "14px 20px", fontWeight: 700 }}>{c.name}</td>
-                <td style={{ padding: "14px 20px", color: "#64748b" }}>{c.ownerEmail}</td>
-                <td style={{ padding: "14px 20px" }}><Badge label={c.plan} color={planColor[c.plan] || "#64748b"} /></td>
-                <td style={{ padding: "14px 20px", fontWeight: 800 }}>₹{(c.mrr || 0).toLocaleString()}</td>
-                <td style={{ padding: "14px 20px" }}><Badge label={c.status} color={statusC[c.status] || "#64748b"} /></td>
+              <tr key={c.id} className="border-b border-slate-50 hover:bg-slate-50/50">
+                <td className="p-3 md:px-5 md:py-3.5 font-bold text-slate-800">{c.name}</td>
+                <td className="p-3 md:px-5 md:py-3.5 text-slate-500">{c.ownerEmail}</td>
+                <td className="p-3 md:px-5 md:py-3.5"><Badge label={c.plan} color={planColor[c.plan] || "#64748b"} /></td>
+                <td className="p-3 md:px-5 md:py-3.5 font-extrabold text-slate-800">₹{(c.mrr || 0).toLocaleString()}</td>
+                <td className="p-3 md:px-5 md:py-3.5"><Badge label={c.status} color={statusC[c.status] || "#64748b"} /></td>
               </tr>
             ))}
           </tbody>
@@ -337,16 +312,16 @@ function CompaniesView({ companies }: { companies: Company[] }) {
 
       {showCreate && (
         <Modal title="Provision New Company" onClose={() => setShowCreate(false)}>
-          {msg && <div style={{ padding: 12, borderRadius: 8, background: msg.includes("✅") ? "#ecfdf5" : "#fef2f2", color: msg.includes("✅") ? "#10b981" : "#ef4444", fontSize: 12, marginBottom: 16, fontWeight: 600 }}>{msg}</div>}
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div><label style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>Company Name</label><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={inp} /></div>
-            <div><label style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>Admin Email</label><input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} style={inp} /></div>
-            <div><label style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>Initial Password</label><input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} style={inp} /></div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div><label style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>Plan</label><select value={form.plan} onChange={e => setForm({ ...form, plan: e.target.value })} style={sel}><option value="free">Free</option><option value="pro">Pro (₹999)</option><option value="enterprise">Enterprise (₹4999)</option></select></div>
-              <div><label style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>Country</label><input value={form.country} onChange={e => setForm({ ...form, country: e.target.value })} style={inp} /></div>
+          {msg && <div className={`p-3 rounded-lg text-xs font-semibold mb-4 ${msg.includes("✅") ? "bg-emerald-50 text-emerald-500" : "bg-rose-50 text-rose-500"}`}>{msg}</div>}
+          <div className="flex flex-col gap-3">
+            <div><label className="text-[11px] font-bold text-slate-500 mb-1 block">Company Name</label><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className={inpClass} /></div>
+            <div><label className="text-[11px] font-bold text-slate-500 mb-1 block">Admin Email</label><input value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className={inpClass} /></div>
+            <div><label className="text-[11px] font-bold text-slate-500 mb-1 block">Initial Password</label><input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className={inpClass} /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div><label className="text-[11px] font-bold text-slate-500 mb-1 block">Plan</label><select value={form.plan} onChange={e => setForm({ ...form, plan: e.target.value })} className={selClass}><option value="free">Free</option><option value="pro">Pro (₹999)</option><option value="enterprise">Enterprise (₹4999)</option></select></div>
+              <div><label className="text-[11px] font-bold text-slate-500 mb-1 block">Country</label><input value={form.country} onChange={e => setForm({ ...form, country: e.target.value })} className={inpClass} /></div>
             </div>
-            <button onClick={handleCreate} disabled={loading} style={{ marginTop: 8, background: "#3b82f6", color: "#fff", border: "none", borderRadius: 8, padding: 12, fontWeight: 800, cursor: "pointer", opacity: loading ? 0.6 : 1 }}>{loading ? "Provisioning..." : "Initialize Tenant"}</button>
+            <button onClick={handleCreate} disabled={loading} className={`mt-2 bg-blue-500 text-white border-none rounded-lg p-3 font-extrabold cursor-pointer hover:bg-blue-600 transition-colors ${loading ? "opacity-60" : ""}`}>{loading ? "Provisioning..." : "Initialize Tenant"}</button>
           </div>
         </Modal>
       )}
@@ -357,23 +332,23 @@ function CompaniesView({ companies }: { companies: Company[] }) {
 // ── USERS VIEW ───────────────────────────────────────────────────────────────
 function UsersView({ users }: { users: User[] }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>Global User Directory</h2>
-      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-          <thead style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-            <tr>{["User", "Company", "Role", "Joined"].map(h => <th key={h} style={{ padding: "12px 20px", textAlign: "left", fontSize: 10, color: "#94a3b8", textTransform: "uppercase" }}>{h}</th>)}</tr>
+    <div className="flex flex-col gap-5">
+      <h2 className="m-0 text-xl font-extrabold text-slate-800">Global User Directory</h2>
+      <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto shadow-sm">
+        <table className="w-full border-collapse text-[13px] min-w-[600px]">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>{["User", "Company", "Role", "Joined"].map(h => <th key={h} className="p-3 md:px-5 md:py-3 text-left text-[10px] text-slate-400 uppercase font-bold">{h}</th>)}</tr>
           </thead>
           <tbody>
             {users.map(u => (
-              <tr key={u.id} style={{ borderBottom: "1px solid #f8fafc" }}>
-                <td style={{ padding: "12px 20px" }}>
-                  <div style={{ fontWeight: 700 }}>{u.name}</div>
-                  <div style={{ fontSize: 11, color: "#94a3b8" }}>{u.email}</div>
+              <tr key={u.id} className="border-b border-slate-50 hover:bg-slate-50/50">
+                <td className="p-3 md:px-5 md:py-3">
+                  <div className="font-bold text-slate-800">{u.name}</div>
+                  <div className="text-[11px] text-slate-400">{u.email}</div>
                 </td>
-                <td style={{ padding: "12px 20px", color: "#64748b" }}>{u.company}</td>
-                <td style={{ padding: "12px 20px" }}><Badge label={u.role} color={roleC[u.role] || "#64748b"} /></td>
-                <td style={{ padding: "12px 20px", color: "#94a3b8" }}>{u.joined}</td>
+                <td className="p-3 md:px-5 md:py-3 text-slate-500">{u.company}</td>
+                <td className="p-3 md:px-5 md:py-3"><Badge label={u.role} color={roleC[u.role] || "#64748b"} /></td>
+                <td className="p-3 md:px-5 md:py-3 text-slate-400">{u.joined}</td>
               </tr>
             ))}
           </tbody>
@@ -386,17 +361,19 @@ function UsersView({ users }: { users: User[] }) {
 // ── AUDIT VIEW ───────────────────────────────────────────────────────────────
 function AuditView({ logs }: { logs: AuditLogEntry[] }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>Platform Audit Trail</h2>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <div className="flex flex-col gap-5">
+      <h2 className="m-0 text-xl font-extrabold text-slate-800">Platform Audit Trail</h2>
+      <div className="flex flex-col gap-2">
         {logs.map(l => (
-          <div key={l.id} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "14px 18px", display: "flex", alignItems: "center", gap: 14 }}>
-            <div style={{ width: 34, height: 34, borderRadius: 8, background: auditBg[l.type] || "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", color: auditC[l.type] || "#64748b" }}><Ic p={P.activity} s={14} /></div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: 13 }}>{l.action}</div>
-              <div style={{ fontSize: 11, color: "#94a3b8" }}>Target: {l.target} · Actor: {l.actor}</div>
+          <div key={l.id} className="bg-white border border-slate-200 rounded-xl p-3 md:px-4 md:py-3.5 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 shadow-sm">
+            <div style={{ background: auditBg[l.type] || "#f1f5f9", color: auditC[l.type] || "#64748b" }} className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0">
+              <Ic p={P.activity} s={14} />
             </div>
-            <div style={{ fontSize: 11, color: "#94a3b8" }}>{l.time ? new Date(l.time).toLocaleString() : "N/A"}</div>
+            <div className="flex-1">
+              <div className="font-bold text-[13px] text-slate-800">{l.action}</div>
+              <div className="text-[11px] text-slate-400 mt-0.5">Target: {l.target} · Actor: {l.actor}</div>
+            </div>
+            <div className="text-[11px] text-slate-400 shrink-0">{l.time ? new Date(l.time).toLocaleString() : "N/A"}</div>
           </div>
         ))}
       </div>

@@ -285,12 +285,8 @@ export default function LeaveRequestView({
     }}>
 
       {/* ══ TOP NAV BAR ══════════════════════════════════ */}
-      <div style={{
-        background:"#fff", borderRadius:12,
-        border:"0.5px solid #e8edf3", padding:"0 20px", height:52,
-        display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0,
-      }}>
-        <div style={{ display:"flex", gap:4 }}>
+      <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 flex flex-col sm:flex-row sm:h-[52px] items-center justify-between gap-3 shrink-0">
+        <div style={{ display:"flex", gap:4, flexWrap:"wrap", justifyContent:"center" }}>
           {([
             { id:"apply",    icon:"✏️",  label:"Apply Leave" },
             { id:"history",  icon:"📋",  label:"My History",  badge:myLeaves.length },
@@ -341,7 +337,7 @@ export default function LeaveRequestView({
 
       {/* ─── APPLY ─── */}
       {view==="apply" && (
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gap:16, alignItems:"start" }}>
+        <div className="flex flex-col lg:grid lg:grid-cols-[1fr_300px] gap-4 items-start">
 
           <div style={cardStyle}>
             <div style={{ fontSize:13, fontWeight:700, color:"#0f172a", marginBottom:16 }}>
@@ -349,7 +345,7 @@ export default function LeaveRequestView({
             </div>
 
             {/* Type selector */}
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8, marginBottom:14 }}>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
               {(Object.keys(LEAVE_META) as LeaveType[]).map(type => {
                 const m   = LEAVE_META[type];
                 const bal = leaveBalance.find(b => b.type === type);
@@ -393,17 +389,17 @@ export default function LeaveRequestView({
             )}
 
             {/* Dates */}
-            <div style={{ display:"flex", alignItems:"flex-end", gap:10, marginBottom:12 }}>
+            <div className="flex flex-col sm:flex-row sm:items-end gap-3 mb-3">
               <div>
                 <label style={fieldLbl}>From</label>
                 <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
-                  min={today} disabled={isExhausted} style={{...inputSt, width:"fit-content"}}/>
+                  min={today} disabled={isExhausted} style={{...inputSt, width:"100%"}}/>
               </div>
-              <div style={{color:"#9ca3af", fontSize:14, paddingBottom:9}}>→</div>
+              <div className="hidden sm:block text-gray-400 text-sm pb-2">→</div>
               <div>
                 <label style={fieldLbl}>To</label>
                 <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
-                  min={fromDate||today} disabled={isExhausted} style={{...inputSt, width:"fit-content"}}/>
+                  min={fromDate||today} disabled={isExhausted} style={{...inputSt, width:"100%"}}/>
               </div>
             </div>
 
@@ -503,8 +499,9 @@ export default function LeaveRequestView({
               </div>
             </div>
           ) : (
-            <div style={{display:"flex", flexDirection:"column", gap:7}}>
-              {filtered.map(leave => {
+            <div className="overflow-x-auto w-full">
+              <div className="flex flex-col gap-2 min-w-[500px]">
+                {filtered.map(leave => {
                 const meta = LEAVE_META[leave.leaveType] ?? LEAVE_META.casual;
                 const sc   = STATUS_STYLES[leave.status]  ?? STATUS_STYLES.Pending;
                 return (
@@ -529,6 +526,7 @@ export default function LeaveRequestView({
                   </div>
                 );
               })}
+              </div>
             </div>
           )}
         </div>
@@ -536,7 +534,7 @@ export default function LeaveRequestView({
 
       {/* ─── HOLIDAYS ─── */}
       {view==="holidays" && (
-        <div style={{display:"grid", gridTemplateColumns:"1fr 300px", gap:16, alignItems:"start"}}>
+        <div className="flex flex-col lg:grid lg:grid-cols-[1fr_300px] gap-4 items-start">
 
           <div style={cardStyle}>
             <div style={{fontSize:13, fontWeight:700, color:"#0f172a", marginBottom:14}}>

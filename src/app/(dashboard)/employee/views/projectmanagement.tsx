@@ -2546,41 +2546,40 @@ export default function ProjectManagement({ user, projects, users }: any) {
   /* ── PROJECT VIEW ── */
   if (activeProject) {
     return (
-      <div className="h-screen flex flex-col bg-gray-50 overflow-hidden" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap');`}</style>
+      <div className="fixed inset-0 sm:relative sm:inset-auto sm:h-screen flex flex-col bg-gray-50 overflow-hidden z-[45]" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght=300;400;500;600;700;800&display=swap');`}</style>
         {toastMsg && <PermissionToast message={toastMsg} onHide={() => setToastMsg(null)} />}
 
         {/* Top bar */}
         <div className="shrink-0 bg-white border-b border-gray-200 shadow-sm">
-          <div className="px-6 py-3 flex items-center gap-4">
-            <button onClick={() => { setActiveProject(null); setActiveSprint(null); setViewMode("kanban"); setKanbanColumns(DEFAULT_COLUMNS); }} className="text-sm font-semibold text-gray-500 hover:text-gray-900 transition flex items-center gap-1">← Projects</button>
-            <div className="w-px h-5 bg-gray-200" />
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full" style={{ background: projectColor }} />
-              <h1 className="font-bold text-gray-900 text-sm">{activeProject.name}</h1>
+          <div className="px-3 sm:px-6 py-2.5 flex items-center justify-between gap-2">
+            <button onClick={() => { setActiveProject(null); setActiveSprint(null); setViewMode("kanban"); setKanbanColumns(DEFAULT_COLUMNS); }} className="text-sm font-semibold text-gray-500 hover:text-gray-900 transition flex items-center gap-1 shrink-0">← Projects</button>
+            <div className="w-px h-5 bg-gray-200 shrink-0" />
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: projectColor }} />
+              <h1 className="font-bold text-gray-900 text-sm truncate">{activeProject.name}</h1>
               {isProjectManager && (
                 <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ml-1 ${user?.accountType === "ADMIN" ? "bg-indigo-100 text-indigo-700" : "text-white"}`}
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${user?.accountType === "ADMIN" ? "bg-indigo-100 text-indigo-700" : "text-white"}`}
                   style={user?.accountType !== "ADMIN" ? { background: projectColor } : {}}
                 >
-                  👑 {user?.accountType === "ADMIN" ? "Admin" : "Team Lead"}
+                  👑 Lead
                 </span>
               )}
-              {permissions.isAdmin && !permissions.isPM && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 ml-1">⚙️ Admin</span>}
+              {permissions.isAdmin && !permissions.isPM && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 shrink-0">⚙️ Admin</span>}
             </div>
-            <div className="flex items-center gap-4 ml-auto">
-              <div className="flex items-center gap-2">
-                <ProgressRing pct={myProgress} size={32} stroke={3} color={projectColor} />
-                <div><p className="text-xs font-bold text-gray-700">{myProgress}%</p><p className="text-[10px] text-gray-400">My tasks</p></div>
+            <div className="flex items-center gap-2 ml-auto shrink-0">
+              <div className="flex items-center gap-1.5">
+                <ProgressRing pct={myProgress} size={28} stroke={2.5} color={projectColor} />
+                <div className="hidden sm:block"><p className="text-xs font-bold text-gray-700">{myProgress}%</p><p className="text-[10px] text-gray-400">My tasks</p></div>
               </div>
-              {overdueTasks.length > 0 && <span className="text-xs font-semibold bg-red-50 text-red-600 border border-red-100 px-2.5 py-1 rounded-full">⚠️ {overdueTasks.length} overdue</span>}
               <TeamButton users={users} activeProject={activeProject} user={user} projectColor={projectColor} />
             </div>
           </div>
 
           {/* Toolbar */}
-          <div className="px-6 py-2 flex items-center gap-2 bg-gray-50 border-t border-gray-100 flex-wrap">
-            <div className="flex bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="px-3 sm:px-6 py-2.5 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2 shrink-0 overflow-x-auto whitespace-nowrap scrollbar-none">
+            <div className="flex bg-white border border-gray-200 rounded-lg overflow-hidden shrink-0">
               {([
                 ["kanban", "⊞ Board"],
                 ["list", "☰ List"],
@@ -2595,25 +2594,25 @@ export default function ProjectManagement({ user, projects, users }: any) {
                 </button>
               ))}
             </div>
-            <div className="w-px h-5 bg-gray-200" />
+            <div className="w-px h-5 bg-gray-200 shrink-0" />
             {viewMode !== "reports" && (
               <>
-                <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none">
-                  <option value="all">All Priorities</option>{["Low", "Medium", "High", "Critical"].map(p => <option key={p}>{p}</option>)}
+                <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none shrink-0">
+                  <option value="all">Priority</option>{["Low", "Medium", "High", "Critical"].map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
-                <select value={filterTicketType} onChange={e => setFilterTicketType(e.target.value as any)} className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none">
-                  <option value="all">All Types</option>
+                <select value={filterTicketType} onChange={e => setFilterTicketType(e.target.value as any)} className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none shrink-0">
+                  <option value="all">Type</option>
                   {(Object.keys(TICKET_TYPES) as TicketType[]).map(t => <option key={t} value={t}>{TICKET_TYPES[t].icon} {TICKET_TYPES[t].label}</option>)}
                 </select>
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search..." className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none w-36" />
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search..." className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none w-24 shrink-0" />
               </>
             )}
-            <div className="flex-1" />
+            <div className="hidden sm:block sm:flex-1" />
             {viewMode !== "reports" && (
-              <>
-                <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-1.5 text-xs font-bold px-4 py-1.5 rounded-lg text-white shadow-sm transition" style={{ background: projectColor }}>+ New Ticket</button>
-                <button onClick={() => setShowWorkLogForm(!showWorkLogForm)} className="flex items-center gap-1.5 text-xs font-bold px-4 py-1.5 rounded-lg text-white shadow-sm" style={{ background: "#64748b" }}>⏱ Log Work</button>
-              </>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg text-white shadow-sm transition" style={{ background: projectColor }}>+ New Ticket</button>
+                <button onClick={() => setShowWorkLogForm(!showWorkLogForm)} className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg text-white shadow-sm" style={{ background: "#64748b" }}>⏱ Log Work</button>
+              </div>
             )}
           </div>
 
@@ -2645,7 +2644,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
         )}
 
         {viewMode !== "reports" && (
-          <div className="shrink-0 px-6 py-2.5 bg-white border-b border-gray-100 flex items-center gap-6">
+          <div className="shrink-0 px-4 sm:px-6 py-2.5 bg-white border-b border-gray-100 flex flex-wrap items-center gap-4 sm:gap-6">
             {[
               { label: "My Tasks", val: myTasks.length, color: "#64748b" },
               { label: "Done", val: myDone, color: "#16a34a" },
@@ -2657,18 +2656,16 @@ export default function ProjectManagement({ user, projects, users }: any) {
               <div key={s.label} className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full" style={{ background: s.color }} />
                 <span className="text-sm font-black" style={{ color: s.color }}>{s.val}</span>
-                <span className="text-xs text-gray-400">{s.label}</span>
+                <span className="text-xs text-gray-400 hidden sm:inline">{s.label}</span>
               </div>
             ))}
-            <div className="ml-auto"><span className="text-xs text-gray-400">Showing {filteredTasks.length} tickets · {filteredTasks.filter(t => t.assignedTo === user?.uid).length} yours</span></div>
+            <div className="ml-auto w-full sm:w-auto mt-2 sm:mt-0"><span className="text-xs text-gray-400">Showing {filteredTasks.length} tickets · {filteredTasks.filter(t => t.assignedTo === user?.uid).length} yours</span></div>
           </div>
         )}
 
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {viewMode === "kanban" && (
-            <div className="h-full border border-gray-200 rounded-xl m-4 overflow-hidden bg-white shadow-sm">
-
-
+            <div className="flex-1 flex flex-col min-h-0 border-t border-b sm:border border-gray-200 sm:rounded-xl sm:m-4 overflow-hidden bg-white shadow-sm">
               {/* ── KanbanBoard imported from ./employeekanban ── */}
               <KanbanBoard
                 tasks={filteredTasks}
@@ -2705,50 +2702,52 @@ export default function ProjectManagement({ user, projects, users }: any) {
           )}
 
           {viewMode === "list" && (
-            <div className="p-6">
+            <div className="flex-1 overflow-auto p-4 sm:p-6">
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <table className="w-full">
-                  <thead><tr className="bg-gray-50 border-b border-gray-100">{["", "Type", "Title", "Status", "Priority", "Assignee", "Due", "Est."].map(h => <th key={h} className="px-4 py-3 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">{h}</th>)}</tr></thead>
-                  <tbody>
-                    {filteredTasks.map(task => {
-                      const mine = task.assignedTo === user?.uid;
-                      const pc = PRIORITY_CONFIG[task.priority];
-                      const colIdx = columns.findIndex(c => c.id === task.status);
-                      const cc = getColStyle(task.status, colIdx >= 0 ? colIdx : 0);
-                      return (
-                        <tr key={task.id} onClick={() => setViewingTask(task)}
-                          className={`border-b border-gray-50 cursor-pointer transition group ${(mine || isProjectManager) ? "hover:bg-indigo-50/40" : "hover:bg-gray-50 opacity-60"}`}>
-                          <td className="px-4 py-3">{(mine || isProjectManager) && <div className="w-1.5 h-1.5 rounded-full" style={{ background: projectColor }} />}</td>
-                          <td className="px-4 py-3"><TicketBadge type={task.ticketType} size="xs" /></td>
-                          <td className="px-4 py-3">
-                            <p className="text-sm font-semibold text-gray-800 group-hover:text-indigo-700">{task.title}</p>
-                            {task.labels && task.labels.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {task.labels.map(l => {
-                                  const lc = LABEL_COLORS[l.color] || LABEL_COLORS.green;
-                                  return <span key={l.id} className="text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-tighter" style={{ background: lc.bg, color: lc.text }}>{l.title}</span>
-                                })}
-                              </div>
-                            )}
-                            {task.parentStoryTitle && <p className="text-[10px] text-purple-400 mt-0.5 font-bold">📖 {task.parentStoryTitle}</p>}
-                          </td>
-                          <td className="px-4 py-3"><span className="text-xs font-semibold flex items-center gap-1" style={{ color: cc?.color }}><div className="w-1.5 h-1.5 rounded-full" style={{ background: cc?.color }} />{columns.find(c => c.id === task.status)?.label ?? task.status}</span></td>
-                          <td className="px-4 py-3"><span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: pc?.bg, color: pc?.color }}>{pc?.icon} {task.priority}</span></td>
-                          <td className="px-4 py-3"><div className="flex items-center gap-2"><Avatar name={task.assignedToName} size="xs" /><span className="text-xs text-gray-600">{task.assignedToName || "—"}{mine && " (you)"}</span></div></td>
-                          <td className="px-4 py-3"><span className={`text-xs ${task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done" ? "text-red-600 font-semibold" : "text-gray-500"}`}>{task.dueDate || "—"}</span></td>
-                          <td className="px-4 py-3 text-xs font-semibold text-gray-600">{task.estimatedHours || 0}h</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead><tr className="bg-gray-50 border-b border-gray-100">{["", "Type", "Title", "Status", "Priority", "Assignee", "Due", "Est."].map(h => <th key={h} className="px-4 py-3 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">{h}</th>)}</tr></thead>
+                    <tbody>
+                      {filteredTasks.map(task => {
+                        const mine = task.assignedTo === user?.uid;
+                        const pc = PRIORITY_CONFIG[task.priority];
+                        const colIdx = columns.findIndex(c => c.id === task.status);
+                        const cc = getColStyle(task.status, colIdx >= 0 ? colIdx : 0);
+                        return (
+                          <tr key={task.id} onClick={() => setViewingTask(task)}
+                            className={`border-b border-gray-50 cursor-pointer transition group ${(mine || isProjectManager) ? "hover:bg-indigo-50/40" : "hover:bg-gray-50 opacity-60"}`}>
+                            <td className="px-4 py-3">{(mine || isProjectManager) && <div className="w-1.5 h-1.5 rounded-full" style={{ background: projectColor }} />}</td>
+                            <td className="px-4 py-3"><TicketBadge type={task.ticketType} size="xs" /></td>
+                            <td className="px-4 py-3">
+                              <p className="text-sm font-semibold text-gray-800 group-hover:text-indigo-700">{task.title}</p>
+                              {task.labels && task.labels.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {task.labels.map(l => {
+                                    const lc = LABEL_COLORS[l.color] || LABEL_COLORS.green;
+                                    return <span key={l.id} className="text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-tighter" style={{ background: lc.bg, color: lc.text }}>{l.title}</span>
+                                  })}
+                                </div>
+                              )}
+                              {task.parentStoryTitle && <p className="text-[10px] text-purple-400 mt-0.5 font-bold">📖 {task.parentStoryTitle}</p>}
+                            </td>
+                            <td className="px-4 py-3"><span className="text-xs font-semibold flex items-center gap-1" style={{ color: cc?.color }}><div className="w-1.5 h-1.5 rounded-full" style={{ background: cc?.color }} />{columns.find(c => c.id === task.status)?.label ?? task.status}</span></td>
+                            <td className="px-4 py-3"><span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: pc?.bg, color: pc?.color }}>{pc?.icon} {task.priority}</span></td>
+                            <td className="px-4 py-3"><div className="flex items-center gap-2"><Avatar name={task.assignedToName} size="xs" /><span className="text-xs text-gray-600">{task.assignedToName || "—"}{mine && " (you)"}</span></div></td>
+                            <td className="px-4 py-3"><span className={`text-xs ${task.dueDate && new Date(task.dueDate) < new Date() && task.status !== "done" ? "text-red-600 font-semibold" : "text-gray-500"}`}>{task.dueDate || "—"}</span></td>
+                            <td className="px-4 py-3 text-xs font-semibold text-gray-600">{task.estimatedHours || 0}h</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
 
           {viewMode === "timeline" && (
-            <div className="p-6">
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <div className="flex-1 overflow-auto p-4 sm:p-6">
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 sm:p-6">
                 <h3 className="font-bold text-gray-800 mb-5">Activity</h3>
                 <div className="space-y-0">
                   {activities.slice(0, 40).map((a, i) => (
@@ -2772,9 +2771,9 @@ export default function ProjectManagement({ user, projects, users }: any) {
           )}
 
           {viewMode === "logs" && (
-            <div className="p-6">
+            <div className="flex-1 overflow-auto p-4 sm:p-6">
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="p-5 border-b border-gray-50 flex items-center justify-between">
+                <div className="p-5 border-b border-gray-50 flex items-center justify-between animate-in fade-in duration-200">
                   <h3 className="font-bold text-gray-800">My Work Logs — {activeProject.name}</h3>
                   <span className="text-sm font-bold" style={{ color: projectColor }}>{allWorkLogs.filter(l => l.userId === user?.uid).reduce((s, l) => s + l.hoursWorked, 0)}h total</span>
                 </div>
@@ -2806,7 +2805,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
           )}
 
           {viewMode === "reports" && (
-            <div className="p-6">
+            <div className="flex-1 overflow-auto p-4 sm:p-6">
               <SprintReports
                 sprints={sprints}
                 tasks={tasks}
@@ -2874,7 +2873,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
     <div className="min-h-screen bg-gray-50" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap');`}</style>
       <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="px-6 py-3 flex items-center justify-between">
+        <div className="px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Avatar name={userName} size="md" highlight />
             <div>
@@ -2883,7 +2882,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
             </div>
             {user?.designation && <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 ml-1">{user.designation}</span>}
           </div>
-          <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+          <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl w-full sm:w-auto overflow-x-auto scrollbar-none">
             {([
               ["dashboard", "🏠 Dashboard"],
               ["projects", "📁 Projects"],
@@ -2891,9 +2890,9 @@ export default function ProjectManagement({ user, projects, users }: any) {
               ["notifications", "🔔 Inbox"],
             ] as [AppTab, string][]).map(([t, label]) => (
               <button key={t} onClick={() => setActiveTab(t)}
-                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition ${activeTab === t ? "bg-white shadow text-gray-900" : "text-gray-500 hover:text-gray-700"}`}>
+                className={`flex-1 sm:flex-initial whitespace-nowrap px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1 active:scale-95 ${activeTab === t ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
                 {label}
-                {t === "notifications" && unreadCount > 0 && <span className="ml-1.5 bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5">{unreadCount}</span>}
+                {t === "notifications" && unreadCount > 0 && <span className="ml-1 bg-red-500 text-white text-[9px] font-black rounded-full px-1.5 py-0.5">{unreadCount}</span>}
               </button>
             ))}
           </div>

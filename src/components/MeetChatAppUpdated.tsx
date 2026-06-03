@@ -113,49 +113,51 @@ export default function MeetChatAppUpdated({ users, isOpen = false, onClose, tar
   const avatarBg = currentUser?.profilePhoto ? "transparent" : "#6366f1";
 
   return (
-    <div className="fixed inset-0 z-50 h-screen flex flex-col" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", fontFamily: "'DM Sans', sans-serif", overflow: "hidden" }}>
 
-      {/* ── DARK TOP HEADER ── */}
+      {/* ── HEADER ── */}
       <div style={{
-        height: 56, background: "#1e2230", color: "#fff",
+        height: 52, background: "#1e2230", color: "#fff",
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 16px", flexShrink: 0, borderBottom: "1px solid rgba(255,255,255,.08)",
+        padding: "0 10px", flexShrink: 0, borderBottom: "1px solid rgba(255,255,255,.08)",
+        gap: 6,
       }}>
-        {/* Left — wordmark */}
-        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+        {/* Left — Back button + Tabs */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
 
-          {/* Logo */}
-          <span style={{ fontSize: 19, fontWeight: 800 }}>
-            Meet<span style={{ color: "#e8512a" }}>Chat</span>
-          </span>
+          {/* Back button */}
+          <button
+            title="Back"
+            onClick={handleClose}
+            style={{ ...hdrBtn, flexShrink: 0 }}
+          >
+            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
 
-          {/* NEW TABS */}
-          <div style={{ display: "flex", gap: 6 }}>
+          {/* Chat / Calls tabs */}
+          <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.08)", borderRadius: 10, padding: "3px" }}>
             <button
               onClick={() => setActiveTab("chat")}
               style={{
-                padding: "6px 14px",
-                borderRadius: 8,
-                border: "none",
-                cursor: "pointer",
+                padding: "5px 14px",
+                borderRadius: 8, border: "none", cursor: "pointer",
                 background: activeTab === "chat" ? "#e8512a" : "transparent",
                 color: activeTab === "chat" ? "#fff" : "rgba(255,255,255,.7)",
-                fontWeight: 600,
+                fontWeight: 700, fontSize: 13, transition: "all .15s",
               }}
             >
               Chats
             </button>
-
             <button
               onClick={() => setActiveTab("calls")}
               style={{
-                padding: "6px 14px",
-                borderRadius: 8,
-                border: "none",
-                cursor: "pointer",
+                padding: "5px 14px",
+                borderRadius: 8, border: "none", cursor: "pointer",
                 background: activeTab === "calls" ? "#e8512a" : "transparent",
                 color: activeTab === "calls" ? "#fff" : "rgba(255,255,255,.7)",
-                fontWeight: 600,
+                fontWeight: 700, fontSize: 13, transition: "all .15s",
               }}
             >
               Calls
@@ -163,8 +165,8 @@ export default function MeetChatAppUpdated({ users, isOpen = false, onClose, tar
           </div>
         </div>
 
-        {/* Right — notification bell, settings, profile, close */}
-        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        {/* Right — icons */}
+        <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
 
           {/* NOTIFICATION BELL */}
           <div ref={notifRef} style={{ position: "relative" }}>
@@ -173,7 +175,7 @@ export default function MeetChatAppUpdated({ users, isOpen = false, onClose, tar
               onClick={() => { setShowNotifs(p => !p); setShowSettings(false); setShowProfile(false); }}
               style={hdrBtn}
             >
-              <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
               {notifications.length > 0 && (
@@ -186,7 +188,7 @@ export default function MeetChatAppUpdated({ users, isOpen = false, onClose, tar
             </button>
 
             {showNotifs && (
-              <div style={{ ...dropdown, width: 310, top: 44, right: 0 }}>
+              <div style={{ ...dropdown, width: 290, top: 46, right: 0 }}>
                 <div style={{ padding: "12px 14px", borderBottom: "1px solid #f0f2f5", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1d23", display: "flex", alignItems: "center", gap: 7 }}>
                     Notifications
@@ -202,7 +204,7 @@ export default function MeetChatAppUpdated({ users, isOpen = false, onClose, tar
                     </button>
                   )}
                 </div>
-                <div style={{ maxHeight: 300, overflowY: "auto" }}>
+                <div style={{ maxHeight: 260, overflowY: "auto" }}>
                   {notifications.length === 0
                     ? <div style={{ padding: "28px 14px", textAlign: "center", fontSize: 13, color: "#9aa0ad" }}>🔔 No new notifications</div>
                     : notifications.slice(0, 10).map(n => {
@@ -235,16 +237,16 @@ export default function MeetChatAppUpdated({ users, isOpen = false, onClose, tar
           {/* SETTINGS */}
           <div ref={settRef} style={{ position: "relative" }}>
             <button title="Settings" onClick={() => { setShowSettings(p => !p); setShowNotifs(false); setShowProfile(false); }} style={hdrBtn}>
-              <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <circle cx="12" cy="12" r="3" />
               </svg>
             </button>
             {showSettings && (
-              <div style={{ ...dropdown, width: 210, top: 44, right: 0 }}>
+              <div style={{ ...dropdown, width: 200, top: 46, right: 0 }}>
                 <div style={{ padding: "10px 14px 6px", fontSize: 13, fontWeight: 700, color: "#1a1d23", borderBottom: "1px solid #f0f2f5" }}>Settings</div>
                 <div style={{ padding: "5px 0" }}>
-                  {[{ e: "👤", l: "Profile" }, { e: "🔔", l: "Notifications" }, { e: "🎨", l: "Appearance" }, { e: "🔒", l: "Privacy" }, { e: "💬", l: "Chat settings" }, { e: "⌨️", l: "Shortcuts" }].map(item => (
+                  {[{ e: "👤", l: "Profile" }, { e: "🔔", l: "Notifications" }, { e: "🎨", l: "Appearance" }, { e: "🔒", l: "Privacy" }, { e: "💬", l: "Chat settings" }].map(item => (
                     <div key={item.l} onClick={() => setShowSettings(false)} style={menuItem}>
                       <span style={{ fontSize: 14 }}>{item.e}</span>{item.l}
                     </div>
@@ -254,43 +256,36 @@ export default function MeetChatAppUpdated({ users, isOpen = false, onClose, tar
             )}
           </div>
 
-          {/* PROFILE + STATUS */}
+          {/* PROFILE */}
           <div ref={profRef} style={{ position: "relative" }}>
             <button
               title="Profile"
               onClick={() => { setShowProfile(p => !p); setShowNotifs(false); setShowSettings(false); }}
-              style={{ ...hdrBtn, width: "auto", padding: "0 6px", gap: 7, display: "flex", alignItems: "center" }}
+              style={{ ...hdrBtn, width: "auto", padding: "0 6px" }}
             >
-              <div style={{ position: "relative", width: 30, height: 30, flexShrink: 0 }}>
+              <div style={{ position: "relative", width: 28, height: 28, flexShrink: 0 }}>
                 <div style={{
-                  width: 30, height: 30, borderRadius: "50%", overflow: "hidden",
+                  width: 28, height: 28, borderRadius: "50%", overflow: "hidden",
                   background: currentUser?.profilePhoto ? "transparent" : avatarBg,
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 12, fontWeight: 700, color: "#fff",
+                  fontSize: 11, fontWeight: 700, color: "#fff",
                 }}>
                   {currentUser?.profilePhoto
                     ? <img src={currentUser.profilePhoto} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="" />
                     : getUserName(currentUser).charAt(0).toUpperCase()}
                 </div>
                 <div style={{
-                  width: 10, height: 10, borderRadius: "50%", border: "2px solid #1e2230",
+                  width: 9, height: 9, borderRadius: "50%", border: "2px solid #1e2230",
                   background: myStCfg.color, position: "absolute", bottom: -1, right: -1,
                 }} />
               </div>
-              <span style={{ fontSize: 13, color: "rgba(255,255,255,.85)", maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {getUserName(currentUser ?? user as any)}
-              </span>
-              <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" style={{ opacity: .6 }}>
-                <path d="M19 9l-7 7-7-7" />
-              </svg>
             </button>
 
             {showProfile && (
-              <div style={{ ...dropdown, width: 270, top: 44, right: 0 }} onClick={e => e.stopPropagation()}>
-                {/* Profile header */}
+              <div style={{ ...dropdown, width: 260, top: 46, right: 0 }} onClick={e => e.stopPropagation()}>
                 <div style={{ padding: 14, borderBottom: "1px solid #f0f2f5", display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{
-                    width: 46, height: 46, borderRadius: 13, overflow: "hidden", flexShrink: 0,
+                    width: 44, height: 44, borderRadius: 13, overflow: "hidden", flexShrink: 0,
                     background: currentUser?.profilePhoto ? "transparent" : "linear-gradient(135deg,#6366f1,#a78bfa)",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: 18, fontWeight: 700, color: "#fff", position: "relative",
@@ -306,11 +301,9 @@ export default function MeetChatAppUpdated({ users, isOpen = false, onClose, tar
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13.5, fontWeight: 700, color: "#1a1d23", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getUserName(currentUser ?? user as any)}</div>
                     <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.email}</div>
-                    <div style={{ fontSize: 11.5, color: "#e8512a", fontWeight: 600, cursor: "pointer", marginTop: 3 }}>View account →</div>
                   </div>
                 </div>
-                {/* Status list */}
-                <div style={{ padding: "4px 10px 2px", fontSize: 10.5, fontWeight: 700, color: "#9aa0ad", textTransform: "uppercase", letterSpacing: ".5px" }}>Set Your Status</div>
+                <div style={{ padding: "4px 10px 2px", fontSize: 10.5, fontWeight: 700, color: "#9aa0ad", textTransform: "uppercase", letterSpacing: ".5px" }}>Set Status</div>
                 <div style={{ padding: "3px 0" }}>
                   {(Object.entries(STATUS_CONFIG) as [UserStatus, { label: string; color: string }][]).map(([key, cfg]) => (
                     <div key={key} onClick={() => changeStatus(key)}
@@ -324,10 +317,6 @@ export default function MeetChatAppUpdated({ users, isOpen = false, onClose, tar
                   ))}
                 </div>
                 <div style={{ borderTop: "1px solid #f0f2f5", padding: "3px 0" }}>
-                  <div onClick={() => changeStatus("available")} style={menuItem}>
-                    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                    Reset status
-                  </div>
                   <div onClick={handleClose} style={{ ...menuItem, color: "#ef4444" }}>
                     <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                     Sign out
@@ -336,23 +325,17 @@ export default function MeetChatAppUpdated({ users, isOpen = false, onClose, tar
               </div>
             )}
           </div>
-
-          {/* DIVIDER */}
-          <div style={{ width: 1, height: 22, background: "rgba(255,255,255,.12)", margin: "0 4px" }} />
-
-          {/* CLOSE */}
-          <button title="Close" onClick={handleClose} style={hdrBtn}>
-            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-              <path d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
         </div>
       </div>
 
-      {/* MAIN CONTENT */}
-      <div style={{ flex: 1, overflow: "hidden" }}>
+      {/* MAIN CONTENT — fills remaining height, no overflow */}
+      <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column", minHeight: 0 }}>
         {activeTab === "chat" && <TeamsStyleChatUpdated users={users} targetUid={targetUid} />}
-        {activeTab === "calls" && <TeamsStyleCalls users={users} />}
+        {activeTab === "calls" && (
+          <div style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
+            <TeamsStyleCalls users={users} />
+          </div>
+        )}
       </div>
     </div>
   );

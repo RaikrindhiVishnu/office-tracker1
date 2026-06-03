@@ -227,14 +227,20 @@ export default function ZohoStyleEmployeeDashboard() {
       snap => setProjects(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
   }, []);
 
-  const loadAttendance = async () => {
-    if (!user) return;
-    const data = await getTodayAttendance(user.uid);
-    setAttendance(data);
-    if (data?.profilePhoto) setProfilePhoto(data.profilePhoto);
-  };
-
-  useEffect(() => { if (!loading && user) loadAttendance(); }, [loading, user]);
+  useEffect(() => {
+    if (!user || loading) return;
+    const dateStr = getTodayDateStr();
+    const unsub = onSnapshot(doc(db, "attendance", `${user.uid}_${dateStr}`), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setAttendance(data);
+        if (data?.profilePhoto) setProfilePhoto(data.profilePhoto);
+      } else {
+        setAttendance(null);
+      }
+    });
+    return () => unsub();
+  }, [user, loading]);
 
   useEffect(() => {
     if (!user) return;
@@ -501,8 +507,8 @@ export default function ZohoStyleEmployeeDashboard() {
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   };
 
-  const doCheckIn = async () => { setBusy(true); await checkIn(user.uid); await loadAttendance(); setBusy(false); };
-  const doCheckOut = async () => { setBusy(true); await checkOut(user.uid); await loadAttendance(); setBusy(false); };
+  const doCheckIn = async () => { setBusy(true); await checkIn(user.uid); setBusy(false); };
+  const doCheckOut = async () => { setBusy(true); await checkOut(user.uid); setBusy(false); };
   const handleSetLeaveType = (v: LeaveType) => setLeaveType(v);
 
   const todayMD = new Date().toISOString().slice(5, 10);
@@ -814,6 +820,23 @@ export default function ZohoStyleEmployeeDashboard() {
             </div>
           </div>
         </header>
+
+        {/* Mobile App Promo Banner */}
+        <div className="lg:hidden p-3.5 bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-950 border-b border-indigo-900 flex items-center justify-between shadow-md shrink-0">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xl">📱</span>
+            <div>
+              <h4 className="text-xs font-bold text-white">Office Tracker PWA</h4>
+              <p className="text-[10px] text-indigo-200">Selfie & GPS check-in, AI standup, offline sync.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => router.push("/mobile")}
+            className="py-1.5 px-3 bg-indigo-500 hover:bg-indigo-600 active:bg-indigo-700 text-white font-extrabold rounded-lg text-[10px] transition-all shadow-sm shrink-0 active:scale-95"
+          >
+            Open App
+          </button>
+        </div>
 
         {/* ── CONTENT ── */}
         <main className="flex-1 overflow-y-auto p-0 bg-white">

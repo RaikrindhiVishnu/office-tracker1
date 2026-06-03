@@ -470,11 +470,7 @@ export default function HelpView() {
     <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16, fontFamily: "'Segoe UI', sans-serif", background: "#f0f4f9", minHeight: "100vh" }}>
 
       {/* ── HEADER ── */}
-      <div style={{
-        background: "#1a2e4a", borderRadius: 16, padding: "0 24px",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        height: 68, flexWrap: "wrap", gap: 10,
-      }}>
+      <div className="bg-[#1a2e4a] rounded-2xl px-4 py-3 sm:px-6 sm:min-h-[68px] flex flex-col sm:flex-row items-center justify-between gap-3">
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17 }}>❓</div>
           <div>
@@ -523,7 +519,7 @@ export default function HelpView() {
 
       {/* ════ NEW QUERY ════ */}
       {tab === "new" && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 420px", gap: 14, alignItems: "start" }}>
+        <div className="flex flex-col lg:grid lg:grid-cols-[1fr_420px] gap-4 items-start">
 
           {/* LEFT */}
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

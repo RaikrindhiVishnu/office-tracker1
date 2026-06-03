@@ -112,6 +112,35 @@ service cloud.firestore {
       allow read, write: if isAuth();
     }
 
+    // ── NEW NOTIFICATION SYSTEM COLLECTIONS ──────
+    match /notifications/{docId} {
+      allow create: if isAuth();
+      allow read, update, delete: if isAuth() && (resource.data.userId == request.auth.uid || isSuperAdmin());
+    }
+
+    match /appNotifications/{docId} {
+      allow create: if isAuth();
+      allow read: if isAuth();
+      allow update: if isAuth();
+    }
+
+    match /notificationPreferences/{userId} {
+      allow read, write: if isAuth() && (request.auth.uid == userId || isSuperAdmin());
+    }
+
+    match /liveLocations/{userId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && request.auth.uid == userId;
+    }
+
+    match /scheduledNotifications/{docId} {
+      allow read, write: if false; // Admin SDK only
+    }
+
+    match /notificationLogs/{docId} {
+      allow read, write: if false; // Admin SDK only
+    }
+
     // ── DEFAULT ──────────────────────────────────
     match /{document=**} {
       allow read, write: if false;

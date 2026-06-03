@@ -349,7 +349,7 @@ export default function Payslips() {
       </div>
 
       {/* ── FILTER ── */}
-      <div className="inline-flex items-center w-fit rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center w-full sm:w-fit rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="relative">
           <select
             value={filterYear}
@@ -365,7 +365,7 @@ export default function Payslips() {
           </svg>
         </div>
 
-        <div className="w-px h-6 bg-slate-200" />
+        <div className="h-px w-full sm:w-px sm:h-6 bg-slate-200" />
 
         <div className="relative">
           <select
@@ -383,7 +383,7 @@ export default function Payslips() {
           </svg>
         </div>
 
-        <div className="w-px h-6 bg-slate-200" />
+        <div className="h-px w-full sm:w-px sm:h-6 bg-slate-200" />
 
         <button
           onClick={handleSubmit}
@@ -463,17 +463,17 @@ export default function Payslips() {
       )}
 
       {/* ── HISTORY TABLE ── */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
+        <div className="min-w-[600px]">
+          <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+            <p className="text-sm font-bold text-slate-800">Payslip History</p>
+            <p className="text-xs text-slate-400">
+              {filteredRows.length} month{filteredRows.length !== 1 ? "s" : ""}
+              {filteredRows.length !== allMonthRows.length && ` (filtered from ${allMonthRows.length})`}
+            </p>
+          </div>
 
-        <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-          <p className="text-sm font-bold text-slate-800">Payslip History</p>
-          <p className="text-xs text-slate-400">
-            {filteredRows.length} month{filteredRows.length !== 1 ? "s" : ""}
-            {filteredRows.length !== allMonthRows.length && ` (filtered from ${allMonthRows.length})`}
-          </p>
-        </div>
-
-        <div className="grid grid-cols-4 px-5 py-2.5 bg-slate-50 border-b border-slate-100 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+          <div className="grid grid-cols-4 px-5 py-2.5 bg-slate-50 border-b border-slate-100 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
           <span>Employee</span>
           <span>Month</span>
           <span className="text-center">Status</span>
@@ -581,6 +581,7 @@ export default function Payslips() {
             </button>
           </div>
         )}
+        </div>
       </div>
 
     </div>

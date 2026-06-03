@@ -33,8 +33,8 @@ export default function OrgChart({ employees, onClose }: OrgChartProps) {
   // Group employees by department/team
   const teams = useMemo(() => {
     const groups: Record<string, Employee[]> = {
-      "Executive / CEO": [],
-      "Management & Leads": [],
+      "CEO and COO": [],
+      "Leads": [],
       "App & Mobile Team": [],
       "Frontend Team": [],
       "Backend Team": [],
@@ -46,6 +46,22 @@ export default function OrgChart({ employees, onClose }: OrgChartProps) {
       "9DS": [],
     };
 
+    // Ensure Katnam Phani Krishna is added as CEO if not present in the list
+    const hasCeo = employees.some((e) => {
+      const name = (e.name || e.displayName || "").toLowerCase();
+      return name.includes("phani krishna") || name.includes("katnam phani krishna");
+    });
+
+    if (!hasCeo) {
+      groups["CEO and COO"].push({
+        id: "ceo_phani_krishna",
+        name: "Katnam Phani Krishna",
+        designation: "CEO",
+        department: "Executive",
+        profilePhoto: "",
+      });
+    }
+
     employees.forEach((emp) => {
       const dept = (emp.department || "").toLowerCase();
       const desig = (emp.designation || "").toLowerCase();
@@ -56,8 +72,15 @@ export default function OrgChart({ employees, onClose }: OrgChartProps) {
         groups["9DS"].push(emp);
       } 
       // Put Phanikumar and C-levels in Executive
-      else if (name.includes("phanikumar") || desig.includes("ceo") || desig.includes("founder") || desig.includes("chief") || desig.includes("director")) {
-        groups["Executive / CEO"].push(emp);
+      else if (name.includes("phanikumar") || name.includes("phani krishna") || name.includes("katnam phani krishna") || desig.includes("ceo") || desig.includes("founder") || desig.includes("chief") || desig.includes("director")) {
+        if (name.includes("phani krishna") || name.includes("katnam phani krishna")) {
+          groups["CEO and COO"].push({
+            ...emp,
+            designation: "CEO"
+          });
+        } else {
+          groups["CEO and COO"].push(emp);
+        }
       } 
       // Move Villa Satish to App & Mobile Team
       else if (name.includes("villa satish") || name === "satish") {
@@ -72,8 +95,12 @@ export default function OrgChart({ employees, onClose }: OrgChartProps) {
       else if (name.includes("amrutha varshini") || desig.includes("business analyst") || desig === "ba") {
         groups["Business Analysts"].push(emp);
       }
+      // Move Harish Kollati to Frontend Team instead of Leads
+      else if (name.includes("harish kollati") || name.includes("harish")) {
+        groups["Frontend Team"].push(emp);
+      }
       else if (desig.includes("manager") || desig.includes("lead")) {
-        groups["Management & Leads"].push(emp);
+        groups["Leads"].push(emp);
       } else if (desig.includes("app") || dept.includes("app") || desig.includes("mobile") || dept.includes("mobile") || desig.includes("android") || desig.includes("ios") || desig.includes("flutter")) {
         groups["App & Mobile Team"].push(emp);
       } else if (dept.includes("frontend") || desig.includes("frontend") || desig.includes("react") || desig.includes("ui dev")) {
@@ -104,10 +131,10 @@ export default function OrgChart({ employees, onClose }: OrgChartProps) {
       groups["Frontend Team"].sort((a, b) => {
         const nameA = (a.name || a.displayName || "").toLowerCase();
         const nameB = (b.name || b.displayName || "").toLowerCase();
-        
+
         const isATop = nameA.includes("harish") || nameA.includes("bathini") || nameA.includes("ramu") || nameA.includes("raikrindhi") || nameA.includes("vishnu");
         const isBTop = nameB.includes("harish") || nameB.includes("bathini") || nameB.includes("ramu") || nameB.includes("raikrindhi") || nameB.includes("vishnu");
-        
+
         if (isATop && !isBTop) return -1;
         if (!isATop && isBTop) return 1;
         return 0;
@@ -165,52 +192,69 @@ export default function OrgChart({ employees, onClose }: OrgChartProps) {
               <div className="w-0.5 h-6 bg-slate-300"></div>
             </div>
 
-            {/* Executive / CEO Level */}
-            {teams["Executive / CEO"] && (
+            {/* CEO and COO Level */}
+            {teams["CEO and COO"] && (
               <div className="relative flex flex-col items-center">
                 {/* CEO Team Header Box */}
-                <div className="px-4 py-1.5 bg-slate-800 text-white rounded-lg shadow-sm font-bold text-xs z-10 border border-slate-700 whitespace-nowrap mb-4">
-                  Executive / CEO
+                <div className="px-4 py-1.5 bg-slate-800 text-white rounded-lg shadow-sm font-bold text-xs z-10 border border-slate-700 whitespace-nowrap">
+                  CEO and COO
                   <span className="ml-1.5 inline-flex items-center justify-center bg-slate-600 text-[9px] px-1.5 py-0.5 rounded-full">
-                    {teams["Executive / CEO"].length}
+                    {teams["CEO and COO"].length}
                   </span>
                 </div>
 
+                {/* Vertical line dropping from header to horizontal line */}
+                <div className="w-0.5 h-5 bg-slate-300 -z-10"></div>
+
                 {/* CEO Cards Side by Side - auto width so long titles appear fully */}
-                <div className="flex flex-wrap justify-center gap-4 z-10">
-                  {teams["Executive / CEO"].map((emp) => (
-                    <div key={emp.id} className="w-auto min-w-[160px] px-4 bg-white border border-blue-200 rounded-xl shadow-sm p-2 flex items-center gap-3">
-                      <div className="shrink-0">
-                        <Avatar name={emp.name || emp.displayName || emp.email?.split("@")[0] || "?"} size={28} photo={emp.profilePhoto} />
+                <div className="flex justify-center gap-12 z-10 w-full relative pt-0 -mt-1">
+                  {teams["CEO and COO"].map((emp, index, arr) => (
+                    <div key={emp.id} className="relative flex flex-col items-center">
+                      {/* Horizontal connector line above each CEO card */}
+                      {arr.length > 1 && (
+                        <div 
+                          className="absolute top-0 h-0.5 bg-slate-300 -z-10"
+                          style={{
+                            left: index === 0 ? "50%" : "0",
+                            right: index === arr.length - 1 ? "50%" : "0"
+                          }}
+                        />
+                      )}
+                      
+                      {/* Vertical line connecting horizontal connector to the card */}
+                      <div className="w-0.5 h-4 bg-slate-300 -z-10"></div>
+
+                      <div className="w-auto min-w-[160px] px-4 bg-white border border-blue-200 rounded-xl shadow-sm p-2 flex items-center gap-3">
+                        <div className="shrink-0">
+                          <Avatar name={emp.name || emp.displayName || emp.email?.split("@")[0] || "?"} size={28} photo={emp.profilePhoto} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="text-xs font-bold text-slate-800 text-blue-700 whitespace-normal">
+                            {emp.name || emp.displayName || emp.email?.split("@")[0]}
+                          </h4>
+                          <p className="text-[10px] font-medium text-blue-500/80 uppercase tracking-wider mt-0.5 whitespace-normal">
+                            {emp.designation === "CEO" ? "Chief Executive Officer" : (emp.designation || "Employee")}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <h4 className="text-xs font-bold text-slate-800 text-blue-700 whitespace-normal">
-                          {emp.name || emp.displayName || emp.email?.split("@")[0]}
-                        </h4>
-                        <p className="text-[10px] font-medium text-blue-500/80 uppercase tracking-wider mt-0.5 whitespace-normal">
-                          {emp.designation || "Employee"}
-                        </p>
-                      </div>
+
+                      {/* Vertical line dropping from the bottom of each card to the horizontal line below */}
+                      <div className="w-0.5 h-8 bg-slate-300 -z-10"></div>
                     </div>
                   ))}
                 </div>
-                
-                {/* Vertical line dropping to the rest of the teams */}
-                {Object.keys(teams).length > 1 && (
-                  <div className="w-0.5 h-6 bg-slate-300"></div>
-                )}
               </div>
             )}
 
             {/* Teams Row */}
-            <div className="relative flex justify-center mt-0 pt-0 w-full z-10">
-              
-              {Object.entries(teams).filter(([t]) => t !== "Executive / CEO").map(([teamName, members], i, arr) => (
+            <div className="relative flex justify-center -mt-2 pt-0 w-full z-10">
+
+              {Object.entries(teams).filter(([t]) => t !== "CEO and COO").map(([teamName, members], i, arr) => (
                 <div key={teamName} className="relative flex flex-col items-center px-1 sm:px-1.5 md:px-2">
-                  
+
                   {/* Perfect edge-to-edge horizontal connector for each column */}
                   {arr.length > 1 && (
-                    <div 
+                    <div
                       className="absolute top-0 h-0.5 bg-slate-300 -z-10"
                       style={{
                         left: i === 0 ? "50%" : "0",
@@ -221,7 +265,7 @@ export default function OrgChart({ employees, onClose }: OrgChartProps) {
 
                   {/* Small vertical tick connecting horizontal line to team box */}
                   <div className="w-0.5 h-4 bg-slate-300 -z-10"></div>
-                  
+
                   {/* Team Header Box */}
                   <div className="px-3 py-1.5 bg-slate-800 text-white rounded-md shadow-sm font-bold text-[11px] z-10 border border-slate-700 whitespace-nowrap mb-4 relative">
                     {teamName}
@@ -236,7 +280,7 @@ export default function OrgChart({ employees, onClose }: OrgChartProps) {
                       <div key={emp.id} className="relative flex items-center pl-8 z-10">
                         {/* Horizontal branch from spine to card */}
                         <div className="absolute left-4 top-1/2 w-4 h-0.5 bg-slate-200 -translate-y-1/2 -z-10"></div>
-                        
+
                         {/* Member Card - Much more compact */}
                         <div className="w-40 bg-white border border-slate-200 rounded-lg shadow-sm hover:shadow-md transition-shadow p-1.5 flex items-center gap-2 group">
                           <div className="shrink-0">

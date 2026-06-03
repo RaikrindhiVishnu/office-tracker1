@@ -259,6 +259,16 @@ const CSS = `
 .zc-gs-add-item span{flex:1;font-weight:500;color:#1a1d23;}
 .zc-gs-avatar-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:8px;border:1.5px dashed #d1d5db;border-radius:8px;background:#f9fafb;cursor:pointer;font-size:12.5px;color:#6b7280;font-family:'DM Sans',sans-serif;font-weight:600;transition:all .14s;margin-top:8px;}
 .zc-gs-avatar-btn:hover{border-color:#e8512a;color:#e8512a;background:#fff3ef;}
+
+/* ── Mobile Responsive ── */
+.zc-back-btn { display: none; }
+@media (max-width: 768px) {
+  .zc-panel { width: 100%; border-right: none; }
+  .zc.has-chat .zc-panel { display: none; }
+  .zc-main, .zc-empty { display: none; }
+  .zc.has-chat .zc-main { display: flex; width: 100%; }
+  .zc-back-btn { display: flex; margin-right: 4px; }
+}
 `;
 
 export default function TeamsStyleChat({ users, targetUid }: { users: User[]; targetUid?: string | null }) {
@@ -1035,7 +1045,7 @@ export default function TeamsStyleChat({ users, targetUid }: { users: User[]; ta
       )}
 
       {/* ── MAIN LAYOUT ── */}
-      <div className="zc">
+      <div className={`zc ${selectedChat ? "has-chat" : ""}`}>
         {/* <div className="zc-sb">
           <div className={`zc-sb-ico${tab==="chats"?" on":""}`} onClick={()=>setTab("chats")} title="Chats">
             <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
@@ -1118,6 +1128,9 @@ export default function TeamsStyleChat({ users, targetUid }: { users: User[]; ta
               : <div className="zc-main">
                 <div className="zc-conv-hd">
                   <div className="zc-conv-hd-left">
+                    <button className="zc-hd-btn zc-back-btn" onClick={() => setSelectedChat(null)} title="Back">
+                      <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" /></svg>
+                    </button>
                     {(() => {
                       const ou = getChatOU(selectedChat); const name = getChatName(selectedChat);
                       const st = getOUSt(selectedChat); const stCfg = STATUS_CONFIG[st]; const [g1, g2] = avGrad(name);

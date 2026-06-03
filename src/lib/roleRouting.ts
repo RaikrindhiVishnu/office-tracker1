@@ -3,8 +3,8 @@ export type UserRole =
   | "admin"
   | "hr"
   | "employee";
-  
-  export function getRoleRedirect(
+
+export function getRoleRedirect(
   role: string | null | undefined,
   department?: string | null
 ): string {
@@ -54,4 +54,29 @@ export function isRoleAuthorized(
 ): boolean {
   if (!userRole) return false;
   return allowedRoles.includes(userRole.toLowerCase());
+}
+
+export function getMobileRedirect(clickAction?: string): string | undefined {
+  if (!clickAction) return undefined;
+  
+  if (typeof window !== "undefined") {
+    const isMobile = window.innerWidth < 768 || /Mobi|Android|iPhone/i.test(navigator.userAgent);
+    if (isMobile) {
+      const lower = clickAction.toLowerCase();
+      let tab = "home";
+      if (lower.includes("attendance")) tab = "attendance";
+      else if (lower.includes("task") || lower.includes("project")) tab = "projects";
+      else if (lower.includes("standup")) tab = "standup";
+      else if (lower.includes("meeting") || lower.includes("meet") || lower.includes("message") || lower.includes("chat")) tab = "chat";
+      else if (lower.includes("approval")) tab = "approvals";
+      else if (lower.includes("emergency") || lower.includes("alert")) tab = "emergency";
+      else if (lower.includes("payslip")) tab = "payslips";
+      else if (lower.includes("profile")) tab = "profile";
+      else if (lower.includes("leave")) tab = "leave";
+      else if (lower.includes("help")) tab = "help";
+      
+      return `/mobile?tab=${tab}`;
+    }
+  }
+  return clickAction;
 }

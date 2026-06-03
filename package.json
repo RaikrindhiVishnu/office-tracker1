@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@daily-co/daily-js": "^0.87.0",
+    "@ducanh2912/next-pwa": "^10.2.9",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@google/generative-ai": "^0.24.1",

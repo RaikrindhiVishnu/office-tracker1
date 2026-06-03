@@ -5,6 +5,8 @@ import {
   collection, addDoc, updateDoc, doc, writeBatch, getDocs,
   query, where, orderBy, onSnapshot, serverTimestamp, getDoc,
 } from "firebase/firestore";
+import { NotificationCategory, NotificationPriority, NotificationActionButton } from "./notificationTypes";
+import { shouldNotify } from "./notificationPreferences";
 
 // ── Helper: send browser push notification ────────────────────────────────────
 export async function triggerPushNotification(
@@ -173,9 +175,16 @@ export interface Notification {
   title: string;
   message: string;
   isRead: boolean;
+  category?: NotificationCategory;
+  event?: string;
+  priority?: NotificationPriority;
+  clickAction?: string;
+  actionButtons?: NotificationActionButton[];
+  imageUrl?: string;
   relatedCollection?: string;
   relatedDocId?: string;
-  createdAt: string;
+  data?: Record<string, string>;
+  createdAt: any;
 }
 
 export interface CreateNotificationParams {
@@ -183,8 +192,15 @@ export interface CreateNotificationParams {
   type: NotificationType;
   title: string;
   message: string;
+  category?: NotificationCategory;
+  event?: string;
+  priority?: NotificationPriority;
+  clickAction?: string;
+  actionButtons?: NotificationActionButton[];
+  imageUrl?: string;
   relatedCollection?: string;
   relatedDocId?: string;
+  data?: Record<string, string>;
 }
 
 // ── Cross-dashboard notification type (new — for dashboard bells) ─────────────
@@ -217,32 +233,91 @@ export interface AppNotification {
 
 // ─── Create a single notification ────────────────────────────────────────────
 export async function createNotification(params: CreateNotificationParams): Promise<string> {
+  const category = params.category || "system";
+  const priority = params.priority || (params.type === "error" || params.type === "warning" ? "high" : "medium");
+
   const ref = await addDoc(collection(db, "notifications"), {
     userId: params.userId,
     type: params.type,
     title: params.title,
     message: params.message,
     isRead: false,
+    category,
+    event: params.event || "SYSTEM_GENERAL",
+    priority,
+    clickAction: params.clickAction || "",
+    actionButtons: params.actionButtons || [],
+    imageUrl: params.imageUrl || "",
     relatedCollection: params.relatedCollection || "",
     relatedDocId: params.relatedDocId || "",
     createdAt: serverTimestamp(),
   });
 
-  // 🔔 Desktop push notification
-  triggerPushNotification(params.userId, params.title, params.message).catch(err => {
-    console.error("[Push] Error triggering push notification:", err);
+  // Respect user notification preferences
+  shouldNotify(params.userId, category, priority).then((check) => {
+    if (!check.showNotification) return;
+
+    // 🔔 Desktop push notification
+    if (check.sendPush) {
+      triggerPushNotification(
+        params.userId,
+        params.title,
+        params.message,
+        params.imageUrl || undefined,
+        {
+          category,
+          priority,
+          clickAction: params.clickAction || "",
+          notifId: ref.id,
+          ...(params.relatedDocId ? { relatedDocId: params.relatedDocId } : {}),
+          ...(params.relatedCollection ? { relatedCollection: params.relatedCollection } : {}),
+        }
+      ).catch(err => {
+        console.error("[Push] Error triggering push notification:", err);
+      });
+    }
+
+    // 📧 Email notification
+    if (check.sendEmail) {
+      triggerEmailNotification(params.userId, params.title, params.message, params.type).catch(err => {
+        console.error("[Email] Error triggering email notification:", err);
+      });
+    }
+
+    // 📱 WhatsApp notification
+    if (check.sendWhatsApp) {
+      triggerWhatsAppNotification(params.userId, `*${params.title}*\n${params.message}`).catch(err => {
+        console.error("[WhatsApp] Error triggering WhatsApp notification:", err);
+      });
+    }
+  }).catch(err => {
+    console.error("[Preferences] Error checking preferences inside createNotification:", err);
   });
 
-  // 📧 Email notification
-  triggerEmailNotification(params.userId, params.title, params.message, params.type).catch(err => {
-    console.error("[Email] Error triggering email notification:", err);
-  });
+  return ref.id;
+}
 
-  // 📱 WhatsApp notification
-  triggerWhatsAppNotification(params.userId, `*${params.title}*\n${params.message}`).catch(err => {
-    console.error("[WhatsApp] Error triggering WhatsApp notification:", err);
+// ─── Schedule a notification for later ────────────────────────────────────────
+export async function scheduleNotification(
+  params: CreateNotificationParams & { scheduledFor: Date }
+): Promise<string> {
+  const ref = await addDoc(collection(db, "scheduledNotifications"), {
+    userId: params.userId,
+    type: params.type,
+    title: params.title,
+    message: params.message,
+    category: params.category || "system",
+    event: params.event || "SYSTEM_GENERAL",
+    priority: params.priority || "medium",
+    clickAction: params.clickAction || "",
+    actionButtons: params.actionButtons || [],
+    imageUrl: params.imageUrl || "",
+    relatedCollection: params.relatedCollection || "",
+    relatedDocId: params.relatedDocId || "",
+    scheduledFor: params.scheduledFor,
+    status: "pending",
+    createdAt: serverTimestamp(),
   });
-
   return ref.id;
 }
 
@@ -252,35 +327,72 @@ export async function createNotificationForMany(
   params: Omit<CreateNotificationParams, "userId">
 ): Promise<void> {
   const batch = writeBatch(db);
+  const tempRefs: string[] = [];
+
   userIds.forEach((userId) => {
     const ref = doc(collection(db, "notifications"));
+    tempRefs.push(ref.id);
+    const category = params.category || "system";
+    const priority = params.priority || (params.type === "error" || params.type === "warning" ? "high" : "medium");
+
     batch.set(ref, {
       userId,
       type: params.type,
       title: params.title,
       message: params.message,
       isRead: false,
+      category,
+      event: params.event || "SYSTEM_GENERAL",
+      priority,
+      clickAction: params.clickAction || "",
+      actionButtons: params.actionButtons || [],
+      imageUrl: params.imageUrl || "",
       relatedCollection: params.relatedCollection || "",
       relatedDocId: params.relatedDocId || "",
       createdAt: serverTimestamp(),
     });
   });
+
   await batch.commit();
 
-  // 🔔 Desktop push + 📧 Email for all users
-  userIds.forEach((userId) => {
-    triggerPushNotification(userId, params.title, params.message).catch(err => {
-      console.error(`[Push] Error triggering push notification for user ${userId}:`, err);
-    });
-    triggerEmailNotification(userId, params.title, params.message, params.type).catch(err => {
-      console.error(`[Email] Error triggering email notification for user ${userId}:`, err);
-    });
-    triggerWhatsAppNotification(userId, `*${params.title}*\n${params.message}`).catch(err => {
-      console.error(`[WhatsApp] Error triggering WhatsApp notification for user ${userId}:`, err);
+  // 🔔 Dispatch pushes / emails asynchronously respecting user preference
+  userIds.forEach((userId, idx) => {
+    const category = params.category || "system";
+    const priority = params.priority || (params.type === "error" || params.type === "warning" ? "high" : "medium");
+    const notifId = tempRefs[idx];
+
+    shouldNotify(userId, category, priority).then((check) => {
+      if (!check.showNotification) return;
+
+      if (check.sendPush) {
+        triggerPushNotification(userId, params.title, params.message, params.imageUrl || undefined, {
+          category,
+          priority,
+          clickAction: params.clickAction || "",
+          notifId,
+          ...(params.relatedDocId ? { relatedDocId: params.relatedDocId } : {}),
+          ...(params.relatedCollection ? { relatedCollection: params.relatedCollection } : {}),
+        }).catch(err => {
+          console.error(`[Push] Error triggering push notification for user ${userId}:`, err);
+        });
+      }
+
+      if (check.sendEmail) {
+        triggerEmailNotification(userId, params.title, params.message, params.type).catch(err => {
+          console.error(`[Email] Error triggering email notification for user ${userId}:`, err);
+        });
+      }
+
+      if (check.sendWhatsApp) {
+        triggerWhatsAppNotification(userId, `*${params.title}*\n${params.message}`).catch(err => {
+          console.error(`[WhatsApp] Error triggering WhatsApp notification for user ${userId}:`, err);
+        });
+      }
+    }).catch(err => {
+      console.error(`[Preferences] Error verifying preferences for user ${userId}:`, err);
     });
   });
 }
-
 
 // ─── Mark single notification as read ────────────────────────────────────────
 export async function markNotificationRead(notificationId: string): Promise<void> {
@@ -306,6 +418,9 @@ export const notifyLeaveApproved = (userId: string, dates: string, docId: string
     userId, type: "success",
     title: "Leave Approved ✓",
     message: `Your leave request for ${dates} has been approved.`,
+    category: "leave",
+    event: "LEAVE_APPROVED",
+    clickAction: "/employee?tab=leave",
     relatedCollection: "leaveRequests", relatedDocId: docId,
   });
 
@@ -314,6 +429,9 @@ export const notifyLeaveRejected = (userId: string, dates: string, reason: strin
     userId, type: "error",
     title: "Leave Request Rejected",
     message: `Your leave for ${dates} was rejected. Reason: ${reason}`,
+    category: "leave",
+    event: "LEAVE_REJECTED",
+    clickAction: "/employee?tab=leave",
     relatedCollection: "leaveRequests", relatedDocId: docId,
   });
 
@@ -322,6 +440,9 @@ export const notifyAttendanceFlagged = (userId: string, date: string, docId: str
     userId, type: "warning",
     title: "Attendance Flagged",
     message: `Your attendance on ${date} has been flagged for review.`,
+    category: "attendance",
+    event: "ATTENDANCE_LATE_WARNING",
+    clickAction: "/employee",
     relatedCollection: "attendance", relatedDocId: docId,
   });
 
@@ -330,6 +451,9 @@ export const notifyPayslipReady = (userId: string, month: string, docId: string)
     userId, type: "info",
     title: "Payslip Ready",
     message: `Your payslip for ${month} is now available.`,
+    category: "system",
+    event: "SYSTEM_GENERAL",
+    clickAction: "/employee",
     relatedCollection: "payslips", relatedDocId: docId,
   });
 
@@ -338,6 +462,9 @@ export const notifyAssetAssigned = (userId: string, assetName: string, docId: st
     userId, type: "info",
     title: "Asset Assigned",
     message: `${assetName} has been assigned to you.`,
+    category: "system",
+    event: "SYSTEM_GENERAL",
+    clickAction: "/employee",
     relatedCollection: "it_assets", relatedDocId: docId,
   });
 
@@ -346,6 +473,9 @@ export const notifyAssetRepairLogged = (userId: string, assetName: string, docId
     userId, type: "warning",
     title: "Asset Sent for Repair",
     message: `${assetName} has been sent for repair and is temporarily unavailable.`,
+    category: "system",
+    event: "SYSTEM_GENERAL",
+    clickAction: "/employee",
     relatedCollection: "it_assets", relatedDocId: docId,
   });
 

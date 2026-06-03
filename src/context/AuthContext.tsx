@@ -116,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Stay in loading=true until Firestore data arrives
       try {
-        const tokenResult  = await firebaseUser.getIdTokenResult(true);
+        const tokenResult  = await firebaseUser.getIdTokenResult();
         const claims       = tokenResult.claims;
         const superAdmin   = claims.superAdmin === true;
         const claimCompany = (claims.companyId as string) || null;

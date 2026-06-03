@@ -466,15 +466,7 @@ export default function AdminPage() {
     router.push("/login");
   };
 
-  if (loading)
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-50 to-slate-100">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-[#193677] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-600 font-medium">Loading dashboard...</p>
-        </div>
-      </div>
-    );
+  if (loading) return null;
 
   if (!user)
     return (
@@ -718,6 +710,12 @@ export default function AdminPage() {
             onClick={() => { setView("it-assets"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
           />
 
+          <NavItem
+            icon={<span className="text-base">📱</span>}
+            label="Mobile Companion" active={false}
+            onClick={() => { router.push("/mobile"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
         </nav>
 
         {/* Logout */}
@@ -824,6 +822,23 @@ export default function AdminPage() {
             </div>
           </div>
         </header>
+
+        {/* Mobile App Promo Banner */}
+        <div className="lg:hidden p-3.5 bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-950 border-b border-indigo-900 flex items-center justify-between shadow-md shrink-0">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xl">📱</span>
+            <div>
+              <h4 className="text-xs font-bold text-white">Office Tracker PWA</h4>
+              <p className="text-[10px] text-indigo-200">Admin quick approvals, live alerts, camera check-in.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => router.push("/mobile")}
+            className="py-1.5 px-3 bg-indigo-500 hover:bg-indigo-600 active:bg-indigo-700 text-white font-extrabold rounded-lg text-[10px] transition-all shadow-sm shrink-0 active:scale-95"
+          >
+            Open App
+          </button>
+        </div>
 
         <main className={`flex-1 overflow-auto bg-slate-50 px-4 pb-4 pt-2 lg:px-8 lg:pb-8 lg:pt-4 space-y-4`}>
 

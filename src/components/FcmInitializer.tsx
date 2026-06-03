@@ -10,7 +10,7 @@ import { useFcm } from "@/hooks/useFcm";
  */
 export default function FcmInitializer() {
   const { user } = useAuth();
-  
+
   // Call useFcm hook with the current user's UID (if logged in)
   useFcm(user?.uid);
 

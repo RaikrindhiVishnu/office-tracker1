@@ -479,14 +479,7 @@ function HRDashboard() {
     {key:"queries"   as HRView,label:"Queries",icon:"💬",badge:queryUnread},
   ];
 
-  if(loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-center space-y-3">
-        <div className="w-10 h-10 border-2 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto"/>
-        <p className="text-gray-400 text-xs font-semibold tracking-widest uppercase">Loading</p>
-      </div>
-    </div>
-  );
+  if (loading) return null;
   if(!user) return null;
 
   return (
@@ -524,6 +517,9 @@ function HRDashboard() {
 </button>
   <button onClick={()=>window.open("/meet","_blank")} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-all text-left">
     <span className="text-base">📹</span><span>Video Meet</span>
+  </button>
+  <button onClick={()=>router.push("/mobile")} className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold text-teal-600 hover:bg-teal-50 hover:text-teal-800 transition-all text-left">
+    <span className="text-base">📱</span><span>Mobile Companion</span>
   </button>
 </div>
         </nav>
@@ -595,6 +591,23 @@ function HRDashboard() {
             <Avatar name={userName} photo={(userData as any)?.profilePhoto} size="sm"/>
           </div>
         </header>
+
+        {/* Mobile App Promo Banner */}
+        <div className="lg:hidden p-3.5 bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-950 border-b border-indigo-900 flex items-center justify-between shadow-md shrink-0">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xl">📱</span>
+            <div>
+              <h4 className="text-xs font-bold text-white">Office Tracker PWA</h4>
+              <p className="text-[10px] text-indigo-200">HR approvals, live notifications, mobile chat.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => router.push("/mobile")}
+            className="py-1.5 px-3 bg-indigo-500 hover:bg-indigo-600 active:bg-indigo-700 text-white font-extrabold rounded-lg text-[10px] transition-all shadow-sm shrink-0 active:scale-95"
+          >
+            Open App
+          </button>
+        </div>
 
         {/* ── PAGE CONTENT ── */}
         <main className="flex-1 px-4 sm:px-6 py-6 space-y-6 overflow-y-auto">

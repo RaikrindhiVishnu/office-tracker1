@@ -17,7 +17,7 @@ interface Message {
   imageUrl?: string; // optional preview of uploaded image
 }
 
-export default function ChatBot() {
+export default function ChatBot({ isInline = false }: { isInline?: boolean }) {
   const { userData } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -27,7 +27,12 @@ export default function ChatBot() {
   const [hasStarted, setHasStarted] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [hasPrimedAudio, setHasPrimedAudio] = useState(false);
   const recognitionRef = useRef<any>(null);
+  
+  useEffect(() => {
+    if (isInline) setIsOpen(true);
+  }, [isInline]);
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -59,24 +64,7 @@ export default function ChatBot() {
       recognition.interimResults = true;
       recognition.lang = "en-US";
       
-      recognition.onresult = (event: any) => {
-        let interimTranscript = "";
-        let finalTranscript = "";
-        
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
-          } else {
-            interimTranscript += event.results[i][0].transcript;
-          }
-        }
-        
-        const transcript = finalTranscript || interimTranscript;
-        if (transcript) {
-          console.log("Speech recognized text:", transcript);
-          setInput(transcript);
-        }
-      };
+      // onresult will be assigned dynamically in toggleListen to capture current input state
       
       recognition.onend = () => {
         console.log("Speech recognition ended");
@@ -84,7 +72,11 @@ export default function ChatBot() {
       };
       
       recognition.onerror = (event: any) => {
-        console.error("Speech recognition error:", event.error, event);
+        if (event.error === "not-allowed") {
+          console.warn("Speech recognition access denied by browser.");
+        } else {
+          console.error("Speech recognition error:", event.error, event);
+        }
         setIsListening(false);
       };
       
@@ -94,14 +86,48 @@ export default function ChatBot() {
     }
   }, []);
 
+  const primeAudio = () => {
+    if (!hasPrimedAudio && window.speechSynthesis) {
+      const u = new SpeechSynthesisUtterance("");
+      u.volume = 0;
+      try {
+        window.speechSynthesis.speak(u);
+      } catch (e) {
+        console.warn("primeAudio failed:", e);
+      }
+      setHasPrimedAudio(true);
+    }
+  };
+
   const toggleListen = () => {
+    primeAudio();
     if (isListening) {
       recognitionRef.current?.stop();
     } else {
       if (recognitionRef.current) {
-        setInput("");
-        recognitionRef.current.start();
-        setIsListening(true);
+        const currentInput = input;
+        recognitionRef.current.onresult = (event: any) => {
+          let interimTranscript = "";
+          let finalTranscript = "";
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              finalTranscript += event.results[i][0].transcript;
+            } else {
+              interimTranscript += event.results[i][0].transcript;
+            }
+          }
+          const transcript = finalTranscript || interimTranscript;
+          if (transcript) {
+            setInput((currentInput ? currentInput + " " : "") + transcript);
+          }
+        };
+        try {
+          recognitionRef.current.start();
+          setIsListening(true);
+        } catch (e) {
+          console.warn("Failed to start SpeechRecognition (may already be running):", e);
+          setIsListening(true); // Assuming it's already running if we get this error
+        }
       }
     }
   };
@@ -121,9 +147,15 @@ export default function ChatBot() {
       
       utterance.onstart = () => console.log("Speech started speaking");
       utterance.onend = () => console.log("Speech finished speaking");
-      utterance.onerror = (e: any) => console.error("SpeechSynthesis error code:", e.error, e);
+      utterance.onerror = (e: any) => {
+        if (e.error !== "interrupted") {
+          console.error("SpeechSynthesis error code:", e.error, e);
+        }
+      };
       
       window.speechSynthesis.speak(utterance);
+      // Critical fix for mobile browsers (especially iOS Safari) where speech gets stuck or doesn't start
+      window.speechSynthesis.resume();
     } catch (err) {
       console.error("Failed to run speechSynthesis:", err);
     }
@@ -266,6 +298,7 @@ export default function ChatBot() {
   };
 
   const handleSend = async (overrideMsg?: string) => {
+    primeAudio();
     const textToSend = overrideMsg || input;
     if (!textToSend.trim() && !attachedImage) return;
 
@@ -330,16 +363,17 @@ export default function ChatBot() {
   if (!userData) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+    <div className={isInline ? "flex flex-col h-[calc(100vh-140px)] w-full relative" : "fixed bottom-6 right-6 z-[9999] flex flex-col items-end"}>
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            onClick={primeAudio}
+            initial={isInline ? undefined : { opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            exit={isInline ? undefined : { opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="mb-4 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden flex flex-col"
-            style={{ height: "500px", maxHeight: "80vh" }}
+            className={`bg-white overflow-hidden flex flex-col ${isInline ? "w-full h-full flex-1 rounded-2xl border border-gray-100 shadow-sm" : "w-80 sm:w-96 mb-4 rounded-2xl shadow-2xl border border-gray-100"}`}
+            style={isInline ? { height: "100%", maxHeight: "100%" } : { height: "500px", maxHeight: "80vh" }}
           >
             {/* Header */}
             <div className="bg-linear-to-r from-[#0b3a5a] to-[#1a5276] p-4 flex justify-between items-center shadow-md z-10">
@@ -366,12 +400,14 @@ export default function ChatBot() {
                 >
                   {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
                 </button>
-                <button
-                  onClick={() => setIsOpen(false)}
-                  className="text-white/80 hover:text-white transition-colors hover:bg-white/10 p-1.5 rounded-lg"
-                >
-                  <X size={20} />
-                </button>
+                {!isInline && (
+                  <button
+                    onClick={() => setIsOpen(false)}
+                    className="text-white/80 hover:text-white transition-colors hover:bg-white/10 p-1.5 rounded-lg"
+                  >
+                    <X size={20} />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -521,7 +557,7 @@ export default function ChatBot() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder={attachedImage ? "Describe or ask about the image..." : "Ask me anything..."}
-                  className="flex-1 bg-transparent px-2 py-1.5 text-sm focus:outline-none text-gray-700 placeholder-gray-400"
+                  className="flex-1 min-w-0 bg-transparent px-2 py-1.5 text-sm focus:outline-none text-gray-700 placeholder-gray-400"
                 />
                 <button
                   type="submit"
@@ -537,22 +573,24 @@ export default function ChatBot() {
       </AnimatePresence>
 
       {/* Floating Button */}
-      <div className="relative">
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setIsOpen(!isOpen)}
-          className="bg-linear-to-r from-[#0b3a5a] to-[#1a5276] text-white p-4 rounded-full shadow-xl hover:shadow-2xl transition-all flex items-center justify-center border-2 border-white/20 cursor-pointer"
-        >
-          {isOpen ? <X size={24} /> : <MessageCircle size={24} />}
-        </motion.button>
-        {!isOpen && !hasSubmittedToday && (
-          <span className="absolute -top-1 -right-1 flex h-4 w-4 z-50">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 text-[9px] text-white font-bold items-center justify-center shadow-md">!</span>
-          </span>
-        )}
-      </div>
+      {!isInline && (
+        <div className="relative mt-2">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setIsOpen(!isOpen)}
+            className="bg-linear-to-r from-[#0b3a5a] to-[#1a5276] text-white p-4 rounded-full shadow-xl hover:shadow-2xl transition-all flex items-center justify-center border-2 border-white/20 cursor-pointer"
+          >
+            {isOpen ? <X size={24} /> : <MessageCircle size={24} />}
+          </motion.button>
+          {!isOpen && !hasSubmittedToday && (
+            <span className="absolute -top-1 -right-1 flex h-4 w-4 z-[9999]">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 text-[9px] text-white font-bold items-center justify-center shadow-md">!</span>
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

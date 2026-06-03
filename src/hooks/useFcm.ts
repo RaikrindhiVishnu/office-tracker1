@@ -1,16 +1,28 @@
 import { useEffect, useState } from "react";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { getToken } from "firebase/messaging";
+import { getToken, onMessage } from "firebase/messaging";
 import { db, getFcmMessaging, firebaseConfig } from "@/lib/firebase";
+import { useNotifications } from "@/context/NotificationContext";
+import { NotificationCategory } from "@/lib/notificationTypes";
 
 export function useFcm(userId: string | undefined) {
   const [token, setToken] = useState<string | null>(null);
   const [permission, setPermission] = useState<NotificationPermission>("default");
+  
+  // Get showToast from NotificationContext
+  let notificationsContext: any = null;
+  try {
+    notificationsContext = useNotifications();
+  } catch (e) {
+    // Context might not be ready during server-side render or init
+  }
 
   useEffect(() => {
     if (!userId || typeof window === "undefined" || !("serviceWorker" in navigator)) {
       return;
     }
+
+    let unsubOnMessage: (() => void) | undefined;
 
     const setupFcm = async () => {
       try {
@@ -57,7 +69,6 @@ export function useFcm(userId: string | undefined) {
         const registration = await navigator.serviceWorker.register(swUrl);
 
         // 3. Wait for the service worker to become active before getting the token
-        //    This fixes: "Subscription failed - no active Service Worker"
         await waitForServiceWorkerActive(registration);
 
         // 4. Get FCM Token
@@ -69,24 +80,60 @@ export function useFcm(userId: string | undefined) {
         if (currentToken) {
           setToken(currentToken);
 
-          // Save token to users/{userId}/fcmTokens/{token} in Firestore
+          // Save token to users/{userId}/fcmTokens/{token} in Firestore with full metadata
           const tokenRef = doc(db, "users", userId, "fcmTokens", currentToken);
+          
+          const isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
+          const platform = /Android/i.test(navigator.userAgent) ? "android" : /iPhone|iPad/i.test(navigator.userAgent) ? "ios" : "web";
+
           await setDoc(tokenRef, {
             token: currentToken,
-            deviceType: /Mobi|Android|iPhone/i.test(navigator.userAgent) ? "mobile" : "desktop",
+            deviceType: isMobile ? "mobile" : "desktop",
+            platform: platform,
             updatedAt: serverTimestamp(),
-          });
+            lastActiveAt: serverTimestamp(),
+          }, { merge: true });
+          
           console.log("[FCM] Token stored successfully in Firestore:", currentToken);
         } else {
           console.warn("[FCM] No registration token received.");
         }
+
+        // 5. Setup foreground notification listener
+        unsubOnMessage = onMessage(messagingInstance, (payload) => {
+          console.log("[FCM] Foreground message received:", payload);
+          if (notificationsContext?.showToast) {
+            const data = payload.data || {};
+            const notif = payload.notification || {};
+            
+            let parsedButtons = [];
+            if (data.actionButtons) {
+              try {
+                parsedButtons = JSON.parse(data.actionButtons);
+              } catch (e) {}
+            }
+
+            notificationsContext.showToast({
+              title: notif.title || data.title || "Office Tracker",
+              message: notif.body || data.body || "",
+              category: (data.category as NotificationCategory) || "system",
+              priority: (data.priority as any) || "medium",
+              clickAction: data.clickAction,
+              actionButtons: parsedButtons.length > 0 ? parsedButtons : undefined,
+            });
+          }
+        });
       } catch (error) {
         console.error("[FCM] Error setting up FCM:", error);
       }
     };
 
     setupFcm();
-  }, [userId]);
+
+    return () => {
+      if (unsubOnMessage) unsubOnMessage();
+    };
+  }, [userId, notificationsContext]);
 
   return { token, permission };
 }
