@@ -1,4 +1,4 @@
-import { MobileDashboard } from "@/components/mobile/MobileDashboard";
+import { MobileRoleRouter } from "@/components/mobile/MobileRoleRouter";
 import { Suspense } from "react";
 
 export default function MobilePage() {
@@ -8,7 +8,7 @@ export default function MobilePage() {
         <div className="text-center font-bold text-gray-500 animate-pulse">Loading Mobile Dashboard...</div>
       </div>
     }>
-      <MobileDashboard />
+      <MobileRoleRouter />
     </Suspense>
   );
 }

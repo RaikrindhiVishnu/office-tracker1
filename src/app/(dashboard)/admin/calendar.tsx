@@ -320,12 +320,38 @@ const CalendarView: React.FC<CalendarViewProps> = ({
         .cm-sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
         .cm-sec-title{font-size:15px;font-weight:800;color:#0f172a;}
         .cm-empty{text-align:center;padding:40px 16px;color:#94a3b8;font-size:13px;}
+
+        @media (max-width: 768px) {
+          .cm-tab { font-size: 10px; padding: 5px 8px; gap: 3px; }
+          .cm-tab-badge { min-width: 14px; height: 14px; font-size: 8px; top: -3px; right: -3px; }
+          .cm-add-btn { font-size: 10px; padding: 4px 8px; }
+          .cm-wish-btn { font-size: 8px; padding: 1px 4px; }
+          .cm-del-btn, .cm-send-btn, .cm-ghost-btn { font-size: 10px; padding: 3px 6px; }
+          .cm-modal-backdrop { padding: 8px !important; }
+          .cm-modal-container { max-height: 98vh !important; }
+          .flex.gap-3.flex-1.min-h-0 { flex-direction: column !important; overflow-y: auto !important; }
+          .flex-1.bg-white.rounded-xl.shadow-xl { overflow-y: visible !important; padding: 10px !important; }
+          .flex.justify-between.items-center.mb-3 { flex-direction: column; align-items: stretch; gap: 8px; }
+          .flex.items-center.gap-2.flex-wrap { justify-content: space-between; gap: 4px !important; }
+          .grid.grid-cols-7.gap-1.5 { gap: 4px !important; }
+          .grid.grid-cols-7 .h-24 { height: 48px !important; padding: 2px !important; }
+          .grid.grid-cols-7 .h-24 .text-sm { font-size: 10px !important; }
+          .grid.grid-cols-7 .h-24 .text-[9px] { font-size: 7px !important; }
+          .cm-bday-pill, .cm-fest-pill, .cm-event-pill { font-size: 6.5px !important; padding: 0px 1.5px !important; margin-top: 1px !important; line-height: 1.0 !important; }
+          .cm-wish-btn { display: none !important; }
+          .w-52 { width: 100% !important; flex-direction: row !important; flex-wrap: wrap !important; gap: 8px !important; overflow-y: visible !important; }
+          .w-52 .cm-next-card { flex: 1 1 calc(50% - 4px); margin-bottom: 0 !important; }
+          .w-52 .bg-white.rounded-xl { width: 100% !important; }
+          .cm-modal-inner { width: 100% !important; padding: 16px !important; }
+          .cm-list-item { padding: 8px !important; flex-wrap: wrap; gap: 6px !important; }
+          .cm-list-item > div:last-child { width: 100%; justify-content: flex-end; display: flex; margin-top: 4px; }
+        }
       `}</style>
 
       {toast && <div className="cm-toast" style={{background:toast.ok!==false?"#193677":"#dc2626"}}>{toast.msg}</div>}
 
-      <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
-        <div className="w-full max-w-5xl max-h-[95vh] flex flex-col" onClick={e=>e.stopPropagation()}>
+      <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 cm-modal-backdrop" onClick={onClose}>
+        <div className="w-full max-w-5xl max-h-[95vh] flex flex-col cm-modal-container" onClick={e=>e.stopPropagation()}>
 
           {/* Tab bar */}
           <div className="flex items-center justify-between mb-3">

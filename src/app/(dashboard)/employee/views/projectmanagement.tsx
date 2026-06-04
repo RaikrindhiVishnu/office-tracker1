@@ -1411,9 +1411,9 @@ function TaskDetailModal({
                     </p>
                     <button 
                       onClick={() => {
-                        const url = `${window.location.origin}${window.location.pathname}?tab=projects&projectId=${task.projectId}&taskId=${task.id}`;
+                        const url = `${window.location.origin}/public/task/${task.id}`;
                         navigator.clipboard.writeText(url);
-                        alert("Link copied to clipboard!");
+                        alert("Public Shareable Link copied to clipboard!");
                       }} 
                       className="text-white/50 hover:text-white transition-colors" 
                       title="Copy Link"
@@ -2545,6 +2545,11 @@ export default function ProjectManagement({ user, projects, users }: any) {
 
   /* ── PROJECT VIEW ── */
   if (activeProject) {
+    const projectMembers = users.filter((u: any) => 
+      activeProject.members?.includes(u.uid) || 
+      activeProject.managers?.includes(u.uid) || 
+      activeProject.createdBy === u.uid
+    );
     return (
       <div className="fixed inset-0 sm:relative sm:inset-auto sm:h-screen flex flex-col bg-gray-50 overflow-hidden z-[45]" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
         <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght=300;400;500;600;700;800&display=swap');`}</style>
@@ -2821,14 +2826,14 @@ export default function ProjectManagement({ user, projects, users }: any) {
         {/* Modals */}
         {showCreateModal && (
           <TaskModal open={showCreateModal} onClose={() => setShowCreateModal(false)} onSubmit={handleCreateTask}
-            users={users} columns={columns} projectColor={projectColor}
+            users={projectMembers} columns={columns} projectColor={projectColor}
             initialData={{ status: columns[0]?.id || "new", projectId: activeProject.id }}
             stories={stories} currentUserId={user?.uid} isProjectManager={isProjectManager}
             allowedTypes={permissions.canCreateTypes} />
         )}
         {quickAddStory && (
           <TaskModal open={!!quickAddStory} onClose={() => setQuickAddStory(null)} onSubmit={handleCreateTask}
-            users={users} columns={columns} projectColor={projectColor}
+            users={projectMembers} columns={columns} projectColor={projectColor}
             initialData={{ ticketType: quickAddStory.ticketType, parentStoryId: quickAddStory.story.id, parentStoryTitle: quickAddStory.story.title, status: columns[0]?.id || "todo", projectId: activeProject.id }}
             stories={stories} currentUserId={user?.uid} isProjectManager={isProjectManager}
             allowedTypes={permissions.canCreateTypes} />
@@ -2842,7 +2847,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
               setViewingTask(prev);
             }
           }} onSubmit={handleSaveEditedTask}
-            users={users} columns={columns} projectColor={projectColor}
+            users={projectMembers} columns={columns} projectColor={projectColor}
             initialData={editingTask} stories={stories} currentUserId={user?.uid}
             isProjectManager={isProjectManager} allowedTypes={permissions.canCreateTypes} />
         )}
@@ -2851,7 +2856,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
             task={viewingTask} onClose={() => setViewingTask(null)} columns={columns}
             projectColor={projectColor} projectName={activeProject.name}
             currentUserId={user?.uid} isProjectManager={isProjectManager}
-            canDelete={permissions.canDelete} users={users}
+            canDelete={permissions.canDelete} users={projectMembers}
             onStatusChange={handleStatusChange} onSave={handleSaveTask}
             db={db} storage={storage} user={user}
             sprints={sprints} onMoveToSprint={handleMoveToSprint} onEditTask={handleEditTask}

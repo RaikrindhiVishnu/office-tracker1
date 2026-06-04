@@ -17,10 +17,22 @@ import { MobileLeave } from "./MobileLeave";
 import { MobileProfile } from "./MobileProfile";
 import { MobileHelp } from "./MobileHelp";
 import { MobilePayslips } from "./MobilePayslips";
-import ProjectManagement from "../../app/(dashboard)/employee/views/projectmanagement";
+import ProjectManagement from "../../app/(dashboard)/admin/ProjectManagement";
+import AdminQueriesView from "../../app/(dashboard)/admin/AdminQueriesView";
+import MessagesView from "../../app/(dashboard)/admin/meassages";
+import MonthlyReport from "../../app/(dashboard)/admin/monthlyreport";
+import CalendarView from "../../app/(dashboard)/admin/calendar";
+import LeadsView from "../../app/(dashboard)/admin/LeadsView";
+import InvoicesView from "../../app/(dashboard)/admin/InvoicesView";
+import AccountsDashboard from "../../app/(dashboard)/admin/Accounts/AccountsDashboard";
+import ITAssetsView from "../../app/(dashboard)/admin/it-assets/page";
+import AIInsightsView from "../../app/(dashboard)/admin/AIInsightsView";
+import EmployeesView from "../../app/(dashboard)/admin/employees";
+import AdminBreakView from "@/components/AdminBreakView";
+import LeaveRequests from "../../app/(dashboard)/admin/leaverequests";
 import { MobileDirectory } from "./MobileDirectory";
 import MeetChatAppUpdated from "../../components/MeetChatAppUpdated";
-import { MobileCalendar } from "./MobileCalendar";
+import GreetingsAdmin from "../GreetingsAdmin";
 import { NotificationCenter } from "../notifications/NotificationCenter";
 import OrgChart from "../../components/OrgChart";
 import {
@@ -48,7 +60,7 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getTodayDateStr } from "@/lib/breakTracking";
-import { doc, onSnapshot, getDocs, query, collection, orderBy, addDoc, serverTimestamp, where } from "firebase/firestore";
+import { doc, onSnapshot, getDocs, query, collection, orderBy, addDoc, serverTimestamp, where, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { LeaveType } from "@/types/leave";
 import { checkIn, checkOut } from "@/lib/attendance";
@@ -230,16 +242,56 @@ const ActiveProjectsSlider = ({ projects, users, setActiveTab }: any) => {
   );
 };
 
-export const MobileDashboard: React.FC = () => {
+export const MobileAdminDashboard: React.FC = () => {
   const { user, userData, userRole, loading, logout } = useAuth();
   const { unreadCount } = useNotifications();
   const router = useRouter();
   const searchParams = useSearchParams();
 
   // Navigation tab state
-  const [activeTab, setActiveTab] = useState<
-    "home" | "attendance" | "standup" | "assistant" | "approvals" | "emergency" | "projects" | "payslips" | "profile" | "leave" | "help" | "directory" | "chat" | "calendar" | "more"
-  >("home");
+  const [activeTab, setActiveTab] = useState<string>("home");
+
+  // Admin Module States
+  const [messages, setMessages] = useState<any[]>([]);
+  const [newMsg, setNewMsg] = useState("");
+  const [monthlyDate, setMonthlyDate] = useState(new Date());
+  const [monthlyAttendance, setMonthlyAttendance] = useState<any>({});
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [selectedEmployee, setSelectedEmployee] = useState<any | null>(null);
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [designation, setDesignation] = useState("");
+  const [accountType, setAccountType] = useState<any>("EMPLOYEE");
+
+  const DECLARED_HOLIDAYS: Record<string, { title: string }> = {
+    "2026-01-01": { title: "New Year" },
+    "2026-01-14": { title: "Pongal" },
+    "2026-08-15": { title: "Independence Day" },
+  };
+  const isSunday = (y: number, m: number, d: number) => new Date(y, m, d).getDay() === 0;
+  const isSecondSaturday = (y: number, m: number, d: number) => new Date(y, m, d).getDay() === 6 && Math.ceil(d / 7) === 2;
+  const isFourthSaturday = (y: number, m: number, d: number) => new Date(y, m, d).getDay() === 6 && Math.ceil(d / 7) === 4;
+  const isFifthSaturday = (y: number, m: number, d: number) => new Date(y, m, d).getDay() === 6 && Math.ceil(d / 7) === 5;
+  const isHoliday = (dateStr: string) => DECLARED_HOLIDAYS[dateStr];
+
+  const getAutoStatus = ({ isHolidayDay }: any): any => isHolidayDay ? "H" : "A";
+  const saveMonthlyAttendance = async (uid: string, dateStr: string, status: any) => {
+    const monthKey = `${monthlyDate.getFullYear()}-${String(monthlyDate.getMonth() + 1).padStart(2, "0")}`;
+    await setDoc(doc(db, "monthlyAttendance", monthKey), { [uid]: { [dateStr]: status }, updatedAt: serverTimestamp() }, { merge: true });
+  };
+  const loadMessages = async () => {
+    const snap = await getDocs(collection(db, "messages"));
+    setMessages(snap.docs.map((d) => ({ id: d.id, text: d.data().text })));
+  };
+  const sendMessage = async () => {
+    if (!newMsg.trim()) return;
+    await addDoc(collection(db, "messages"), { text: newMsg, createdAt: serverTimestamp() });
+    setNewMsg("");
+    loadMessages();
+  };
+  useEffect(() => { loadMessages(); }, []);
 
   // Firestore state for Project Management
   const [users, setUsers] = useState<any[]>([]);
@@ -482,16 +534,26 @@ export const MobileDashboard: React.FC = () => {
   // Calculate today's progress percentage safely outside JSX to avoid Turbopack regex parsing issues
   const todayProgressPercent = Math.min(100, (shiftSeconds / 28800) * 100);
 
+  const getGreeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return "Good Morning";
+    if (h < 17) return "Good Afternoon";
+    return "Good Evening";
+  };
+  // Resolve name from userData, Firebase Auth displayName, or email prefix
+  const resolvedName = userData?.name || user?.displayName || user?.email?.split("@")[0] || "Admin";
+  const firstName = resolvedName.split(" ")[0];
+
   return (
     <div className="min-h-screen bg-gray-50/50 pb-24 text-gray-900">
-      {/* Global Branded Header — for all tabs except chat */}
-      {activeTab !== "chat" && (
+      {/* Global Branded Header — for all tabs except fullscreen chat overlay */}
+      {activeTab !== "fullscreen-chat" && (
         <div className={`px-4 pt-5 pb-3 flex items-center justify-between sticky top-0 z-40 ${isScrolled ? "bg-white shadow-sm border-b border-gray-200" : "bg-[#e0e7ff]"}`}>
           <div className="flex items-center gap-2">
             <Image src="/logo-black.svg" alt="TGY CRM Logo" width={85} height={50} className="object-contain" priority />
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setActiveTab("chat")} className="w-9 h-9 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center active:scale-90 transition-transform relative">
+            <button onClick={() => setActiveTab("fullscreen-chat")} className="w-9 h-9 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center active:scale-90 transition-transform relative">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M20 2H4C2.9 2 2 2.9 2 4V16C2 17.1 2.9 18 4 18H7V22L11.6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z" fill="#3b82f6" fillOpacity="0.15" stroke="#3b82f6" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 <circle cx="8" cy="11" r="1.2" fill="#3b82f6" />
@@ -519,7 +581,7 @@ export const MobileDashboard: React.FC = () => {
       )}
 
       {/* Main Tab Render Container */}
-      <main className={["home", "projects", "payslips", "profile", "leave", "help", "directory", "chat", "calendar"].includes(activeTab) ? "w-full pb-20" : "px-4 pt-6 max-w-lg mx-auto flex flex-col gap-6 pb-20"}>
+      <main className={["home"].includes(activeTab) ? "w-full pb-20" : "w-full px-0 pt-4 max-w-lg mx-auto flex flex-col pb-20"}>
 
         {/* ═══════════════════════════════════════════════════ */}
         {/* Tab 1: HOME                                        */}
@@ -583,15 +645,18 @@ export const MobileDashboard: React.FC = () => {
                       {/* Apps/Features Results */}
                       {(() => {
                         const apps = [
-                          { label: "Check In / Attendance", tab: "attendance", icon: "👤", desc: "View shift details" },
-                          { label: "Daily Standup", tab: "standup", icon: "🎙️", desc: "Voice update" },
-                          { label: "AI Assistant", tab: "assistant", icon: "✨", desc: "Chat & Ask" },
-                          { label: "Projects & Tasks", tab: "projects", icon: "📁", desc: "View timelines" },
-                          { label: "Payslips", tab: "payslips", icon: "📄", desc: "View salary" },
-                          { label: "Apply Leave", tab: "leave", icon: "🏄", desc: "Request off" },
-                          { label: "Directory", tab: "directory", icon: "👥", desc: "Find colleagues" },
-                          { label: "Chat / Messages", tab: "chat", icon: "💬", desc: "Team chats" },
-                          { label: "Calendar", tab: "calendar", icon: "📅", desc: "Company events" }
+                          { label: "Team", tab: "employees", icon: "👥", desc: "Manage employees" },
+                          { label: "Projects", tab: "projects", icon: "📁", desc: "View timelines" },
+                          { label: "Approvals", tab: "approvals", icon: "✅", desc: "Leave requests" },
+                          { label: "Messages", tab: "messages", icon: "💬", desc: "Broadcasts" },
+                          { label: "Tickets", tab: "queries", icon: "🎫", desc: "Employee queries" },
+                          { label: "CRM", tab: "crm", icon: "📈", desc: "Leads" },
+                          { label: "Billing", tab: "invoices", icon: "🧾", desc: "Invoices" },
+                          { label: "Accounts", tab: "accounts", icon: "💰", desc: "Payroll" },
+                          { label: "Assets", tab: "assets", icon: "💻", desc: "IT Assets" },
+                          { label: "AI Hub", tab: "ai", icon: "🧠", desc: "Insights" },
+                          { label: "Calendar", tab: "calendar", icon: "📅", desc: "Company Events" },
+                          { label: "Reports", tab: "monthly", icon: "📑", desc: "Attendance Reports" },
                         ];
                         const matchedApps = apps.filter(a => a.label.toLowerCase().includes(searchQuery.toLowerCase()) || a.tab.toLowerCase().includes(searchQuery.toLowerCase()));
 
@@ -670,11 +735,18 @@ export const MobileDashboard: React.FC = () => {
             <div className="bg-[#e0e7ff] px-3 pb-3 flex gap-2 overflow-x-auto hide-scrollbar">
               {([
                 { label: "Home", tab: "home", icon: "🏠" },
-                { label: "Attend.", tab: "attendance", icon: "👤" },
+                { label: "Team", tab: "employees", icon: "👥" },
                 { label: "Projects", tab: "projects", icon: "📁" },
-                { label: "Leave", tab: "leave", icon: "🏄" },
-                { label: "Chat", tab: "chat", icon: "💬" },
-                { label: "Payslips", tab: "payslips", icon: "📄" },
+                { label: "Approvals", tab: "approvals", icon: "✅" },
+                { label: "Messages", tab: "messages", icon: "💬" },
+                { label: "Tickets", tab: "queries", icon: "🎫" },
+                { label: "CRM", tab: "crm", icon: "📈" },
+                { label: "Billing", tab: "invoices", icon: "🧾" },
+                { label: "Accounts", tab: "accounts", icon: "💰" },
+                { label: "Assets", tab: "assets", icon: "💻" },
+                { label: "AI Hub", tab: "ai", icon: "🧠" },
+                { label: "Calendar", tab: "calendar", icon: "📅" },
+                { label: "Reports", tab: "monthly", icon: "📑" },
               ] as const).map((item) => (
                 <button
                   key={item.tab}
@@ -736,7 +808,7 @@ export const MobileDashboard: React.FC = () => {
                       transition={{ delay: 0.3, duration: 0.5 }}
                       className="text-[9px] font-bold text-white/70 uppercase tracking-widest mb-0.5"
                     >
-                      Good Afternoon
+                      {getGreeting()}
                     </motion.div>
 
                     {/* Awwwards-style Text Mask Reveal */}
@@ -747,7 +819,7 @@ export const MobileDashboard: React.FC = () => {
                         transition={{ delay: 0.4, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
                         className="text-3xl font-black tracking-tight drop-shadow-md"
                       >
-                        Hey, {userData.name?.split(" ")[0] || "Employee"}
+                        Hey, {firstName}
                       </motion.h2>
                     </div>
                   </div>
@@ -795,22 +867,22 @@ export const MobileDashboard: React.FC = () => {
               </motion.div>
             </div>
 
-            {/* ── LEAVE BALANCE INDICATOR ── */}
+            {/* ── ADMIN QUICK STATS ── */}
             <div className="px-4 mb-4">
               <div className="flex items-center gap-3">
-                <div className="flex-1 bg-white rounded-3xl p-4 border border-gray-100 flex items-center justify-between shadow-sm">
+                <div onClick={() => setActiveTab("approvals")} className="flex-1 bg-white rounded-3xl p-4 border border-gray-100 flex items-center justify-between shadow-sm cursor-pointer active:scale-95 transition-transform">
                   <div className="flex items-center gap-2.5">
-                    <span className="text-xl">🌴</span>
-                    <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Casual Leaves</div>
+                    <span className="text-xl">✅</span>
+                    <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Approvals</div>
                   </div>
-                  <div className="text-base font-black text-gray-900">{(userData as any).casualLeaves !== undefined ? (userData as any).casualLeaves : 12} <span className="text-[10px] text-gray-400 font-bold uppercase">left</span></div>
+                  <div className="text-base font-black text-rose-500">{pendingLeaves.length}</div>
                 </div>
-                <div className="flex-1 bg-white rounded-3xl p-4 border border-gray-100 flex items-center justify-between shadow-sm">
+                <div onClick={() => setActiveTab("employees")} className="flex-1 bg-white rounded-3xl p-4 border border-gray-100 flex items-center justify-between shadow-sm cursor-pointer active:scale-95 transition-transform">
                   <div className="flex items-center gap-2.5">
-                    <span className="text-xl">🤒</span>
-                    <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Sick Leaves</div>
+                    <span className="text-xl">👥</span>
+                    <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Team</div>
                   </div>
-                  <div className="text-base font-black text-gray-900">{(userData as any).sickLeaves !== undefined ? (userData as any).sickLeaves : 12} <span className="text-[10px] text-gray-400 font-bold uppercase">left</span></div>
+                  <div className="text-base font-black text-indigo-600">{users.length}</div>
                 </div>
               </div>
             </div>
@@ -1153,14 +1225,14 @@ export const MobileDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* 7. Apps & Tools Grid */}
+            {/* 7. Admin Quick Access Grid */}
             <motion.div
               initial="hidden"
               whileInView="show"
               viewport={{ once: false, margin: "-50px" }}
               className="bg-white p-6 border-b border-gray-100"
             >
-              <div className="text-[11px] font-black text-gray-900 uppercase tracking-widest mb-6">Apps & Tools</div>
+              <div className="text-[11px] font-black text-gray-900 uppercase tracking-widest mb-6">Admin Modules</div>
               <motion.div
                 variants={{
                   hidden: { opacity: 0 },
@@ -1172,25 +1244,40 @@ export const MobileDashboard: React.FC = () => {
                 className="grid grid-cols-4 gap-y-6 gap-x-2"
               >
                 {[
-                  { icon: UserCheck, label: "Check In", tab: "attendance", bg: "bg-sky-50 text-sky-600 hover:bg-sky-100" },
-                  { icon: Mic, label: "Standup", tab: "standup", bg: "bg-emerald-50 text-emerald-600 hover:bg-emerald-100" },
-                  { icon: Folder, label: "Projects", tab: "projects", bg: "bg-indigo-50 text-indigo-600 hover:bg-indigo-100" },
-                  { icon: Calendar, label: "Leave", tab: "leave", bg: "bg-rose-50 text-rose-600 hover:bg-rose-100" },
-                  { icon: MessageSquare, label: "Chat", tab: "chat", bg: "bg-blue-50 text-blue-600 hover:bg-blue-100" },
-                  { icon: Calendar, label: "Calendar", tab: "calendar", bg: "bg-purple-50 text-purple-600 hover:bg-purple-100" },
-                  { icon: FileText, label: "Payslips", tab: "payslips", bg: "bg-orange-50 text-orange-600 hover:bg-orange-100" },
-                  { icon: Users, label: "Directory", tab: "directory", bg: "bg-teal-50 text-teal-600 hover:bg-teal-100" },
+                  { emoji: "👥", label: "Team", tab: "employees", bg: "bg-sky-50 text-sky-600 hover:bg-sky-100" },
+                  { emoji: "✅", label: "Approvals", tab: "approvals", bg: "bg-emerald-50 text-emerald-600 hover:bg-emerald-100" },
+                  { emoji: "📁", label: "Projects", tab: "projects", bg: "bg-indigo-50 text-indigo-600 hover:bg-indigo-100" },
+                  { emoji: "🎫", label: "Tickets", tab: "queries", bg: "bg-rose-50 text-rose-600 hover:bg-rose-100" },
+                  { emoji: "💬", label: "Messages", tab: "messages", bg: "bg-blue-50 text-blue-600 hover:bg-blue-100" },
+                  { emoji: "📈", label: "CRM", tab: "crm", bg: "bg-purple-50 text-purple-600 hover:bg-purple-100" },
+                  { emoji: "🧾", label: "Billing", tab: "invoices", bg: "bg-orange-50 text-orange-600 hover:bg-orange-100" },
+                  { emoji: "💰", label: "Accounts", tab: "accounts", bg: "bg-teal-50 text-teal-600 hover:bg-teal-100" },
+                  { emoji: "💻", label: "IT Assets", tab: "assets", bg: "bg-cyan-50 text-cyan-600 hover:bg-cyan-100" },
+                  { emoji: "🧠", label: "AI Hub", tab: "ai", bg: "bg-violet-50 text-violet-600 hover:bg-violet-100" },
+                  { emoji: "📅", label: "Calendar", tab: "calendar", bg: "bg-amber-50 text-amber-600 hover:bg-amber-100" },
+                  { emoji: "📑", label: "Reports", tab: "monthly", bg: "bg-lime-50 text-lime-600 hover:bg-lime-100" },
+                  { emoji: "👤", label: "Attendance", tab: "attendance", bg: "bg-red-50 text-red-600 hover:bg-red-100" },
+                  { emoji: "🏄", label: "Work Update", tab: "standup", bg: "bg-pink-50 text-pink-600 hover:bg-pink-100" },
+                  { emoji: "📄", label: "Payslips", tab: "payslips", bg: "bg-gray-50 text-gray-600 hover:bg-gray-100" },
+                  { emoji: "🗒️", label: "Emp Details", tab: "employees", bg: "bg-fuchsia-50 text-fuchsia-600 hover:bg-fuchsia-100" },
+                  { emoji: "🎉", label: "Greetings", tab: "greetings", bg: "bg-amber-50 text-amber-600 hover:bg-amber-100" },
                 ].map((item, i) => (
                   <motion.button
                     variants={{
                       hidden: { opacity: 0, scale: 0.8 },
                       show: { opacity: 1, scale: 1, transition: { type: "spring", stiffness: 300 } }
                     }}
-                    key={i} onClick={() => setActiveTab(item.tab as any)}
+                    key={i}
+                    onClick={() => {
+                      setActiveTab(item.tab as any);
+                      if (item.tab === "calendar") {
+                        setShowCalendar(true);
+                      }
+                    }}
                     className="flex flex-col items-center gap-2.5 group cursor-pointer"
                   >
-                    <div className={`w-14 h-14 rounded-[1.5rem] ${item.bg} flex items-center justify-center group-active:scale-90 group-hover:-translate-y-1 group-hover:shadow-md transition-all`}>
-                      <item.icon className="w-6 h-6" />
+                    <div className={`w-14 h-14 rounded-[1.5rem] ${item.bg} flex items-center justify-center group-active:scale-90 group-hover:-translate-y-1 group-hover:shadow-md transition-all text-2xl`}>
+                      {item.emoji}
                     </div>
                     <span className="text-[10px] font-bold text-gray-600 group-hover:text-gray-900 transition-colors">{item.label}</span>
                   </motion.button>
@@ -1198,148 +1285,7 @@ export const MobileDashboard: React.FC = () => {
               </motion.div>
             </motion.div>
 
-            {/* 8. Weekly Insights (New Section) */}
-            <motion.div
-              initial="hidden"
-              whileInView="show"
-              viewport={{ once: false, margin: "-50px" }}
-              className="bg-teal-50/30 px-5 pt-5 pb-8 border-b border-teal-100/50"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-[15px] font-black text-gray-900">Weekly Insights</h2>
-                <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm border border-teal-100/50">
-                  <Award className="w-4 h-4 text-teal-500" />
-                </div>
-              </div>
 
-              <motion.div
-                variants={{
-                  hidden: { opacity: 0, y: 20 },
-                  show: { opacity: 1, y: 0, transition: { type: "spring" } }
-                }}
-                className="bg-white rounded-3xl p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 relative overflow-hidden"
-              >
-                <div className="absolute -right-6 -top-6 w-24 h-24 bg-teal-50 rounded-full blur-2xl z-0"></div>
-
-                <div className="relative z-10">
-                  <div className="flex items-end justify-between mb-6">
-                    <div>
-                      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Total Week Logged</div>
-                      <div className="text-2xl font-black text-gray-900 leading-none">39.3<span className="text-sm font-bold text-gray-400">h</span></div>
-                    </div>
-                    <div className="text-[10px] font-bold text-rose-500 bg-rose-50 border border-rose-100 px-2 py-1 rounded-full flex items-center gap-1">
-                      <div className="w-1.5 h-1.5 rounded-full bg-rose-500"></div> Break Gap
-                    </div>
-                  </div>
-
-                  {/* Building Bar Graph - Professional Aesthetic */}
-                  <div className="relative h-44 w-full mt-8 flex pb-6">
-                    {/* Y-Axis Labels & Grid Lines */}
-                    <div className="absolute inset-0 flex flex-col justify-between pb-6 pointer-events-none z-0">
-                      {[8, 4, 0].map(val => (
-                        <div key={val} className="w-full flex items-center gap-2">
-                          <span className="text-[9px] font-bold text-gray-300 w-4 text-right">{val}h</span>
-                          <div className="flex-1 border-b border-dashed border-gray-200/60"></div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Bars Container */}
-                    <div className="flex-1 flex items-end justify-between pl-8 relative z-10 h-[calc(100%-24px)]">
-                      {[
-                        { day: "Mon", hours: 8.5, blocks: [{ type: "work", h: "40%" }, { type: "break", h: "10%" }, { type: "work", h: "35%" }] },
-                        { day: "Tue", hours: 7.2, blocks: [{ type: "work", h: "35%" }, { type: "break", h: "5%" }, { type: "work", h: "32%" }] },
-                        { day: "Wed", hours: 9.0, blocks: [{ type: "work", h: "90%" }] },
-                        { day: "Thu", hours: 6.5, blocks: [{ type: "work", h: "30%" }, { type: "break", h: "20%" }, { type: "work", h: "15%" }] },
-                        { day: "Fri", hours: 8.1, blocks: [{ type: "work", h: "40%" }, { type: "break", h: "10%" }, { type: "work", h: "31%" }] },
-                        { day: "Sat", hours: 0, blocks: [] },
-                        { day: "Sun", hours: 0, blocks: [] },
-                      ].map((d, i) => (
-                        <div key={d.day} className="flex flex-col items-center group h-full justify-end relative w-6">
-                          {/* Always-visible Time Text */}
-                          <div className="absolute -top-6 text-[9px] font-black text-indigo-600 z-20">
-                            {d.hours > 0 ? `${d.hours}h` : ""}
-                          </div>
-
-                          {/* Lollipop Line (Straight line with top dot) */}
-                          <div className="w-[3px] h-full flex flex-col-reverse justify-start items-center relative z-10">
-                            {d.blocks.map((b, idx) => (
-                              <motion.div
-                                key={idx}
-                                initial={{ height: 0 }}
-                                whileInView={{ height: b.h }}
-                                viewport={{ once: false }}
-                                transition={{ duration: 0.8, delay: i * 0.05 + idx * 0.1, ease: [0.16, 1, 0.3, 1] }}
-                                className={`w-full rounded-[2px] ${b.type === 'work' ? 'bg-indigo-400' : 'bg-rose-500'} ${b.type === 'break' ? 'my-0.5' : ''}`}
-                              />
-                            ))}
-                            {/* Top Dot */}
-                            {d.hours > 0 && (
-                              <motion.div
-                                initial={{ scale: 0 }}
-                                whileInView={{ scale: 1 }}
-                                viewport={{ once: false }}
-                                transition={{ delay: i * 0.05 + 0.5, type: "spring", bounce: 0.6 }}
-                                className="w-2.5 h-2.5 bg-indigo-600 rounded-full border border-white z-20 -mb-1 shadow-sm"
-                              />
-                            )}
-                            {/* Empty state pill for aesthetics when 0 hours */}
-                            {d.hours === 0 && <div className="w-1.5 h-1.5 rounded-full bg-gray-200 mb-1"></div>}
-                          </div>
-
-                          {/* X-Axis Label */}
-                          <div className="absolute -bottom-6 text-[10px] font-bold text-gray-400 group-hover:text-indigo-600 transition-colors">
-                            {d.day.charAt(0)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                </div>
-              </motion.div>
-            </motion.div>
-
-            {/* 9. Focus Mode (Deep Work Timer) */}
-            <motion.div
-              initial="hidden"
-              whileInView="show"
-              viewport={{ once: false, margin: "-50px" }}
-              className="bg-violet-50/40 px-5 pt-6 pb-8 border-b border-violet-100/50"
-            >
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-[15px] font-black text-gray-900">Focus Mode</h2>
-                <div className="text-[10px] font-bold text-violet-600 bg-violet-100/50 px-3 py-1 rounded-full flex items-center gap-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse"></div> Deep Work
-                </div>
-              </div>
-
-              <motion.div
-                variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { type: "spring" } } }}
-                className="bg-white rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-violet-100/50 flex flex-col items-center relative overflow-hidden"
-              >
-                {/* Decorative background blurs */}
-                <div className="absolute -left-10 -top-10 w-32 h-32 bg-violet-100/50 rounded-full blur-3xl z-0 pointer-events-none"></div>
-                <div className="absolute -right-10 -bottom-10 w-32 h-32 bg-fuchsia-100/50 rounded-full blur-3xl z-0 pointer-events-none"></div>
-
-                <div className="relative z-10 w-full flex flex-col items-center">
-                  <div className="w-32 h-32 rounded-full border-[6px] border-violet-50 flex items-center justify-center mb-5 relative shadow-sm">
-                    {/* Simulated progress ring background */}
-                    <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 100 100">
-                      <circle cx="50" cy="50" r="47" fill="none" stroke="currentColor" strokeWidth="6" className="text-violet-500" strokeDasharray="295" strokeDashoffset="295" />
-                    </svg>
-                    <div className="text-3xl font-black text-gray-900 tabular-nums tracking-tight">25:00</div>
-                  </div>
-
-                  <h3 className="text-[13px] font-black text-gray-900 mb-1">Ready to focus?</h3>
-                  <p className="text-[10px] text-gray-500 font-medium text-center mb-5 px-4">Mute notifications and track your deep work time.</p>
-
-                  <button className="w-full bg-gray-900 hover:bg-gray-800 text-white text-[11px] font-black py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md">
-                    <span className="text-sm">🎧</span> Start Session
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
 
             {/* 10. My Action Items */}
             <motion.div
@@ -1450,98 +1396,100 @@ export const MobileDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Tab 2: ATTENDANCE */}
+        {/* Employee-shared tabs also available in Admin */}
         {activeTab === "attendance" && <MobileAttendance />}
-
-        {/* Tab 3: DAILY UPDATE */}
         {activeTab === "standup" && <VoiceWorkUpdate />}
-
-        {/* Tab 4: VOICE ASSISTANT */}
         {activeTab === "assistant" && (
           <div className="h-[calc(100dvh-150px)] w-full relative">
             <ChatBot isInline={true} />
           </div>
         )}
-
-        {/* Tab 5: QUICK APPROVALS */}
-        {activeTab === "approvals" && isManager && <MobileQuickApprovals />}
-
-        {/* Tab 6: EMERGENCY BROADCAST */}
-        {activeTab === "emergency" && isAdmin && <EmergencyBroadcast />}
-
-        {/* Tab 7: PROJECTS */}
-        {activeTab === "projects" && (
-          <ProjectManagement user={{ ...user, ...userData }} projects={projects} users={users} />
-        )}
-
-        {/* Tab 8: PAYSLIPS */}
-        {activeTab === "payslips" && (
-          <MobilePayslips />
-        )}
-
-        {/* Tab 9: PROFILE */}
-        {activeTab === "profile" && (
-          <MobileProfile />
-        )}
-
-        {/* Tab 10: LEAVE REQUESTS */}
-        {activeTab === "leave" && (
-          <MobileLeave />
-        )}
-
-        {/* Tab 11: HELP & QUERIES */}
-        {activeTab === "help" && (
-          <MobileHelp />
-        )}
-
-        {/* Tab 12: DIRECTORY */}
+        {activeTab === "payslips" && <MobilePayslips />}
+        {activeTab === "profile" && <MobileProfile />}
+        {activeTab === "leave" && <MobileLeave />}
         {activeTab === "directory" && (
           <div className="p-4 bg-gray-50 min-h-screen">
             <MobileDirectory user={{ ...user, ...userData }} />
           </div>
         )}
-
-        {/* Tab 13: CHAT — full screen, no header, no bottom padding */}
-        {activeTab === "chat" && (
+        {activeTab === "fullscreen-chat" && (
           <div style={{ position: "fixed", inset: 0, zIndex: 45, display: "flex", flexDirection: "column" }}>
             <MeetChatAppUpdated users={users} isOpen={true} onClose={() => setActiveTab("home")} />
           </div>
         )}
-
-        {/* Tab 14: CALENDAR */}
-        {activeTab === "calendar" && (
-          <MobileCalendar />
+        {activeTab === "projects" && (
+          <div className="w-full min-h-screen">
+            <ProjectManagement user={{ ...user, ...userData }} projects={projects} users={users} />
+          </div>
+        )}
+        {activeTab === "greetings" && (
+          <div className="w-full min-h-screen">
+            <GreetingsAdmin />
+          </div>
         )}
 
-        {/* Tab 15: MORE */}
-        {activeTab === "more" && (
-          <div className="flex flex-col gap-6">
-            <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm">
-              <h3 className="text-sm font-black text-gray-900 mb-4 uppercase tracking-wider">Features Directory</h3>
-              <div className="flex flex-col gap-2">
-                <MenuOption icon={<Users className="w-5 h-5 text-sky-600" />} label="Colleague Directory" desc="Find and contact team members" onClick={() => setActiveTab("directory")} />
-                <MenuOption icon={<MessageSquare className="w-5 h-5 text-indigo-600" />} label="Meet & Chat" desc="Team messaging and calls" onClick={() => setActiveTab("chat")} />
-                <MenuOption icon={<Calendar className="w-5 h-5 text-rose-600" />} label="Company Calendar" desc="Holidays and team leaves" onClick={() => setActiveTab("calendar")} />
-                <MenuOption icon={<Folder className="w-5 h-5 text-blue-600" />} label="Projects & Tasks" desc="View timelines and update kanban boards" onClick={() => setActiveTab("projects")} />
-                <MenuOption icon={<FileText className="w-5 h-5 text-emerald-600" />} label="My Payslips" desc="View and download monthly payslips" onClick={() => setActiveTab("payslips")} />
-                <MenuOption icon={<Calendar className="w-5 h-5 text-indigo-600" />} label="Apply Leave" desc="Request leaves and view holiday calendar" onClick={() => setActiveTab("leave")} />
-                <MenuOption icon={<UserIcon className="w-5 h-5 text-amber-600" />} label="My Profile" desc="Update profile details and preferences" onClick={() => setActiveTab("profile")} />
-                <MenuOption icon={<HelpCircle className="w-5 h-5 text-purple-600" />} label="Help & Queries" desc="Submit queries and review admin responses" onClick={() => setActiveTab("help")} />
-              </div>
-            </div>
+        {/* Admin Modules */}
+        {activeTab === "employees" && (
 
-            {isManager && (
-              <div className="bg-amber-50/50 rounded-3xl p-6 border border-amber-100 shadow-sm">
-                <h3 className="text-sm font-black text-amber-900 mb-4 uppercase tracking-wider">Manager Quick Access</h3>
-                <div className="flex flex-col gap-2">
-                  <MenuOption icon={<Layers className="w-5 h-5 text-amber-600" />} label="Manage Approvals" desc="Review leaves and attendance requests" onClick={() => setActiveTab("approvals")} />
-                  {isAdmin && (
-                    <MenuOption icon={<AlertTriangle className="w-5 h-5 text-red-600" />} label="Emergency Alerts" desc="Broadcast emergency notifications" onClick={() => setActiveTab("emergency")} />
-                  )}
-                </div>
+           <div className="px-2">
+              <div className="bg-white rounded-2xl shadow-sm p-4 overflow-x-auto overflow-y-hidden mb-6">
+                 <EmployeesView 
+                    view="employees" setView={setActiveTab as any} selectedEmployee={selectedEmployee} users={users} 
+                    setSelectedUser={setSelectedEmployee} deleteUser={() => alert("Please use desktop app to delete users.")} showAddUser={showAddUser} 
+                    setShowAddUser={setShowAddUser} msg="" name={name} setName={setName} email={email} 
+                    setEmail={setEmail} designation={designation} setDesignation={setDesignation} 
+                    accountType={accountType} setAccountType={setAccountType} handleAddUser={() => alert("Please use desktop app to add users.")} 
+                    creatingUser={false} formatTime={(ts: any) => ts?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || ""} 
+                    formatTotal={(mins: number = 0) => `${Math.floor(mins / 60)}h ${mins % 60}m`} 
+                 />
               </div>
-            )}
-          </div>
+           </div>
+        )}
+        {activeTab === "approvals" && (
+           <div className="px-2">
+              <div className="bg-white rounded-2xl shadow-sm overflow-hidden mb-6">
+                 <LeaveRequests />
+              </div>
+           </div>
+        )}
+        {activeTab === "queries" && (
+           <div className="px-2 overflow-x-auto">
+              {/* @ts-ignore */}
+              <AdminQueriesView user={user} userData={userData} />
+           </div>
+        )}
+        {activeTab === "messages" && (
+           <div className="px-2">
+             <MessagesView view={activeTab} messages={messages} newMsg={newMsg} setNewMsg={setNewMsg} sendMessage={sendMessage} loadMessages={loadMessages} db={db} />
+           </div>
+        )}
+        {activeTab === "crm" && (
+           <div className="px-2 overflow-x-auto"><LeadsView /></div>
+        )}
+        {activeTab === "invoices" && (
+           <div className="px-2 overflow-x-auto"><InvoicesView /></div>
+        )}
+        {activeTab === "accounts" && (
+           <div className="px-2 overflow-x-auto"><AccountsDashboard /></div>
+        )}
+        {activeTab === "assets" && (
+           <div className="px-2 overflow-x-auto"><ITAssetsView /></div>
+        )}
+        {activeTab === "ai" && (
+           <div className="px-2 overflow-x-auto"><AIInsightsView /></div>
+        )}
+        {activeTab === "calendar" && (
+           <div className="px-2 overflow-x-auto">
+              <CalendarView showCalendar={showCalendar} setShowCalendar={(show) => {
+                setShowCalendar(show);
+                if (!show) setActiveTab("home");
+              }} calendarDate={calendarDate} setCalendarDate={setCalendarDate} isSunday={isSunday} isSecondSaturday={isSecondSaturday} isFourthSaturday={isFourthSaturday} isFifthSaturday={isFifthSaturday} isHoliday={isHoliday} />
+           </div>
+        )}
+        {activeTab === "monthly" && (
+           <div className="px-2 overflow-x-auto">
+              <MonthlyReport db={db} users={users} monthlyDate={monthlyDate} setMonthlyDate={setMonthlyDate} monthlyAttendance={monthlyAttendance} setMonthlyAttendance={setMonthlyAttendance} sessionsByDate={{}} isHoliday={isHoliday} saveMonthlyAttendance={saveMonthlyAttendance as any} getAutoStatus={getAutoStatus} isSunday={isSunday} isSecondSaturday={isSecondSaturday} isFourthSaturday={isFourthSaturday} isFifthSaturday={isFifthSaturday} />
+           </div>
         )}
       </main>
 
@@ -1557,34 +1505,34 @@ export const MobileDashboard: React.FC = () => {
           <span className="text-[9px] font-bold">Home</span>
         </button>
 
-        {/* Attendance */}
+        {/* Team */}
         <button
-          onClick={() => setActiveTab("attendance")}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === "attendance" ? "text-indigo-600 scale-105" : "text-gray-400 hover:text-gray-600"
+          onClick={() => setActiveTab("employees")}
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === "employees" ? "text-indigo-600 scale-105" : "text-gray-400 hover:text-gray-600"
             }`}
         >
-          <UserCheck className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Attendance</span>
+          <Users className="w-5 h-5" />
+          <span className="text-[9px] font-bold">Team</span>
         </button>
 
-        {/* Standup */}
-        <button
-          onClick={() => setActiveTab("standup")}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === "standup" ? "text-indigo-600 scale-105" : "text-gray-400 hover:text-gray-600"
-            }`}
-        >
-          <Mic className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Standup</span>
-        </button>
-
-        {/* AI Chat */}
+        {/* AI Bot */}
         <button
           onClick={() => setActiveTab("assistant")}
           className={`flex flex-col items-center gap-1 transition-all ${activeTab === "assistant" ? "text-indigo-600 scale-105" : "text-gray-400 hover:text-gray-600"
             }`}
         >
           <Sparkles className="w-5 h-5" />
-          <span className="text-[9px] font-bold">AI Chat</span>
+          <span className="text-[9px] font-bold">AI Bot</span>
+        </button>
+
+        {/* Profile */}
+        <button
+          onClick={() => setActiveTab("profile")}
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === "profile" ? "text-indigo-600 scale-105" : "text-gray-400 hover:text-gray-600"
+            }`}
+        >
+          <UserIcon className="w-5 h-5" />
+          <span className="text-[9px] font-bold">Profile</span>
         </button>
 
         {/* Logout */}
@@ -1623,7 +1571,7 @@ export const MobileDashboard: React.FC = () => {
                   <LogOut className="w-7 h-7 text-rose-500" />
                 </div>
                 <h2 className="text-xl font-black text-gray-900">Sign Out?</h2>
-                <p className="text-sm font-medium text-gray-500">You will be returned to the login screen. Your data is safe and synced.</p>
+                <p className="text-sm font-medium text-gray-500">You will be returned to the login screen. All your data is safely synced.</p>
               </div>
               <div className="flex flex-col gap-3">
                 <button

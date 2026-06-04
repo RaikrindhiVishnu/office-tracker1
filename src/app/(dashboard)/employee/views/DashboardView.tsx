@@ -612,29 +612,29 @@ function EmployeeDetailsCard({ user, isCheckedIn, totalSeconds, formatTotal }: {
   ];
 
   return (
-    <div className="hover-card" style={{ ...CARD, padding: 0, display: "flex", flexDirection: "column" }}>
+    <div className="hover-card welcome-card" style={{ ...CARD, padding: 0, display: "flex", flexDirection: "column" }}>
       {/* Profile header */}
-      <div style={{ background: "linear-gradient(135deg, #f0f4ff 0%, #e8f0fb 100%)", padding: "24px 20px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 14 }}>
-        <div style={{ width: 60, height: 60, borderRadius: 16, background: T.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 800, color: "#fff", flexShrink: 0, boxShadow: "0 8px 16px -4px rgba(0,113,227,0.3)", border: "2px solid #fff" }}>
+      <div className="profile-header" style={{ background: "linear-gradient(135deg, #f0f4ff 0%, #e8f0fb 100%)", padding: "24px 20px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 14 }}>
+        <div className="avatar-box" style={{ width: 60, height: 60, borderRadius: 16, background: T.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 800, color: "#fff", flexShrink: 0, boxShadow: "0 8px 16px -4px rgba(0,113,227,0.3)", border: "2px solid #fff" }}>
           {getInitials(name) || "?"}
         </div>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 16, fontWeight: 800, letterSpacing: "-0.3px", color: T.text }}>{name}</div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: T.accent, marginTop: 3 }}>{role}</div>
+          <div className="name-text" style={{ fontSize: 16, fontWeight: 800, letterSpacing: "-0.3px", color: T.text }}>{name}</div>
+          <div className="role-text" style={{ fontSize: 12, fontWeight: 600, color: T.accent, marginTop: 3 }}>{role}</div>
           {(dept || empId) && (
-            <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-              {dept && <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: "rgba(0,0,0,0.06)", color: T.text2 }}>{dept}</span>}
-              {empId && <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: "rgba(0,0,0,0.06)", color: T.text2 }}>{empId}</span>}
+            <div className="tags-row" style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+              {dept && <span className="tag-item" style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: "rgba(0,0,0,0.06)", color: T.text2 }}>{dept}</span>}
+              {empId && <span className="tag-item" style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: "rgba(0,0,0,0.06)", color: T.text2 }}>{empId}</span>}
             </div>
           )}
         </div>
       </div>
 
       {/* Info rows */}
-      <div style={{ padding: "16px 20px", flex: 1, display: "flex", flexDirection: "column", gap: 0 }}>
+      <div className="info-rows" style={{ padding: "16px 20px", flex: 1, display: "flex", flexDirection: "column", gap: 0 }}>
         <span style={{ ...CARD_LABEL, marginBottom: 10 }}>Employee Info</span>
         {details.map(({ icon, label, value }) => (
-          <div key={label} style={{ display: "grid", gridTemplateColumns: "20px 72px 1fr", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: `1px solid ${T.borderLight}` }}>
+          <div key={label} className="info-row-item" style={{ display: "grid", gridTemplateColumns: "20px 72px 1fr", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: `1px solid ${T.borderLight}` }}>
             <span style={{ fontSize: 13, textAlign: "center" }}>{icon}</span>
             <span style={{ fontSize: 11, fontWeight: 600, color: T.text3 }}>{label}</span>
             <span style={{ fontSize: 12, fontWeight: 500, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</span>
@@ -660,13 +660,13 @@ function EmployeeDetailsCard({ user, isCheckedIn, totalSeconds, formatTotal }: {
       </div>
 
       {/* Status strip */}
-      <div style={{ margin: "0 16px 16px", background: T.greenLight, borderRadius: 10, padding: "10px 14px", display: "flex", alignItems: "center", gap: 8 }}>
+      <div className="status-strip" style={{ margin: "0 16px 16px", background: T.greenLight, borderRadius: 10, padding: "10px 14px", display: "flex", alignItems: "center", gap: 8 }}>
         <div style={{ width: 8, height: 8, borderRadius: "50%", background: isCheckedIn ? T.green : T.text3, flexShrink: 0, boxShadow: isCheckedIn ? "0 0 0 3px rgba(52,199,89,0.2)" : "none" }} />
         <div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{isCheckedIn ? "Checked In" : "Checked Out"}</div>
-          <div style={{ fontSize: 12, color: T.text2, marginTop: 1 }}>{isCheckedIn ? `${formatTotal(totalWorked)} online today` : "Not checked in"}</div>
+          <div className="status-text" style={{ fontSize: 13, fontWeight: 700, color: T.text }}>{isCheckedIn ? "Checked In" : "Checked Out"}</div>
+          <div className="status-subtext" style={{ fontSize: 12, color: T.text2, marginTop: 1 }}>{isCheckedIn ? `${formatTotal(totalWorked)} online today` : "Not checked in"}</div>
         </div>
-        <div style={{ marginLeft: "auto", fontSize: 13, fontWeight: 800, color: T.green }}>{formatTotal(totalWorked)}</div>
+        <div className="time-text" style={{ marginLeft: "auto", fontSize: 13, fontWeight: 800, color: T.green }}>{formatTotal(totalWorked)}</div>
       </div>
     </div>
   );
@@ -1332,9 +1332,25 @@ export default function DashboardView({
         ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 2px; }
         input::placeholder, textarea::placeholder { color: #AEAEB2; }
         @media (max-width: 1024px) {
-          .dashboard-grid { grid-template-columns: 1fr !important; }
-          .right-col-grid { grid-column: 1 / -1 !important; grid-template-columns: 1fr !important; }
+          .dashboard-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
+          .right-col-grid { grid-column: 1 / -1 !important; grid-template-columns: 1fr !important; gap: 10px !important; }
           .full-mobile-card { grid-column: 1 / -1 !important; }
+          
+          /* HEADER */
+          .mobile-header { margin-bottom: 0 !important; gap: 12px !important; }
+          
+          /* Compress Welcome Card Height on Mobile */
+          .welcome-card { background: linear-gradient(135deg, #0f172a 0%, #3b82f6 100%) !important; border: none !important; color: white !important; }
+          .welcome-card .profile-header { padding: 16px 16px 12px !important; background: transparent !important; border-bottom: none !important; }
+          .welcome-card .name-text { color: white !important; font-size: 18px !important; }
+          .welcome-card .role-text { color: rgba(255,255,255,0.85) !important; font-size: 13px !important; }
+          .welcome-card .tag-item { background: rgba(255,255,255,0.15) !important; color: white !important; }
+          .welcome-card .info-rows { display: none !important; }
+          .welcome-card .status-strip { margin: 0 16px 16px !important; padding: 12px 14px !important; background: rgba(255,255,255,0.12) !important; border: 1px solid rgba(255,255,255,0.2) !important; box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important; }
+          .welcome-card .status-text { color: white !important; font-size: 14px !important; }
+          .welcome-card .status-subtext { color: rgba(255,255,255,0.7) !important; }
+          .welcome-card .time-text { color: white !important; font-size: 16px !important; }
+          .welcome-card .avatar-box { width: 54px !important; height: 54px !important; font-size: 20px !important; box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important; border-color: rgba(255,255,255,0.8) !important; }
         }
         .hover-card {
           transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
@@ -1363,7 +1379,7 @@ export default function DashboardView({
       {activeModal === "help" && <Modal onClose={close} wide><ModalHeader emoji="💬" title="Help & Support" subtitle="Raise a ticket or browse FAQs" onClose={close} /><HelpView /></Modal>}
 
       {/* ── HEADER ── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", marginTop: 4, marginBottom: 4, gap: 64, flexWrap: "wrap" }}>
+      <div className="mobile-header" style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", marginTop: 4, marginBottom: 4, gap: 64, flexWrap: "wrap" }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: T.text, letterSpacing: "-0.04em", margin: 0, lineHeight: 1.2 }}>
             <span style={{ marginLeft: -6 }}>{greetEmoji}</span> {greeting}, {userName.split(" ")[0]}

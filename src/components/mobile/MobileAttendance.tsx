@@ -12,7 +12,7 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { ref as storageRef, uploadString, getDownloadURL } from "firebase/storage";
 import { Camera, MapPin, Compass, AlertCircle, RefreshCw, CheckCircle2, CalendarDays, Clock } from "lucide-react";
 import { useNotifications } from "@/context/NotificationContext";
-import { MobileAttendanceCalendar } from "./MobileAttendanceCalendar";
+import EmployeeAttendanceView from "../../app/(dashboard)/employee/views/EmployeeAttendanceView";
 
 export const MobileAttendance: React.FC = () => {
   const { user } = useAuth();
@@ -356,14 +356,14 @@ export const MobileAttendance: React.FC = () => {
             onClick={() => setViewMode("history")}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === "history" ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
           >
-            <CalendarDays className="w-4 h-4" /> History
+            <CalendarDays className="w-4 h-4" /> Attendance History
           </button>
         </div>
       </div>
 
       {viewMode === "history" ? (
-        <div className="px-4 pb-8 flex-1 overflow-y-auto">
-          <MobileAttendanceCalendar user={user} />
+        <div className="px-1 md:px-4 pb-8 flex-1 overflow-y-auto w-full">
+          <EmployeeAttendanceView />
         </div>
       ) : (
         <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm max-w-md mx-auto w-full">

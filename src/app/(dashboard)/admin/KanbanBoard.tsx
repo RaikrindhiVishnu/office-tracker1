@@ -1160,7 +1160,7 @@ export function KanbanBoard({
     filteredTasks.forEach(t => { if (t.parentStoryId) sIds.add(t.parentStoryId); });
     return tasks.filter(t => t.ticketType === "story" && sIds.has(t.id));
   }, [tasks, filteredTasks]);
-  const orphans = filteredTasks.filter(t => t.ticketType !== "story" && !t.parentStoryId);
+  const orphans = filteredTasks.filter(t => t.ticketType !== "story" && (!t.parentStoryId || !stories.some(s => s.id === t.parentStoryId)));
 
   const toggleStory = useCallback((id: string) => setCollapsedStories(p => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; }), []);
   const toggleCol = useCallback((id: string) => setCollapsedCols(p => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; }), []);

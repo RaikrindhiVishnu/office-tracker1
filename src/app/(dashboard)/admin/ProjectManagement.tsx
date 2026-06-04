@@ -1157,9 +1157,9 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                 <div className="flex items-center gap-2">
                   <p className="text-xs font-bold text-white/70 tracking-wider">{activeTask?.taskCode || "—"}</p>
                   <button onClick={() => {
-                    const url = `${window.location.origin}${window.location.pathname}?tab=projects&projectId=${activeProject!.id}&taskId=${activeTask!.id}`;
+                    const url = `${window.location.origin}/public/task/${activeTask!.id}`;
                     navigator.clipboard.writeText(url);
-                    alert("Link copied to clipboard!");
+                    alert("Public Shareable Link copied to clipboard!");
                   }} className="text-white/70 hover:text-white" title="Copy Link">🔗</button>
                 </div>
                 <h2 className="text-xl font-bold text-white leading-snug mb-3">{activeTask.title}</h2>
@@ -1579,7 +1579,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
           open={showTaskModal}
           onClose={() => { setShowTaskModal(false); setEditingTask(null); setQuickTaskStoryId(undefined); setQuickTaskType(undefined); }}
           onSubmit={handleTaskSubmit}
-          users={users}
+          users={projectMembers}
           columns={columns}
           projectColor={activeProject?.color || "#6366f1"}
           stories={stories}

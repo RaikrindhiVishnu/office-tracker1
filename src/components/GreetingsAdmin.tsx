@@ -765,6 +765,110 @@ export default function GreetingsAdmin() {
 
     /* Send success banner */
     .gr-mail-success{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 20px;text-align:center;}
+
+    @media (max-width: 768px) {
+      .gr {
+        flex-direction: column;
+      }
+      .gr-sb {
+        width: 100%;
+        border-bottom: 1px solid rgba(255,255,255,.07);
+        flex-direction: column;
+        align-items: stretch;
+        padding: 10px 16px;
+      }
+      .gr-logo {
+        padding: 8px 0;
+        border-bottom: none;
+        justify-content: space-between;
+      }
+      .gr-logo-sub {
+        display: none;
+      }
+      .gr-nav {
+        display: flex;
+        overflow-x: auto;
+        padding: 8px 0;
+        gap: 6px;
+        flex: 1;
+        scrollbar-width: none;
+      }
+      .gr-nav::-webkit-scrollbar {
+        display: none;
+      }
+      .gr-nav-sec {
+        display: none;
+      }
+      .gr-ni {
+        margin-bottom: 0;
+        white-space: nowrap;
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 12px;
+      }
+      .gr-ni.on::before {
+        display: none;
+      }
+      .gr-sb-foot {
+        display: none;
+      }
+      .gr-topbar {
+        padding: 0 16px;
+        height: auto;
+        min-height: 52px;
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: center;
+        gap: 8px;
+        padding-top: 8px;
+        padding-bottom: 8px;
+      }
+      .gr-tb-right {
+        justify-content: flex-end;
+      }
+      .gr-tb-date {
+        display: none;
+      }
+      .gr-scroll {
+        padding: 16px 12px 100px;
+      }
+      .gr-stats {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .gr-tiles {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .gr-grid2 {
+        grid-template-columns: 1fr;
+      }
+      .gr-mail-layout {
+        grid-template-columns: 1fr;
+      }
+      .gr-rmode-tabs {
+        grid-template-columns: 1fr 1fr;
+      }
+      .gr-panel {
+        position: fixed;
+        top: 60px;
+        left: 16px;
+        right: 16px;
+        width: auto;
+        z-index: 110;
+      }
+      .gr-modal {
+        width: 100%;
+        padding: 16px;
+      }
+      .gr-mbtns {
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .gr-mbtns > button {
+        flex: 1;
+      }
+    }
   `;
 
   const StatCard = ({ val, lbl, icon, bg, color, badge, badgeBg, barPct }: { val: number; lbl: string; icon: React.ReactNode; bg: string; color: string; badge?: string; badgeBg?: string; barPct?: number }) => (
