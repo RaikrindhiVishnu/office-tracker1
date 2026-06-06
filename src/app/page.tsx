@@ -35,7 +35,7 @@ export default function HomePage() {
     // Use getRoleRedirect which handles department-based analytics routing
     // e.g. employee with department "sales" → /analytics/sales
     const accountType = (userData.accountType as string) || "";
-    const department  = (userData.department as string) || "";
+    const department = (userData.department as string) || "";
     const destination = getRoleRedirect(
       userRole || accountType.toLowerCase(),
       department

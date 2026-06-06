@@ -92,12 +92,13 @@ const holidays = [
   { date: "2026-01-14", title: "Pongal" },
   { date: "2026-03-04", title: "Holi" },
   { date: "2026-03-19", title: "Ugadi" },
-  { date: "2026-08-15", title: "Independence Day" },
-  { date: "2026-08-28", title: "Raksha Bandhan" },
+  { date: "2026-06-26", title: "Muharram" },
+  { date: "2026-08-28", title: "Raksha Bandan" },
+  { date: "2026-09-04", title: "Janmastami" },
   { date: "2026-09-14", title: "Ganesh Chaturthi" },
   { date: "2026-10-02", title: "Gandhi Jayanthi" },
   { date: "2026-10-20", title: "Dussehra" },
-  { date: "2026-11-08", title: "Diwali" },
+  { date: "2026-11-09", title: "Diwali" },
   { date: "2026-12-25", title: "Christmas" },
 ];
 
@@ -137,21 +138,7 @@ export default function ZohoStyleEmployeeDashboard() {
   const [users, setUsers] = useState<any[]>([]);
   const [activeView, setActiveView] = useState<ViewType>("dashboard");
 
-  useEffect(() => {
-    const saved = localStorage.getItem("activeView") as ViewType | null;
-    const validViews: ViewType[] = [
-      "dashboard", "work-update", "attendance", "notifications",
-      "calendar", "holidays", "leave-history", "leave-request",
-      "profile", "help", "projects", "meet", "tasks", "team",
-      "reports", "settings", "payslips"
-    ];
-    if (saved && validViews.includes(saved)) setActiveView(saved);
-  }, []);
-
-  const changeView = (view: ViewType) => {
-    setActiveView(view);
-    localStorage.setItem("activeView", view);
-  };
+  // activeView effects moved down below state declarations
 
   const [attendance, setAttendance] = useState<any>(null);
   const [busy, setBusy] = useState(false);
@@ -180,6 +167,8 @@ export default function ZohoStyleEmployeeDashboard() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [projects, setProjects] = useState<any[]>([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarScrollDirection, setSidebarScrollDirection] = useState<"up" | "down">("up");
+  const [lastMainScrollY, setLastMainScrollY] = useState(0);
   const [queryNotifications, setQueryNotifications] = useState<any[]>([]);
   const [dismissedAnnouncements, setDismissedAnnouncements] = useState<Set<string>>(new Set());
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
@@ -190,6 +179,24 @@ export default function ZohoStyleEmployeeDashboard() {
   const mobileNotifDropdownRef = useRef<HTMLDivElement>(null);
   const year = calendarDate.getFullYear();
   const month = calendarDate.getMonth();
+
+  useEffect(() => {
+    const saved = localStorage.getItem("activeView") as ViewType | null;
+    const validViews: ViewType[] = [
+      "dashboard", "work-update", "attendance", "notifications",
+      "calendar", "holidays", "leave-history", "leave-request",
+      "profile", "help", "projects", "meet", "tasks", "team",
+      "reports", "settings", "payslips"
+    ];
+    if (saved && validViews.includes(saved)) {
+      setActiveView(saved);
+    }
+  }, []);
+
+  const changeView = (view: ViewType) => {
+    setActiveView(view);
+    localStorage.setItem("activeView", view);
+  };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -529,9 +536,9 @@ export default function ZohoStyleEmployeeDashboard() {
   return (
     <div className="h-screen flex bg-white overflow-hidden">
 
-      {/* ── SIDEBAR ── (unchanged) */}
-      <aside className={`fixed lg:static inset-y-0 left-0 z-50 bg-[#1a2e45] text-white flex flex-col transform transition-all duration-300 ${sidebarCollapsed ? "lg:w-16 w-64" : "w-64"} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
-        <div className="p-4 flex items-center justify-between border-b border-white/10">
+      {/* ── SIDEBAR ── */}
+      <aside className={`fixed lg:static inset-y-0 left-0 z-50 bg-[#1a2e45] text-white flex flex-col transform transition-all duration-300 ${sidebarScrollDirection === "down" && activeView !== "dashboard" ? "lg:w-0 lg:opacity-0 lg:overflow-hidden lg:-translate-x-full" : (sidebarCollapsed ? "lg:w-16 w-64 lg:opacity-100 lg:translate-x-0" : "w-64 lg:opacity-100 lg:translate-x-0")} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+        <div className="p-4 flex items-center justify-between border-b border-white/10 w-64">
           {(!sidebarCollapsed || mobileMenuOpen) && (
             <div className="flex items-center gap-2 ml-2">
               <Image src="/logo.svg" alt="TGY CRM Logo" width={90} height={70} className="object-contain" />
@@ -839,7 +846,18 @@ export default function ZohoStyleEmployeeDashboard() {
         </div>
 
         {/* ── CONTENT ── */}
-        <main className="flex-1 overflow-y-auto p-0 bg-white">
+        <main 
+          className="flex-1 overflow-y-auto p-0 bg-white"
+          onScroll={(e) => {
+            const currentScrollY = e.currentTarget.scrollTop;
+            if (currentScrollY > lastMainScrollY && currentScrollY > 50) {
+              setSidebarScrollDirection("down");
+            } else if (currentScrollY < lastMainScrollY) {
+              setSidebarScrollDirection("up");
+            }
+            setLastMainScrollY(currentScrollY);
+          }}
+        >
           <div className="space-y-3">
             {activeView === "dashboard" && (
               <DashboardView
@@ -873,7 +891,7 @@ export default function ZohoStyleEmployeeDashboard() {
             )}
             {activeView === "attendance" && <EmployeeAttendanceView />}
             {activeView === "work-update" && <WorkUpdateView />}
-            {activeView === "projects" && <ProjectManagement user={{ ...user, ...userData }} projects={projects} users={users} />}
+            {activeView === "projects" && <ProjectManagement user={{ ...user, ...userData }} projects={projects} users={users} setSidebarCollapsed={setSidebarCollapsed} />}
             {activeView === "notifications" && (
               <UnifiedNotificationsView
                 chatNotifications={chatNotifications}

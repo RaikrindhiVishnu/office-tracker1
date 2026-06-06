@@ -16,7 +16,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
-import { Notification } from "@/lib/notifications";
+import type { Notification } from "@/lib/notifications";
 import {
   NotificationPreferences,
   getPreferences,
@@ -80,6 +80,40 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
+        // Trigger native device notifications for newly inserted documents
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === "added") {
+            const data = change.doc.data();
+            // Check if it's a truly new notification (created within the last 5 seconds)
+            // to avoid spamming the user with old notifications on initial load
+            const createdAt = data.createdAt?.toMillis ? data.createdAt.toMillis() : 0;
+            if (createdAt > Date.now() - 5000) {
+              if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+                const title = data.title || "New Alert";
+                const options = { 
+                  body: data.message || "You have a new notification from Office Tracker.",
+                  icon: "/favicon.ico" 
+                };
+
+                // Mobile browsers require ServiceWorker to show push notifications
+                if ("serviceWorker" in navigator) {
+                  navigator.serviceWorker.getRegistration().then((reg) => {
+                    if (reg && reg.showNotification) {
+                      reg.showNotification(title, options);
+                    } else {
+                      new window.Notification(title, options);
+                    }
+                  }).catch(() => {
+                    new window.Notification(title, options);
+                  });
+                } else {
+                  new window.Notification(title, options);
+                }
+              }
+            }
+          }
+        });
+
         const notifs = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),

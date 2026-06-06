@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
@@ -23,6 +23,7 @@ import MeetChatAppUpdated from "../../components/MeetChatAppUpdated";
 import { MobileCalendar } from "./MobileCalendar";
 import { NotificationCenter } from "../notifications/NotificationCenter";
 import OrgChart from "../../components/OrgChart";
+import { BottomSheetNotification } from "./BottomSheetNotification";
 import {
   Home,
   UserCheck,
@@ -155,6 +156,19 @@ const ActiveProjectsSlider = ({ projects, users, setActiveTab }: any) => {
         >
           {activeProjects.map((p: any, index: number) => {
             const bgImage = p.imageUrl || bgImages[index % bgImages.length];
+
+            // AI Project Health Score Logic
+            const dueDate = p.dueDate ? new Date(p.dueDate) : null;
+            const daysLeft = dueDate ? Math.ceil((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 999;
+            const memberCount = p.members?.length || 0;
+
+            let health = { label: "🟢 On Track", color: "bg-emerald-500/80 border-emerald-400 text-emerald-50" };
+            if (daysLeft < 3 && p.status !== "Testing" && p.status !== "Completed") {
+              health = { label: "🔴 At Risk", color: "bg-rose-500/80 border-rose-400 text-rose-50" };
+            } else if (daysLeft < 7 || memberCount < 2) {
+              health = { label: "🟡 Warning", color: "bg-amber-500/80 border-amber-400 text-amber-50" };
+            }
+
             return (
               <div key={p.id} className="w-full shrink-0 px-4">
                 <div
@@ -170,9 +184,14 @@ const ActiveProjectsSlider = ({ projects, users, setActiveTab }: any) => {
                     <div className="w-9 h-9 rounded-[12px] bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-sm">
                       <Folder className="w-4 h-4 text-white drop-shadow-md" />
                     </div>
-                    <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-md border border-white/20 text-white drop-shadow-sm">
-                      {p.status || 'Active'}
-                    </span>
+                    <div className="flex gap-1.5">
+                      <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-md border border-white/20 text-white drop-shadow-sm">
+                        {p.status || 'Active'}
+                      </span>
+                      <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full drop-shadow-sm border backdrop-blur-md ${health.color}`}>
+                        {health.label}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="mt-auto relative z-10">
@@ -232,7 +251,7 @@ const ActiveProjectsSlider = ({ projects, users, setActiveTab }: any) => {
 
 export const MobileDashboard: React.FC = () => {
   const { user, userData, userRole, loading, logout } = useAuth();
-  const { unreadCount } = useNotifications();
+  const { notifications, unreadCount } = useNotifications();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -263,12 +282,180 @@ export const MobileDashboard: React.FC = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  const [isScrolled, setIsScrolled] = useState(false);
+  // ── Native Mobile: Device Notifications ──
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().then(permission => {
+        if (permission === "granted") {
+          new Notification("Notifications Enabled", {
+            body: "You will now receive device notifications from Office Tracker.",
+          });
+        }
+      });
+    }
+  }, []);
+
+  const triggerDeviceNotification = (title: string, body: string) => {
+    setShowNotifications(true); // Show in-app bottom sheet
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    
+    const sendPush = () => {
+      const options = { body, icon: "/favicon.ico" };
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.getRegistration().then((reg) => {
+          if (reg && reg.showNotification) reg.showNotification(title, options);
+          else new window.Notification(title, options);
+        }).catch(() => new window.Notification(title, options));
+      } else {
+        new window.Notification(title, options);
+      }
     };
-    window.addEventListener("scroll", handleScroll);
+
+    if (Notification.permission === "granted") {
+      sendPush();
+    } else if (Notification.permission !== "denied") {
+      // iOS Safari requires permission requests to be inside a user interaction (like this onClick)
+      Notification.requestPermission().then(permission => {
+        if (permission === "granted") sendPush();
+      });
+    }
+  };
+
+  // ── Native Mobile: Haptic Feedback & Sounds ──
+  const playSound = (type: 'pop' | 'refresh') => {
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+      const ctx = new AudioContextClass();
+      const osc = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      
+      osc.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      
+      if (type === 'pop') {
+        // Professional crisp "tick" (like iOS keyboard or premium UI click)
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.02);
+        gainNode.gain.setValueAtTime(0.15, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.02);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.03);
+      } else if (type === 'refresh') {
+        // Professional "Success/Refresh" tone (clean, soft double harmonic)
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+        osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1); // E5
+        
+        // Envelope for first note
+        gainNode.gain.setValueAtTime(0, ctx.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 0.02);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+        
+        // Envelope for second note
+        gainNode.gain.setValueAtTime(0, ctx.currentTime + 0.1);
+        gainNode.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.12);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+        
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.3);
+      }
+    } catch (e) {
+      console.warn("AudioContext not supported", e);
+    }
+  };
+
+  const triggerHaptic = (style: 'light' | 'success') => {
+    playSound(style === 'success' ? 'refresh' : 'pop');
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      if (style === 'light') navigator.vibrate(15);
+      if (style === 'success') navigator.vibrate([25, 40, 25]);
+    }
+  };
+
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [scrollDirection, setScrollDirection] = useState<"up" | "down">("up");
+
+  // ── Native Mobile: Pull-to-Refresh & Swipe Gestures ──
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullProgress, setPullProgress] = useState(0);
+  const touchStartY = useRef<number | null>(null);
+  const touchStartX = useRef<number | null>(null);
+
+  const TABS_ORDER = ["home", "directory", "profile", "assistant", "standup", "attendance"];
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchStartY.current || !touchStartX.current) return;
+    const y = e.touches[0].clientY;
+    const x = e.touches[0].clientX;
+    const deltaY = y - touchStartY.current;
+
+    // If at the very top and pulling down, calculate pull progress for refresh
+    if (window.scrollY <= 0 && deltaY > 0) {
+      const progress = Math.min(deltaY / 150, 1);
+      setPullProgress(progress);
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStartY.current || !touchStartX.current) return;
+    const y = e.changedTouches[0].clientY;
+    const x = e.changedTouches[0].clientX;
+    const deltaY = y - touchStartY.current;
+    const deltaX = x - touchStartX.current;
+
+    // Check Pull-to-Refresh
+    if (window.scrollY <= 0 && deltaY > 80 && Math.abs(deltaY) > Math.abs(deltaX)) {
+      triggerHaptic('success');
+      setIsRefreshing(true);
+      setPullProgress(0);
+      setTimeout(() => setIsRefreshing(false), 1500); // Mock network request duration
+    } else {
+      setPullProgress(0);
+    }
+
+    // Check Horizontal Swipe
+    if (Math.abs(deltaX) > 100 && Math.abs(deltaX) > Math.abs(deltaY)) {
+      const currentIndex = TABS_ORDER.indexOf(activeTab as string);
+      if (currentIndex !== -1) {
+        if (deltaX < 0 && currentIndex < TABS_ORDER.length - 1) {
+          // Swipe Left -> Next Tab
+          setActiveTab(TABS_ORDER[currentIndex + 1] as any);
+          triggerHaptic('light');
+        } else if (deltaX > 0 && currentIndex > 0) {
+          // Swipe Right -> Prev Tab
+          setActiveTab(TABS_ORDER[currentIndex - 1] as any);
+          triggerHaptic('light');
+        }
+      }
+    }
+
+    touchStartY.current = null;
+    touchStartX.current = null;
+  };
+
+  useEffect(() => {
+    let lastScrollY = window.scrollY;
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      setIsScrolled(currentScrollY > 20);
+
+      if (currentScrollY > lastScrollY && currentScrollY > 50) {
+        setScrollDirection("down");
+      } else if (currentScrollY < lastScrollY) {
+        setScrollDirection("up");
+      }
+      lastScrollY = currentScrollY;
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
@@ -415,6 +602,7 @@ export const MobileDashboard: React.FC = () => {
         leaveType, fromDate, toDate, reason: leaveReason.trim(),
         status: "Pending", notificationRead: false, createdAt: serverTimestamp(),
       });
+      triggerHaptic('success');
       setLeaveMsg("✅ Request submitted");
       setFromDate(""); setToDate(""); setLeaveReason(""); setLeaveType("casual");
       setTimeout(() => setLeaveMsg(""), 2000);
@@ -469,8 +657,31 @@ export const MobileDashboard: React.FC = () => {
 
   if (!user || !userData) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center font-bold text-gray-500 animate-pulse">Loading employee profile...</div>
+      <div className="min-h-screen bg-gray-50/50 pb-24 text-gray-900 w-full overflow-hidden">
+        {/* Skeleton Top Header */}
+        <div className="px-4 pt-3 pb-2 flex items-center justify-between">
+          <div className="w-24 h-8 bg-gray-200 rounded-lg animate-pulse" />
+          <div className="w-10 h-10 bg-gray-200 rounded-full animate-pulse" />
+        </div>
+        <div className="px-4 pt-1 pb-4">
+          <div className="w-full h-12 bg-gray-200 rounded-xl animate-pulse" />
+        </div>
+
+        {/* Skeleton Hero Card */}
+        <div className="px-4 mb-6">
+          <div className="w-full h-32 bg-gray-200 rounded-[28px] animate-pulse" />
+        </div>
+
+        {/* Skeleton Grid */}
+        <div className="px-4 grid grid-cols-2 gap-3 mb-6">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="bg-white rounded-[24px] p-5 shadow-sm border border-gray-100 flex flex-col items-center justify-center animate-pulse">
+              <div className="w-12 h-12 bg-gray-100 rounded-full mb-3" />
+              <div className="w-20 h-4 bg-gray-100 rounded-full mb-1.5" />
+              <div className="w-12 h-3 bg-gray-100 rounded-full" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -483,10 +694,15 @@ export const MobileDashboard: React.FC = () => {
   const todayProgressPercent = Math.min(100, (shiftSeconds / 28800) * 100);
 
   return (
-    <div className="min-h-screen bg-gray-50/50 pb-24 text-gray-900">
+    <div
+      className="min-h-screen bg-gray-50/50 pb-24 text-gray-900 overflow-x-hidden"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Global Branded Header — for all tabs except chat */}
       {activeTab !== "chat" && (
-        <div className={`px-4 pt-5 pb-3 flex items-center justify-between sticky top-0 z-40 ${isScrolled ? "bg-white shadow-sm border-b border-gray-200" : "bg-[#e0e7ff]"}`}>
+        <div className={`px-4 pt-3 pb-1 flex items-center justify-between sticky top-0 z-40 transition-transform duration-500 ease-in-out ${isScrolled ? "bg-white shadow-sm border-b border-gray-200" : "bg-[#e0e7ff]"} ${scrollDirection === "down" ? "-translate-y-[150%]" : "translate-y-0"}`}>
           <div className="flex items-center gap-2">
             <Image src="/logo-black.svg" alt="TGY CRM Logo" width={85} height={50} className="object-contain" priority />
           </div>
@@ -500,7 +716,7 @@ export const MobileDashboard: React.FC = () => {
               </svg>
               <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 rounded-full border-[1.5px] border-white"></span>
             </button>
-            <button onClick={() => setShowNotifications(true)} className="w-9 h-9 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center active:scale-90 transition-transform relative">
+            <button onClick={() => { triggerHaptic('light'); triggerDeviceNotification('Office Tracker Alerts', 'You have new team messages and approval requests.'); }} className="w-9 h-9 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center active:scale-90 transition-transform relative">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" />
               </svg>
@@ -517,6 +733,16 @@ export const MobileDashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Pull-to-Refresh Indicator */}
+      <div
+        className="flex justify-center items-center w-full overflow-hidden transition-all duration-200 ease-out"
+        style={{ height: isRefreshing ? 60 : pullProgress * 60, opacity: isRefreshing ? 1 : pullProgress }}
+      >
+        <div className="bg-white shadow-md rounded-full p-2 flex items-center justify-center">
+          <RefreshCw className={`w-5 h-5 text-indigo-500 ${isRefreshing ? "animate-spin" : ""}`} style={{ transform: `rotate(${pullProgress * 360}deg)` }} />
+        </div>
+      </div>
 
       {/* Main Tab Render Container */}
       <main className={["home", "projects", "payslips", "profile", "leave", "help", "directory", "chat", "calendar"].includes(activeTab) ? "w-full pb-20" : "px-4 pt-6 max-w-lg mx-auto flex flex-col gap-6 pb-20"}>
@@ -543,8 +769,8 @@ export const MobileDashboard: React.FC = () => {
 
 
             {/* ── SEARCH BAR ── */}
-            <div className="bg-[#e0e7ff] px-4 pt-3 pb-4 flex items-center gap-3 relative z-50">
-              <div className="flex-1 flex items-center gap-2.5 bg-white rounded-2xl px-4 py-3 shadow-[0_2px_12px_rgba(0,0,0,0.04)] relative overflow-hidden">
+            <div className="bg-[#e0e7ff] px-4 pt-1 pb-1 flex items-center gap-3 relative z-50">
+              <div className="flex-1 flex items-center gap-2.5 bg-white rounded-2xl px-4 py-2 shadow-[0_2px_12px_rgba(0,0,0,0.04)] relative overflow-hidden">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
                   <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
                 </svg>
@@ -563,7 +789,7 @@ export const MobileDashboard: React.FC = () => {
                   <AnimatedSearchPlaceholder />
                 </div>
               </div>
-              <button onClick={() => setActiveTab("assistant")} className="w-11 h-11 rounded-2xl bg-white shadow-sm flex items-center justify-center active:scale-90 transition-transform">
+              <button onClick={() => setActiveTab("assistant")} className="w-9 h-9 rounded-2xl bg-white shadow-sm flex items-center justify-center active:scale-90 transition-transform">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 2a3 3 0 00-3 3v7a3 3 0 006 0V5a3 3 0 00-3-3z" />
                   <path d="M19 10v2a7 7 0 01-14 0v-2M12 19v3M8 22h8" />
@@ -593,11 +819,29 @@ export const MobileDashboard: React.FC = () => {
                           { label: "Chat / Messages", tab: "chat", icon: "💬", desc: "Team chats" },
                           { label: "Calendar", tab: "calendar", icon: "📅", desc: "Company events" }
                         ];
-                        const matchedApps = apps.filter(a => a.label.toLowerCase().includes(searchQuery.toLowerCase()) || a.tab.toLowerCase().includes(searchQuery.toLowerCase()));
+                        const queryLower = searchQuery.toLowerCase();
 
-                        const matchedUsers = users.filter(u => u.name?.toLowerCase().includes(searchQuery.toLowerCase()) || u.role?.toLowerCase().includes(searchQuery.toLowerCase()));
+                        const matchedApps = apps.filter(a => a.label.toLowerCase().includes(queryLower) || a.tab.toLowerCase().includes(queryLower) || a.desc.toLowerCase().includes(queryLower));
 
-                        const matchedProjects = projects.filter(p => p.name?.toLowerCase().includes(searchQuery.toLowerCase()));
+                        const matchedUsers = users.filter(u => {
+                          const roleMatches = (queryLower.includes("hr") && u.role?.toLowerCase().includes("hr")) ||
+                            (queryLower.includes("admin") && u.role?.toLowerCase().includes("admin")) ||
+                            (queryLower.includes("dev") && u.role?.toLowerCase().includes("dev"));
+                          return roleMatches || u.name?.toLowerCase().includes(queryLower) || u.role?.toLowerCase().includes(queryLower);
+                        });
+
+                        const matchedProjects = projects.filter(p => {
+                          if (queryLower.includes("delay") || queryLower.includes("overdue") || queryLower.includes("late") || queryLower.includes("risk")) {
+                            return p.dueDate && new Date(p.dueDate) < new Date();
+                          }
+                          if (queryLower.includes("due today")) {
+                            return p.dueDate && new Date(p.dueDate).toDateString() === new Date().toDateString();
+                          }
+                          if (queryLower.includes("active") || queryLower.includes("ongoing")) {
+                            return p.status !== "Completed";
+                          }
+                          return p.name?.toLowerCase().includes(queryLower) || p.description?.toLowerCase().includes(queryLower);
+                        });
 
                         if (matchedApps.length === 0 && matchedUsers.length === 0 && matchedProjects.length === 0) {
                           return <div className="p-8 text-center text-gray-400 text-[13px] font-bold">No results found for "{searchQuery}"</div>;
@@ -667,7 +911,7 @@ export const MobileDashboard: React.FC = () => {
             </div>
 
             {/* ── CATEGORY NAV TABS ── */}
-            <div className="bg-[#e0e7ff] px-3 pb-3 flex gap-2 overflow-x-auto hide-scrollbar">
+            <div className="bg-[#e0e7ff] px-3 pt-1 pb-1 flex gap-2 overflow-x-auto hide-scrollbar">
               {([
                 { label: "Home", tab: "home", icon: "🏠" },
                 { label: "Attend.", tab: "attendance", icon: "👤" },
@@ -678,7 +922,7 @@ export const MobileDashboard: React.FC = () => {
               ] as const).map((item) => (
                 <button
                   key={item.tab}
-                  onClick={() => setActiveTab(item.tab as any)}
+                  onClick={() => { triggerHaptic('light'); setActiveTab(item.tab as any); }}
                   className={`flex flex-col items-center gap-1.5 shrink-0 px-4 py-2.5 rounded-2xl transition-all ${activeTab === item.tab ? "bg-white text-gray-900 font-black shadow-sm" : "bg-transparent text-gray-800 hover:bg-white/20 font-bold"
                     }`}
                 >
@@ -718,48 +962,42 @@ export const MobileDashboard: React.FC = () => {
 
                 <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/3 translate-x-1/3 z-0 pointer-events-none mix-blend-overlay"></div>
 
-                <div className="flex justify-between items-start mb-4 relative z-10">
-                  <div>
+                <div className="flex flex-col relative z-10 mb-4">
+                  <div className="flex justify-between items-start mb-2">
                     <motion.div
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.2, duration: 0.6 }}
-                      className="inline-flex items-center gap-1.5 bg-white/10 border border-white/20 backdrop-blur-md px-2.5 py-1 rounded-full mb-1.5"
+                      className="inline-flex items-center gap-1.5 bg-white/10 border border-white/20 backdrop-blur-md px-2.5 py-1 rounded-full"
                     >
                       <div className="w-1.5 h-1.5 rounded-full bg-green-400"></div>
                       <span className="text-[9px] font-black uppercase tracking-widest text-white">Welcome Back 👋</span>
                     </motion.div>
 
                     <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3, duration: 0.5 }}
-                      className="text-[9px] font-bold text-white/70 uppercase tracking-widest mb-0.5"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.5 }}
+                      className="text-right shrink-0"
                     >
-                      Good Afternoon
+                      <div className="text-[10px] sm:text-xs font-black text-white/90 whitespace-nowrap">{new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</div>
+                      <div className="text-[9px] font-semibold text-indigo-300 mt-0.5 whitespace-nowrap">Shift: 9:00 AM - 6:00 PM</div>
                     </motion.div>
-
-                    {/* Awwwards-style Text Mask Reveal */}
-                    <div className="overflow-hidden">
-                      <motion.h2
-                        initial={{ y: "100%" }}
-                        animate={{ y: 0 }}
-                        transition={{ delay: 0.4, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-                        className="text-3xl font-black tracking-tight drop-shadow-md"
-                      >
-                        Hey, {userData.name?.split(" ")[0] || "Employee"}
-                      </motion.h2>
-                    </div>
                   </div>
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.5 }}
-                    className="text-right mt-1"
-                  >
-                    <div className="text-xs font-black text-white/90">{new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</div>
-                    <div className="text-[9px] font-semibold text-indigo-300 mt-0.5">Shift: 9:00 AM - 6:00 PM</div>
-                  </motion.div>
+
+                  <div className="overflow-hidden mt-1">
+                    <motion.h2
+                      initial={{ y: "100%" }}
+                      animate={{ y: 0 }}
+                      transition={{ delay: 0.3, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+                      className="text-[22px] sm:text-3xl font-black tracking-tight drop-shadow-md leading-snug break-words pr-2"
+                    >
+                      <span className="text-white/80 text-[12px] font-bold uppercase tracking-widest block mb-0.5">
+                        {new Date().getHours() < 12 ? "Good Morning," : new Date().getHours() < 18 ? "Good Afternoon," : "Good Evening,"}
+                      </span>
+                      {userData.name || "Employee"}
+                    </motion.h2>
+                  </div>
                 </div>
 
                 <motion.div
@@ -775,7 +1013,7 @@ export const MobileDashboard: React.FC = () => {
                     </span>
                   </div>
                   <button
-                    onClick={handleHomeCheckInOut}
+                    onClick={() => { handleHomeCheckInOut(); triggerHaptic('success'); }}
                     disabled={isSyncing}
                     className={`px-4 py-2.5 rounded-xl font-extrabold text-xs shadow-md transition-all duration-300 flex items-center gap-1.5 ${attendance?.sessions?.length > 0 && attendance.sessions[attendance.sessions.length - 1].checkOut === null
                       ? "bg-rose-500 hover:bg-rose-600 text-white shadow-rose-950/20 active:scale-95"
@@ -795,29 +1033,130 @@ export const MobileDashboard: React.FC = () => {
               </motion.div>
             </div>
 
-            {/* ── LEAVE BALANCE INDICATOR ── */}
-            <div className="px-4 mb-4">
-              <div className="flex items-center gap-3">
-                <div className="flex-1 bg-white rounded-3xl p-4 border border-gray-100 flex items-center justify-between shadow-sm">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-xl">🌴</span>
-                    <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Casual Leaves</div>
-                  </div>
-                  <div className="text-base font-black text-gray-900">{(userData as any).casualLeaves !== undefined ? (userData as any).casualLeaves : 12} <span className="text-[10px] text-gray-400 font-bold uppercase">left</span></div>
+            {/* ── ✨ AI SMART DASHBOARD INSIGHTS ── */}
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.5 }}
+              className="mx-4 mb-4 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-2xl p-4 shadow-sm relative overflow-hidden"
+            >
+              <div className="absolute -top-2 -right-2 p-2 opacity-10">
+                <Sparkles className="w-16 h-16 text-indigo-600" />
+              </div>
+              <div className="flex items-start gap-3 relative z-10">
+                <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center shrink-0 shadow-md">
+                  <Sparkles className="w-4 h-4 text-white" />
                 </div>
-                <div className="flex-1 bg-white rounded-3xl p-4 border border-gray-100 flex items-center justify-between shadow-sm">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-xl">🤒</span>
-                    <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Sick Leaves</div>
-                  </div>
-                  <div className="text-base font-black text-gray-900">{(userData as any).sickLeaves !== undefined ? (userData as any).sickLeaves : 12} <span className="text-[10px] text-gray-400 font-bold uppercase">left</span></div>
+                <div>
+                  <h3 className="text-[11px] font-black text-indigo-900 uppercase tracking-widest mb-1">AI Daily Briefing</h3>
+                  <p className="text-[13px] text-indigo-900/80 font-medium leading-relaxed">
+                    {attendance?.sessions?.length > 0 && attendance.sessions[attendance.sessions.length - 1].checkOut === null
+                      ? `You're clocked in! You have ${projects.filter((p: any) => p.status !== "Completed").length} active projects on the board. Let's make today productive.`
+                      : `Good ${new Date().getHours() < 12 ? 'morning' : 'afternoon'}! Don't forget to check in. You currently have ${pendingLeaves.filter((l: any) => l.uid === user.uid).length} pending leave requests.`}
+                  </p>
                 </div>
+              </div>
+            </motion.div>
+
+            {/* ── SMART HIGHLIGHTS AUTO-LOOP CAROUSEL ── */}
+            <div className="mb-4 overflow-hidden relative w-full">
+              <h3 className="pl-4 text-lg font-bold text-gray-900 tracking-tight mb-3">Smart Highlights</h3>
+
+              {/* Marquee Container */}
+              <div className="w-full overflow-hidden">
+                <motion.div
+                  className="flex gap-3 w-max pl-4"
+                  animate={{ x: ["0%", "-50%"] }}
+                  transition={{ repeat: Infinity, ease: "linear", duration: 25 }}
+                >
+                  {[...Array(2)].map((_, loopIndex) => (
+                    <React.Fragment key={loopIndex}>
+                      {/* Leave Balance Card */}
+                      <div className="min-w-[140px] w-[140px] bg-white rounded-[16px] p-3 border border-gray-100 flex flex-col justify-between shadow-sm shrink-0 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-12 h-12 bg-emerald-50 rounded-bl-full z-0"></div>
+                        <div className="flex items-center gap-1.5 mb-1.5 relative z-10">
+                          <span className="text-lg">🌴</span>
+                          <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider">Leaves</div>
+                        </div>
+                        <div className="relative z-10 mt-1">
+                          <div className="text-xl font-black text-gray-900">{(userData as any).casualLeaves !== undefined ? (userData as any).casualLeaves : 12}</div>
+                          <div className="text-[9px] text-emerald-600 font-bold uppercase">Casual Left</div>
+                        </div>
+                      </div>
+
+                      {/* Upcoming Holiday Card */}
+                      <div className="min-w-[140px] w-[140px] bg-white rounded-[16px] p-3 border border-gray-100 flex flex-col justify-between shadow-sm shrink-0 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-12 h-12 bg-rose-50 rounded-bl-full z-0"></div>
+                        <div className="flex items-center gap-1.5 mb-1.5 relative z-10">
+                          <span className="text-lg">🎉</span>
+                          <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider">Holiday</div>
+                        </div>
+                        <div className="relative z-10 mt-1">
+                          <div className="text-xs font-black text-gray-900 truncate">Thanksgiving</div>
+                          <div className="text-[9px] text-rose-600 font-bold uppercase">In 5 Days</div>
+                        </div>
+                      </div>
+
+                      {/* Current Task Card */}
+                      <div className="min-w-[140px] w-[140px] bg-white rounded-[16px] p-3 border border-gray-100 flex flex-col justify-between shadow-sm shrink-0 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-12 h-12 bg-blue-50 rounded-bl-full z-0"></div>
+                        <div className="flex items-center gap-1.5 mb-1.5 relative z-10">
+                          <span className="text-lg">🎯</span>
+                          <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider">My Task</div>
+                        </div>
+                        <div className="relative z-10 mt-1">
+                          <div className="text-xs font-black text-gray-900 truncate">UI Redesign</div>
+                          <div className="text-[9px] text-blue-600 font-bold uppercase">In Progress</div>
+                        </div>
+                      </div>
+
+                      {/* Latest Announcement Card */}
+                      <div className="min-w-[140px] w-[140px] bg-white rounded-[16px] p-3 border border-gray-100 flex flex-col justify-between shadow-sm shrink-0 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-12 h-12 bg-amber-50 rounded-bl-full z-0"></div>
+                        <div className="flex items-center gap-1.5 mb-1.5 relative z-10">
+                          <span className="text-lg">📢</span>
+                          <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider">Update</div>
+                        </div>
+                        <div className="relative z-10 mt-1">
+                          <div className="text-xs font-black text-gray-900 truncate">Townhall Sync</div>
+                          <div className="text-[9px] text-amber-600 font-bold uppercase">Tomorrow, 10 AM</div>
+                        </div>
+                      </div>
+
+                      {/* Work Anniversary Card */}
+                      <div className="min-w-[140px] w-[140px] bg-white rounded-[16px] p-3 border border-gray-100 flex flex-col justify-between shadow-sm shrink-0 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-12 h-12 bg-purple-50 rounded-bl-full z-0"></div>
+                        <div className="flex items-center gap-1.5 mb-1.5 relative z-10">
+                          <span className="text-lg">🎂</span>
+                          <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider">Events</div>
+                        </div>
+                        <div className="relative z-10 mt-1">
+                          <div className="text-xs font-black text-gray-900 truncate">Work Anniv.</div>
+                          <div className="text-[9px] text-purple-600 font-bold uppercase">Next Week</div>
+                        </div>
+                      </div>
+
+                      {/* Payroll Status Card */}
+                      <div className="min-w-[140px] w-[140px] bg-white rounded-[16px] p-3 border border-gray-100 flex flex-col justify-between shadow-sm shrink-0 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-12 h-12 bg-teal-50 rounded-bl-full z-0"></div>
+                        <div className="flex items-center gap-1.5 mb-1.5 relative z-10">
+                          <span className="text-lg">💰</span>
+                          <div className="text-[9px] font-bold text-gray-500 uppercase tracking-wider">Payroll</div>
+                        </div>
+                        <div className="relative z-10 mt-1">
+                          <div className="text-xs font-black text-gray-900 truncate">May Payslip</div>
+                          <div className="text-[9px] text-teal-600 font-bold uppercase">Ready</div>
+                        </div>
+                      </div>
+                    </React.Fragment>
+                  ))}
+                </motion.div>
               </div>
             </div>
 
             {/* ── RECENT ACTIVITY ── */}
             <div className="px-4 mb-4">
-              <h3 className="text-[11px] font-black text-gray-900 uppercase tracking-widest mb-3">Recent Activity</h3>
+              <h3 className="text-lg font-bold text-gray-900 tracking-tight mb-3">Recent Activity</h3>
               <div className="bg-white rounded-[24px] p-4 border border-gray-100 shadow-[0_2px_10px_rgba(0,0,0,0.02)] flex flex-col gap-4 relative overflow-hidden">
                 <div className="absolute left-7 top-6 bottom-6 w-[2px] bg-gray-50"></div>
                 {recentActivities.map((act, index) => (
@@ -871,7 +1210,7 @@ export const MobileDashboard: React.FC = () => {
               className="bg-amber-50/30 border-b border-amber-100/50 py-5"
             >
               <div className="px-5 mb-4 flex items-center justify-between">
-                <h3 className="text-[11px] font-black text-gray-900 uppercase tracking-widest">Team Status</h3>
+                <h3 className="text-lg font-bold text-gray-900 tracking-tight">Team Status</h3>
                 <span className="text-[10px] font-bold text-gray-400 px-2 py-0.5 bg-gray-100 rounded-full">{users.filter(u => u.status === "ONLINE").length} Online</span>
               </div>
               <motion.div
@@ -884,25 +1223,39 @@ export const MobileDashboard: React.FC = () => {
                 }}
                 className="flex overflow-x-auto hide-scrollbar px-5 gap-5 pb-1"
               >
-                {users.map(u => (
-                  <motion.div
-                    variants={{
-                      hidden: { opacity: 0, scale: 0.8, x: -20 },
-                      show: { opacity: 1, scale: 1, x: 0, transition: { type: "spring", stiffness: 300 } }
-                    }}
-                    key={u.id}
-                    className="flex flex-col items-center gap-2 shrink-0 cursor-pointer group"
-                    onClick={() => setActiveTab("directory")}
-                  >
-                    <div className="relative group-active:scale-90 transition-transform">
-                      <div className="w-[52px] h-[52px] rounded-full bg-gray-100 overflow-hidden border-2 border-white shadow-sm">
-                        {u.profilePhoto ? <img src={u.profilePhoto} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" /> : <span className="w-full h-full flex items-center justify-center font-bold text-gray-400">{u.name?.charAt(0)}</span>}
+                {users.map((u: any) => {
+                  // Mock AI Sentiment
+                  let sentiment = { emoji: "😐", color: "bg-gray-100 border-gray-200" };
+                  if (u.status === "ONLINE") sentiment = { emoji: "🔥", color: "bg-emerald-50 border-emerald-200" };
+                  else if (u.name?.length % 3 === 0) sentiment = { emoji: "😴", color: "bg-rose-50 border-rose-200" };
+                  else sentiment = { emoji: "😊", color: "bg-blue-50 border-blue-200" };
+
+                  return (
+                    <motion.div
+                      variants={{
+                        hidden: { opacity: 0, scale: 0.8, x: -20 },
+                        show: { opacity: 1, scale: 1, x: 0, transition: { type: "spring", stiffness: 300 } }
+                      }}
+                      key={u.id}
+                      className="flex flex-col items-center gap-2 shrink-0 cursor-pointer group"
+                      onClick={() => setActiveTab("directory")}
+                    >
+                      <div className="relative group-active:scale-90 transition-transform">
+                        <div className="w-[52px] h-[52px] rounded-full bg-gray-100 overflow-hidden border-2 border-white shadow-sm">
+                          {u.profilePhoto ? <img src={u.profilePhoto} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" /> : <span className="w-full h-full flex items-center justify-center font-bold text-gray-400">{u.name?.charAt(0)}</span>}
+                        </div>
+                        <div className={`absolute bottom-0.5 right-0.5 w-3.5 h-3.5 rounded-full border-[2.5px] border-white ${u.status === "ONLINE" ? "bg-emerald-500" : "bg-gray-300"}`} />
+                        {/* AI Sentiment Badge */}
+                        {isManager && (
+                          <div className={`absolute -top-1 -left-1 w-4 h-4 flex items-center justify-center text-[10px] rounded-full border shadow-sm ${sentiment.color}`} title="AI Sentiment Prediction">
+                            {sentiment.emoji}
+                          </div>
+                        )}
                       </div>
-                      <div className={`absolute bottom-0.5 right-0.5 w-3.5 h-3.5 rounded-full border-[2.5px] border-white ${u.status === "ONLINE" ? "bg-emerald-500" : "bg-gray-300"}`} />
-                    </div>
-                    <span className="text-[10px] font-extrabold text-gray-600 truncate w-14 text-center group-hover:text-indigo-600 transition-colors">{u.name?.split(" ")[0]}</span>
-                  </motion.div>
-                ))}
+                      <span className="text-[10px] font-extrabold text-gray-600 truncate w-14 text-center group-hover:text-indigo-600 transition-colors">{u.name?.split(" ")[0]}</span>
+                    </motion.div>
+                  )
+                })}
               </motion.div>
             </motion.div>
 
@@ -917,7 +1270,7 @@ export const MobileDashboard: React.FC = () => {
               className="bg-sky-50/40 px-4 pt-4 pb-2"
             >
               <div className="flex items-center justify-between mb-4 px-1">
-                <h2 className="text-lg font-black text-gray-900">Recent activity</h2>
+                <h2 className="text-lg font-bold text-gray-900 tracking-tight">Recent Activity</h2>
                 <button className="text-[13px] font-bold text-indigo-600">See all</button>
               </div>
 
@@ -1180,13 +1533,17 @@ export const MobileDashboard: React.FC = () => {
                   { icon: Calendar, label: "Calendar", tab: "calendar", bg: "bg-purple-50 text-purple-600 hover:bg-purple-100" },
                   { icon: FileText, label: "Payslips", tab: "payslips", bg: "bg-orange-50 text-orange-600 hover:bg-orange-100" },
                   { icon: Users, label: "Directory", tab: "directory", bg: "bg-teal-50 text-teal-600 hover:bg-teal-100" },
+                  { icon: UserIcon, label: "Profile", tab: "profile", bg: "bg-pink-50 text-pink-600 hover:bg-pink-100" },
+                  { icon: HelpCircle, label: "Help", tab: "help", bg: "bg-amber-50 text-amber-600 hover:bg-amber-100" },
+                  { icon: Sparkles, label: "AI Chat", tab: "assistant", bg: "bg-fuchsia-50 text-fuchsia-600 hover:bg-fuchsia-100" },
+                  { icon: Layers, label: "More", tab: "more", bg: "bg-slate-50 text-slate-600 hover:bg-slate-100" },
                 ].map((item, i) => (
                   <motion.button
                     variants={{
                       hidden: { opacity: 0, scale: 0.8 },
                       show: { opacity: 1, scale: 1, transition: { type: "spring", stiffness: 300 } }
                     }}
-                    key={i} onClick={() => setActiveTab(item.tab as any)}
+                    key={i} onClick={() => { triggerHaptic('light'); setActiveTab(item.tab as any); }}
                     className="flex flex-col items-center gap-2.5 group cursor-pointer"
                   >
                     <div className={`w-14 h-14 rounded-[1.5rem] ${item.bg} flex items-center justify-center group-active:scale-90 group-hover:-translate-y-1 group-hover:shadow-md transition-all`}>
@@ -1206,7 +1563,7 @@ export const MobileDashboard: React.FC = () => {
               className="bg-teal-50/30 px-5 pt-5 pb-8 border-b border-teal-100/50"
             >
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-[15px] font-black text-gray-900">Weekly Insights</h2>
+                <h2 className="text-lg font-bold text-gray-900 tracking-tight">Weekly Insights</h2>
                 <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm border border-teal-100/50">
                   <Award className="w-4 h-4 text-teal-500" />
                 </div>
@@ -1308,7 +1665,7 @@ export const MobileDashboard: React.FC = () => {
               className="bg-violet-50/40 px-5 pt-6 pb-8 border-b border-violet-100/50"
             >
               <div className="flex items-center justify-between mb-5">
-                <h2 className="text-[15px] font-black text-gray-900">Focus Mode</h2>
+                <h2 className="text-lg font-bold text-gray-900 tracking-tight">Focus Mode</h2>
                 <div className="text-[10px] font-bold text-violet-600 bg-violet-100/50 px-3 py-1 rounded-full flex items-center gap-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse"></div> Deep Work
                 </div>
@@ -1349,7 +1706,7 @@ export const MobileDashboard: React.FC = () => {
               className="bg-emerald-50/40 px-5 pt-6 pb-8 border-b border-emerald-100/50"
             >
               <div className="flex items-center justify-between mb-5">
-                <h2 className="text-[15px] font-black text-gray-900">My Action Items</h2>
+                <h2 className="text-lg font-bold text-gray-900 tracking-tight">My Action Items</h2>
                 <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm border border-emerald-100/50">
                   <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                 </div>
@@ -1424,8 +1781,8 @@ export const MobileDashboard: React.FC = () => {
 
               <div className="flex flex-col gap-3">
                 {[
-                  { date: "Jul 4", name: "Independence Day", day: "Thursday" },
-                  { date: "Sep 2", name: "Labor Day", day: "Monday" }
+                  { date: "Aug 28", name: "Raksha Bandan", day: "Friday" },
+                  { date: "Sep 04", name: "Janmastami", day: "Friday" }
                 ].map((holiday, i) => (
                   <motion.div
                     key={i}
@@ -1545,55 +1902,63 @@ export const MobileDashboard: React.FC = () => {
         )}
       </main>
 
-      {/* Sticky Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-gray-100 py-2.5 px-6 flex items-center justify-between z-40 max-w-lg mx-auto shadow-lg">
+
+
+      {/* Floating Glass Bottom Navigation Bar */}
+      <nav className={`fixed bottom-5 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-[480px] bg-white/70 backdrop-blur-2xl border border-white/60 rounded-[28px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] py-2 px-6 flex items-center justify-between z-50 transition-transform duration-500 ease-in-out ${scrollDirection === "down" ? "translate-y-[200px]" : "translate-y-0"}`}>
         {/* Home */}
         <button
-          onClick={() => setActiveTab("home")}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === "home" ? "text-indigo-600 scale-105" : "text-gray-400 hover:text-gray-600"
-            }`}
+          onClick={() => { setActiveTab("home"); triggerHaptic('light'); }}
+          className="flex flex-col items-center gap-1 transition-all group relative"
         >
-          <Home className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Home</span>
+          <div className={`flex items-center justify-center w-12 h-8 rounded-full transition-all ${activeTab === "home" ? "bg-indigo-100 text-indigo-600" : "text-gray-400 group-hover:text-gray-600"}`}>
+            <Home className="w-5 h-5" />
+          </div>
+          <span className={`text-[9px] font-bold transition-all ${activeTab === "home" ? "text-indigo-600" : "text-gray-400"}`}>Home</span>
         </button>
 
         {/* Attendance */}
         <button
-          onClick={() => setActiveTab("attendance")}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === "attendance" ? "text-indigo-600 scale-105" : "text-gray-400 hover:text-gray-600"
-            }`}
+          onClick={() => { setActiveTab("attendance"); triggerHaptic('light'); }}
+          className="flex flex-col items-center gap-1 transition-all group relative"
         >
-          <UserCheck className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Attendance</span>
+          <div className={`flex items-center justify-center w-12 h-8 rounded-full transition-all ${activeTab === "attendance" ? "bg-indigo-100 text-indigo-600" : "text-gray-400 group-hover:text-gray-600"}`}>
+            <UserCheck className="w-5 h-5" />
+          </div>
+          <span className={`text-[9px] font-bold transition-all ${activeTab === "attendance" ? "text-indigo-600" : "text-gray-400"}`}>Attendance</span>
         </button>
 
         {/* Standup */}
         <button
-          onClick={() => setActiveTab("standup")}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === "standup" ? "text-indigo-600 scale-105" : "text-gray-400 hover:text-gray-600"
-            }`}
+          onClick={() => { setActiveTab("standup"); triggerHaptic('light'); }}
+          className="flex flex-col items-center gap-1 transition-all group relative"
         >
-          <Mic className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Standup</span>
+          <div className={`flex items-center justify-center w-12 h-8 rounded-full transition-all ${activeTab === "standup" ? "bg-indigo-100 text-indigo-600" : "text-gray-400 group-hover:text-gray-600"}`}>
+            <Mic className="w-5 h-5" />
+          </div>
+          <span className={`text-[9px] font-bold transition-all ${activeTab === "standup" ? "text-indigo-600" : "text-gray-400"}`}>Standup</span>
         </button>
 
         {/* AI Chat */}
         <button
-          onClick={() => setActiveTab("assistant")}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === "assistant" ? "text-indigo-600 scale-105" : "text-gray-400 hover:text-gray-600"
-            }`}
+          onClick={() => { setActiveTab("assistant"); triggerHaptic('light'); }}
+          className="flex flex-col items-center gap-1 transition-all group relative"
         >
-          <Sparkles className="w-5 h-5" />
-          <span className="text-[9px] font-bold">AI Chat</span>
+          <div className={`flex items-center justify-center w-12 h-8 rounded-full transition-all ${activeTab === "assistant" ? "bg-indigo-100 text-indigo-600" : "text-gray-400 group-hover:text-gray-600"}`}>
+            <Sparkles className="w-5 h-5" />
+          </div>
+          <span className={`text-[9px] font-bold transition-all ${activeTab === "assistant" ? "text-indigo-600" : "text-gray-400"}`}>AI Chat</span>
         </button>
 
         {/* Logout */}
         <button
-          onClick={() => setShowLogoutConfirm(true)}
-          className="flex flex-col items-center gap-1 transition-all text-rose-400 hover:text-rose-600 active:scale-95"
+          onClick={() => { setShowLogoutConfirm(true); triggerHaptic('light'); }}
+          className="flex flex-col items-center gap-1 transition-all group relative"
         >
-          <LogOut className="w-5 h-5" />
-          <span className="text-[9px] font-bold">Logout</span>
+          <div className="flex items-center justify-center w-12 h-8 rounded-full transition-all text-gray-400 group-hover:text-rose-500 group-hover:bg-rose-50">
+            <LogOut className="w-5 h-5" />
+          </div>
+          <span className="text-[9px] font-bold text-gray-400 group-hover:text-rose-500">Logout</span>
         </button>
       </nav>
 
@@ -1644,42 +2009,18 @@ export const MobileDashboard: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* ── IN-APP NOTIFICATIONS MODAL ── */}
-      <AnimatePresence>
-        {showNotifications && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowNotifications(false)}
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]"
-            />
-            <motion.div
-              initial={{ y: "100%", opacity: 0.5 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: "100%", opacity: 0.5 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="fixed bottom-0 left-0 right-0 max-h-[85vh] h-full bg-white rounded-t-3xl shadow-2xl z-[101] overflow-hidden flex flex-col"
-            >
-              <div className="flex items-center justify-between p-4 border-b border-gray-100 shrink-0">
-                <h2 className="text-lg font-black text-gray-900">Notifications</h2>
-                <button
-                  onClick={() => setShowNotifications(false)}
-                  className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:text-gray-900"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
-                    <path d="M18 6L6 18M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto">
-                <NotificationCenter />
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      {/* ── IN-APP NOTIFICATIONS BOTTOM SHEET ── */}
+      <BottomSheetNotification
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+        notifications={notifications.map(n => ({
+          id: n.id,
+          type: n.category === "leave" ? "event" : n.category === "chat" ? "message" : "alert",
+          title: n.title,
+          message: n.message,
+          time: n.createdAt?.toDate ? n.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now"
+        }))}
+      />
 
       {/* Render Desktop-style Org Chart Modal */}
       {showOrgChart && (

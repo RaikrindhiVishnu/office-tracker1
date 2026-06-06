@@ -86,12 +86,13 @@ const DECLARED_HOLIDAYS: Record<string, { title: string }> = {
   "2026-01-14": { title: "Pongal" },
   "2026-03-04": { title: "Holi" },
   "2026-03-19": { title: "Ugadi" },
-  "2026-08-15": { title: "Independence Day" },
-  "2026-08-28": { title: "Raksha Bandhan" },
+  "2026-06-26": { title: "Muharram" },
+  "2026-08-28": { title: "Raksha Bandan" },
+  "2026-09-04": { title: "Janmastami" },
   "2026-09-14": { title: "Ganesh Chaturthi" },
   "2026-10-02": { title: "Gandhi Jayanthi" },
   "2026-10-20": { title: "Dussehra" },
-  "2026-11-08": { title: "Diwali" },
+  "2026-11-09": { title: "Diwali" },
   "2026-12-25": { title: "Christmas" },
 };
 

@@ -63,18 +63,19 @@ interface BalanceItem {
 // ─── STATIC HOLIDAYS 2026 ─────────────────────────────────
 // Declared after Holiday interface so TypeScript is satisfied
 const STATIC_HOLIDAYS: Holiday[] = [
-  { date:"2026-01-01", name:"New Year's Day",           type:"national" },
-  { date:"2026-01-14", name:"Makar Sankranti / Pongal", type:"national" },
-  { date:"2026-01-26", name:"Republic Day",             type:"national" },
-  { date:"2026-03-20", name:"Ugadi",                    type:"national" },
-  { date:"2026-03-25", name:"Holi",                     type:"national" },
-  { date:"2026-08-15", name:"Independence Day",         type:"national" },
-  { date:"2026-08-28", name:"Raksha Bandhan",           type:"national" },
+  { date:"2026-01-01", name:"New Year",                 type:"national" },
+  { date:"2026-01-13", name:"Bhogi",                    type:"optional" },
+  { date:"2026-01-14", name:"Pongal",                   type:"national" },
+  { date:"2026-03-04", name:"Holi",                     type:"optional" },
+  { date:"2026-03-19", name:"Ugadi",                    type:"national" },
+  { date:"2026-06-26", name:"Muharram",                 type:"optional" },
+  { date:"2026-08-28", name:"Raksha Bandan",            type:"optional" },
+  { date:"2026-09-04", name:"Janmastami",               type:"optional" },
   { date:"2026-09-14", name:"Ganesh Chaturthi",         type:"national" },
-  { date:"2026-10-02", name:"Gandhi Jayanti",           type:"national" },
+  { date:"2026-10-02", name:"Gandhi Jayanthi",          type:"national" },
   { date:"2026-10-20", name:"Dussehra",                 type:"national" },
-  { date:"2026-11-08", name:"Diwali",                   type:"national" },
-  { date:"2026-12-25", name:"Christmas Day",            type:"national" },
+  { date:"2026-11-09", name:"Diwali",                   type:"national" },
+  { date:"2026-12-25", name:"Christmas",                type:"national" },
 ];
 
 // ─── HELPERS ──────────────────────────────────────────────

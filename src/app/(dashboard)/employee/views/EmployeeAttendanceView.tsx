@@ -58,12 +58,13 @@ const holidays = [
   { date: "2026-01-14", title: "Pongal" },
   { date: "2026-03-04", title: "Holi" },
   { date: "2026-03-19", title: "Ugadi" },
-  { date: "2026-08-15", title: "Independence Day" },
-  { date: "2026-08-28", title: "Raksha Bandhan" },
+  { date: "2026-06-26", title: "Muharram" },
+  { date: "2026-08-28", title: "Raksha Bandan" },
+  { date: "2026-09-04", title: "Janmastami" },
   { date: "2026-09-14", title: "Ganesh Chaturthi" },
   { date: "2026-10-02", title: "Gandhi Jayanthi" },
   { date: "2026-10-20", title: "Dussehra" },
-  { date: "2026-11-08", title: "Diwali" },
+  { date: "2026-11-09", title: "Diwali" },
   { date: "2026-12-25", title: "Christmas" },
 ];
 

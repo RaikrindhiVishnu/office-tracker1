@@ -52,12 +52,13 @@ const CANONICAL_HOLIDAYS = [
   { title: "Pongal", date: "2026-01-14", type: "Festival" },
   { title: "Holi", date: "2026-03-04", type: "Festival" },
   { title: "Ugadi", date: "2026-03-19", type: "Festival" },
-  { title: "Independence Day", date: "2026-08-15", type: "National" },
-  { title: "Raksha Bandhan", date: "2026-08-28", type: "Festival" },
+  { title: "Muharram", date: "2026-06-26", type: "Optional" },
+  { title: "Raksha Bandan", date: "2026-08-28", type: "Festival" },
+  { title: "Janmastami", date: "2026-09-04", type: "Optional" },
   { title: "Ganesh Chaturthi", date: "2026-09-14", type: "Festival" },
   { title: "Gandhi Jayanthi", date: "2026-10-02", type: "National" },
   { title: "Dussehra", date: "2026-10-20", type: "Festival" },
-  { title: "Diwali", date: "2026-11-08", type: "Festival" },
+  { title: "Diwali", date: "2026-11-09", type: "Festival" },
   { title: "Christmas", date: "2026-12-25", type: "National" },
 ];
 

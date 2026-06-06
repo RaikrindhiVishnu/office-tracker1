@@ -1043,6 +1043,70 @@ function TaskModal({
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Description</label>
             <textarea value={form.description || ""} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Add details, acceptance criteria, steps to reproduce..." rows={8} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-vertical" />
           </div>
+
+          {/* Bug Image Upload */}
+          {form.ticketType === "bug" && (
+            <div>
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Bug Screenshot</label>
+              <div className="flex flex-col gap-3">
+                {(form.imageUrl || (form.images && form.images.length > 0)) && (
+                  <div className="relative group self-start">
+                    <img 
+                      src={form.imageUrl || form.images?.[0]?.url} 
+                      alt="Bug screenshot" 
+                      className="h-32 w-auto object-cover rounded-xl border border-gray-200 shadow-sm"
+                    />
+                    <button
+                      onClick={() => setForm(f => ({ ...f, imageUrl: "", images: [] }))}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow-md"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+                <div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        const img = new window.Image();
+                        img.onload = () => {
+                          const canvas = document.createElement("canvas");
+                          let { width, height } = img;
+                          const MAX_DIM = 800;
+                          if (width > height && width > MAX_DIM) {
+                            height *= MAX_DIM / width;
+                            width = MAX_DIM;
+                          } else if (height > MAX_DIM) {
+                            width *= MAX_DIM / height;
+                            height = MAX_DIM;
+                          }
+                          canvas.width = width;
+                          canvas.height = height;
+                          const ctx = canvas.getContext("2d");
+                          ctx?.drawImage(img, 0, 0, width, height);
+                          const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+                          setForm(f => ({
+                            ...f,
+                            imageUrl: compressedBase64,
+                            images: [{ url: compressedBase64, name: file.name, uploadedAt: new Date().toISOString() }]
+                          }));
+                        };
+                        img.src = ev.target?.result as string;
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                    className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 file:mr-4 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Priority</label>
@@ -2247,7 +2311,7 @@ function ProjectsPage({ user, myProjects, onOpenProject, onCreateProject, onEdit
 /* ═══════════════════════════════════════════
    MAIN COMPONENT
 ═══════════════════════════════════════════ */
-export default function ProjectManagement({ user, projects, users }: any) {
+export default function ProjectManagement({ user, projects, users, setSidebarCollapsed }: any) {
   const [viewStack, setViewStack] = useState<Task[]>([]);
   const [activeTab, setActiveTab] = useState<AppTab>("dashboard");
   const [activeProject, setActiveProject] = useState<any>(null);
@@ -2267,6 +2331,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
   const [filterTicketType, setFilterTicketType] = useState<"all" | TicketType>("all");
   const [search, setSearch] = useState("");
   const [showMyTasksOnly, setShowMyTasksOnly] = useState(false);
+  const [headerCollapsed, setHeaderCollapsed] = useState(false);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [quickAddStory, setQuickAddStory] = useState<{ story: Task; ticketType: TicketType } | null>(null);
@@ -2289,6 +2354,12 @@ export default function ProjectManagement({ user, projects, users }: any) {
       }
     }
   }, [projects]);
+
+  useEffect(() => {
+    if (setSidebarCollapsed) {
+      setSidebarCollapsed(!!activeProject);
+    }
+  }, [activeProject, setSidebarCollapsed]);
 
   useEffect(() => {
     if (deepLinkTaskId && tasks.length > 0) {
@@ -2556,7 +2627,8 @@ export default function ProjectManagement({ user, projects, users }: any) {
         {toastMsg && <PermissionToast message={toastMsg} onHide={() => setToastMsg(null)} />}
 
         {/* Top bar */}
-        <div className="shrink-0 bg-white border-b border-gray-200 shadow-sm">
+        {/* Top bar */}
+        <div className="shrink-0 bg-white border-b border-gray-200 shadow-sm transition-all duration-300 relative">
           <div className="px-3 sm:px-6 py-2.5 flex items-center justify-between gap-2">
             <button onClick={() => { setActiveProject(null); setActiveSprint(null); setViewMode("kanban"); setKanbanColumns(DEFAULT_COLUMNS); }} className="text-sm font-semibold text-gray-500 hover:text-gray-900 transition flex items-center gap-1 shrink-0">← Projects</button>
             <div className="w-px h-5 bg-gray-200 shrink-0" />
@@ -2579,8 +2651,20 @@ export default function ProjectManagement({ user, projects, users }: any) {
                 <div className="hidden sm:block"><p className="text-xs font-bold text-gray-700">{myProgress}%</p><p className="text-[10px] text-gray-400">My tasks</p></div>
               </div>
               <TeamButton users={users} activeProject={activeProject} user={user} projectColor={projectColor} />
+              
+              {/* Collapse/Expand Toggle */}
+              <button 
+                onClick={() => setHeaderCollapsed(!headerCollapsed)}
+                className="ml-2 w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 transition"
+                title={headerCollapsed ? "Expand Header" : "Collapse Header"}
+              >
+                {headerCollapsed ? "▼" : "▲"}
+              </button>
             </div>
           </div>
+
+          {!headerCollapsed && (
+            <>
 
           {/* Toolbar */}
           <div className="px-3 sm:px-6 py-2.5 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2 shrink-0 overflow-x-auto whitespace-nowrap scrollbar-none">
@@ -2631,6 +2715,8 @@ export default function ProjectManagement({ user, projects, users }: any) {
               ))}
             </div>
           )}
+            </>
+          )}
         </div>
 
         {showWorkLogForm && viewMode !== "reports" && (
@@ -2648,7 +2734,7 @@ export default function ProjectManagement({ user, projects, users }: any) {
           </div>
         )}
 
-        {viewMode !== "reports" && (
+        {viewMode !== "reports" && !headerCollapsed && (
           <div className="shrink-0 px-4 sm:px-6 py-2.5 bg-white border-b border-gray-100 flex flex-wrap items-center gap-4 sm:gap-6">
             {[
               { label: "My Tasks", val: myTasks.length, color: "#64748b" },

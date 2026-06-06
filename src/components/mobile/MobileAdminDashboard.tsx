@@ -267,8 +267,18 @@ export const MobileAdminDashboard: React.FC = () => {
 
   const DECLARED_HOLIDAYS: Record<string, { title: string }> = {
     "2026-01-01": { title: "New Year" },
+    "2026-01-13": { title: "Bhogi" },
     "2026-01-14": { title: "Pongal" },
-    "2026-08-15": { title: "Independence Day" },
+    "2026-03-04": { title: "Holi" },
+    "2026-03-19": { title: "Ugadi" },
+    "2026-06-26": { title: "Muharram" },
+    "2026-08-28": { title: "Raksha Bandan" },
+    "2026-09-04": { title: "Janmastami" },
+    "2026-09-14": { title: "Ganesh Chaturthi" },
+    "2026-10-02": { title: "Gandhi Jayanthi" },
+    "2026-10-20": { title: "Dussehra" },
+    "2026-11-09": { title: "Diwali" },
+    "2026-12-25": { title: "Christmas" },
   };
   const isSunday = (y: number, m: number, d: number) => new Date(y, m, d).getDay() === 0;
   const isSecondSaturday = (y: number, m: number, d: number) => new Date(y, m, d).getDay() === 6 && Math.ceil(d / 7) === 2;
@@ -1370,8 +1380,8 @@ export const MobileAdminDashboard: React.FC = () => {
 
               <div className="flex flex-col gap-3">
                 {[
-                  { date: "Jul 4", name: "Independence Day", day: "Thursday" },
-                  { date: "Sep 2", name: "Labor Day", day: "Monday" }
+                  { date: "Aug 28", name: "Raksha Bandan", day: "Friday" },
+                  { date: "Sep 04", name: "Janmastami", day: "Friday" }
                 ].map((holiday, i) => (
                   <motion.div
                     key={i}

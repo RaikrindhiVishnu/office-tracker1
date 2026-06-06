@@ -649,10 +649,66 @@ export function TaskModal({
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" />
             </div>
           </div>
-          {f.imageUrl && (
+          {/* Bug Image Upload */}
+          {f.ticketType === "bug" && (
             <div className="mt-3">
-              <label className="text-xs font-medium text-gray-500 block mb-1">Attached Bug Image</label>
-              <img src={f.imageUrl} alt="Bug screenshot" className="w-full h-auto max-h-64 object-contain rounded-lg border border-gray-200 bg-gray-50" />
+              <label className="text-xs font-medium text-gray-500 block mb-1">Bug Screenshot</label>
+              <div className="flex flex-col gap-3">
+                {(f.imageUrl || (f.images && f.images.length > 0)) && (
+                  <div className="relative group self-start">
+                    <img 
+                      src={f.imageUrl || f.images?.[0]?.url} 
+                      alt="Bug screenshot" 
+                      className="h-32 w-auto object-cover rounded-lg border border-gray-200 bg-gray-50" 
+                    />
+                    <button
+                      onClick={() => setF(prev => ({ ...prev, imageUrl: "", images: [] }))}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow-md text-xs font-bold"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+                <div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        const img = new window.Image();
+                        img.onload = () => {
+                          const canvas = document.createElement("canvas");
+                          let { width, height } = img;
+                          const MAX_DIM = 800;
+                          if (width > height && width > MAX_DIM) {
+                            height *= MAX_DIM / width;
+                            width = MAX_DIM;
+                          } else if (height > MAX_DIM) {
+                            width *= MAX_DIM / height;
+                            height = MAX_DIM;
+                          }
+                          canvas.width = width;
+                          canvas.height = height;
+                          const ctx = canvas.getContext("2d");
+                          ctx?.drawImage(img, 0, 0, width, height);
+                          const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+                          setF(prev => ({
+                            ...prev,
+                            imageUrl: compressedBase64,
+                            images: [{ url: compressedBase64, name: file.name, uploadedAt: new Date().toISOString() }]
+                          }));
+                        };
+                        img.src = ev.target?.result as string;
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                  />
+                </div>
+              </div>
             </div>
           )}
           <div>
