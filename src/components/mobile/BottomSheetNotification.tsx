@@ -59,7 +59,7 @@ export const BottomSheetNotification: React.FC<BottomSheetNotificationProps> = (
 
   // Combine system notifications (like task assignments) with chat notifications
   const allNotifications = [
-    ...systemNotifications.map(n => ({ ...n, isChat: false, read: n.read })),
+    ...systemNotifications.map(n => ({ ...n, isChat: false, read: n.isRead })),
     ...chatNotifications.map(n => ({ 
       ...n, 
       isChat: true, 
