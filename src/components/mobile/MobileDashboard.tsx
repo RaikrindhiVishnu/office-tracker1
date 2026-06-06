@@ -2015,7 +2015,7 @@ export const MobileDashboard: React.FC = () => {
         onClose={() => setShowNotifications(false)}
         notifications={notifications.map(n => ({
           id: n.id,
-          type: n.category === "leave" ? "event" : n.category === "chat" ? "message" : "alert",
+          type: n.category === "attendance" ? "event" : n.category === "message" ? "message" : "alert",
           title: n.title,
           message: n.message,
           time: n.createdAt?.toDate ? n.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now"

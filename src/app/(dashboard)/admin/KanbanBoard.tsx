@@ -477,6 +477,7 @@ export function TaskModal({
     taskCode: getAutoCode(defaultTicketType || "task"),
     labels: [] as TaskLabel[],
     imageUrl: "",
+    images: [] as { url: string; name: string; uploadedAt: string }[],
   });
   const [taskCodeManual, setTaskCodeManual] = useState(false);
 
@@ -492,6 +493,7 @@ export function TaskModal({
         parentStoryId: editingTask.parentStoryId || "", taskCode: editingTask.taskCode || "",
         labels: editingTask.labels || [],
         imageUrl: editingTask.imageUrl || "",
+        images: editingTask.images || [],
       });
     }
   }, [editingTask]);
