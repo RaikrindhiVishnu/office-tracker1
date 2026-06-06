@@ -1197,7 +1197,7 @@ export default function TeamsStyleChat({ users, targetUid }: { users: User[]; ta
                     if (isSystem) return <div key={m.id} className="zc-sys-msg"><span className="zc-sys-pill">{m.text}</span></div>;
                     return (
                       <div key={m.id} className={`zc-msg-row${mine ? " mine" : ""}`} style={{ alignItems: "flex-end" }}>
-                        {!mine && (showAv
+                        {!mine && selectedChat.isGroup && (showAv
                           ? <div style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, overflow: "hidden" }}><div className="zc-msg-av-ph" style={{ background: `linear-gradient(135deg,${sg1},${sg2})` }}>{su?.profilePhoto ? <img src={su.profilePhoto} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="" /> : initials(m.senderName || "?")}</div></div>
                           : <div style={{ width: 30, flexShrink: 0 }} />
                         )}

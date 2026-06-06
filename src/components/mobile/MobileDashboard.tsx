@@ -249,6 +249,22 @@ const ActiveProjectsSlider = ({ projects, users, setActiveTab }: any) => {
   );
 };
 
+const CANONICAL_HOLIDAYS = [
+  { title: "New Year", date: "2026-01-01", type: "National" },
+  { title: "Bhogi", date: "2026-01-13", type: "Festival" },
+  { title: "Pongal", date: "2026-01-14", type: "Festival" },
+  { title: "Holi", date: "2026-03-04", type: "Festival" },
+  { title: "Ugadi", date: "2026-03-19", type: "Festival" },
+  { title: "Muharram", date: "2026-06-26", type: "Optional" },
+  { title: "Raksha Bandan", date: "2026-08-28", type: "Festival" },
+  { title: "Janmastami", date: "2026-09-04", type: "Optional" },
+  { title: "Ganesh Chaturthi", date: "2026-09-14", type: "Festival" },
+  { title: "Gandhi Jayanthi", date: "2026-10-02", type: "National" },
+  { title: "Dussehra", date: "2026-10-20", type: "Festival" },
+  { title: "Diwali", date: "2026-11-09", type: "Festival" },
+  { title: "Christmas", date: "2026-12-25", type: "National" },
+];
+
 export const MobileDashboard: React.FC = () => {
   const { user, userData, userRole, loading, logout } = useAuth();
   const { notifications, unreadCount } = useNotifications();
@@ -266,6 +282,37 @@ export const MobileDashboard: React.FC = () => {
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [companyEvents, setCompanyEvents] = useState<any[]>([]);
   const [pendingLeaves, setPendingLeaves] = useState<any[]>([]);
+  const [holidays, setHolidays] = useState<any[]>(CANONICAL_HOLIDAYS);
+  const [chatNotifications, setChatNotifications] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "notifications"), where("toUid", "==", user.uid));
+    const unsubscribe = onSnapshot(q, snap => {
+      // Check for newly added chat messages to trigger device notifications
+      snap.docChanges().forEach(change => {
+        if (change.type === "added") {
+          const data = change.doc.data();
+          const createdAt = data.timestamp?.toMillis ? data.timestamp.toMillis() : 0;
+          // Only trigger for truly new notifications (created within the last 5 seconds)
+          if (createdAt > Date.now() - 5000) {
+            triggerDeviceNotification(data.fromName || "New Message", data.message || "You received a new chat message.");
+            playSound('pop');
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+              navigator.vibrate([25, 40, 25]);
+            }
+          }
+        }
+      });
+
+      const docs = snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as any))
+        .filter(n => n.deletedByEmployee !== true)
+        .sort((a, b) => (b.timestamp?.toMillis?.() || 0) - (a.timestamp?.toMillis?.() || 0));
+      setChatNotifications(docs);
+    });
+    return () => unsubscribe();
+  }, [user]);
 
   // Leave Request form states
   const [leaveType, setLeaveType] = useState<LeaveType>("casual");
@@ -282,16 +329,25 @@ export const MobileDashboard: React.FC = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
+  const totalUnread = unreadCount + chatNotifications.filter(c => !c.read).length;
+
+  const prevUnreadCount = useRef(totalUnread);
+  useEffect(() => {
+    if (totalUnread > prevUnreadCount.current) {
+      setShowNotifications(true);
+      playSound('pop');
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate([25, 40, 25]);
+      }
+    }
+    prevUnreadCount.current = totalUnread;
+  }, [totalUnread]);
+
   // ── Native Mobile: Device Notifications ──
   useEffect(() => {
     if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission().then(permission => {
-        if (permission === "granted") {
-          new Notification("Notifications Enabled", {
-            body: "You will now receive device notifications from Office Tracker.",
-          });
-        }
-      });
+      // We don't automatically request anymore because iOS blocks it without user gesture.
+      // Handled by the banner in the UI now.
     }
   }, []);
 
@@ -313,11 +369,6 @@ export const MobileDashboard: React.FC = () => {
 
     if (Notification.permission === "granted") {
       sendPush();
-    } else if (Notification.permission !== "denied") {
-      // iOS Safari requires permission requests to be inside a user interaction (like this onClick)
-      Notification.requestPermission().then(permission => {
-        if (permission === "granted") sendPush();
-      });
     }
   };
 
@@ -525,12 +576,20 @@ export const MobileDashboard: React.FC = () => {
     const unsubLeaves = onSnapshot(query(collection(db, "leaveRequests"), where("status", "==", "Pending")), (snap) =>
       setPendingLeaves(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
+    const unsubHolidays = onSnapshot(query(collection(db, "holidays"), orderBy("date", "asc")), (snap) => {
+      if (snap.empty) {
+        setHolidays(CANONICAL_HOLIDAYS);
+      } else {
+        setHolidays(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      }
+    });
     return () => {
       unsubProjects();
       unsubUsers();
       unsubAnnouncements();
       unsubEvents();
       unsubLeaves();
+      unsubHolidays();
     };
   }, [user]);
 
@@ -720,8 +779,8 @@ export const MobileDashboard: React.FC = () => {
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" />
               </svg>
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 rounded-full border-[1.5px] border-white text-[8px] text-white font-bold flex items-center justify-center">{unreadCount}</span>
+              {totalUnread > 0 && (
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 rounded-full border-[1.5px] border-white text-[8px] text-white font-bold flex items-center justify-center">{totalUnread}</span>
               )}
             </button>
             <button onClick={() => setActiveTab("profile")} className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center shadow-sm active:scale-90 transition-transform overflow-hidden">
@@ -984,6 +1043,32 @@ export const MobileDashboard: React.FC = () => {
                       <div className="text-[9px] font-semibold text-indigo-300 mt-0.5 whitespace-nowrap">Shift: 9:00 AM - 6:00 PM</div>
                     </motion.div>
                   </div>
+
+                  {typeof window !== "undefined" && "Notification" in window && Notification.permission === "default" && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-4 mx-4 bg-indigo-500/20 backdrop-blur-md border border-indigo-400/30 rounded-xl p-3 flex flex-col gap-2"
+                    >
+                      <div className="text-[12px] font-bold text-white leading-tight">
+                        Enable real-time notifications for updates and messages.
+                      </div>
+                      <button
+                        onClick={() => {
+                          Notification.requestPermission().then(permission => {
+                            if (permission === "granted") {
+                              new Notification("Notifications Enabled", { body: "You will now receive device notifications." });
+                              // Force re-render to hide banner
+                              setHolidays([...holidays]); 
+                            }
+                          });
+                        }}
+                        className="bg-indigo-500 hover:bg-indigo-600 text-white font-black text-[11px] py-2 rounded-lg shadow-sm"
+                      >
+                        Allow Notifications
+                      </button>
+                    </motion.div>
+                  )}
 
                   <div className="overflow-hidden mt-1">
                     <motion.h2
@@ -1770,35 +1855,45 @@ export const MobileDashboard: React.FC = () => {
               initial="hidden"
               whileInView="show"
               viewport={{ once: false, margin: "-50px" }}
-              className="bg-cyan-50/40 px-5 pt-6 pb-8 border-b border-cyan-100/50"
+              className="px-4 py-6"
             >
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-[15px] font-black text-gray-900">Upcoming Holidays</h2>
-                <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm border border-cyan-100/50">
-                  <CalendarX2 className="w-4 h-4 text-cyan-500" />
+              <div className="bg-white rounded-[24px] p-5 shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-[15px] font-black text-gray-900">Upcoming Holidays</h2>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-orange-50 text-orange-500">
+                      {holidays.filter(h => new Date(h.date + "T00:00:00").getTime() >= new Date().setHours(0,0,0,0)).slice(0, 5).length} remaining
+                    </span>
+                    <button className="text-[11px] font-bold text-blue-600 tracking-wide">View all &rarr;</button>
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex flex-col gap-3">
-                {[
-                  { date: "Aug 28", name: "Raksha Bandan", day: "Friday" },
-                  { date: "Sep 04", name: "Janmastami", day: "Friday" }
-                ].map((holiday, i) => (
-                  <motion.div
-                    key={i}
-                    variants={{ hidden: { opacity: 0, x: -10 }, show: { opacity: 1, x: 0, transition: { delay: i * 0.1 } } }}
-                    className="bg-white rounded-[20px] p-3 flex items-center gap-4 shadow-sm border border-cyan-100/50 group active:scale-[0.98] transition-transform"
-                  >
-                    <div className="w-12 h-12 rounded-[14px] bg-cyan-50 border border-cyan-100/50 flex flex-col items-center justify-center shrink-0">
-                      <span className="text-[9px] font-black text-cyan-600 uppercase">{holiday.date.split(' ')[0]}</span>
-                      <span className="text-lg font-black text-gray-900 leading-none">{holiday.date.split(' ')[1]}</span>
-                    </div>
-                    <div>
-                      <div className="text-[13px] font-black text-gray-900">{holiday.name}</div>
-                      <div className="text-[10px] font-bold text-gray-400 mt-0.5">{holiday.day} — Company Off</div>
-                    </div>
-                  </motion.div>
-                ))}
+                <div className="flex flex-col">
+                  {holidays.filter(h => new Date(h.date + "T00:00:00").getTime() >= new Date().setHours(0,0,0,0)).slice(0, 5).map((holiday, i, arr) => {
+                    const d = new Date(holiday.date + "T00:00:00");
+                    const isLast = i === arr.length - 1;
+                    return (
+                      <div key={holiday.id || i} className={`flex items-center py-3.5 ${isLast ? '' : 'border-b border-gray-100'}`}>
+                        <div className="w-[55px] shrink-0 text-[13px] font-black text-blue-600">
+                          {d.getDate()} {d.toLocaleString('default', { month: 'short' })}
+                        </div>
+                        <div className="flex-1 text-[13.5px] font-semibold text-gray-800 truncate pr-2">
+                          {holiday.title || holiday.name}
+                        </div>
+                        <div className={`shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-md ${
+                          holiday.type === 'National' ? 'bg-blue-50 text-blue-600' :
+                          holiday.type === 'Festival' ? 'bg-orange-50 text-orange-500' :
+                          'bg-emerald-50 text-emerald-600'
+                        }`}>
+                          {holiday.type || 'Optional'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {holidays.filter(h => new Date(h.date + "T00:00:00").getTime() >= new Date().setHours(0,0,0,0)).length === 0 && (
+                    <div className="text-[12px] font-bold text-gray-400 text-center py-4">No upcoming holidays scheduled</div>
+                  )}
+                </div>
               </div>
             </motion.div>
 
@@ -1905,7 +2000,7 @@ export const MobileDashboard: React.FC = () => {
 
 
       {/* Floating Glass Bottom Navigation Bar */}
-      <nav className={`fixed bottom-5 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-[480px] bg-white/70 backdrop-blur-2xl border border-white/60 rounded-[28px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] py-2 px-6 flex items-center justify-between z-50 transition-transform duration-500 ease-in-out ${scrollDirection === "down" ? "translate-y-[200px]" : "translate-y-0"}`}>
+      <nav className={`fixed bottom-5 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-[480px] bg-white/70 backdrop-blur-2xl border border-white/60 rounded-[28px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] py-2 px-6 flex items-center justify-between z-50 transition-transform duration-500 ease-in-out ${(scrollDirection === "down" || activeTab === "chat") ? "translate-y-[200px]" : "translate-y-0"}`}>
         {/* Home */}
         <button
           onClick={() => { setActiveTab("home"); triggerHaptic('light'); }}
@@ -2013,13 +2108,6 @@ export const MobileDashboard: React.FC = () => {
       <BottomSheetNotification
         isOpen={showNotifications}
         onClose={() => setShowNotifications(false)}
-        notifications={notifications.map(n => ({
-          id: n.id,
-          type: n.category === "attendance" ? "event" : n.category === "message" ? "message" : "alert",
-          title: n.title,
-          message: n.message,
-          time: n.createdAt?.toDate ? n.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now"
-        }))}
       />
 
       {/* Render Desktop-style Org Chart Modal */}
