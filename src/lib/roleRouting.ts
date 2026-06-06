@@ -13,6 +13,12 @@ export function getRoleRedirect(
   const r = role.toLowerCase();
   const d = (department || "").toLowerCase();
 
+  // ✅ MOBILE DETECTION
+  if (typeof window !== "undefined") {
+    const isMobile = window.innerWidth < 768 || /Mobi|Android|iPhone/i.test(navigator.userAgent);
+    if (isMobile) return "/mobile";
+  }
+
   // ✅ ADMIN ROUTES
   if (r === "superadmin") return "/superadmin";
   if (r === "admin") return "/admin";
