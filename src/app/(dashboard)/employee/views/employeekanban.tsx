@@ -168,7 +168,9 @@ const TaskCard = memo(({
       }}
       style={{
         background: isSelected ? "#eff6ff" : "#ffffff",
-        border: `1px solid ${isSelected ? "#6366f1" : ovd ? "#fca5a5" : "#e5e7eb"}`,
+        borderTop: `1px solid ${isSelected ? "#6366f1" : ovd ? "#fca5a5" : "#e5e7eb"}`,
+        borderRight: `1px solid ${isSelected ? "#6366f1" : ovd ? "#fca5a5" : "#e5e7eb"}`,
+        borderBottom: `1px solid ${isSelected ? "#6366f1" : ovd ? "#fca5a5" : "#e5e7eb"}`,
         borderLeft: `3px solid ${tm.color}`,
         borderRadius: "10px",
         padding: "10px 10px 8px",

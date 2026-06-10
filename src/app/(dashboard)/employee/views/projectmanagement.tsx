@@ -37,6 +37,7 @@ import {
   KanbanBoard,
 } from "./employeekanban";
 import { Task, KanbanColumn, TicketType, TICKET_TYPES, LABEL_COLORS, TaskLabel, getPermissions, getColStyle, getLabelStyle } from "@/lib/kanbanUtils";
+import { TaskActivityTimeline } from "../../admin/ActivityTimeline";
 
 /* ─── LOCAL TYPES (not needed in kanban file) ─── */
 type ViewMode = "kanban" | "list" | "timeline" | "logs" | "reports";
@@ -1263,7 +1264,7 @@ function TaskDetailModal({
   tasks: Task[];
   onAddChildToStory: (story: Task, ticketType: TicketType) => void;
 }) {
-  const [taskTab, setTaskTab] = useState<"details" | "storytasks" | "subtasks" | "images" | "files" | "comments" | "worklogs" | "empsheet">("details");
+  const [taskTab, setTaskTab] = useState<"details" | "storytasks" | "subtasks" | "images" | "files" | "comments" | "worklogs" | "empsheet" | "history">("details");
   const [comments, setComments] = useState<any[]>([]);
   const [taskFiles, setTaskFiles] = useState<any[]>([]);
   const [subtasks, setSubtasks] = useState<any[]>([]);
@@ -1453,6 +1454,7 @@ function TaskDetailModal({
     { id: "comments", icon: "💬", label: "Comments", badge: comments.length > 0 ? String(comments.length) : null },
     { id: "worklogs", icon: "⏱", label: "Logs", badge: taskWorklogs.length > 0 ? `${totalLoggedHours}h` : null },
     { id: "empsheet", icon: "📝", label: "My Work", badge: taskEmpEntries.length > 0 ? `${totalEmpHours}h` : null },
+    { id: "history", icon: "📜", label: "Activity", badge: null },
   ] as const;
 
   return createPortal(
@@ -1954,6 +1956,12 @@ function TaskDetailModal({
               }
             </div>
           )}
+
+          {taskTab === "history" && (
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <TaskActivityTimeline taskId={task.id} projectColor={projectColor} />
+            </div>
+          )}
         </div>
 
         {taskTab === "comments" && (
@@ -2442,6 +2450,7 @@ export default function ProjectManagement({ user, projects, users, setSidebarCol
 
   const logActivity = async (projectId: string, action: string, description: string, taskId?: string) => {
     await addDoc(collection(db, "projectActivities"), { projectId, userId: user.uid, userName, action, description, taskId: taskId ?? null, createdAt: serverTimestamp() });
+    await addDoc(collection(db, "activityLogs"), { projectId, taskId: taskId ?? null, userId: user.uid, userName, action: action.replace(/ /g, "_"), description, createdAt: serverTimestamp() });
   };
 
   const handleUpdateKanbanColumns = async (updated: KanbanColumn[]) => {
@@ -2474,6 +2483,18 @@ export default function ProjectManagement({ user, projects, users, setSidebarCol
     }
 
     await logActivity(activeProject.id, "moved task", `"${task.title}" → ${columns.find(c => c.id === newStatus)?.label ?? newStatus}`, taskId);
+    await addDoc(collection(db, "activityLogs"), {
+      projectId: activeProject.id,
+      taskId,
+      userId: user.uid,
+      userName: userName,
+      action: "status_changed",
+      from: { status: task.status },
+      to: { status: newStatus },
+      description: `Status changed to ${columns.find(c => c.id === newStatus)?.label || newStatus}`,
+      createdAt: serverTimestamp()
+    });
+
     const snap = await getDocs(query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id)));
     const all = snap.docs.map(d => d.data());
     if (all.length) await updateDoc(doc(db, "projects", activeProject.id), { progress: Math.round((all.filter(t => t.status === "done").length / all.length) * 100) });
@@ -2492,10 +2513,29 @@ export default function ProjectManagement({ user, projects, users, setSidebarCol
       createdAt: serverTimestamp(), actualHours: 0,
     });
     await logActivity(activeProject.id, "created task", `"${taskData.title}" (${taskData.ticketType || "task"})`, docRef.id);
+    await addDoc(collection(db, "activityLogs"), {
+      projectId: activeProject.id,
+      taskId: docRef.id,
+      userId: user.uid,
+      userName: userName,
+      action: "created",
+      description: `Created ${taskData.ticketType || "task"} "${taskData.title}"`,
+      createdAt: serverTimestamp()
+    });
 
     // Notify assignee
     if (taskData.assignedTo && taskData.assignedTo !== user?.uid) {
       await sendNotification(taskData.assignedTo, "task_assigned", "Task Assigned", `You've been assigned "${taskData.title}" in ${activeProject.name}`, activeProject.id, docRef.id);
+      await addDoc(collection(db, "activityLogs"), {
+        projectId: activeProject.id,
+        taskId: docRef.id,
+        userId: user.uid,
+        userName: userName,
+        action: "assigned",
+        to: { assignee: taskData.assignedToName || "Someone" },
+        description: `Assigned to ${taskData.assignedToName || "Someone"}`,
+        createdAt: serverTimestamp()
+      });
     }
     if (children && children.length > 0) {
       for (const child of children) {

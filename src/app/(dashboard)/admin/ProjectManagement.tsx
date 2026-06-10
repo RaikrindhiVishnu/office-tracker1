@@ -789,7 +789,10 @@ export default function AdminProjectManagement({ user, projects, users }: { user
     } else {
       const snapshot = await getDocs(query(collection(db, "projectTasks"), where("projectId", "==", activeProject.id)));
       const count = snapshot.size + 1;
-      const taskCode = `TSK-${count.toString().padStart(3, "0")}`;
+      const prefixMap: Record<string, string> = { story: "STR", task: "TSK", bug: "BUG", defect: "DEF" };
+      const typeKey = (data.ticketType || "task").toLowerCase();
+      const prefix = prefixMap[typeKey] || "TSK";
+      const taskCode = `${prefix}-${count.toString().padStart(3, "0")}`;
       const cleanData: any = {
         ...data,
         taskCode,
@@ -881,6 +884,20 @@ export default function AdminProjectManagement({ user, projects, users }: { user
     }
 
     await updateDoc(doc(db, "projectTasks", taskId), updateData);
+
+    // If it's a story, move all its tasks too
+    if (oldTask.ticketType === "story") {
+      const subTasks = tasks.filter(t => t.parentStoryId === taskId);
+      if (subTasks.length > 0) {
+        const { writeBatch } = await import("firebase/firestore");
+        const batch = writeBatch(db);
+        subTasks.forEach(st => {
+          batch.update(doc(db, "projectTasks", st.id), { status: newStatus });
+        });
+        await batch.commit();
+      }
+    }
+
     await logActivity(activeProject!.id, "status_changed", `→ ${columns.find(c => c.id === newStatus)?.label || newStatus}`, taskId);
     await addDoc(collection(db, "activityLogs"), { projectId: activeProject!.id, taskId, userId: user.uid, userName: user.email?.split("@")[0] ?? "", action: "status_changed", from: { status: oldTask?.status }, to: { status: newStatus }, description: `Status changed to ${columns.find(c => c.id === newStatus)?.label || newStatus}`, createdAt: serverTimestamp() });
     const snap = await getDocs(query(collection(db, "projectTasks"), where("projectId", "==", activeProject!.id)));
@@ -1104,7 +1121,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
     const TAB_LABELS: Record<string, string> = {
       details: "Details", storytasks: "Tasks", subtasks: "Subtasks", images: "Images", links: "Links",
       deps: "Deps", files: "Files", comments: "Comments", logs: "Logs",
-      empsheet: "My Work", history: "History",
+      empsheet: "My Work", history: "Activity",
     };
 
     return createPortal(
