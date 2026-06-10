@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (
     process.env.CRON_SECRET &&
-    authHeader !== \`Bearer \${process.env.CRON_SECRET}\`
+    authHeader !== `Bearer ${process.env.CRON_SECRET}`
   ) {
     // Return 401 if unauthorized, but for local dev we can allow or check differently
     // console.warn("Unauthorized cron request");
@@ -60,8 +60,8 @@ export async function GET(request: Request) {
       if (isPresent) presentCount++;
       
       const statusHtml = isPresent 
-        ? \`<span style="color:#059669;font-weight:700;">Present</span>\`
-        : \`<span style="color:#e11d48;font-weight:700;">Absent</span>\`;
+        ? `<span style="color:#059669;font-weight:700;">Present</span>`
+        : `<span style="color:#e11d48;font-weight:700;">Absent</span>`;
         
       const firstCheckIn = isPresent && record.sessions?.[0]?.checkIn
         ? new Date(record.sessions[0].checkIn._seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
@@ -76,36 +76,36 @@ export async function GET(request: Request) {
         ? (record.totalMinutes / 60).toFixed(1) + " hrs"
         : "-";
 
-      return \`
+      return `
         <tr>
-          <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:14px;color:#1e293b;">\${user.name}</td>
-          <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:14px;color:#475569;">\${user.department}</td>
-          <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:14px;">\${statusHtml}</td>
-          <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:14px;color:#475569;">\${firstCheckIn}</td>
-          <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:14px;color:#475569;">\${lastCheckOut}</td>
-          <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:14px;color:#475569;font-weight:600;">\${totalHours}</td>
+          <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:14px;color:#1e293b;">${user.name}</td>
+          <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:14px;color:#475569;">${user.department}</td>
+          <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:14px;">${statusHtml}</td>
+          <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:14px;color:#475569;">${firstCheckIn}</td>
+          <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:14px;color:#475569;">${lastCheckOut}</td>
+          <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-size:14px;color:#475569;font-weight:600;">${totalHours}</td>
         </tr>
-      \`;
+      `;
     });
 
     const absentCount = totalEmployees - presentCount;
     const attendancePercentage = totalEmployees > 0 ? Math.round((presentCount / totalEmployees) * 100) : 0;
 
-    const contentHtml = \`
+    const contentHtml = `
       <div style="margin-bottom:24px;">
-        <p>Here is the daily attendance summary for <strong>\${dateStr}</strong>.</p>
+        <p>Here is the daily attendance summary for <strong>${dateStr}</strong>.</p>
         
         <div style="display:flex;gap:12px;margin:20px 0;">
           <div style="background:#f1f5f9;border:1px solid #cbd5e1;padding:16px;border-radius:12px;flex:1;text-align:center;">
-            <div style="font-size:24px;font-weight:800;color:#0f172a;">\${presentCount}/\${totalEmployees}</div>
+            <div style="font-size:24px;font-weight:800;color:#0f172a;">${presentCount}/${totalEmployees}</div>
             <div style="font-size:12px;color:#64748b;text-transform:uppercase;font-weight:700;margin-top:4px;">Present Today</div>
           </div>
           <div style="background:#fff1f2;border:1px solid #fecdd3;padding:16px;border-radius:12px;flex:1;text-align:center;">
-            <div style="font-size:24px;font-weight:800;color:#be123c;">\${absentCount}</div>
+            <div style="font-size:24px;font-weight:800;color:#be123c;">${absentCount}</div>
             <div style="font-size:12px;color:#f43f5e;text-transform:uppercase;font-weight:700;margin-top:4px;">Absent Today</div>
           </div>
           <div style="background:#eff6ff;border:1px solid #bfdbfe;padding:16px;border-radius:12px;flex:1;text-align:center;">
-            <div style="font-size:24px;font-weight:800;color:#1d4ed8;">\${attendancePercentage}%</div>
+            <div style="font-size:24px;font-weight:800;color:#1d4ed8;">${attendancePercentage}%</div>
             <div style="font-size:12px;color:#3b82f6;text-transform:uppercase;font-weight:700;margin-top:4px;">Attendance Rate</div>
           </div>
         </div>
@@ -124,16 +124,16 @@ export async function GET(request: Request) {
             </tr>
           </thead>
           <tbody>
-            \${rows.join("")}
+            ${rows.join("")}
           </tbody>
         </table>
       </div>
-    \`;
+    `;
 
     const emailHtml = buildMncEmailHtml(
       "Daily Attendance Report",
       "📊",
-      \`Summary for \${dateStr}\`,
+      `Summary for ${dateStr}`,
       "Admin Team",
       contentHtml
     );
@@ -144,12 +144,12 @@ export async function GET(request: Request) {
       try {
         await sendEmail({
           to: adminEmail,
-          subject: \`📊 Daily Attendance Report - \${dateStr}\`,
+          subject: `📊 Daily Attendance Report - ${dateStr}`,
           html: emailHtml,
         });
         sentCount++;
       } catch (err) {
-        console.error(\`Failed to send to \${adminEmail}\`, err);
+        console.error(`Failed to send to ${adminEmail}`, err);
       }
     }
 

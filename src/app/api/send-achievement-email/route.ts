@@ -32,9 +32,6 @@ export async function POST(req: NextRequest) {
 
     const icon = CATEGORY_ICONS[category] || "🏆";
 
-    await sendEmail({
-      to: email,
-      subject: `🏆 Congratulations ${name}! — ${title}`,
     const content = `
       <p>We are absolutely thrilled to recognize your outstanding achievement and present you with this award! 🎊</p>
       <div style="background:linear-gradient(135deg,#f5f3ff,#ede9fe);border:1px solid #ddd6fe;border-radius:14px;padding:24px;margin:24px 0;text-align:center;">
