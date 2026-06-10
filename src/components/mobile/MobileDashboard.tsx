@@ -515,6 +515,7 @@ export const MobileDashboard: React.FC = () => {
 
   // Live Timer State
   const [attendance, setAttendance] = useState<any>(null);
+  const [weeklyAttendance, setWeeklyAttendance] = useState<any[]>([]);
   const [shiftSeconds, setShiftSeconds] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -607,6 +608,94 @@ export const MobileDashboard: React.FC = () => {
     return () => unsub();
   }, [user]);
 
+  // Fetch weekly attendance for Weekly Insights
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, "attendance"), where("userId", "==", user.uid));
+    const unsub = onSnapshot(q, (snap) => {
+      setWeeklyAttendance(snap.docs.map(d => d.data()));
+    });
+    return () => unsub();
+  }, [user]);
+
+  const weeklyChartData = useMemo(() => {
+    const now = new Date();
+    const dayOfWeek = now.getDay() || 7; // Sunday is 0, make it 7
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - dayOfWeek + 1);
+    monday.setHours(0, 0, 0, 0);
+
+    const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const currentDayIdx = dayOfWeek - 1;
+
+    let totalWeekLogHours = 0;
+
+    const chartData = days.map((dayName, index) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + index);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+      const record = weeklyAttendance.find(r => r.date === dateStr);
+      let hours = 0;
+      let blocks: any[] = [];
+
+      if (index > currentDayIdx) {
+        // Future day
+        return { day: dayName, hours: 0, blocks: [] };
+      }
+
+      if (record && record.sessions && record.sessions.length > 0) {
+        let totalMs = 0;
+        const d10am = new Date(d); d10am.setHours(10, 0, 0, 0);
+        const d7pm = new Date(d); d7pm.setHours(19, 0, 0, 0);
+        
+        for (const s of record.sessions) {
+          const start = s.checkIn?.toMillis ? s.checkIn.toMillis() : s.checkIn;
+          if (!start) continue;
+          
+          const end = s.checkOut ? (s.checkOut?.toMillis ? s.checkOut.toMillis() : s.checkOut) : Date.now();
+          
+          const clampedStart = Math.max(start, d10am.getTime());
+          const actualEnd = s.checkOut ? end : Math.min(Date.now(), d7pm.getTime());
+          const clampedEnd = Math.min(actualEnd, d7pm.getTime());
+          
+          if (clampedEnd > clampedStart) {
+            totalMs += (clampedEnd - clampedStart);
+          }
+        }
+        hours = totalMs / (1000 * 60 * 60);
+      } else if (record && record.totalMinutes) {
+        hours = record.totalMinutes / 60;
+      }
+
+      hours = parseFloat(hours.toFixed(1));
+
+      if (hours === 0) {
+        // Absent or no checkin for past/current day -> red block
+        return { day: dayName, hours: 0, blocks: [{ type: "break", h: "100%" }] };
+      }
+
+      totalWeekLogHours += hours;
+
+      const hPercent = Math.min(100, (hours / 9) * 100);
+      if (record.sessions && record.sessions.length > 1) {
+          const h1 = hPercent * 0.45;
+          const h2 = hPercent * 0.45;
+          blocks = [
+            { type: "work", h: `${h1}%` },
+            { type: "break", h: `10%` },
+            { type: "work", h: `${h2}%` }
+          ];
+      } else {
+          blocks = [{ type: "work", h: `${hPercent}%` }];
+      }
+
+      return { day: dayName, hours, blocks };
+    });
+
+    return { data: chartData, totalHours: totalWeekLogHours.toFixed(1) };
+  }, [weeklyAttendance]);
+
   // Calculate live shift timer
   useEffect(() => {
     let interval: any;
@@ -616,23 +705,44 @@ export const MobileDashboard: React.FC = () => {
         interval = setInterval(() => {
           const sessions = attendance.sessions || [];
           let totalMs = 0;
+          const today = new Date();
+          const d10am = new Date(today); d10am.setHours(10, 0, 0, 0);
+          const d7pm = new Date(today); d7pm.setHours(19, 0, 0, 0);
+
           for (let i = 0; i < sessions.length; i++) {
             const s = sessions[i];
             const start = s.checkIn?.toMillis ? s.checkIn.toMillis() : s.checkIn;
             if (!start) continue;
             const end = s.checkOut ? (s.checkOut?.toMillis ? s.checkOut.toMillis() : s.checkOut) : Date.now();
-            totalMs += (end - start);
+            
+            const clampedStart = Math.max(start, d10am.getTime());
+            const clampedEnd = Math.min(end, d7pm.getTime());
+            
+            if (clampedEnd > clampedStart) {
+              totalMs += (clampedEnd - clampedStart);
+            }
           }
           setShiftSeconds(Math.floor(totalMs / 1000));
         }, 1000);
       } else {
         const sessions = attendance.sessions || [];
         let totalMs = 0;
+        const today = new Date();
+        const d10am = new Date(today); d10am.setHours(10, 0, 0, 0);
+        const d7pm = new Date(today); d7pm.setHours(19, 0, 0, 0);
+
         for (let i = 0; i < sessions.length; i++) {
           const s = sessions[i];
           const start = s.checkIn?.toMillis ? s.checkIn.toMillis() : s.checkIn;
           const end = s.checkOut?.toMillis ? s.checkOut.toMillis() : s.checkOut;
-          if (start && end) totalMs += (end - start);
+          if (!start || !end) continue;
+
+          const clampedStart = Math.max(start, d10am.getTime());
+          const clampedEnd = Math.min(end, d7pm.getTime());
+          
+          if (clampedEnd > clampedStart) {
+            totalMs += (clampedEnd - clampedStart);
+          }
         }
         setShiftSeconds(Math.floor(totalMs / 1000));
       }
@@ -1667,7 +1777,7 @@ export const MobileDashboard: React.FC = () => {
                   <div className="flex items-end justify-between mb-6">
                     <div>
                       <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Total Week Logged</div>
-                      <div className="text-2xl font-black text-gray-900 leading-none">39.3<span className="text-sm font-bold text-gray-400">h</span></div>
+                      <div className="text-2xl font-black text-gray-900 leading-none">{weeklyChartData.totalHours}<span className="text-sm font-bold text-gray-400">h</span></div>
                     </div>
                     <div className="text-[10px] font-bold text-rose-500 bg-rose-50 border border-rose-100 px-2 py-1 rounded-full flex items-center gap-1">
                       <div className="w-1.5 h-1.5 rounded-full bg-rose-500"></div> Break Gap
@@ -1688,15 +1798,7 @@ export const MobileDashboard: React.FC = () => {
 
                     {/* Bars Container */}
                     <div className="flex-1 flex items-end justify-between pl-8 relative z-10 h-[calc(100%-24px)]">
-                      {[
-                        { day: "Mon", hours: 8.5, blocks: [{ type: "work", h: "40%" }, { type: "break", h: "10%" }, { type: "work", h: "35%" }] },
-                        { day: "Tue", hours: 7.2, blocks: [{ type: "work", h: "35%" }, { type: "break", h: "5%" }, { type: "work", h: "32%" }] },
-                        { day: "Wed", hours: 9.0, blocks: [{ type: "work", h: "90%" }] },
-                        { day: "Thu", hours: 6.5, blocks: [{ type: "work", h: "30%" }, { type: "break", h: "20%" }, { type: "work", h: "15%" }] },
-                        { day: "Fri", hours: 8.1, blocks: [{ type: "work", h: "40%" }, { type: "break", h: "10%" }, { type: "work", h: "31%" }] },
-                        { day: "Sat", hours: 0, blocks: [] },
-                        { day: "Sun", hours: 0, blocks: [] },
-                      ].map((d, i) => (
+                      {weeklyChartData.data.map((d, i) => (
                         <div key={d.day} className="flex flex-col items-center group h-full justify-end relative w-6">
                           {/* Always-visible Time Text */}
                           <div className="absolute -top-6 text-[9px] font-black text-indigo-600 z-20">
