@@ -1645,15 +1645,15 @@ export default function GreetingsAdmin() {
                         <label className="gr-lbl">Message *</label>
                         <textarea
                           className={"gr-mail-body" + (mailErrors.body ? " err" : "")}
-                          placeholder={"Dear {name},\n\nWrite your message here...\n\nRegards,\nHR Team"}
+                          placeholder="Write your message here...&#10;&#10;(Note: 'Dear [Name]' and 'Regards, HR Team' will be added automatically to each email)"
                           value={mailBody}
                           onChange={e => setMailBody(e.target.value)}
                           style={{ minHeight: 220 }}
                         />
                         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
                           {mailErrors.body && <div className="gr-inp-err">⚠️ {mailErrors.body}</div>}
-                          <div style={{ fontSize: 10, color: "var(--text3)", marginLeft: "auto" }}>
-                            Tip: Use <code style={{ background: "#f1f5f9", padding: "1px 4px", borderRadius: 3 }}>{"{name}"}</code> to personalize per recipient
+                          <div style={{ fontSize: 10, color: "var(--text3)", marginLeft: "auto", fontWeight: 700 }}>
+                            ✨ Greeting and HR Footer are attached automatically.
                           </div>
                         </div>
                       </div>

@@ -137,10 +137,16 @@ ${cleanBody}
         </div>
 
         <!-- SIGNATURE (FIXED) -->
-        <p style="font-size:14px;color:#64748b;margin-top:28px;">
-          Warm regards,<br/>
-          <strong>Techgy Innovations HR Team</strong>
-        </p>
+        <div style="font-size:14px;color:#64748b;margin-top:32px;padding-top:24px;border-top:1px solid #e2e8f0;">
+          <p style="margin:0 0 4px 0;color:#0f172a;font-weight:700;">Regards,</p>
+          <p style="margin:0 0 12px 0;color:#1e40af;font-weight:800;font-size:15px;">HR Team</p>
+          
+          <div style="font-size:12px;color:#94a3b8;line-height:1.6;">
+            <strong>Techgy Innovations</strong><br/>
+            Global Headquarters<br/>
+            <a href="https://techgyinnovations.com" style="color:#2563eb;text-decoration:none;">www.techgyinnovations.com</a>
+          </div>
+        </div>
       </div>
     </div>
   `;
