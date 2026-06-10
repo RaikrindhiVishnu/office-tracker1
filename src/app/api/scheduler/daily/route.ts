@@ -77,19 +77,23 @@ export async function POST(req: NextRequest) {
         });
 
         const names = due.map((u: any) => u.name || u.email?.split("@")[0] || "Employee").join(", ");
-        const bdayAlertHtml = (adminName: string) => `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-            <h2 style="color: #1e3a8a; margin-top: 0;">🎉 Birthday Alert!</h2>
-            <p>Hello ${adminName},</p>
+        const { buildMncEmailHtml } = require("@/lib/emailTemplate");
+        const bdayAlertHtml = (adminName: string) => {
+          const content = `
             <p>Here is a reminder that today is a birthday for the following employee(s):</p>
             <div style="background-color: #f3f4f6; padding: 15px; border-radius: 6px; margin: 20px 0; font-size: 16px; font-weight: bold; color: #1f2937;">
               🎂 ${names}
             </div>
             <p>Please make sure to congratulate them!</p>
-            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-            <p style="font-size: 12px; color: #6b7280; text-align: center;">Techgy Innovations HR System</p>
-          </div>
-        `;
+          `;
+          return buildMncEmailHtml(
+            "Birthday Alert!",
+            "🎉",
+            "Today's birthdays",
+            adminName,
+            content
+          );
+        };
 
         await sendBatch({
           recipients: uniqueAdminRecipients,

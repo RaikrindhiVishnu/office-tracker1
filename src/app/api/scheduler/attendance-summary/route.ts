@@ -53,10 +53,9 @@ export async function GET(req: NextRequest) {
       return true;
     });
 
-    const attendanceSummaryHtml = (adminName: string) => `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-        <h2 style="color: #1e3a8a; margin-top: 0;">📅 Daily Attendance Summary</h2>
-        <p>Hello ${adminName},</p>
+    const { buildMncEmailHtml } = require("@/lib/emailTemplate");
+    const attendanceSummaryHtml = (adminName: string) => {
+      const content = `
         <p>Here is the daily attendance report for <strong>${todayISO}</strong>:</p>
         
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
@@ -87,11 +86,16 @@ export async function GET(req: NextRequest) {
           <h4 style="color: #475569; margin-bottom: 5px;">❌ Not Checked In Today:</h4>
           <p style="font-size: 13px; color: #1e293b; background-color: #fef2f2; padding: 10px; border-radius: 4px; line-height: 1.5;">${absentList}</p>
         </div>
+      `;
 
-        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #6b7280; text-align: center;">Techgy Innovations HR System</p>
-      </div>
-    `;
+      return buildMncEmailHtml(
+        "Daily Attendance Summary",
+        "📅",
+        "Overview of today's attendance",
+        adminName,
+        content
+      );
+    };
 
     const result = await sendBatch({
       recipients: uniqueAdminRecipients,

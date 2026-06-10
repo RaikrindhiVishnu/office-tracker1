@@ -94,29 +94,26 @@ export async function POST(req: NextRequest) {
 
 function buildEventHtml(ev: any, recipientName: string, type: string): string {
   const isReminder = type === "reminder";
-  return `
-    <div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.1);">
-      <div style="background:${ev.color || "#6366f1"};padding:36px 32px;text-align:center;">
-        <div style="font-size:48px;margin-bottom:10px;">${isReminder ? "⏰" : "📅"}</div>
-        <h1 style="color:#fff;margin:0;font-size:24px;font-weight:900;">
-          ${isReminder ? "Reminder: " : ""}${ev.title}
-        </h1>
-        ${isReminder ? `<p style="color:rgba(255,255,255,.85);margin:8px 0 0;font-size:14px;">Don't forget — this event is coming up soon!</p>` : ""}
-      </div>
-      <div style="padding:32px;">
-        <p style="font-size:16px;color:#1e293b;">Dear <strong>${recipientName || "Team Member"}</strong>,</p>
-        ${isReminder
-          ? `<p style="font-size:15px;color:#334155;line-height:1.7;">This is a friendly reminder about the upcoming <strong>${ev.title}</strong> event.</p>`
-          : `<p style="font-size:15px;color:#334155;line-height:1.7;">We're excited to invite you to <strong>${ev.title}</strong>!</p>`
-        }
-        ${ev.description ? `<p style="font-size:14px;color:#64748b;">${ev.description}</p>` : ""}
-        <div style="background:#f8fafc;border-radius:10px;padding:16px 20px;margin:20px 0;border:1px solid #e2e8f0;">
-          <div style="font-size:13px;color:#334155;margin-bottom:6px;">📅 <strong>Date:</strong> ${ev.eventDate}</div>
-          ${ev.location ? `<div style="font-size:13px;color:#334155;margin-bottom:6px;">📍 <strong>Location:</strong> ${ev.location}</div>` : ""}
-          ${ev.rsvpLink ? `<div style="font-size:13px;color:#334155;">🔗 <a href="${ev.rsvpLink}" style="color:#6366f1;font-weight:700;">RSVP Here</a></div>` : ""}
-        </div>
-        <p style="font-size:14px;color:#64748b;margin-top:20px;">See you there!<br/><strong>Techgy Innovations HR Team</strong></p>
-      </div>
+  const content = `
+    ${isReminder
+      ? `<p>This is a friendly reminder about the upcoming <strong>${ev.title}</strong> event.</p>`
+      : `<p>We're excited to invite you to <strong>${ev.title}</strong>!</p>`
+    }
+    ${ev.description ? `<p>${ev.description}</p>` : ""}
+    <div style="background:#f8fafc;border-radius:10px;padding:16px 20px;margin:20px 0;border:1px solid #e2e8f0;">
+      <div style="font-size:13px;color:#334155;margin-bottom:6px;">📅 <strong>Date:</strong> ${ev.eventDate}</div>
+      ${ev.location ? `<div style="font-size:13px;color:#334155;margin-bottom:6px;">📍 <strong>Location:</strong> ${ev.location}</div>` : ""}
+      ${ev.rsvpLink ? `<div style="font-size:13px;color:#334155;">🔗 <a href="${ev.rsvpLink}" style="color:#2563eb;font-weight:700;">RSVP Here</a></div>` : ""}
     </div>
+    <p>See you there!</p>
   `;
+
+  const { buildMncEmailHtml } = require("@/lib/emailTemplate");
+  return buildMncEmailHtml(
+    isReminder ? `Reminder: ${ev.title}` : ev.title,
+    isReminder ? "⏰" : "📅",
+    isReminder ? "Don't forget — this event is coming up soon!" : "You're Invited!",
+    recipientName || "Team Member",
+    content
+  );
 }

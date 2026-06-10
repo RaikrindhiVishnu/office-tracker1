@@ -16,26 +16,27 @@ async function sendEmail(toEmail: string, toName: string, subject: string, body:
       },
     });
 
+    const { buildMncEmailHtml } = require("@/lib/emailTemplate");
+    const content = `
+      <div style="background: #f0f9ff; border-left: 4px solid #0b3a5a; padding: 14px 18px; border-radius: 6px; margin: 16px 0;">
+        <p style="margin: 0; color: #1e3a5f; font-size: 14px; line-height: 1.6;">${body}</p>
+      </div>
+      <p style="color: #9ca3af; font-size: 12px; margin-top: 24px; text-align: center;">
+        This is an automated message from your AI HR Assistant.
+      </p>
+    `;
+
     await transporter.sendMail({
       from: `"Tracker Bot 🤖" <${process.env.GMAIL_USER}>`,
       to: toEmail,
       subject,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 520px; margin: auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px;">
-          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
-            <span style="font-size: 28px;">🤖</span>
-            <h2 style="margin: 0; color: #0b3a5a; font-size: 18px;">Tracker Bot — AI Assistant</h2>
-          </div>
-          <p style="color: #374151; font-size: 15px; line-height: 1.6;">Hi <strong>${toName}</strong>,</p>
-          <div style="background: #f0f9ff; border-left: 4px solid #0b3a5a; padding: 14px 18px; border-radius: 6px; margin: 16px 0;">
-            <p style="margin: 0; color: #1e3a5f; font-size: 14px; line-height: 1.6;">${body}</p>
-          </div>
-          <p style="color: #9ca3af; font-size: 12px; margin-top: 24px; text-align: center;">
-            This is an automated message from your AI HR Assistant.<br/>
-            © ${new Date().getFullYear()} Office Tracker
-          </p>
-        </div>
-      `,
+      html: buildMncEmailHtml(
+        "Tracker Bot — AI Assistant",
+        "🤖",
+        "",
+        toName,
+        content
+      ),
     });
   } catch (err) {
     console.error("[AI Workflow] Email failed:", err);

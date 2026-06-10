@@ -109,45 +109,12 @@ function buildFestivalHtml(fest: any, recipientName: string): string {
     fest.emailMessage?.trim() ||
     `Wishing you a very Happy ${fest.title}.`;
 
-  return `
-  <div style="font-family:Segoe UI,Arial,sans-serif;background:#f3f4f6;padding:20px;">
-    
-    <div style="max-width:640px;margin:auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
-      
-      <!-- HEADER (FIXED) -->
-      <div style="background:${fest.bannerColor || "#4f46e5"};padding:32px;text-align:center;">
-        <div style="font-size:56px;margin-bottom:10px;">
-          ${fest.bannerEmoji || "🎉"}
-        </div>
-        <h1 style="color:#ffffff;margin:0;font-size:26px;font-weight:700;">
-          ${fest.title} Greetings
-        </h1>
-      </div>
-
-      <!-- BODY (ONLY WHAT YOU TYPE) -->
-      <div style="padding:32px;">
-        <p style="font-size:15px;color:#111827;margin:0;">
-          Dear <strong>${recipientName || "Team Member"}</strong>,
-        </p>
-
-        <p style="font-size:15px;color:#374151;line-height:1.8;margin-top:16px;white-space:pre-line;">
-${message}
-        </p>
-
-        <!-- SIGNATURE (FIXED) -->
-        <p style="margin-top:28px;font-size:14px;color:#6b7280;">
-          Warm regards,<br/>
-          <strong>HR Team</strong><br/>
-          Techgy Innovations Pvt. Ltd.
-        </p>
-      </div>
-
-      <!-- FOOTER (FIXED) -->
-      <div style="background:#f9fafb;padding:16px;text-align:center;font-size:12px;color:#9ca3af;">
-        © ${new Date().getFullYear()} Techgy Innovations Pvt. Ltd. All rights reserved.
-      </div>
-
-    </div>
-  </div>
-  `;
+  const { buildMncEmailHtml } = require("@/lib/emailTemplate");
+  return buildMncEmailHtml(
+    `${fest.title} Greetings`,
+    fest.bannerEmoji || "🎉",
+    "",
+    recipientName || "Team Member",
+    `<p style="white-space:pre-line;">${message}</p>`
+  );
 }

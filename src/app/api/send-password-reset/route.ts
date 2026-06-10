@@ -40,43 +40,44 @@ export async function POST(req: NextRequest) {
       ? `${process.env.NEXT_PUBLIC_APP_URL}/login`
       : "https://office-tracker-1.vercel.app/login";
 
+    const { buildMncEmailHtml } = await import("@/lib/emailTemplate");
+    const content = `
+      <p>We received a request to reset the password for your account
+         (<strong>${normalizedEmail}</strong>).</p>
+
+      <div style="background:#f4f6f9; padding:15px; border-radius:8px; margin:20px 0;">
+        <p style="margin:0; font-size:13px; color:#555;">
+          Click the button below to set a new password.
+          This link expires in <strong>1 hour</strong>.
+        </p>
+      </div>
+
+      <p style="text-align: center; margin: 30px 0;">
+        <a href="${resetLink}"
+           target="_blank"
+           style="display:inline-block; background:#1e3a5f; color:white;
+                  padding:12px 24px; text-decoration:none;
+                  border-radius:6px; font-weight:bold;">
+          Reset My Password
+        </a>
+      </p>
+
+      <p style="margin-top:25px; font-size:12px; color:#888;">
+        If you did not request a password reset, you can safely ignore this email.
+      </p>
+    `;
+
     await transporter.sendMail({
       from: `"Techgy Innovations" <${process.env.GMAIL_USER}>`,
       to: normalizedEmail,
       subject: "Reset Your Password – Office Tracker",
-      html: `
-        <div style="font-family: Arial, sans-serif; padding:20px;">
-          <h2 style="color:#193677;">Reset Your Password</h2>
-
-          <p>We received a request to reset the password for your account
-             (<strong>${normalizedEmail}</strong>).</p>
-
-          <div style="background:#f4f6f9; padding:15px; border-radius:8px; margin:20px 0;">
-            <p style="margin:0; font-size:13px; color:#555;">
-              Click the button below to set a new password.
-              This link expires in <strong>1 hour</strong>.
-            </p>
-          </div>
-
-          <p>
-            <a href="${resetLink}"
-               target="_blank"
-               style="display:inline-block; background:#193677; color:white;
-                      padding:12px 24px; text-decoration:none;
-                      border-radius:6px; font-weight:bold;">
-              Reset My Password
-            </a>
-          </p>
-
-          <p style="margin-top:25px; font-size:12px; color:#888;">
-            If you did not request a password reset, you can safely ignore this email.
-          </p>
-
-          <p style="margin-top:20px; font-size:12px; color:gray;">
-            © ${new Date().getFullYear()} Techgy Innovations
-          </p>
-        </div>
-      `,
+      html: buildMncEmailHtml(
+        "Reset Your Password",
+        "🔐",
+        "Secure your account",
+        "",
+        content
+      ),
     });
 
     return NextResponse.json({ success: true });
