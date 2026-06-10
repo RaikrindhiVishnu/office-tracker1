@@ -112,12 +112,12 @@ export function buildEventHtml(
             <span style="font-size:15px;font-weight:700;color:#1e293b;">${formattedDate}</span>
           </td>
         </tr>
-        ${location ? \`<tr>
+        ${location ? `<tr>
           <td style="padding:8px 0;border-bottom:1px solid #f1f5f9;">
             <span style="font-size:13px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">📍 Location</span><br/>
-            <span style="font-size:15px;font-weight:700;color:#1e293b;">\${location}</span>
+            <span style="font-size:15px;font-weight:700;color:#1e293b;">${location}</span>
           </td>
-        </tr>\` : ""}
+        </tr>` : ""}
         <tr>
           <td style="padding:8px 0;">
             <span style="font-size:13px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">About</span><br/>
@@ -127,12 +127,12 @@ export function buildEventHtml(
       </table>
     </div>
 
-    ${rsvpLink ? \`
+    ${rsvpLink ? `
     <div style="text-align:center;margin:0 0 32px;">
-      <a href="\${rsvpLink}" style="display:inline-block;background:\${color};color:#fff;font-size:15px;font-weight:800;padding:14px 36px;border-radius:50px;text-decoration:none;">
+      <a href="${rsvpLink}" style="display:inline-block;background:${color};color:#fff;font-size:15px;font-weight:800;padding:14px 36px;border-radius:50px;text-decoration:none;">
         ✅ RSVP Now
       </a>
-    </div>\` : ""}
+    </div>` : ""}
   `;
 
   return buildMncEmailHtml(
