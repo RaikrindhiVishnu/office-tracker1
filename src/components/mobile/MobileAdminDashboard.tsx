@@ -264,7 +264,7 @@ export const MobileAdminDashboard: React.FC = () => {
   const [email, setEmail] = useState("");
   const [designation, setDesignation] = useState("");
   const [accountType, setAccountType] = useState<any>("EMPLOYEE");
-  const [role, setRole] = useState("");
+  const [role, setRole] = useState<"employee" | "lead">("employee");
   const [department, setDepartment] = useState("");
 
   const DECLARED_HOLIDAYS: Record<string, { title: string }> = {
