@@ -37,7 +37,7 @@ export default function EmployeeDetails({
   const [leadsList, setLeadsList] = useState<{ id: string; name: string }[]>([]);
 
   const isAdmin = ["ADMIN", "SUPERADMIN", "HR", "BUSINESSOWNER"].includes(
-    userData?.accountType?.toString().trim().toUpperCase()
+    userData?.accountType?.toString().trim().toUpperCase() || ""
   );
 
   useEffect(() => {

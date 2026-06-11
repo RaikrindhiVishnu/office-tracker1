@@ -264,6 +264,8 @@ export const MobileAdminDashboard: React.FC = () => {
   const [email, setEmail] = useState("");
   const [designation, setDesignation] = useState("");
   const [accountType, setAccountType] = useState<any>("EMPLOYEE");
+  const [role, setRole] = useState("");
+  const [department, setDepartment] = useState("");
 
   const DECLARED_HOLIDAYS: Record<string, { title: string }> = {
     "2026-01-01": { title: "New Year" },
@@ -1451,6 +1453,7 @@ export const MobileAdminDashboard: React.FC = () => {
                     accountType={accountType} setAccountType={setAccountType} handleAddUser={() => alert("Please use desktop app to add users.")} 
                     creatingUser={false} formatTime={(ts: any) => ts?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) || ""} 
                     formatTotal={(mins: number = 0) => `${Math.floor(mins / 60)}h ${mins % 60}m`} 
+                    role={role} setRole={setRole} department={department} setDepartment={setDepartment}
                  />
               </div>
            </div>

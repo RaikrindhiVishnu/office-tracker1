@@ -6,7 +6,7 @@ export async function GET(req: Request) {
   try {
     // Find the user "raikrindhi vishnu"
     const usersSnap = await getDocs(collection(db, "users"));
-    let targetUid = null;
+    let targetUid: string | null = null;
     let targetName = "";
     
     usersSnap.forEach(d => {
