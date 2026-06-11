@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ProtectedRoute from "@/components/common/ProtectedRoute";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore";
 
 export default function AddUserPage() {
   const [name, setName] = useState("");
@@ -14,6 +14,23 @@ export default function AddUserPage() {
   // 🔥 NEW
   const [designation, setDesignation] = useState("Developer");
   const [accountType, setAccountType] = useState("EMPLOYEE");
+  const [department, setDepartment] = useState("Frontend Team");
+  const [reportingTo, setReportingTo] = useState("");
+  const [leads, setLeads] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    async function fetchLeads() {
+      try {
+        const q = query(collection(db, "users"), where("accountType", "==", "LEAD"));
+        const snapshot = await getDocs(q);
+        const leadsData = snapshot.docs.map(d => ({ id: d.id, name: d.data().name }));
+        setLeads(leadsData);
+      } catch (err) {
+        console.error("Failed to fetch leads", err);
+      }
+    }
+    fetchLeads();
+  }, []);
 
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
@@ -39,7 +56,9 @@ export default function AddUserPage() {
         email,
 
         designation,        // 🔥 flexible role
-        accountType,        // EMPLOYEE | ADMIN
+        accountType,        // EMPLOYEE | LEAD | ADMIN
+        department,
+        reportingTo,
 
         enabled: true,
         createdAt: serverTimestamp(),
@@ -52,6 +71,8 @@ export default function AddUserPage() {
       setPassword("");
       setDesignation("Developer");
       setAccountType("EMPLOYEE");
+      setDepartment("Frontend Team");
+      setReportingTo("");
     } catch (err: any) {
       setMsg(`❌ ${err.message}`);
     } finally {
@@ -123,6 +144,36 @@ export default function AddUserPage() {
               <option>Data Analyst</option>
             </select> 
 
+            {/* 🔹 Department */}
+            <select
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-orange-400"
+            >
+              <option value="Frontend Team">Frontend Team</option>
+              <option value="Backend Team">Backend Team</option>
+              <option value="Testing Team">Testing Team</option>
+              <option value="UI/UX Team">UI/UX Team</option>
+              <option value="DevOps Team">DevOps Team</option>
+              <option value="Sales">Sales</option>
+              <option value="Operations">Operations</option>
+              <option value="HR">HR</option>
+            </select>
+
+            {/* 🔹 Reporting To (Lead) */}
+            <select
+              value={reportingTo}
+              onChange={(e) => setReportingTo(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-orange-400"
+            >
+              <option value="">No Reporting Lead (None)</option>
+              {leads.map((lead) => (
+                <option key={lead.id} value={lead.id}>
+                  {lead.name}
+                </option>
+              ))}
+            </select>
+
             {/* 🔹 Account Type */}
             <select
               value={accountType}
@@ -130,6 +181,7 @@ export default function AddUserPage() {
               className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-orange-400"
             >
               <option value="EMPLOYEE">Employee</option>
+              <option value="LEAD">Lead</option>
               <option value="ADMIN">Admin</option>
             </select>
           </div>

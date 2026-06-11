@@ -702,7 +702,8 @@ export default function AdminProjectManagement({ user, projects, users }: { user
     if (!pf.name.trim()) return;
     const pms = [...new Set([user.uid, ...pf.selectedManagers])];
     const members = [...new Set([user.uid, ...pms, ...pf.selectedMembers])];
-    const data = { name: pf.name, clientName: pf.clientName, description: pf.description, projectType: pf.projectType, billingType: pf.billingType, startDate: pf.startDate, endDate: pf.endDate, projectManagers: pms, projectManager: pms[0] || user.uid, members, budget: pf.budget ? Number(pf.budget) : null, priority: pf.priority, status: pf.status, progress: 0, color: pf.color };
+    const data: any = { name: pf.name, clientName: pf.clientName, description: pf.description, projectType: pf.projectType || "Billing", billingType: pf.billingType || "Hourly", startDate: pf.startDate, endDate: pf.endDate, projectManagers: pms, projectManager: pms[0] || user.uid, members, budget: pf.budget ? Number(pf.budget) : null, priority: pf.priority || "Medium", status: pf.status || "Planning", progress: 0, color: pf.color };
+    Object.keys(data).forEach(k => { if (data[k] === undefined) delete data[k]; });
     if (editingProject) {
       await updateDoc(doc(db, "projects", editingProject.id), data);
       const newM = members.filter((m: string) => !editingProject.members.includes(m));
@@ -725,7 +726,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
   const handleEditProject = (p: Project) => {
     setEditingProject(p);
     const pms = getProjectManagers(p).filter(m => m !== user.uid);
-    setPf({ name: p.name, clientName: p.clientName || "", description: p.description || "", projectType: p.projectType, billingType: p.billingType || "Hourly", startDate: p.startDate || "", endDate: p.endDate || "", selectedManagers: pms, budget: p.budget?.toString() || "", priority: p.priority, status: p.status, selectedMembers: p.members.filter((m: string) => m !== user.uid && !getProjectManagers(p).includes(m)), color: p.color || PROJECT_COLORS[0] });
+    setPf({ name: p.name, clientName: p.clientName || "", description: p.description || "", projectType: p.projectType || "Billing", billingType: p.billingType || "Hourly", startDate: p.startDate || "", endDate: p.endDate || "", selectedManagers: pms, budget: p.budget?.toString() || "", priority: p.priority || "Medium", status: p.status || "Planning", selectedMembers: p.members.filter((m: string) => m !== user.uid && !getProjectManagers(p).includes(m)), color: p.color || PROJECT_COLORS[0] });
     setShowProjectForm(true);
   };
 
@@ -1270,7 +1271,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                       {
                         label: "Due Date", content: (
                           canManage
-                            ? <input type="date" defaultValue={activeTask.dueDate?.split("T")[0] || ""} onChange={async e => { await updateDoc(doc(db, "projectTasks", activeTask.id), { dueDate: e.target.value }); }} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none" />
+                            ? <input type="datetime-local" defaultValue={activeTask.dueDate || ""} onChange={async e => { await updateDoc(doc(db, "projectTasks", activeTask.id), { dueDate: e.target.value }); }} className="w-full text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none" />
                             : <div className="text-xs text-gray-700 px-2 py-1.5">{activeTask.dueDate || "—"}</div>
                         )
                       },

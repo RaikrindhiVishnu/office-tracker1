@@ -281,21 +281,30 @@ function EditProjectModal({ open, onClose, project, users, onSaved }: {
     if (!form.name.trim()) return;
     setSaving(true);
     try {
-      const pms = [...new Set([project.createdBy, ...form.selectedManagers])];
-      const members = [...new Set([project.createdBy, ...pms, ...form.selectedMembers])];
+      const creator = project.createdBy || project.projectManager || null;
+      const pms = [...new Set([creator, ...form.selectedManagers])].filter(Boolean) as string[];
+      const members = [...new Set([creator, ...pms, ...form.selectedMembers])].filter(Boolean) as string[];
 
-      await updateDoc(doc(db, "projects", project.id), {
+      const updateData: any = {
         name: form.name,
         description: form.description,
         clientName: form.clientName,
+        projectType: project.projectType || "Billing",
+        billingType: project.billingType || "Hourly",
         status: form.status,
         color: form.color,
         endDate: form.endDate,
         projectManagers: pms,
-        projectManager: pms[0],
+        projectManager: pms[0] || null,
         members: members,
         updatedAt: serverTimestamp(),
+      };
+
+      Object.keys(updateData).forEach(k => {
+        if (updateData[k] === undefined) delete updateData[k];
       });
+
+      await updateDoc(doc(db, "projects", project.id), updateData);
 
       // Notify NEW members
       const existingMembers = project.members || [];
@@ -1125,7 +1134,7 @@ function TaskModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Due Date</label>
-              <input type="date" value={form.dueDate || ""} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+              <input type="datetime-local" value={form.dueDate || ""} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
             </div>
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Assignee</label>

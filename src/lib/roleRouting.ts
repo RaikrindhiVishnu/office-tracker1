@@ -2,6 +2,7 @@ export type UserRole =
   | "superadmin"
   | "admin"
   | "hr"
+  | "lead"
   | "employee";
 
 export function getRoleRedirect(
@@ -24,8 +25,8 @@ export function getRoleRedirect(
   if (r === "admin") return "/admin";
   if (r === "hr") return "/hr";
 
-  // ✅ EMPLOYEE → DEPARTMENT BASED 
-  if (r === "employee") {
+  // ✅ EMPLOYEE & LEAD → DEPARTMENT BASED 
+  if (r === "employee" || r === "lead") {
     switch (d) {
       case "sales":
         return "/analytics/sales";

@@ -10,6 +10,8 @@ import {
 } from "@/lib/employeeSync";
 import { useAuth } from "@/context/AuthContext";
 import type { View } from "@/types/View";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 interface EmployeeDetailsProps {
   selectedUser: any;
@@ -32,8 +34,25 @@ export default function EmployeeDetails({
 
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [leadsList, setLeadsList] = useState<{ id: string; name: string }[]>([]);
 
-  const isAdmin = userData?.accountType === "ADMIN";
+  const isAdmin = ["ADMIN", "SUPERADMIN", "HR", "BUSINESSOWNER"].includes(
+    userData?.accountType?.toString().trim().toUpperCase()
+  );
+
+  useEffect(() => {
+    // Fetch all leads so the Admin can assign employees to them
+    const fetchLeads = async () => {
+      try {
+        const q = query(collection(db, "users"), where("role", "==", "lead"));
+        const snap = await getDocs(q);
+        setLeadsList(snap.docs.map(d => ({ id: d.id, name: d.data().name || d.data().email })));
+      } catch (err) {
+        console.error("Error fetching leads", err);
+      }
+    };
+    if (isAdmin) fetchLeads();
+  }, [isAdmin]);
 
   /* -------------------------------------------------- */
   /* ✅ Admin Photo Upload */
@@ -200,7 +219,7 @@ export default function EmployeeDetails({
     // Reduced padding at the top completely (pt-1) to ensure flush layout
     <div className="min-h-screen bg-slate-50/50 p-2 sm:p-4 pt-1">
       <div className="max-w-7xl mx-auto space-y-3">
-        
+
         {/* TOP BAR: Flush Back Button & Notifications */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <button
@@ -231,11 +250,11 @@ export default function EmployeeDetails({
         {/* COMPACT NOTIFICATIONS DROPDOWN */}
         {showNotifications && (
           <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-4 max-h-60 overflow-y-auto mb-2">
-             <div className="flex justify-between items-center mb-3">
-               <h4 className="text-sm font-bold text-slate-800">Recent Updates</h4>
-               <button onClick={handleMarkAllRead} className="text-xs text-blue-100 hover:underline">Mark all read</button>
-             </div>
-             <div className="space-y-2">
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="text-sm font-bold text-slate-800">Recent Updates</h4>
+              <button onClick={handleMarkAllRead} className="text-xs text-blue-100 hover:underline">Mark all read</button>
+            </div>
+            <div className="space-y-2">
               {notifications.map((n) => (
                 <div key={n.id} className="flex justify-between items-start p-2 hover:bg-slate-50 rounded-lg border border-slate-100">
                   <div>
@@ -247,14 +266,14 @@ export default function EmployeeDetails({
                   </button>
                 </div>
               ))}
-             </div>
+            </div>
           </div>
         )}
 
         {/* 🎴 BIG MAIN PROFILE BANNER */}
         <div className="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden mb-4 hover:shadow-xl transition-shadow duration-300">
           <div className="bg-gradient-to-r from-slate-950 via-slate-800 to-slate-950 px-8 py-8 flex flex-col sm:flex-row items-center sm:justify-between gap-6 relative">
-            
+
             <div className="flex flex-col sm:flex-row items-center gap-6 w-full sm:w-auto text-center sm:text-left">
               {/* BIGGER AVATAR with Hover Effect */}
               <div className="relative flex-shrink-0 group">
@@ -263,10 +282,10 @@ export default function EmployeeDetails({
                     <img src={editedUser.profilePhoto} alt="Profile" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                   ) : (
                     // Replaced placeholder text with a dedicated user avatar image
-                    <img 
-                        src="https://img.icons8.com/bubbles/200/user-male.png" 
-                        alt="Profile Placeholder" 
-                        className="w-full h-full object-cover p-2 bg-gradient-to-br from-slate-700 to-slate-900 transition-transform duration-500 group-hover:scale-110"
+                    <img
+                      src="https://img.icons8.com/bubbles/200/user-male.png"
+                      alt="Profile Placeholder"
+                      className="w-full h-full object-cover p-2 bg-gradient-to-br from-slate-700 to-slate-900 transition-transform duration-500 group-hover:scale-110"
                     />
                   )}
                   {isEditing && isAdmin && (
@@ -283,7 +302,7 @@ export default function EmployeeDetails({
                 <h1 className="text-3xl sm:text-4xl font-bold text-white leading-tight truncate mb-3">
                   {editedUser.name || "Unnamed Employee"}
                 </h1>
-                
+
                 {/* Badges */}
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 mb-4">
                   <span className="text-sm font-semibold text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-full border border-emerald-400/20">
@@ -314,7 +333,7 @@ export default function EmployeeDetails({
             {/* Action Buttons */}
             <div className="flex w-full sm:w-auto gap-3 mt-2 sm:mt-0 z-10 relative flex-wrap justify-end">
               {editedUser.resumeUrl && (
-                <a 
+                <a
                   href={`https://docs.google.com/viewer?url=${encodeURIComponent(editedUser.resumeUrl)}`}
                   target="_blank" rel="noreferrer"
                   className="w-full sm:w-auto px-5 py-2.5 bg-blue-500 hover:bg-blue-600 border border-blue-400 text-white rounded-xl text-sm font-semibold shadow-sm transition-colors flex items-center justify-center gap-2"
@@ -366,12 +385,35 @@ export default function EmployeeDetails({
             <div className="grid grid-cols-2 gap-3">
               <Field label="Employee ID" value={editedUser.employeeId} editing={isEditing && isAdmin} onChange={(v) => setEditedUser({ ...editedUser, employeeId: v })} />
               <Field label="Designation" value={editedUser.designation} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, designation: v })} />
-              <Field label="Department" value={editedUser.department} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, department: v })} />
+              <SelectField label="Department" value={editedUser.department} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, department: v })} options={["Frontend Team", "Backend Team", "UI/UX Team", "Testing Team", "DevOps Team", "AI Team", "Mobile Team", "3D Max Team", "QA Team", "Sales", "Operations", "HR"]} />
               <Field label="Date of Joining" value={editedUser.dateOfJoining} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, dateOfJoining: v })} type="date" />
               <SelectField label="Employment Type" value={editedUser.employmentType} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, employmentType: v })} options={["Full-time", "Part-time", "Contract", "Intern"]} />
               <Field label="Location" value={editedUser.workLocation} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, workLocation: v })} />
-              <Field label="Manager" value={editedUser.reportingManager} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, reportingManager: v })} />
-              <SelectField label="Account Level" value={editedUser.accountType} editing={isEditing && isAdmin} onChange={(v) => setEditedUser({ ...editedUser, accountType: v })} options={["EMPLOYEE", "ADMIN"]} />
+              
+              {/* Dynamic Reporting To Dropdown */}
+              <div className="flex flex-col gap-1 group">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-slate-700 transition-colors">Reporting To (Lead)</label>
+                {isEditing ? (
+                  <select
+                    value={editedUser.reportingTo || ""}
+                    onChange={(e) => setEditedUser({ ...editedUser, reportingTo: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg focus:border-blue-100 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm text-slate-900 appearance-none bg-no-repeat bg-[right_12px_top_50%]"
+                    style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")` }}
+                  >
+                    <option value="">No Reporting Lead</option>
+                    {leadsList.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                  </select>
+                ) : (
+                  <div className="px-3 py-1.5 bg-slate-50/80 rounded-lg border border-slate-100 min-h-[34px] flex items-center group-hover:bg-slate-50 group-hover:border-slate-300 transition-all duration-200">
+                    <p className="text-sm font-medium text-slate-800 truncate">
+                      {leadsList.find(l => l.id === editedUser.reportingTo)?.name || editedUser.reportingManager || <span className="text-slate-400 font-normal">—</span>}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <SelectField label="Account Level" value={editedUser.accountType} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, accountType: v })} options={["EMPLOYEE", "ADMIN", "HR", "BUSINESSOWNER"]} />
+              <SelectField label="Role" value={editedUser.role || "employee"} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, role: v })} options={["employee", "lead"]} />
               <div className="col-span-2"><Field label="Work Experience" value={editedUser.workExperience} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, workExperience: v })} /></div>
             </div>
           </InfoSection>
@@ -383,15 +425,15 @@ export default function EmployeeDetails({
                 <Field label="Monthly Salary" value={editedUser.salary} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, salary: v ? Number(v) : undefined })} type="number" prefix="₹" />
               </div>
               <div className="col-span-2 sm:col-span-1">
-<Field label="Bank Name" value={editedUser.bankName} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, bankName: v })} /></div>
+                <Field label="Bank Name" value={editedUser.bankName} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, bankName: v })} /></div>
 
-<Field label="Account No." value={editedUser.accountNumber} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, accountNumber: v })} />
+              <Field label="Account No." value={editedUser.accountNumber} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, accountNumber: v })} />
 
-<Field label="IFSC Code" value={editedUser.ifscCode} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, ifscCode: v })} />
+              <Field label="IFSC Code" value={editedUser.ifscCode} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, ifscCode: v })} />
 
-<Field label="PAN Number" value={editedUser.panNumber} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, panNumber: v })} />
+              <Field label="PAN Number" value={editedUser.panNumber} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, panNumber: v })} />
 
-<Field label="Aadhar No." value={editedUser.aadharNumber} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, aadharNumber: v })} />
+              <Field label="Aadhar No." value={editedUser.aadharNumber} editing={isEditing} onChange={(v) => setEditedUser({ ...editedUser, aadharNumber: v })} />
             </div>
           </InfoSection>
 
@@ -460,8 +502,8 @@ function Field({ label, value, editing, onChange, type = "text", prefix }: Field
         // Added smooth transition on border/background highlight
         <div className="px-3 py-1.5 bg-slate-50/80 rounded-lg border border-slate-100 min-h-[34px] flex items-center group-hover:bg-slate-50 group-hover:border-slate-300 transition-all duration-200">
           <p className="text-sm font-medium text-slate-800 truncate">
-            {type === "date" && value 
-              ? new Date(value as string).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) 
+            {type === "date" && value
+              ? new Date(value as string).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
               : value || <span className="text-slate-400 font-normal">—</span>}
           </p>
         </div>

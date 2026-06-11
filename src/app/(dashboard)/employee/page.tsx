@@ -43,6 +43,8 @@ import HelpView from "./views/HelpView";
 import ProjectManagement from "./views/projectmanagement";
 import { LeaveType } from "@/types/leave";
 import Payslips from "./views/Payslips";
+import EmployeeTasksView from "./views/EmployeeTasksView";
+import TeamTasksView from "./views/TeamTasksView";
 
 // ── IMPORT MeetChat overlay ──────────────────────────────
 // Change this path to wherever your MeetChatAppUpdated file lives
@@ -111,8 +113,10 @@ const isHoliday = (dateStr: string): { title: string } | null => {
   return holiday ? { title: holiday.title } : null;
 };
 
-const sidebarItems: [ViewType, string, string][] = [
+const getSidebarItems = (isLead: boolean): [ViewType, string, string][] => [
   ["dashboard", "Dashboard", "📊"],
+  ...(isLead ? [["team", "Team Tasks", "👥"] as [ViewType, string, string]] : []),
+  ["tasks", "My Tasks", "✅"],
   ["work-update", "Work Update", "📝"],
   ["attendance", "Attendance", "⏰"],
   ["projects", "Projects", "📁"],
@@ -537,7 +541,7 @@ export default function ZohoStyleEmployeeDashboard() {
     <div className="h-screen flex bg-white overflow-hidden">
 
       {/* ── SIDEBAR ── */}
-      <aside className={`fixed lg:static inset-y-0 left-0 z-50 bg-[#1a2e45] text-white flex flex-col transform transition-all duration-300 ${sidebarScrollDirection === "down" && activeView !== "dashboard" ? "lg:w-0 lg:opacity-0 lg:overflow-hidden lg:-translate-x-full" : (sidebarCollapsed ? "lg:w-16 w-64 lg:opacity-100 lg:translate-x-0" : "w-64 lg:opacity-100 lg:translate-x-0")} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+      <aside className={`fixed lg:static inset-y-0 left-0 z-50 bg-[#1a2e45] text-white flex flex-col transform transition-all duration-300 ${sidebarCollapsed ? "lg:w-16 w-64 lg:opacity-100 lg:translate-x-0" : "w-64 lg:opacity-100 lg:translate-x-0"} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
         <div className="p-4 flex items-center justify-between border-b border-white/10 w-64">
           {(!sidebarCollapsed || mobileMenuOpen) && (
             <div className="flex items-center gap-2 ml-2">
@@ -577,16 +581,16 @@ export default function ZohoStyleEmployeeDashboard() {
             </div>
           </div>
         )}
-        <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20">
-          {sidebarItems.map(([id, label, icon]) => (
+        <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20">
+          {getSidebarItems(userData?.accountType === "LEAD" || userData?.role === "lead").map(([id, label, icon]) => (
             <button key={id} onClick={() => { changeView(id); setMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 relative group ${activeView === id ? "bg-white/20 text-white shadow-sm border border-white/20" : "text-white/75 hover:bg-white/8 hover:text-white"
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150 relative group ${activeView === id ? "bg-white/20 text-white shadow-sm border border-white/20" : "text-white/75 hover:bg-white/8 hover:text-white"
                 }`}
               title={(sidebarCollapsed && !mobileMenuOpen) ? label : undefined}
             >
-              {activeView === id && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-400 rounded-r-full" />}
-              <span className={`text-base shrink-0 transition-transform duration-150 ${activeView === id ? "scale-110" : "group-hover:scale-105"}`}>{icon}</span>
-              {(!sidebarCollapsed || mobileMenuOpen) && <span className="text-sm font-medium truncate">{label}</span>}
+              {activeView === id && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-blue-400 rounded-r-full" />}
+              <span className={`text-[15px] shrink-0 transition-transform duration-150 ${activeView === id ? "scale-110" : "group-hover:scale-105"}`}>{icon}</span>
+              {(!sidebarCollapsed || mobileMenuOpen) && <span className="text-[13px] font-medium truncate">{label}</span>}
               {id === "notifications" && totalNotifications > 0 && (
                 (sidebarCollapsed && !mobileMenuOpen)
                   ? <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
@@ -846,18 +850,7 @@ export default function ZohoStyleEmployeeDashboard() {
         </div>
 
         {/* ── CONTENT ── */}
-        <main 
-          className="flex-1 overflow-y-auto p-0 bg-white"
-          onScroll={(e) => {
-            const currentScrollY = e.currentTarget.scrollTop;
-            if (currentScrollY > lastMainScrollY && currentScrollY > 50) {
-              setSidebarScrollDirection("down");
-            } else if (currentScrollY < lastMainScrollY) {
-              setSidebarScrollDirection("up");
-            }
-            setLastMainScrollY(currentScrollY);
-          }}
-        >
+        <main className="flex-1 overflow-y-auto p-0 bg-white">
           <div className="space-y-3">
             {activeView === "dashboard" && (
               <DashboardView
@@ -921,7 +914,8 @@ export default function ZohoStyleEmployeeDashboard() {
             {activeView === "profile" && <ProfileView />}
             {activeView === "help" && <HelpView />}
             {activeView === "meet" && <MeetView users={users.filter((u: any) => u.uid !== user.uid)} />}
-            {activeView === "tasks" && <TasksView user={user} />}
+            {activeView === "tasks" && <EmployeeTasksView user={{ ...user, ...userData }} />}
+            {activeView === "team" && <TeamTasksView user={{ ...user, ...userData }} />}
             {activeView === "reports" && <ReportsView user={user} attendance={attendance} />}
             {activeView === "settings" && <SettingsView user={user} />}
             {activeView === "payslips" && <Payslips />}
@@ -990,26 +984,6 @@ export default function ZohoStyleEmployeeDashboard() {
 }
 
 // ── Sub-views ─────────────────────────────────────────────
-function TasksView({ user }: any) {
-  return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-xl shadow-lg p-5">
-        <h2 className="text-xl font-bold mb-3">My Tasks</h2>
-        <div className="space-y-2">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="flex items-center justify-between p-3 border-2 border-gray-200 rounded-lg hover:border-blue-400 transition">
-              <div className="flex items-center gap-3">
-                <input type="checkbox" className="w-4 h-4" />
-                <div><h3 className="font-semibold text-sm">Task {i}</h3><p className="text-xs text-gray-600">Due: Today</p></div>
-              </div>
-              <span className="px-2.5 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-semibold">In Progress</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function ReportsView({ user, attendance }: any) {
   return (

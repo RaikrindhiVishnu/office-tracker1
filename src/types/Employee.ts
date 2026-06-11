@@ -12,7 +12,7 @@ export interface Employee {
   status?: "ONLINE" | "OFFLINE";
   totalMinutes?: number;
   designation?: string;
-  accountType?: "EMPLOYEE" | "ADMIN";
+  accountType?: "EMPLOYEE" | "ADMIN" | "HR" | "BUSINESSOWNER";
   department?: string;
   salary?: number;
   lastUpdated?: any;

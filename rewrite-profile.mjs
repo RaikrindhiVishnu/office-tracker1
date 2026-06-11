@@ -1,4 +1,7 @@
-"use client";
+import fs from 'fs';
+import path from 'path';
+
+const content = `"use client";
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -275,7 +278,7 @@ export default function ProfileView() {
             <div className="grid grid-cols-2 gap-3">
               <Field label="Employee ID" value={form.employeeId} editing={false} onChange={setF("employeeId")} />
               <Field label="Designation" value={form.designation} editing={false} onChange={setF("designation")} />
-              <SelectField label="Department" value={form.department} editing={isEditing} onChange={setF("department")} options={["Frontend Team", "Backend Team", "UI/UX Team", "Testing Team", "DevOps Team", "AI Team", "Mobile Team", "3D Max Team", "QA Team", "Sales", "Operations", "HR"]} />
+              <SelectField label="Department" value={form.department} editing={false} onChange={setF("department")} options={["Frontend Team", "Backend Team", "UI/UX Team", "Testing Team", "DevOps Team", "AI Team", "Mobile Team", "3D Max Team", "QA Team", "Sales", "Operations", "HR"]} />
               <Field label="Date of Joining" value={form.dateOfJoining} editing={false} onChange={setF("dateOfJoining")} type="date" />
               <SelectField label="Employment Type" value={form.employmentType} editing={false} onChange={setF("employmentType")} options={["Full-time", "Part-time", "Contract", "Intern"]} />
               <Field label="Location" value={form.workLocation} editing={isEditing} onChange={setF("workLocation")} />
@@ -283,23 +286,11 @@ export default function ProfileView() {
               {/* Dynamic Reporting To Dropdown */}
               <div className="flex flex-col gap-1 group">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-slate-700 transition-colors">Reporting To (Lead)</label>
-                {isEditing ? (
-                  <select
-                    value={form.reportingManager || ""}
-                    onChange={(e) => setF("reportingManager")(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg focus:border-blue-100 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm text-slate-900 appearance-none bg-no-repeat bg-[right_12px_top_50%]"
-                    style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")` }}
-                  >
-                    <option value="">No Reporting Lead</option>
-                    {leadsList.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}
-                  </select>
-                ) : (
-                  <div className="px-3 py-1.5 bg-slate-50/80 rounded-lg border border-slate-100 min-h-[34px] flex items-center group-hover:bg-slate-50 group-hover:border-slate-300 transition-all duration-200">
-                    <p className="text-sm font-medium text-slate-800 truncate">
-                      {leadsList.find(l => l.name === form.reportingManager)?.name || form.reportingManager || <span className="text-slate-400 font-normal">—</span>}
-                    </p>
-                  </div>
-                )}
+                <div className="px-3 py-1.5 bg-slate-50/80 rounded-lg border border-slate-100 min-h-[34px] flex items-center group-hover:bg-slate-50 group-hover:border-slate-300 transition-all duration-200">
+                  <p className="text-sm font-medium text-slate-800 truncate">
+                    {leadsList.find(l => l.name === form.reportingManager)?.name || form.reportingManager || <span className="text-slate-400 font-normal">—</span>}
+                  </p>
+                </div>
               </div>
 
               <SelectField label="Account Level" value={localData.accountType} editing={false} onChange={() => {}} options={["EMPLOYEE", "ADMIN", "HR", "BUSINESSOWNER"]} />
@@ -368,7 +359,7 @@ interface InfoSectionProps {
 
 function InfoSection({ title, icon, children, isEditing }: InfoSectionProps) {
   return (
-    <div className={`bg-white rounded-xl shadow-sm border ${isEditing ? 'border-blue-200 ring-1 ring-blue-50' : 'border-slate-200'} overflow-hidden transition-all duration-300 ease-in-out hover:-translate-y-1.5 hover:shadow-xl`}>
+    <div className={\`bg-white rounded-xl shadow-sm border \${isEditing ? 'border-blue-200 ring-1 ring-blue-50' : 'border-slate-200'} overflow-hidden transition-all duration-300 ease-in-out hover:-translate-y-1.5 hover:shadow-xl\`}>
       <div className="bg-slate-50/50 px-5 py-3 border-b border-slate-100 flex items-center gap-2">
         <span className="text-lg">{icon}</span>
         <h3 className="text-sm font-bold text-slate-800">{title}</h3>
@@ -398,7 +389,7 @@ function Field({ label, value, editing, onChange, type = "text", prefix }: Field
             type={type}
             value={value ?? ""}
             onChange={(e) => onChange(e.target.value)}
-            className={`w-full ${prefix ? 'pl-7' : 'px-3'} py-1.5 bg-white border border-slate-300 rounded-lg focus:border-blue-100 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm text-slate-900`}
+            className={\`w-full \${prefix ? 'pl-7' : 'px-3'} py-1.5 bg-white border border-slate-300 rounded-lg focus:border-blue-100 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm text-slate-900\`}
           />
         </div>
       ) : (
@@ -423,7 +414,7 @@ function SelectField({ label, value, editing, onChange, options }: { label: stri
           value={value ?? ""}
           onChange={(e) => onChange(e.target.value)}
           className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg focus:border-blue-100 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm text-slate-900 appearance-none bg-no-repeat bg-[right_12px_top_50%]"
-          style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")` }}
+          style={{ backgroundImage: \`url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")\` }}
         >
           <option value="">Select...</option>
           {options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
@@ -456,3 +447,7 @@ function TextAreaField({ label, value, editing, onChange }: { label: string; val
     </div>
   );
 }
+`;
+
+fs.writeFileSync(path.join(process.cwd(), 'src/app/(dashboard)/employee/views/ProfileView.tsx'), content);
+console.log('Done rewriting ProfileView.tsx');

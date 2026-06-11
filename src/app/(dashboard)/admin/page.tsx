@@ -41,6 +41,7 @@ import LeadsView from "./LeadsView"; // ← NEW CRM MODULE
 import InvoicesView from "./InvoicesView"; // ← NEW BILLING MODULE
 import ITAssetsView from "./it-assets/page"; // ← NEW ASSETS MODULE
 import AIInsightsView from "./AIInsightsView"; // ← NEW AI DASHBOARD
+import DepartmentAnalytics from "./DepartmentAnalytics"; // ← NEW DEPT ANALYTICS
 import { Employee } from "@/types/Employee";
 import type { Session } from "@/types/Employee";
 import { EmployeeRow } from "@/types/EmployeeRow";
@@ -180,8 +181,10 @@ export default function AdminPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [designation, setDesignation] = useState("Developer");
+  const [designation, setDesignation] = useState("Software Engineer");
   const [accountType, setAccountType] = useState<"EMPLOYEE" | "ADMIN" | "HR" | "BUSINESSOWNER">("EMPLOYEE");
+  const [role, setRole] = useState<"employee" | "lead">("employee");
+  const [department, setDepartment] = useState("Frontend Team");
   const [msg, setMsg] = useState("");
   const [creatingUser, setCreatingUser] = useState(false);
 
@@ -549,12 +552,14 @@ export default function AdminPage() {
           email: email.trim().toLowerCase(),
           designation,
           accountType,
+          role,
+          department,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create employee");
       setMsg("✅ Employee created! Login credentials sent to their email.");
-      setName(""); setEmail(""); setPassword(""); setDesignation("Developer"); setAccountType("EMPLOYEE");
+      setName(""); setEmail(""); setPassword(""); setDesignation("Software Engineer"); setAccountType("EMPLOYEE"); setRole("employee"); setDepartment("Frontend Team");
       setTimeout(() => { setShowAddUser(false); setMsg(""); }, 2000);
     } catch (error: any) {
       console.error("Add user error:", error);
@@ -633,7 +638,7 @@ export default function AdminPage() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-4 space-y-1 custom-scrollbar">
+        <nav className="flex-1 overflow-y-auto py-2 space-y-0.5 custom-scrollbar">
 
           <NavItem
             icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>}
@@ -691,24 +696,16 @@ export default function AdminPage() {
             onClick={() => { setView("accounts"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
           />
 
-{/* 
-          <NavItem
-            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>}
-            label="Leads (CRM)" active={view === "leads"}
-            onClick={() => { setView("leads"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
-          />
-
-          <NavItem
-            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>}
-            label="Invoices" active={view === "invoices"}
-            onClick={() => { setView("invoices"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
-          />
-*/}
-
           <NavItem
             icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg>}
             label="IT Assets" active={view === "it-assets"}
             onClick={() => { setView("it-assets"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
+          <NavItem
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>}
+            label="Departments" active={view === "departments"}
+            onClick={() => { setView("departments"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
           />
 
 
@@ -718,7 +715,7 @@ export default function AdminPage() {
         {/* Logout */}
         <button
           onClick={handleLogout}
-          className="m-3 bg-gray-500 hover:bg-red-700 py-2.5 px-5 rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 group text-white"
+          className="m-3 bg-gray-500 hover:bg-red-700 py-2 px-4 rounded-xl text-sm font-semibold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 group text-white"
           title="Logout"
         >
           <svg className="w-5 h-5 group-hover:rotate-12 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -849,6 +846,10 @@ export default function AdminPage() {
             />
           )}
 
+          {view === "departments" && (
+            <DepartmentAnalytics />
+          )}
+
           {view === "analytics" && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -927,6 +928,8 @@ export default function AdminPage() {
               name={name} setName={setName} email={email} setEmail={setEmail}
               designation={designation} setDesignation={setDesignation}
               accountType={accountType} setAccountType={setAccountType}
+              role={role} setRole={setRole}
+              department={department} setDepartment={setDepartment}
               handleAddUser={handleAddUser} creatingUser={creatingUser}
               formatTime={formatTime} formatTotal={formatTotal}
             />
@@ -1043,7 +1046,7 @@ function NavItem({ icon, label, active = false, onClick, badge, collapsed = fals
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200 relative ${active ? "bg-[#58576358] text-white shadow-md" : "text-slate-300 hover:bg-white/10 hover:text-white"
+      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative ${active ? "bg-[#58576358] text-white shadow-md" : "text-slate-300 hover:bg-white/10 hover:text-white"
         } ${collapsed ? "justify-center" : ""}`}
       title={collapsed ? label : ""}
     >

@@ -18,4 +18,5 @@ export type View =
   | "leads"
   | "invoices"
   | "it-assets"
-  | "ai-insights";
+  | "ai-insights"
+  | "departments";

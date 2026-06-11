@@ -19,9 +19,11 @@ interface EmployeesViewProps {
   designation: string;
   setDesignation: (designation: string) => void;
   accountType: "EMPLOYEE" | "ADMIN" | "HR" | "BUSINESSOWNER";
-  setAccountType: React.Dispatch<
-    React.SetStateAction<"EMPLOYEE" | "ADMIN" | "HR" | "BUSINESSOWNER">
-  >;
+  setAccountType: React.Dispatch<React.SetStateAction<"EMPLOYEE" | "ADMIN" | "HR" | "BUSINESSOWNER">>;
+  role: "employee" | "lead";
+  setRole: React.Dispatch<React.SetStateAction<"employee" | "lead">>;
+  department: string;
+  setDepartment: React.Dispatch<React.SetStateAction<string>>;
   handleAddUser: () => void;
   creatingUser: boolean;
   formatTime: (timestamp: any) => string;
@@ -46,12 +48,15 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
   setDesignation,
   accountType,
   setAccountType,
+  role,
+  setRole,
+  department,
+  setDepartment,
   handleAddUser,
   creatingUser,
   formatTime,
   formatTotal,
 }) => {
-  const [department, setDepartment] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"ALL" | "EMPLOYEE" | "ADMIN">("ALL");
   const [currentPage, setCurrentPage] = useState(1);
@@ -349,11 +354,11 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex gap-3 items-center">
-                              <button title="View Employee" onClick={() => { setSelectedUser(u); setView("employeeDetails"); }} className="p-2 bg-indigo-500 hover:bg-indigo-700 rounded-lg transition shadow-sm">
-                                <img src="https://cdn-icons-png.flaticon.com/128/159/159604.png" alt="view" className="w-5 h-5 object-contain" />
+                              <button title="View Employee" onClick={() => { setSelectedUser(u); setView("employeeDetails"); }} className="p-2 bg-indigo-500 hover:bg-indigo-700 text-white rounded-lg transition shadow-sm">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                               </button>
-                              <button title="Delete Employee" onClick={() => deleteUser(u.uid)} className="p-2 bg-amber-600 hover:bg-red-600 rounded-lg transition shadow-sm">
-                                <img src="https://cdn-icons-png.flaticon.com/128/484/484662.png" alt="delete" className="w-5 h-5 object-contain" />
+                              <button title="Delete Employee" onClick={() => deleteUser(u.uid)} className="p-2 bg-amber-600 hover:bg-red-600 text-white rounded-lg transition shadow-sm">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                               </button>
                             </div>
                           </td>
@@ -503,6 +508,16 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                   <option value="ADMIN">Admin</option>
                   <option value="HR">HR Manager</option>
                   <option value="BUSINESSOWNER">Business Owner</option>
+                </select>
+
+                {/* ROLE */}
+                <select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as "employee" | "lead")}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5"
+                >
+                  <option value="employee">Regular Employee</option>
+                  <option value="lead">Team Lead</option>
                 </select>
 
                 {/* DEPARTMENT */}

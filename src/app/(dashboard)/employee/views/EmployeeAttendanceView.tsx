@@ -348,7 +348,7 @@ export default function EmployeeAttendanceView() {
   const monthLabel = `${MONTHS[month]} ${year}`;
 
   return (
-    <div className="ea-root">
+    <div className="ea-root space-y-6 p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto w-full">
       <style>{STYLES}</style>
 
       {/* Loading overlay */}
