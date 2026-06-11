@@ -264,7 +264,7 @@ export default function DepartmentAnalytics() {
                     cursor={{ fill: '#f8fafc' }}
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                     itemStyle={{ color: '#1e293b', fontWeight: 600 }}
-                    formatter={(value: number) => [`${value}%`, 'Performance']}
+                    formatter={(value: any) => [`${value}%`, 'Performance']}
                   />
                   <Bar dataKey="performance" radius={[6, 6, 0, 0]} maxBarSize={40}>
                     {departmentData.map((entry, index) => (
