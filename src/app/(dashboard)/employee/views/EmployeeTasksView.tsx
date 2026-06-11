@@ -13,7 +13,7 @@ export default function EmployeeTasksView({ user }: { user: any }) {
   const [users, setUsers] = useState<any[]>([]);
 
   useEffect(() => {
-    // Fetch users for resolving "Assigned By" names
+    // Fetch users for resolving "Created By" names
     import("firebase/firestore").then(({ getDocs, collection }) => {
       getDocs(collection(db, "users")).then(snap => {
         setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -33,8 +33,19 @@ export default function EmployeeTasksView({ user }: { user: any }) {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
       setTasks(data);
       setLoading(false);
+    }, (error) => {
+      console.error("Firestore onSnapshot error:", error);
+      setLoading(false);
     });
-    return () => unsub();
+
+    const timeout = setTimeout(() => {
+      setLoading(false);
+    }, 5000);
+
+    return () => {
+      clearTimeout(timeout);
+      unsub();
+    };
   }, [user?.uid]);
 
   const updateStatus = async (taskId: string, status: "todo" | "in progress" | "done") => {
@@ -115,7 +126,7 @@ export default function EmployeeTasksView({ user }: { user: any }) {
           <thead>
             <tr className="border-b border-gray-200 text-[11px] text-gray-500 font-medium bg-white">
               <th className="px-3 py-3 font-medium">Task</th>
-              <th className="px-3 py-3 font-medium">Assigned By</th>
+              <th className="px-3 py-3 font-medium">Created By</th>
               <th className="px-3 py-3 font-medium">Priority</th>
               <th className="px-3 py-3 font-medium whitespace-nowrap text-center">Assigned At</th>
               <th className="px-3 py-3 font-medium whitespace-nowrap text-center">Deadline</th>
@@ -206,7 +217,17 @@ export default function EmployeeTasksView({ user }: { user: any }) {
                     }`}
                   >
                     <div className={`w-1.5 h-1.5 rounded-full ${isCompleted ? "bg-green-500" : isWorking ? "bg-orange-500" : "bg-blue-500"}`}></div>
-                    {isCompleted ? "Completed" : isWorking ? "In Progress" : "Pending"}
+                    {{
+                                new: "New",
+                                dev_in_progress: "Dev In Progress",
+                                unit_testing: "Unit Testing",
+                                ready_for_qa: "Ready For QA",
+                                testing_in_progress: "Testing In Progress",
+                                reopened: "Reopened",
+                                done: "Done",
+                                r_and_d: "R & D",
+                                Completed: "Done"
+                              }[t.status] || t.status || 'New'}
                   </div>
                 </td>
 

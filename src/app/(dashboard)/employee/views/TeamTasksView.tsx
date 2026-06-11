@@ -79,12 +79,22 @@ export default function TeamTasksView({ user }: { user: any }) {
           });
           
           setTasks(sorted);
+          setTasks(sorted);
+          setLoading(false);
+        }, (error) => {
+          console.error("Firestore onSnapshot error:", error);
           setLoading(false);
         });
         unsubscribeFunctions.push(unsub);
       });
+      
+      // Fallback: stop loading after 5 seconds if onSnapshot never fires
+      const timeout = setTimeout(() => {
+        setLoading(false);
+      }, 5000);
 
       return () => {
+        clearTimeout(timeout);
         unsubscribeFunctions.forEach(unsub => unsub());
       };
     };
@@ -403,7 +413,7 @@ export default function TeamTasksView({ user }: { user: any }) {
                 <thead>
                   <tr className="bg-white border-b border-gray-100 text-[12px] text-slate-500 whitespace-nowrap">
                     <th className="px-3 py-4 font-semibold">Task</th>
-                    <th className="px-3 py-4 font-semibold text-center">Assigned By</th>
+                    <th className="px-3 py-4 font-semibold text-center">Assigned To</th>
                     <th className="px-3 py-4 font-semibold text-center">Priority</th>
                     <th className="px-3 py-4 font-semibold whitespace-nowrap text-center">Assigned At</th>
                     <th className="px-3 py-4 font-semibold whitespace-nowrap text-center">Deadline</th>
@@ -481,7 +491,19 @@ export default function TeamTasksView({ user }: { user: any }) {
                         </td>
                         <td className="px-3 py-3">
                           <div className="flex items-center justify-center gap-2">
-                            <span className="text-[13px] font-medium text-slate-700">{t.status === 'done' || t.status === 'Completed' ? 'Completed' : t.status || 'Pending'}</span>
+                            <span className="text-[13px] font-medium text-slate-700">
+                              {{
+                                new: "New",
+                                dev_in_progress: "Dev In Progress",
+                                unit_testing: "Unit Testing",
+                                ready_for_qa: "Ready For QA",
+                                testing_in_progress: "Testing In Progress",
+                                reopened: "Reopened",
+                                done: "Done",
+                                r_and_d: "R & D",
+                                Completed: "Done"
+                              }[t.status] || t.status || 'New'}
+                            </span>
                           </div>
                         </td>
                         <td className="px-3 py-3 text-right">

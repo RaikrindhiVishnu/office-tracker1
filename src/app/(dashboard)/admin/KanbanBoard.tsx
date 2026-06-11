@@ -30,6 +30,7 @@ const STATIC_COL_CONFIG: Record<string, { color: string; bg: string; border: str
   testing_in_progress: { color: "#0d9488", bg: "#f0fdfa", border: "#99f6e4", headerBg: "#ccfbf1", dot: "#14b8a6" },
   reopened: { color: "#dc2626", bg: "#fef2f2", border: "#fecaca", headerBg: "#fee2e2", dot: "#ef4444" },
   done: { color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0", headerBg: "#dcfce7", dot: "#22c55e" },
+  r_and_d: { color: "#ec4899", bg: "#fdf2f8", border: "#fbcfe8", headerBg: "#fce7f3", dot: "#db2777" },
 };
 
 const DYNAMIC_PALETTE = [
@@ -541,6 +542,50 @@ export function TaskModal({
     onClose();
   };
 
+  useEffect(() => {
+    if (!open || f.ticketType !== "bug") return;
+    const handleGlobalPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf("image") !== -1) {
+          const file = items[i].getAsFile();
+          if (!file) continue;
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const img = new window.Image();
+            img.onload = () => {
+              const canvas = document.createElement("canvas");
+              let { width, height } = img;
+              const MAX_DIM = 800;
+              if (width > height && width > MAX_DIM) {
+                height *= MAX_DIM / width;
+                width = MAX_DIM;
+              } else if (height > MAX_DIM) {
+                width *= MAX_DIM / height;
+                height = MAX_DIM;
+              }
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext("2d");
+              ctx?.drawImage(img, 0, 0, width, height);
+              const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+              setF(prev => ({
+                ...prev,
+                imageUrl: prev.imageUrl || compressedBase64,
+                images: [...(prev.images || []), { url: compressedBase64, name: file.name || "Pasted Image", uploadedAt: new Date().toISOString() }]
+              }));
+            };
+            img.src = ev.target?.result as string;
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+    };
+    window.addEventListener("paste", handleGlobalPaste);
+    return () => window.removeEventListener("paste", handleGlobalPaste);
+  }, [open, f.ticketType]);
+
   if (!open) return null;
 
   return createPortal(
@@ -651,33 +696,52 @@ export function TaskModal({
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" />
             </div>
           </div>
-          {/* Bug Image Upload */}
           {f.ticketType === "bug" && (
-            <div className="mt-3">
-              <label className="text-xs font-medium text-gray-500 block mb-1">Bug Screenshot</label>
-              <div className="flex flex-col gap-3">
-                {(f.imageUrl || (f.images && f.images.length > 0)) && (
-                  <div className="relative group self-start">
-                    <img 
-                      src={f.imageUrl || f.images?.[0]?.url} 
-                      alt="Bug screenshot" 
-                      className="h-32 w-auto object-cover rounded-lg border border-gray-200 bg-gray-50" 
-                    />
-                    <button
-                      onClick={() => setF(prev => ({ ...prev, imageUrl: "", images: [] }))}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow-md text-xs font-bold"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
-                <div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Bug Screenshot</label>
+              </div>
+              <div className="flex gap-4 items-stretch">
+                {(() => {
+                  const displayImages = f.images?.length ? f.images : f.imageUrl ? [{url: f.imageUrl, name: "Screenshot"}] : [];
+                  if (displayImages.length === 0) return null;
+                  return (
+                    <div className="w-1/3 min-w-[180px] border border-gray-100 rounded-2xl p-3 bg-white shadow-sm flex flex-col max-h-[160px] overflow-y-auto custom-scrollbar">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 shrink-0">Images ({displayImages.length})</span>
+                      <div className="flex flex-col gap-2">
+                        {displayImages.map((img, idx) => (
+                          <div key={idx} className="relative group shrink-0 h-20">
+                            <img 
+                              src={img.url} 
+                              alt={`Screenshot ${idx + 1}`} 
+                              className="w-full h-full object-cover rounded-xl border border-gray-100"
+                            />
+                            <button
+                              onClick={() => setF(prev => {
+                                 const curr = prev.images?.length ? prev.images : prev.imageUrl ? [{url: prev.imageUrl, name: "Screenshot"}] : [];
+                                 const newImages = curr.filter((_, i) => i !== idx);
+                                 return { ...prev, images: newImages, imageUrl: newImages[0]?.url || "" };
+                              })}
+                              className="absolute -top-2 -right-2 bg-red-400 text-white w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow-sm text-xs z-10 hover:bg-red-500 hover:scale-110"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+                <div 
+                  className="flex-1 min-h-[160px] border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center bg-white hover:bg-indigo-50/30 hover:border-indigo-300 transition-all relative overflow-hidden group shadow-sm"
+                  onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = "#818cf8"; e.currentTarget.style.background = "#eef2ff"; }}
+                  onDragLeave={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "rgb(249 250 251 / 0.5)"; }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "rgb(249 250 251 / 0.5)";
+                    if (!e.dataTransfer.files) return;
+                    Array.from(e.dataTransfer.files).forEach(file => {
+                      if (file.type.indexOf("image") === -1) return;
                       const reader = new FileReader();
                       reader.onload = (ev) => {
                         const img = new window.Image();
@@ -685,30 +749,63 @@ export function TaskModal({
                           const canvas = document.createElement("canvas");
                           let { width, height } = img;
                           const MAX_DIM = 800;
-                          if (width > height && width > MAX_DIM) {
-                            height *= MAX_DIM / width;
-                            width = MAX_DIM;
-                          } else if (height > MAX_DIM) {
-                            width *= MAX_DIM / height;
-                            height = MAX_DIM;
-                          }
-                          canvas.width = width;
-                          canvas.height = height;
+                          if (width > height && width > MAX_DIM) { height *= MAX_DIM / width; width = MAX_DIM; }
+                          else if (height > MAX_DIM) { width *= MAX_DIM / height; height = MAX_DIM; }
+                          canvas.width = width; canvas.height = height;
                           const ctx = canvas.getContext("2d");
                           ctx?.drawImage(img, 0, 0, width, height);
                           const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
                           setF(prev => ({
-                            ...prev,
-                            imageUrl: compressedBase64,
-                            images: [{ url: compressedBase64, name: file.name, uploadedAt: new Date().toISOString() }]
+                            ...prev, imageUrl: prev.imageUrl || compressedBase64,
+                            images: [...(prev.images || []), { url: compressedBase64, name: file.name, uploadedAt: new Date().toISOString() }]
                           }));
                         };
                         img.src = ev.target?.result as string;
                       };
                       reader.readAsDataURL(file);
+                    });
+                  }}
+                >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                    onChange={(e) => {
+                      if (!e.target.files) return;
+                      Array.from(e.target.files).forEach(file => {
+                        if (file.type.indexOf("image") === -1) return;
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                          const img = new window.Image();
+                          img.onload = () => {
+                            const canvas = document.createElement("canvas");
+                            let { width, height } = img;
+                            const MAX_DIM = 800;
+                            if (width > height && width > MAX_DIM) { height *= MAX_DIM / width; width = MAX_DIM; }
+                            else if (height > MAX_DIM) { width *= MAX_DIM / height; height = MAX_DIM; }
+                            canvas.width = width; canvas.height = height;
+                            const ctx = canvas.getContext("2d");
+                            ctx?.drawImage(img, 0, 0, width, height);
+                            const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+                            setF(prev => ({
+                              ...prev, imageUrl: prev.imageUrl || compressedBase64,
+                              images: [...(prev.images || []), { url: compressedBase64, name: file.name, uploadedAt: new Date().toISOString() }]
+                            }));
+                          };
+                          img.src = ev.target?.result as string;
+                        };
+                        reader.readAsDataURL(file);
+                      });
                     }}
-                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
                   />
+                  <div className="flex flex-col items-center justify-center p-4 text-center pointer-events-none">
+                    <div className="w-10 h-10 mb-2 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-500 group-hover:scale-110 transition-transform">
+                      <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                    </div>
+                    <p className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-1">Paste or Drop Image Here</p>
+                    <p className="text-[10px] text-slate-400">or click to browse</p>
+                  </div>
                 </div>
               </div>
             </div>

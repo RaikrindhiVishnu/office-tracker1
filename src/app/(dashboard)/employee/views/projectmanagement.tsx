@@ -97,13 +97,14 @@ interface DailyTask {
 
 /* ─── CONSTANTS ─── */
 const DEFAULT_COLUMNS: KanbanColumn[] = [
-  { id: "new", label: "New" },
-  { id: "dev_in_progress", label: "dev in progress" },
-  { id: "unit_testing", label: "Unit testing" },
-  { id: "ready_for_qa", label: "Ready for QA" },
-  { id: "testing_in_progress", label: "Testing In Progress" },
-  { id: "reopened", label: "Reopened" },
-  { id: "done", label: "Done" },
+  { id: "new", label: "NEW" },
+  { id: "dev_in_progress", label: "DEV IN PROGRESS" },
+  { id: "unit_testing", label: "UNIT TESTING" },
+  { id: "ready_for_qa", label: "READY FOR QA" },
+  { id: "testing_in_progress", label: "TESTING IN PROGRESS" },
+  { id: "reopened", label: "REOPENED" },
+  { id: "done", label: "DONE" },
+  { id: "r_and_d", label: "R & D" },
 ];
 
 const PRIORITY_CONFIG: Record<string, { color: string; bg: string; icon: string }> = {
@@ -966,6 +967,50 @@ function TaskModal({
   };
   const removeChild = (idx: number) => setChildTickets(prev => prev.filter((_, i) => i !== idx));
 
+  useEffect(() => {
+    if (!open || form.ticketType !== "bug") return;
+    const handleGlobalPaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf("image") !== -1) {
+          const file = items[i].getAsFile();
+          if (!file) continue;
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const img = new window.Image();
+            img.onload = () => {
+              const canvas = document.createElement("canvas");
+              let { width, height } = img;
+              const MAX_DIM = 800;
+              if (width > height && width > MAX_DIM) {
+                height *= MAX_DIM / width;
+                width = MAX_DIM;
+              } else if (height > MAX_DIM) {
+                width *= MAX_DIM / height;
+                height = MAX_DIM;
+              }
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext("2d");
+              ctx?.drawImage(img, 0, 0, width, height);
+              const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+              setForm(f => ({
+                ...f,
+                imageUrl: f.imageUrl || compressedBase64,
+                images: [...(f.images || []), { url: compressedBase64, name: file.name || "Pasted Image", uploadedAt: new Date().toISOString() }]
+              }));
+            };
+            img.src = ev.target?.result as string;
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+    };
+    window.addEventListener("paste", handleGlobalPaste);
+    return () => window.removeEventListener("paste", handleGlobalPaste);
+  }, [open, form.ticketType]);
+
   const isStory = form.ticketType === "story";
   const tc = TICKET_TYPES[form.ticketType || "task"];
 
@@ -1057,30 +1102,50 @@ function TaskModal({
           {/* Bug Image Upload */}
           {form.ticketType === "bug" && (
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Bug Screenshot</label>
-              <div className="flex flex-col gap-3">
-                {(form.imageUrl || (form.images && form.images.length > 0)) && (
-                  <div className="relative group self-start">
-                    <img 
-                      src={form.imageUrl || form.images?.[0]?.url} 
-                      alt="Bug screenshot" 
-                      className="h-32 w-auto object-cover rounded-xl border border-gray-200 shadow-sm"
-                    />
-                    <button
-                      onClick={() => setForm(f => ({ ...f, imageUrl: "", images: [] }))}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow-md"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
-                <div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Bug Screenshot</label>
+              </div>
+              <div className="flex gap-4 items-stretch">
+                {(() => {
+                  const displayImages = form.images?.length ? form.images : form.imageUrl ? [{url: form.imageUrl, name: "Screenshot"}] : [];
+                  if (displayImages.length === 0) return null;
+                  return (
+                    <div className="w-1/3 min-w-[180px] border border-gray-100 rounded-2xl p-3 bg-white shadow-sm flex flex-col max-h-[160px] overflow-y-auto custom-scrollbar">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 shrink-0">Images ({displayImages.length})</span>
+                      <div className="flex flex-col gap-2">
+                        {displayImages.map((img, idx) => (
+                          <div key={idx} className="relative group shrink-0 h-20">
+                            <img 
+                              src={img.url} 
+                              alt={`Screenshot ${idx + 1}`} 
+                              className="w-full h-full object-cover rounded-xl border border-gray-100"
+                            />
+                            <button
+                              onClick={() => setForm(f => {
+                                 const curr = f.images?.length ? f.images : f.imageUrl ? [{url: f.imageUrl, name: "Screenshot"}] : [];
+                                 const newImages = curr.filter((_, i) => i !== idx);
+                                 return { ...f, images: newImages, imageUrl: newImages[0]?.url || "" };
+                              })}
+                              className="absolute -top-2 -right-2 bg-red-400 text-white w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow-sm text-xs z-10 hover:bg-red-500 hover:scale-110"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+                <div 
+                  className="flex-1 min-h-[160px] border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center bg-white hover:bg-indigo-50/30 hover:border-indigo-300 transition-all relative overflow-hidden group shadow-sm"
+                  onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = "#818cf8"; e.currentTarget.style.background = "#eef2ff"; }}
+                  onDragLeave={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "rgb(249 250 251 / 0.5)"; }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "rgb(249 250 251 / 0.5)";
+                    if (!e.dataTransfer.files) return;
+                    Array.from(e.dataTransfer.files).forEach(file => {
+                      if (file.type.indexOf("image") === -1) return;
                       const reader = new FileReader();
                       reader.onload = (ev) => {
                         const img = new window.Image();
@@ -1088,30 +1153,63 @@ function TaskModal({
                           const canvas = document.createElement("canvas");
                           let { width, height } = img;
                           const MAX_DIM = 800;
-                          if (width > height && width > MAX_DIM) {
-                            height *= MAX_DIM / width;
-                            width = MAX_DIM;
-                          } else if (height > MAX_DIM) {
-                            width *= MAX_DIM / height;
-                            height = MAX_DIM;
-                          }
-                          canvas.width = width;
-                          canvas.height = height;
+                          if (width > height && width > MAX_DIM) { height *= MAX_DIM / width; width = MAX_DIM; }
+                          else if (height > MAX_DIM) { width *= MAX_DIM / height; height = MAX_DIM; }
+                          canvas.width = width; canvas.height = height;
                           const ctx = canvas.getContext("2d");
                           ctx?.drawImage(img, 0, 0, width, height);
                           const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
                           setForm(f => ({
-                            ...f,
-                            imageUrl: compressedBase64,
-                            images: [{ url: compressedBase64, name: file.name, uploadedAt: new Date().toISOString() }]
+                            ...f, imageUrl: f.imageUrl || compressedBase64,
+                            images: [...(f.images || []), { url: compressedBase64, name: file.name, uploadedAt: new Date().toISOString() }]
                           }));
                         };
                         img.src = ev.target?.result as string;
                       };
                       reader.readAsDataURL(file);
+                    });
+                  }}
+                >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                    onChange={(e) => {
+                      if (!e.target.files) return;
+                      Array.from(e.target.files).forEach(file => {
+                        if (file.type.indexOf("image") === -1) return;
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                          const img = new window.Image();
+                          img.onload = () => {
+                            const canvas = document.createElement("canvas");
+                            let { width, height } = img;
+                            const MAX_DIM = 800;
+                            if (width > height && width > MAX_DIM) { height *= MAX_DIM / width; width = MAX_DIM; }
+                            else if (height > MAX_DIM) { width *= MAX_DIM / height; height = MAX_DIM; }
+                            canvas.width = width; canvas.height = height;
+                            const ctx = canvas.getContext("2d");
+                            ctx?.drawImage(img, 0, 0, width, height);
+                            const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+                            setForm(f => ({
+                              ...f, imageUrl: f.imageUrl || compressedBase64,
+                              images: [...(f.images || []), { url: compressedBase64, name: file.name, uploadedAt: new Date().toISOString() }]
+                            }));
+                          };
+                          img.src = ev.target?.result as string;
+                        };
+                        reader.readAsDataURL(file);
+                      });
                     }}
-                    className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 file:mr-4 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
                   />
+                  <div className="flex flex-col items-center justify-center p-4 text-center pointer-events-none">
+                    <div className="w-10 h-10 mb-2 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-500 group-hover:scale-110 transition-transform">
+                      <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                    </div>
+                    <p className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-1">Paste or Drop Image Here</p>
+                    <p className="text-[10px] text-slate-400">or click to browse</p>
+                  </div>
                 </div>
               </div>
             </div>
