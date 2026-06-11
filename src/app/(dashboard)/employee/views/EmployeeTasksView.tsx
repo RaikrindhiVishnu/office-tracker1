@@ -217,7 +217,7 @@ export default function EmployeeTasksView({ user }: { user: any }) {
                     }`}
                   >
                     <div className={`w-1.5 h-1.5 rounded-full ${isCompleted ? "bg-green-500" : isWorking ? "bg-orange-500" : "bg-blue-500"}`}></div>
-                    {{
+                    {( {
                                 new: "New",
                                 dev_in_progress: "Dev In Progress",
                                 unit_testing: "Unit Testing",
@@ -227,7 +227,7 @@ export default function EmployeeTasksView({ user }: { user: any }) {
                                 done: "Done",
                                 r_and_d: "R & D",
                                 Completed: "Done"
-                              }[t.status] || t.status || 'New'}
+                              } as Record<string, string> )[t.status as string] || (t.status as string) || 'New'}
                   </div>
                 </td>
 

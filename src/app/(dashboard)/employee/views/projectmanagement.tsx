@@ -1122,7 +1122,7 @@ function TaskModal({
                             />
                             <button
                               onClick={() => setForm(f => {
-                                 const curr = f.images?.length ? f.images : f.imageUrl ? [{url: f.imageUrl, name: "Screenshot"}] : [];
+                                 const curr = f.images?.length ? f.images : f.imageUrl ? [{url: f.imageUrl, name: "Screenshot", uploadedAt: new Date().toISOString()}] : [];
                                  const newImages = curr.filter((_, i) => i !== idx);
                                  return { ...f, images: newImages, imageUrl: newImages[0]?.url || "" };
                               })}

@@ -718,7 +718,7 @@ export function TaskModal({
                             />
                             <button
                               onClick={() => setF(prev => {
-                                 const curr = prev.images?.length ? prev.images : prev.imageUrl ? [{url: prev.imageUrl, name: "Screenshot"}] : [];
+                                 const curr = prev.images?.length ? prev.images : prev.imageUrl ? [{url: prev.imageUrl, name: "Screenshot", uploadedAt: new Date().toISOString()}] : [];
                                  const newImages = curr.filter((_, i) => i !== idx);
                                  return { ...prev, images: newImages, imageUrl: newImages[0]?.url || "" };
                               })}

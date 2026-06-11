@@ -492,7 +492,7 @@ export default function TeamTasksView({ user }: { user: any }) {
                         <td className="px-3 py-3">
                           <div className="flex items-center justify-center gap-2">
                             <span className="text-[13px] font-medium text-slate-700">
-                              {{
+                              {( {
                                 new: "New",
                                 dev_in_progress: "Dev In Progress",
                                 unit_testing: "Unit Testing",
@@ -502,7 +502,7 @@ export default function TeamTasksView({ user }: { user: any }) {
                                 done: "Done",
                                 r_and_d: "R & D",
                                 Completed: "Done"
-                              }[t.status] || t.status || 'New'}
+                              } as Record<string, string> )[t.status as string] || (t.status as string) || 'New'}
                             </span>
                           </div>
                         </td>
