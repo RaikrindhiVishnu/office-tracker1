@@ -12,6 +12,27 @@ function today(): string {
   return new Date().toISOString().split("T")[0];
 }
 
+/** 
+ * Gets bounded minutes between 10:00 AM and 7:00 PM.
+ * If time is completely outside this window, returns 0.
+ */
+export function getBoundedMinutes(startTs: Timestamp, endTs: Timestamp): number {
+  const start = startTs.toDate();
+  const end = endTs.toDate();
+  
+  const boundaryStart = new Date(start);
+  boundaryStart.setHours(10, 0, 0, 0);
+
+  const boundaryEnd = new Date(start);
+  boundaryEnd.setHours(19, 0, 0, 0);
+
+  const effectiveStart = new Date(Math.max(start.getTime(), boundaryStart.getTime()));
+  const effectiveEnd = new Date(Math.min(end.getTime(), boundaryEnd.getTime()));
+
+  if (effectiveEnd <= effectiveStart) return 0;
+  return Math.floor((effectiveEnd.getTime() - effectiveStart.getTime()) / 60000);
+}
+
 /** Get today's attendance */
 export async function getTodayAttendance(userId: string) {
   const id = `${userId}_${today()}`;
@@ -88,9 +109,7 @@ export async function checkOut(userId: string) {
   }
 
   const now = Timestamp.now();
-  const durationMinutes = Math.floor(
-    (now.toMillis() - last.checkIn.toMillis()) / 60000
-  );
+  const durationMinutes = getBoundedMinutes(last.checkIn, now);
 
   last.checkOut = now;
   last.durationMinutes = durationMinutes;

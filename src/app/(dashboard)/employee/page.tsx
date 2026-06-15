@@ -50,6 +50,21 @@ import TeamTasksView from "./views/TeamTasksView";
 // ── IMPORT MeetChat overlay ──────────────────────────────
 // Change this path to wherever your MeetChatAppUpdated file lives
 import MeetChatAppUpdated from "@/components/MeetChatAppUpdated";
+import {
+  LayoutGrid,
+  Users,
+  FileCheck,
+  ClipboardList,
+  Calendar,
+  Clock,
+  Folder,
+  Receipt,
+  Palmtree,
+  User,
+  HelpCircle,
+  Settings,
+  LogOut
+} from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────
 type ViewType =
@@ -114,18 +129,18 @@ const isHoliday = (dateStr: string): { title: string } | null => {
   return holiday ? { title: holiday.title } : null;
 };
 
-const getSidebarItems = (isLead: boolean): [ViewType, string, string][] => [
-  ["dashboard", "Dashboard", "📊"],
-  ...(isLead ? [["team", "Team Tasks", "👥"] as [ViewType, string, string]] : []),
-  ["tasks", "My Tasks", "✅"],
-  ["work-update", "Work Update", "📝"],
-  ["daily-sheet", "Time Sheet", "📅"],
-  ["attendance", "Attendance", "⏰"],
-  ["projects", "Projects", "📁"],
-  ["payslips", "Payslips", "💰"],
-  ["leave-request", "Apply Leave", "📋"],
-  ["profile", "Profile", "👤"],
-  ["help", "Help", "❓"],
+const getSidebarItems = (isLead: boolean): [ViewType, string, React.ReactNode][] => [
+  ["dashboard", "Dashboard", <LayoutGrid key="dashboard" className="w-5 h-5" />],
+  ...(isLead ? [["team", "Team Tasks", <Users key="team" className="w-5 h-5" />] as [ViewType, string, React.ReactNode]] : []),
+  ["tasks", "My Tasks", <FileCheck key="tasks" className="w-5 h-5" />],
+  ["work-update", "Work Update", <ClipboardList key="work-update" className="w-5 h-5" />],
+  ["daily-sheet", "Time Sheet", <Calendar key="daily-sheet" className="w-5 h-5" />],
+  ["attendance", "Attendance", <Clock key="attendance" className="w-5 h-5" />],
+  ["projects", "Projects", <Folder key="projects" className="w-5 h-5" />],
+  ["payslips", "Payslips", <Receipt key="payslips" className="w-5 h-5" />],
+  ["leave-request", "Apply Leave", <Palmtree key="leave-request" className="w-5 h-5" />],
+  ["profile", "Profile", <User key="profile" className="w-5 h-5" />],
+  ["help", "Help", <HelpCircle key="help" className="w-5 h-5" />],
 ];
 
 // ── Notification Dropdown ─────────────────────────────────
@@ -272,12 +287,19 @@ export default function ZohoStyleEmployeeDashboard() {
     const calc = () => {
       let s = 0;
       attendance.sessions.forEach((sess: any) => {
-        const ci = sess.checkIn?.toDate()?.getTime();
-        if (!ci) return;
+        if (!sess.checkIn) return;
+        const checkInDate = sess.checkIn.toDate();
+        const shiftStart = new Date(checkInDate); shiftStart.setHours(10, 0, 0, 0);
+        const shiftEnd = new Date(checkInDate); shiftEnd.setHours(19, 0, 0, 0);
+
+        let ci = Math.max(checkInDate.getTime(), shiftStart.getTime());
         const now = new Date();
-        const shiftEnd = new Date(); shiftEnd.setHours(19, 0, 0, 0);
+
         let co = sess.checkOut ? sess.checkOut.toDate().getTime() : Math.min(now.getTime(), shiftEnd.getTime());
-        if (activeBreak?.startTime && !sess.checkOut) co = activeBreak.startTime.toDate().getTime();
+        if (activeBreak?.startTime && !sess.checkOut) co = Math.min(activeBreak.startTime.toDate().getTime(), shiftEnd.getTime());
+
+        co = Math.min(co, shiftEnd.getTime());
+
         if (co > ci) {
           let sessionSeconds = Math.floor((co - ci) / 1000);
           const totalBreakSeconds = todayBreaks.reduce((acc: number, b: Break) => {
@@ -349,8 +371,8 @@ export default function ZohoStyleEmployeeDashboard() {
     if (!user) return;
     return onSnapshot(
       query(
-        collection(db, "employeeQueries"), 
-        where("employeeId", "==", user.uid), 
+        collection(db, "employeeQueries"),
+        where("employeeId", "==", user.uid),
         orderBy("createdAt", "desc")
       ),
       snap => setQueryNotifications(
@@ -461,7 +483,7 @@ export default function ZohoStyleEmployeeDashboard() {
         status: "pending", adminReply: "", employeeUnread: false, adminUnread: true, createdAt: serverTimestamp(),
       });
       setQueryMsg("✅ Query submitted successfully"); setQuerySubject(""); setQueryMessage("");
-      
+
       // Notify admins
       try {
         const adminsSnapshot = await getDocs(query(collection(db, "users"), where("accountType", "==", "ADMIN")));
@@ -476,7 +498,7 @@ export default function ZohoStyleEmployeeDashboard() {
           }
         }
       } catch (err) { console.error("Failed to notify admins of query", err); }
-      
+
     } catch (error) { setQueryMsg("❌ Failed to submit query"); console.error(error); }
     finally { setQuerySubmitting(false); }
   };
@@ -543,50 +565,48 @@ export default function ZohoStyleEmployeeDashboard() {
     <div className="h-screen flex bg-white overflow-hidden">
 
       {/* ── SIDEBAR ── */}
-      <aside className={`fixed lg:static inset-y-0 left-0 z-50 bg-[#1a2e45] text-white flex flex-col transform transition-all duration-300 ${sidebarCollapsed ? "lg:w-16 w-52 lg:opacity-100 lg:translate-x-0" : "w-52 lg:opacity-100 lg:translate-x-0"} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
-        <div className={`p-4 flex items-center justify-between border-b border-white/10 ${sidebarCollapsed && !mobileMenuOpen ? "w-16 justify-center px-0" : "w-52"}`}>
+      <aside className={`fixed lg:static inset-y-0 left-0 z-50 bg-[#282B3E] text-white flex flex-col transform transition-all duration-300 ${sidebarCollapsed ? "lg:w-16 w-52 lg:opacity-100 lg:translate-x-0" : "w-52 lg:opacity-100 lg:translate-x-0"} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+        <div className={`h-[88px] px-4 flex items-center justify-between border-b border-white/10 ${sidebarCollapsed && !mobileMenuOpen ? "w-16 justify-center px-0" : "w-52"}`}>
           {(!sidebarCollapsed || mobileMenuOpen) && (
             <div className="flex items-center gap-2 ml-2">
-              <Image src="/logo.svg" alt="TGY CRM Logo" width={90} height={70} className="object-contain" />
+              <Image src="/logo.svg" alt="TGY CRM Logo" width={90} height={40} className="object-contain invert brightness-0" />
             </div>
           )}
-          <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="hidden lg:block p-2 hover:bg-white/10 rounded-lg transition">
+          <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="hidden lg:block p-2 hover:bg-white/10 rounded-lg transition text-white">
             <svg className={`w-5 h-5 transition-transform ${sidebarCollapsed ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
             </svg>
           </button>
-          <button onClick={() => setMobileMenuOpen(false)} className="lg:hidden p-2 hover:bg-white/10 rounded-lg">×</button>
+          <button onClick={() => setMobileMenuOpen(false)} className="lg:hidden p-2 hover:bg-white/10 rounded-lg text-white">×</button>
         </div>
-
-        <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <nav className="flex-1 px-3 py-4 space-y-2 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {getSidebarItems(userData?.accountType === "LEAD" || userData?.role === "lead").map(([id, label, icon]) => (
             <button key={id} onClick={() => { changeView(id); setMobileMenuOpen(false); }}
-              className={`w-full flex items-center ${sidebarCollapsed && !mobileMenuOpen ? "justify-center px-0 py-3.5" : "gap-3 px-3 py-2"} rounded-lg transition-all duration-150 relative group ${activeView === id ? "bg-white/20 text-white shadow-sm border border-white/20" : "text-white/75 hover:bg-white/8 hover:text-white"
+              className={`w-full flex items-center ${sidebarCollapsed && !mobileMenuOpen ? "justify-center px-0 py-3.5" : "gap-3 px-4 py-3"} rounded-xl transition-all duration-150 relative group ${activeView === id ? "bg-white text-[#282B3E] font-bold" : "text-[#A0B2C6] hover:bg-white/10 hover:text-white font-medium"
                 }`}
               title={(sidebarCollapsed && !mobileMenuOpen) ? label : undefined}
             >
-              {activeView === id && <span className={`absolute left-0 top-1/2 -translate-y-1/2 ${sidebarCollapsed && !mobileMenuOpen ? "w-1.5 h-6 rounded-r-md" : "w-1 h-5 rounded-r-full"} bg-blue-400`} />}
-              <span className={`${sidebarCollapsed && !mobileMenuOpen ? "text-xl drop-shadow-sm" : "text-[15px]"} shrink-0 transition-transform duration-150 ${activeView === id ? (sidebarCollapsed && !mobileMenuOpen ? "scale-110" : "scale-110") : (sidebarCollapsed && !mobileMenuOpen ? "group-hover:scale-110" : "group-hover:scale-105")}`}>{icon}</span>
-              {(!sidebarCollapsed || mobileMenuOpen) && <span className="text-[13px] font-medium truncate">{label}</span>}
+              <span className={`${sidebarCollapsed && !mobileMenuOpen ? "text-xl drop-shadow-sm" : "text-[18px]"} shrink-0 transition-transform duration-150 ${activeView === id ? (sidebarCollapsed && !mobileMenuOpen ? "scale-110" : "scale-110") : (sidebarCollapsed && !mobileMenuOpen ? "group-hover:scale-110" : "group-hover:scale-105")}`}>{icon}</span>
+              {(!sidebarCollapsed || mobileMenuOpen) && <span className="text-[14px] truncate tracking-wide">{label}</span>}
               {id === "notifications" && totalNotifications > 0 && (
                 (sidebarCollapsed && !mobileMenuOpen)
-                  ? <span className="absolute top-2 right-4 w-2 h-2 bg-red-500 rounded-full shadow-sm animate-pulse" />
-                  : <span className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full font-semibold shrink-0">{totalNotifications}</span>
+                  ? <span className="absolute top-2 right-4 w-2 h-2 bg-rose-500 rounded-full shadow-sm animate-pulse" />
+                  : <span className="ml-auto bg-rose-500 text-white text-xs px-1.5 py-0.5 rounded-full font-bold shrink-0">{totalNotifications}</span>
               )}
               {(sidebarCollapsed && !mobileMenuOpen) && (
-                <div className="absolute left-full ml-2 px-2.5 py-1 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 shadow-lg">{label}</div>
+                <div className="absolute left-full ml-3 px-3 py-1.5 bg-gray-900 text-white text-xs font-semibold rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 shadow-xl">{label}</div>
               )}
             </button>
           ))}
         </nav>
         {(!sidebarCollapsed || mobileMenuOpen) ? (
-          <button onClick={async () => { await signOut(auth); router.push("/login"); }} className="mx-3 mb-3 flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 rounded-lg hover:bg-white/20 transition text-sm">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-            <span className="font-medium">Logout</span>
+          <button onClick={async () => { await signOut(auth); router.push("/login"); }} className="mx-4 mb-6 flex items-center justify-center gap-3 px-4 py-3.5 bg-[#31344A] rounded-xl hover:bg-[#3E425C] transition text-[15px] font-semibold text-white">
+            <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+            <span>Logout</span>
           </button>
         ) : (
-          <button onClick={async () => { await signOut(auth); router.push("/login"); }} className="mx-2 mb-3 p-2.5 bg-white/10 rounded-lg hover:bg-white/20 transition flex items-center justify-center" title="Logout">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+          <button onClick={async () => { await signOut(auth); router.push("/login"); }} className="mx-2 mb-6 p-3.5 bg-[#31344A] rounded-xl hover:bg-[#3E425C] transition flex items-center justify-center text-white" title="Logout">
+            <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
           </button>
         )}
       </aside>
@@ -601,21 +621,21 @@ export default function ZohoStyleEmployeeDashboard() {
           <div className="hidden lg:flex items-center justify-between w-full h-full">
             <div className="flex items-center min-w-0 shrink-0">
               <h1 className="text-lg font-bold capitalize flex items-center gap-2 whitespace-nowrap text-gray-900">
-                {getSidebarItems(!!userData?.isLead).find(([key]) => key === activeView)?.[2] ?? "📊"}{" "}
+                {getSidebarItems(!!userData?.isLead).find(([key]) => key === activeView)?.[2] ?? <LayoutGrid className="w-5 h-5" />}{" "}
                 <span>{getSidebarItems(!!userData?.isLead).find(([key]) => key === activeView)?.[1] ?? activeView.replace(/-/g, " ")}</span>
               </h1>
             </div>
             <div className="flex items-center gap-2">
-              <div className="h-8 flex items-center gap-2 bg-amber-50 rounded-lg px-3 border border-amber-200 shadow-sm transition-all">
-                <div className="font-mono font-bold text-xs text-amber-700 flex items-center gap-1.5">
+              <div className="h-8 flex items-center gap-2 bg-[#F0F2F8] rounded-lg px-3 border border-[#E2E6F0] shadow-sm transition-all">
+                <div className="font-mono font-bold text-xs text-[#282B3E] flex items-center gap-1.5">
                   <span className="opacity-70 text-sm">⏱</span><span className="tabular-nums">{formatTimer(totalSeconds)}</span>
                 </div>
               </div>
               <NavbarBreakStatus uid={user.uid} isCheckedIn={!!isCheckedIn} />
               {isCheckedIn ? (
-                <button disabled={busy} onClick={doCheckOut} className="h-8 px-4 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg hover:bg-rose-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-bold text-xs hover:scale-[1.02] active:scale-95 shadow-sm">Check Out</button>
+                <button disabled={busy} onClick={doCheckOut} className="h-8 px-4 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-bold text-xs hover:scale-[1.02] active:scale-95 shadow-sm">Check Out</button>
               ) : (
-                <button disabled={busy} onClick={doCheckIn} className="h-8 px-4 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-bold text-xs hover:scale-[1.02] active:scale-95 shadow-sm">Check In</button>
+                <button disabled={busy} onClick={doCheckIn} className="h-8 px-4 bg-[#282B3E] text-white border border-[#282B3E] rounded-lg hover:bg-[#3E425C] disabled:opacity-40 disabled:cursor-not-allowed transition-all font-bold text-xs hover:scale-[1.02] active:scale-95 shadow-sm">Check In</button>
               )}
               <button onClick={() => setShowCalendar(true)} className="p-2 hover:bg-gray-100 rounded-lg transition-all group relative" title="Calendar">
                 <img src="https://cdn-icons-png.flaticon.com/128/668/668278.png" alt="Calendar" className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" />
@@ -697,10 +717,10 @@ export default function ZohoStyleEmployeeDashboard() {
                         </div>
                       </div>
                       <div className="py-1">
-                        <button onClick={() => { changeView("profile"); setShowUserMenu(false); }} className="w-full text-left px-3 py-2.5 text-gray-700 hover:bg-blue-50 flex items-center gap-2.5 group text-sm"><span className="text-lg group-hover:scale-110 transition-transform">👤</span><span className="font-medium">Profile</span></button>
-                        <button onClick={() => { changeView("settings"); setShowUserMenu(false); }} className="w-full text-left px-3 py-2.5 text-gray-700 hover:bg-blue-50 flex items-center gap-2.5 group text-sm"><span className="text-lg group-hover:scale-110 transition-transform">⚙️</span><span className="font-medium">Settings</span></button>
+                        <button onClick={() => { changeView("profile"); setShowUserMenu(false); }} className="w-full text-left px-3 py-2.5 text-gray-700 hover:bg-blue-50 flex items-center gap-2.5 group text-sm"><User className="w-4 h-4 group-hover:scale-110 transition-transform" /><span className="font-medium">Profile</span></button>
+                        <button onClick={() => { changeView("settings"); setShowUserMenu(false); }} className="w-full text-left px-3 py-2.5 text-gray-700 hover:bg-blue-50 flex items-center gap-2.5 group text-sm"><Settings className="w-4 h-4 group-hover:scale-110 transition-transform" /><span className="font-medium">Settings</span></button>
                         <hr className="my-1 border-gray-200" />
-                        <button onClick={async () => { await signOut(auth); router.push("/login"); }} className="w-full text-left px-3 py-2.5 text-red-600 hover:bg-red-50 flex items-center gap-2.5 group text-sm"><span className="text-lg group-hover:scale-110 transition-transform">🚪</span><span className="font-medium">Logout</span></button>
+                        <button onClick={async () => { await signOut(auth); router.push("/login"); }} className="w-full text-left px-3 py-2.5 text-red-600 hover:bg-red-50 flex items-center gap-2.5 group text-sm"><LogOut className="w-4 h-4 group-hover:scale-110 transition-transform" /><span className="font-medium">Logout</span></button>
                       </div>
                     </div>
                   </>
@@ -718,7 +738,10 @@ export default function ZohoStyleEmployeeDashboard() {
                 <button onClick={() => setMobileMenuOpen(true)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-all" aria-label="Open menu">
                   <svg className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
                 </button>
-                <h1 className="text-sm font-bold capitalize truncate max-w-36 text-gray-900">📊 {activeView === "daily-sheet" ? "time sheet" : activeView.replace(/-/g, " ")}</h1>
+                <h1 className="text-sm font-bold capitalize flex items-center gap-2 truncate max-w-36 text-gray-900">
+                  {getSidebarItems(!!userData?.isLead).find(([key]) => key === activeView)?.[2] ?? <LayoutGrid className="w-5 h-5" />}
+                  <span>{getSidebarItems(!!userData?.isLead).find(([key]) => key === activeView)?.[1] ?? activeView.replace(/-/g, " ")}</span>
+                </h1>
               </div>
               <div className="flex items-center gap-1">
                 <div className="relative" ref={mobileNotifDropdownRef}>
@@ -768,10 +791,10 @@ export default function ZohoStyleEmployeeDashboard() {
                     <p className="text-xs text-gray-500 truncate">{user.email}</p>
                   </div>
                   <div className="py-1">
-                    <button onClick={() => { setActiveView("profile"); setShowUserMenu(false); }} className="w-full text-left px-3 py-2 text-gray-700 hover:bg-blue-50 flex items-center gap-2.5 text-sm"><span>👤</span><span>Profile</span></button>
-                    <button onClick={() => { setActiveView("settings"); setShowUserMenu(false); }} className="w-full text-left px-3 py-2 text-gray-700 hover:bg-blue-50 flex items-center gap-2.5 text-sm"><span>⚙️</span><span>Settings</span></button>
+                    <button onClick={() => { setActiveView("profile"); setShowUserMenu(false); }} className="w-full text-left px-3 py-2 text-gray-700 hover:bg-blue-50 flex items-center gap-2.5 text-sm"><User className="w-4 h-4" /><span>Profile</span></button>
+                    <button onClick={() => { setActiveView("settings"); setShowUserMenu(false); }} className="w-full text-left px-3 py-2 text-gray-700 hover:bg-blue-50 flex items-center gap-2.5 text-sm"><Settings className="w-4 h-4" /><span>Settings</span></button>
                     <hr className="my-1 border-gray-200" />
-                    <button onClick={async () => { await signOut(auth); router.push("/login"); }} className="w-full text-left px-3 py-2 text-red-600 hover:bg-red-50 flex items-center gap-2.5 text-sm"><span>🚪</span><span>Logout</span></button>
+                    <button onClick={async () => { await signOut(auth); router.push("/login"); }} className="w-full text-left px-3 py-2 text-red-600 hover:bg-red-50 flex items-center gap-2.5 text-sm"><LogOut className="w-4 h-4" /><span>Logout</span></button>
                   </div>
                 </div>
               </>

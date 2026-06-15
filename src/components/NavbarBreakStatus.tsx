@@ -42,26 +42,26 @@ const breakMeta: Record<BreakType, { label: string; icon: React.ReactNode; pillB
   MORNING: {
     label: "Morning Break",
     icon: <FaCoffee />,
-    pillBg: "bg-amber-50 border-amber-200",
-    pillText: "text-amber-700",
-    dotColor: "bg-amber-400",
-    btnGrad: "from-amber-400 to-orange-500",
+    pillBg: "bg-[#F0F2F8] border-[#E2E6F0]",
+    pillText: "text-[#282B3E]",
+    dotColor: "bg-[#282B3E]",
+    btnGrad: "from-[#4A4D64] to-[#282B3E]",
   },
   LUNCH: {
     label: "Lunch Break",
     icon: <FaUtensils />,
-    pillBg: "bg-emerald-50 border-emerald-200",
-    pillText: "text-emerald-700",
-    dotColor: "bg-emerald-400",
-    btnGrad: "from-emerald-400 to-teal-500",
+    pillBg: "bg-[#F0F2F8] border-[#E2E6F0]",
+    pillText: "text-[#282B3E]",
+    dotColor: "bg-[#282B3E]",
+    btnGrad: "from-[#4A4D64] to-[#282B3E]",
   },
   EVENING: {
     label: "Evening Break",
     icon: <FaCloudMoon />,
-    pillBg: "bg-violet-50 border-violet-200",
-    pillText: "text-violet-700",
-    dotColor: "bg-violet-400",
-    btnGrad: "from-violet-400 to-purple-600",
+    pillBg: "bg-[#F0F2F8] border-[#E2E6F0]",
+    pillText: "text-[#282B3E]",
+    dotColor: "bg-[#282B3E]",
+    btnGrad: "from-[#4A4D64] to-[#282B3E]",
   },
 };
 
@@ -172,9 +172,9 @@ export default function NavbarBreakStatus({
       }
     : isCheckedIn
     ? {
-        bg: "bg-emerald-50 border-emerald-200",
-        text: "text-emerald-700",
-        dot: "bg-green-400",
+        bg: "bg-[#F0F2F8] border-[#E2E6F0]",
+        text: "text-[#282B3E]",
+        dot: "bg-[#34C759] animate-pulse",
         label: "Working",
         timer: null,
       }

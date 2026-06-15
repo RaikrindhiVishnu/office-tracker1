@@ -124,7 +124,15 @@ export default function DailySheetView() {
           const last = sessions[sessions.length - 1];
           let addedMins = 0;
           if (!last.checkOut) {
-            if (data.date === getTodayDateStr()) addedMins = Math.floor((Date.now() - last.checkIn.toMillis()) / 60000);
+            if (data.date === getTodayDateStr()) {
+              const start = last.checkIn.toDate();
+              const end = new Date();
+              const bStart = new Date(start); bStart.setHours(10, 0, 0, 0);
+              const bEnd = new Date(start); bEnd.setHours(19, 0, 0, 0);
+              const effStart = new Date(Math.max(start.getTime(), bStart.getTime()));
+              const effEnd = new Date(Math.min(end.getTime(), bEnd.getTime()));
+              if (effEnd > effStart) addedMins = Math.floor((effEnd.getTime() - effStart.getTime()) / 60000);
+            }
             else addedMins = Math.max(0, 9 * 60 - data.totalMinutes);
           }
           attMap[data.date] = {
@@ -187,7 +195,7 @@ export default function DailySheetView() {
   // ── Analytics (Charts) ─────────────────────────────────────
   const projectHrs = React.useMemo(() => {
     const map: Record<string, number> = {};
-    monthEntries.forEach((e) => { if(e.project) map[e.project] = (map[e.project] || 0) + (e.hours || 0); });
+    monthEntries.forEach((e) => { if (e.project) map[e.project] = (map[e.project] || 0) + (e.hours || 0); });
     const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 4);
     const maxVal = sorted[0]?.[1] || 1;
     const colors = ["bg-emerald-500", "bg-indigo-500", "bg-amber-400", "bg-rose-400"];
@@ -200,10 +208,10 @@ export default function DailySheetView() {
     const projects = new Set(monthEntries.filter(e => e.project).map(e => e.project));
     const tasksCount = monthEntries.length;
     const hoursCount = monthEntries.reduce((acc, e) => acc + (e.hours || 0), 0);
-    
+
     // Normalize heights but ensure they are visible
     const maxVal = Math.max(1, projects.size, tasksCount, hoursCount);
-    
+
     return [
       { label: "Projects", value: projects.size, suffix: "", color: "bg-fuchsia-500", pct: Math.max(8, Math.round((projects.size / maxVal) * 100)) },
       { label: "Tasks", value: tasksCount, suffix: "", color: "bg-indigo-500", pct: Math.max(8, Math.round((tasksCount / maxVal) * 100)) },
@@ -250,7 +258,7 @@ export default function DailySheetView() {
   const handleEdit = (entry: DailySheetEntry) => {
     setEditingId(entry.id!);
     setEntryDate(entry.dateStr);
-    
+
     // If the project isn't in the list, we set it as "Other" and pre-fill custom
     const isKnownProject = projects.some(p => p.name === entry.project);
     if (entry.project && !isKnownProject) {
@@ -291,7 +299,15 @@ export default function DailySheetView() {
             checkOutStr = fmt(sessions[sessions.length - 1].checkOut);
             let addedMins = 0;
             if (!sessions[sessions.length - 1].checkOut) {
-              if (data.date === getTodayDateStr()) addedMins = Math.floor((Date.now() - sessions[sessions.length - 1].checkIn.toMillis()) / 60000);
+              if (data.date === getTodayDateStr()) {
+                const start = sessions[sessions.length - 1].checkIn.toDate();
+                const end = new Date();
+                const bStart = new Date(start); bStart.setHours(10, 0, 0, 0);
+                const bEnd = new Date(start); bEnd.setHours(19, 0, 0, 0);
+                const effStart = new Date(Math.max(start.getTime(), bStart.getTime()));
+                const effEnd = new Date(Math.min(end.getTime(), bEnd.getTime()));
+                if (effEnd > effStart) addedMins = Math.floor((effEnd.getTime() - effStart.getTime()) / 60000);
+              }
               else addedMins = Math.max(0, 9 * 60 - data.totalMinutes);
             }
             totalSysHours = Number(((data.totalMinutes + addedMins) / 60).toFixed(2));
@@ -351,12 +367,12 @@ export default function DailySheetView() {
           <h2 className="text-white text-xl font-extrabold leading-tight tracking-tight drop-shadow-lg">My Time Sheets</h2>
           <p className="text-slate-300 text-xs mt-1.5 leading-relaxed">Log your tasks, track your hours, and review your personal performance.</p>
           <div className="mt-4 flex items-center gap-2">
-             <div className="px-3 py-1 bg-white/10 backdrop-blur border border-white/20 rounded-lg text-white text-xs font-semibold">
-               {monthLabel}
-             </div>
-             <div className="px-3 py-1 bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-sm">
-               {monthEntries.length} tasks logged
-             </div>
+            <div className="px-3 py-1 bg-white/10 backdrop-blur border border-white/20 rounded-lg text-white text-xs font-semibold">
+              {monthLabel}
+            </div>
+            <div className="px-3 py-1 bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-sm">
+              {monthEntries.length} tasks logged
+            </div>
           </div>
         </div>
       </div>
@@ -433,11 +449,11 @@ export default function DailySheetView() {
         <div className="flex items-center gap-4 text-xs text-slate-500">
           <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-1 py-1">
             <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-white rounded transition text-slate-500 hover:text-slate-800">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             </button>
-            <input type="month" value={selectedMonth} onChange={(e) => { setSelectedMonth(e.target.value); setSelectedIds(new Set()); }} className="text-xs font-semibold text-slate-700 bg-transparent outline-none cursor-pointer px-1"/>
+            <input type="month" value={selectedMonth} onChange={(e) => { setSelectedMonth(e.target.value); setSelectedIds(new Set()); }} className="text-xs font-semibold text-slate-700 bg-transparent outline-none cursor-pointer px-1" />
             <button onClick={() => changeMonth(1)} className="p-1 hover:bg-white rounded transition text-slate-500 hover:text-slate-800">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
             </button>
           </div>
           {selectedIds.size > 0 && <span className="text-indigo-600 font-semibold">{selectedIds.size} selected</span>}
@@ -458,24 +474,24 @@ export default function DailySheetView() {
               Delete ({selectedIds.size})
             </button>
           )}
-            <button
-              onClick={exportToExcel}
-              className="flex items-center gap-2 px-4 py-1.5 bg-[#1a8a5a] text-white text-sm font-bold rounded-lg hover:bg-[#157a50] transition shadow-sm"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Export
-            </button>
-            <button
-              onClick={() => {
-                resetForm();
-                const todayMonth = todayStr.substring(0, 7);
-                setEntryDate(todayMonth === selectedMonth ? todayStr : `${selectedMonth}-01`);
-                setIsModalOpen(true);
-              }}
-              className="flex items-center gap-2 px-4 py-1.5 bg-[#1a2e45] text-white text-sm font-bold rounded-lg hover:bg-[#0f1b29] transition shadow-sm"
-            >
+          <button
+            onClick={exportToExcel}
+            className="flex items-center gap-2 px-4 py-1.5 bg-[#1a8a5a] text-white text-sm font-bold rounded-lg hover:bg-[#157a50] transition shadow-sm"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Export
+          </button>
+          <button
+            onClick={() => {
+              resetForm();
+              const todayMonth = todayStr.substring(0, 7);
+              setEntryDate(todayMonth === selectedMonth ? todayStr : `${selectedMonth}-01`);
+              setIsModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-1.5 bg-[#1a2e45] text-white text-sm font-bold rounded-lg hover:bg-[#0f1b29] transition shadow-sm"
+          >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
@@ -543,13 +559,12 @@ export default function DailySheetView() {
                         return (
                           <tr
                             key={e.id}
-                            className={`border-b border-slate-100 transition-colors ${
-                              isSelected
+                            className={`border-b border-slate-100 transition-colors ${isSelected
                                 ? "bg-indigo-50"
                                 : idx % 2 === 0
-                                ? "bg-white hover:bg-slate-50"
-                                : "bg-[#fafbfc] hover:bg-slate-50"
-                            }`}
+                                  ? "bg-white hover:bg-slate-50"
+                                  : "bg-[#fafbfc] hover:bg-slate-50"
+                              }`}
                           >
                             <td className="px-4 py-3">
                               <input

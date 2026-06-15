@@ -15,7 +15,7 @@ function initials(name: string) {
   return name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 }
 function avatarColor(name: string) {
-  const colors = ["bg-violet-500","bg-indigo-500","bg-sky-500","bg-emerald-500","bg-rose-500","bg-amber-500","bg-pink-500"];
+  const colors = ["bg-violet-500", "bg-indigo-500", "bg-sky-500", "bg-emerald-500", "bg-rose-500", "bg-amber-500", "bg-pink-500"];
   let h = 0;
   for (const c of name) h = (h * 31 + c.charCodeAt(0)) % colors.length;
   return colors[h];
@@ -75,8 +75,8 @@ function EmployeePerformanceChart({ data }: { data: { label: string; pct: number
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
   return (
     <span className="flex flex-col gap-px ml-0.5">
-      <svg className={`w-2 h-2 ${active && dir === "asc" ? "text-indigo-600" : "opacity-30"}`} viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5-5 5 5H7z"/></svg>
-      <svg className={`w-2 h-2 ${active && dir === "desc" ? "text-indigo-600" : "opacity-30"}`} viewBox="0 0 24 24" fill="currentColor"><path d="M7 14l5 5 5-5H7z"/></svg>
+      <svg className={`w-2 h-2 ${active && dir === "asc" ? "text-indigo-600" : "opacity-30"}`} viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5-5 5 5H7z" /></svg>
+      <svg className={`w-2 h-2 ${active && dir === "desc" ? "text-indigo-600" : "opacity-30"}`} viewBox="0 0 24 24" fill="currentColor"><path d="M7 14l5 5 5-5H7z" /></svg>
     </span>
   );
 }
@@ -150,9 +150,9 @@ export default function AdminDailySheetsView() {
             let add = 0;
             if (!last.checkOut) {
               const ds = key.split("_").slice(1).join("_");
-              add = ds === todayStr ? Math.floor((Date.now() - last.checkIn.toMillis()) / 60000) : Math.max(0, 9*60-(att.totalMinutes||0));
+              add = ds === todayStr ? Math.floor((Date.now() - last.checkIn.toMillis()) / 60000) : Math.max(0, 9 * 60 - (att.totalMinutes || 0));
             }
-            map[key] = { in: fmt(first.checkIn), out: last.checkOut ? fmt(last.checkOut) : "--:--", sys: `${Number(((att.totalMinutes||0)+add)/60).toFixed(1)}h` };
+            map[key] = { in: fmt(first.checkIn), out: last.checkOut ? fmt(last.checkOut) : "--:--", sys: `${Number(((att.totalMinutes || 0) + add) / 60).toFixed(1)}h` };
           }
         }
       }));
@@ -210,9 +210,9 @@ export default function AdminDailySheetsView() {
       switch (sortKey) {
         case "name": return dir * empName(a.uid).localeCompare(empName(b.uid));
         case "date": return dir * a.dateStr.localeCompare(b.dateStr);
-        case "in":   return dir * (attA?.in ?? "").localeCompare(attB?.in ?? "");
-        case "out":  return dir * (attA?.out ?? "").localeCompare(attB?.out ?? "");
-        case "sys":  return dir * parseFloat(attA?.sys ?? "0") - dir * parseFloat(attB?.sys ?? "0");
+        case "in": return dir * (attA?.in ?? "").localeCompare(attB?.in ?? "");
+        case "out": return dir * (attA?.out ?? "").localeCompare(attB?.out ?? "");
+        case "sys": return dir * parseFloat(attA?.sys ?? "0") - dir * parseFloat(attB?.sys ?? "0");
         case "task": return dir * a.taskTitle.localeCompare(b.taskTitle);
         case "status": return dir * (a.status ?? "").localeCompare(b.status ?? "");
         case "hours": return dir * ((a.hours || 0) - (b.hours || 0));
@@ -262,14 +262,14 @@ export default function AdminDailySheetsView() {
 
   // ── Column definitions ────────────────────────────────────────────────────
   const cols: { label: string; key: SortKey; cls: string }[] = [
-    { label: "NAME",     key: "name",   cls: "min-w-[160px]" },
-    { label: "IN",       key: "in",     cls: "w-20" },
-    { label: "OUT",      key: "out",    cls: "w-20" },
-    { label: "SYS HRS",  key: "sys",    cls: "w-24" },
+    { label: "NAME", key: "name", cls: "min-w-[160px]" },
+    { label: "IN", key: "in", cls: "w-20" },
+    { label: "OUT", key: "out", cls: "w-20" },
+    { label: "SYS HRS", key: "sys", cls: "w-24" },
     { label: "TASK TITLE", key: "task", cls: "min-w-[160px]" },
-    { label: "STATUS",   key: "status", cls: "w-24" },
-    { label: "TASK HRS", key: "hours",  cls: "w-20" },
-    { label: "STATE",    key: "state",  cls: "w-24" },
+    { label: "STATUS", key: "status", cls: "w-24" },
+    { label: "TASK HRS", key: "hours", cls: "w-20" },
+    { label: "STATE", key: "state", cls: "w-24" },
   ];
 
   return (
@@ -440,7 +440,7 @@ export default function AdminDailySheetsView() {
         {selectedDate && (
           <button onClick={() => setSelectedDate("")}
             className="text-xs text-rose-400 hover:text-rose-600 px-2 py-1 hover:bg-rose-50 rounded-lg transition flex items-center gap-1">
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             Clear
           </button>
         )}
@@ -455,7 +455,7 @@ export default function AdminDailySheetsView() {
           <button onClick={exportToExcel}
             className="flex items-center gap-1.5 px-4 py-1.5 bg-[#1a8a5a] text-white text-xs font-bold rounded-lg hover:bg-[#157a50] active:bg-[#0f5c3a] transition shadow-sm">
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
             Export
           </button>
@@ -466,7 +466,7 @@ export default function AdminDailySheetsView() {
       <div className="mx-6 bg-white border border-slate-200 border-b-0 px-5 py-2.5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 rounded-lg bg-white w-52 focus-within:ring-2 focus-within:ring-indigo-200 transition">
           <svg className="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z"/>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
           </svg>
           <input
             ref={searchRef}
@@ -476,7 +476,7 @@ export default function AdminDailySheetsView() {
           />
           {search && (
             <button onClick={() => setSearch("")} className="text-slate-300 hover:text-slate-500 transition">
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           )}
         </div>
@@ -484,15 +484,15 @@ export default function AdminDailySheetsView() {
           <span>Pager line:</span>
           <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}
             className="border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-700 bg-white outline-none w-16">
-            {[10,25,50,100].map((n) => <option key={n} value={n}>{n}</option>)}
+            {[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
           <span className="text-slate-400">
-            {sorted.length === 0 ? "0" : `${(page-1)*pageSize+1}–${Math.min(page*pageSize, sorted.length)}`} of {sorted.length}
+            {sorted.length === 0 ? "0" : `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, sorted.length)}`} of {sorted.length}
           </span>
           {/* Search focus button */}
           <button onClick={() => searchRef.current?.focus()}
             className="p-1.5 hover:bg-indigo-50 rounded-lg transition text-slate-400 hover:text-indigo-500" title="Focus search">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z"/></svg>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" /></svg>
           </button>
         </div>
       </div>
@@ -525,7 +525,7 @@ export default function AdminDailySheetsView() {
                   <td colSpan={9} className="px-4 py-16 text-center">
                     <div className="flex flex-col items-center gap-2 text-slate-400">
                       <svg className="w-10 h-10 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                       </svg>
                       <p className="text-sm font-medium">No entries found</p>
                       <p className="text-xs">Try adjusting the filters above.</p>
@@ -538,9 +538,9 @@ export default function AdminDailySheetsView() {
                   const att = attendanceMap[`${e.uid}_${e.dateStr}`];
                   return (
                     <tr key={e.id}
-                      className={`border-b border-slate-100 transition-colors ${idx%2===0?"bg-white hover:bg-slate-50":"bg-[#fafbfc] hover:bg-slate-50"}`}>
+                      className={`border-b border-slate-100 transition-colors ${idx % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-[#fafbfc] hover:bg-slate-50"}`}>
                       <td className="px-4 py-2.5">
-                        <input type="checkbox" className="w-4 h-4 rounded border-slate-300 accent-indigo-600 cursor-pointer"/>
+                        <input type="checkbox" className="w-4 h-4 rounded border-slate-300 accent-indigo-600 cursor-pointer" />
                       </td>
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-2">
@@ -587,30 +587,30 @@ export default function AdminDailySheetsView() {
             </span>
             <div className="flex items-center gap-1">
               {[
-                { icon: "M11 19l-7-7 7-7m8 14l-7-7 7-7", fn: () => setPage(1), dis: page===1 },
-                { icon: "M15 19l-7-7 7-7", fn: () => setPage((p) => Math.max(1,p-1)), dis: page===1 },
+                { icon: "M11 19l-7-7 7-7m8 14l-7-7 7-7", fn: () => setPage(1), dis: page === 1 },
+                { icon: "M15 19l-7-7 7-7", fn: () => setPage((p) => Math.max(1, p - 1)), dis: page === 1 },
               ].map((b, i) => (
                 <button key={i} onClick={b.fn} disabled={b.dis}
                   className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-200 disabled:opacity-30 transition">
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={b.icon}/></svg>
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={b.icon} /></svg>
                 </button>
               ))}
-              {Array.from({length: Math.min(5,totalPages)}, (_, i) => {
-                const pg = Math.max(1, Math.min(page-2+i, totalPages-Math.min(4,totalPages-1)+i));
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const pg = Math.max(1, Math.min(page - 2 + i, totalPages - Math.min(4, totalPages - 1) + i));
                 return (
                   <button key={pg} onClick={() => setPage(pg)}
-                    className={`w-8 h-8 rounded-lg text-xs font-semibold transition ${pg===page?"bg-[#1a2e45] text-white":"text-slate-500 hover:bg-slate-200"}`}>
+                    className={`w-8 h-8 rounded-lg text-xs font-semibold transition ${pg === page ? "bg-[#1a2e45] text-white" : "text-slate-500 hover:bg-slate-200"}`}>
                     {pg}
                   </button>
                 );
               })}
               {[
-                { icon: "M9 5l7 7-7 7", fn: () => setPage((p) => Math.min(totalPages,p+1)), dis: page===totalPages },
-                { icon: "M13 5l7 7-7 7M5 5l7 7-7 7", fn: () => setPage(totalPages), dis: page===totalPages },
+                { icon: "M9 5l7 7-7 7", fn: () => setPage((p) => Math.min(totalPages, p + 1)), dis: page === totalPages },
+                { icon: "M13 5l7 7-7 7M5 5l7 7-7 7", fn: () => setPage(totalPages), dis: page === totalPages },
               ].map((b, i) => (
                 <button key={i} onClick={b.fn} disabled={b.dis}
                   className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-200 disabled:opacity-30 transition">
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={b.icon}/></svg>
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={b.icon} /></svg>
                 </button>
               ))}
             </div>

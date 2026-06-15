@@ -37,6 +37,10 @@
     {
       "path": "/api/cron/daily-attendance-report",
       "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/auto-checkout",
+      "schedule": "30 13 * * *"
     }
   ]
 }
