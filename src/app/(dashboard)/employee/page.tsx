@@ -853,7 +853,7 @@ export default function ZohoStyleEmployeeDashboard() {
         </div>
 
         {/* ── CONTENT ── */}
-        <main className="flex-1 overflow-y-auto p-0 bg-white">
+        <main className="flex-1 overflow-y-auto p-0 bg-white [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <div className="space-y-3">
             {activeView === "dashboard" && (
               <DashboardView

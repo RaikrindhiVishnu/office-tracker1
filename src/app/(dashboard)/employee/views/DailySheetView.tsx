@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { db } from "@/lib/firebase";
 import {
   collection,
@@ -13,8 +13,6 @@ import {
   doc,
   getDoc,
   serverTimestamp,
-  orderBy,
-  getDocs,
 } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import type { DailySheetEntry } from "@/types/dailySheet";
@@ -26,13 +24,29 @@ const STATUSES = ["Completed", "In Progress", "Blocked", "Pending"];
 
 export default function DailySheetView() {
   const { user } = useAuth();
-  const [entries, setEntries] = useState<DailySheetEntry[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
+  const [userFullName, setUserFullName] = useState("");
 
-  // Date selection
-  const [selectedDate, setSelectedDate] = useState(getTodayDateStr());
+  // Month navigation (YYYY-MM)
+  const todayStr = getTodayDateStr();
+  const [selectedMonth, setSelectedMonth] = useState(todayStr.substring(0, 7));
 
-  // Form state
+  // All entries for selected month
+  const [monthEntries, setMonthEntries] = useState<DailySheetEntry[]>([]);
+  const [monthAttendance, setMonthAttendance] = useState<Record<string, { in: string; out: string; sys: string }>>({});
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successInfo, setSuccessInfo] = useState({ title: "", project: "", hours: "" });
+  // The date used when adding a new entry (defaults to today if in current month, else 1st)
+  const [entryDate, setEntryDate] = useState(todayStr);
+
+  // Form fields
   const [project, setProject] = useState("");
   const [taskTitle, setTaskTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -40,455 +54,668 @@ export default function DailySheetView() {
   const [status, setStatus] = useState(STATUSES[0]);
   const [hours, setHours] = useState<number | "">("");
 
-  // Edit state
-  const [editingId, setEditingId] = useState<string | null>(null);
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isDaySubmitted, setIsDaySubmitted] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [monthAttendance, setMonthAttendance] = useState<Record<string, { in: string, out: string, sys: string }>>({});
+  // Project search dropdown
   const [projectSearch, setProjectSearch] = useState("");
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
-  const [userFullName, setUserFullName] = useState("");
+  const projectDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Month wise history
-  const historyMonth = selectedDate.substring(0, 7); // YYYY-MM
-  const [historyEntries, setHistoryEntries] = useState<DailySheetEntry[]>([]);
-
+  // ── Fetch projects ─────────────────────────────────────────
   useEffect(() => {
-    // Fetch Projects
-    const unsubProjects = onSnapshot(collection(db, "projects"), (snap) => {
+    return onSnapshot(collection(db, "projects"), (snap) => {
       setProjects(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
-    return () => unsubProjects();
   }, []);
 
+  // ── Fetch user name ────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
-    // Fetch user full name from the users collection
     const q = query(collection(db, "users"), where("uid", "==", user.uid));
-    const unsub = onSnapshot(q, (snap) => {
+    return onSnapshot(q, (snap) => {
       if (!snap.empty) {
         const profile = snap.docs[0].data();
-        const fullName = profile.name ?? profile.displayName ?? user.displayName ?? user.email?.split("@")[0] ?? "Unknown";
-        setUserFullName(fullName);
+        setUserFullName(profile.name ?? profile.displayName ?? user.displayName ?? user.email?.split("@")[0] ?? "Unknown");
       } else {
         setUserFullName(user.displayName ?? user.email?.split("@")[0] ?? "Unknown");
       }
     });
-    return () => unsub();
   }, [user]);
 
+  // ── Fetch all month entries ────────────────────────────────
   useEffect(() => {
     if (!user) return;
-
-    // Fetch today's entries
     const q = query(
       collection(db, "dailySheets"),
       where("uid", "==", user.uid),
-      where("dateStr", "==", selectedDate)
+      where("monthStr", "==", selectedMonth)
     );
-
-    const unsub = onSnapshot(q, (snap) => {
+    return onSnapshot(q, (snap) => {
       const data = snap.docs.map((d) => ({ id: d.id, ...d.data() } as DailySheetEntry));
-      setEntries(data.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0)));
-      // Day is never locked — always allow adding/editing entries
-      setIsDaySubmitted(false);
+      // Sort by date asc, then createdAt desc within same date
+      data.sort((a, b) => {
+        const dateCmp = a.dateStr.localeCompare(b.dateStr);
+        if (dateCmp !== 0) return dateCmp;
+        return (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0);
+      });
+      setMonthEntries(data);
     });
-    return () => unsub();
-  }, [user, selectedDate]);
+  }, [user, selectedMonth]);
 
-
-
+  // ── Fetch month attendance ─────────────────────────────────
   useEffect(() => {
     if (!user) return;
-
-    // Fetch month history
-    const qHistory = query(
-      collection(db, "dailySheets"),
-      where("uid", "==", user.uid),
-      where("monthStr", "==", historyMonth)
-    );
-
-    const unsubHist = onSnapshot(qHistory, (snap) => {
-      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() } as DailySheetEntry));
-      setHistoryEntries(data.sort((a, b) => a.dateStr.localeCompare(b.dateStr) || (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0)));
-    });
-
-    // Fetch month attendance
-    const start = `${historyMonth}-01`;
-    const end = `${historyMonth}-31`;
-    const qAttMonth = query(
+    const start = `${selectedMonth}-01`;
+    const end = `${selectedMonth}-31`;
+    const q = query(
       collection(db, "attendance"),
       where("userId", "==", user.uid),
       where("date", ">=", start),
       where("date", "<=", end)
     );
-
-    const unsubAtt = onSnapshot(qAttMonth, (snap) => {
-      const attMap: Record<string, { in: string, out: string, sys: string }> = {};
-      snap.docs.forEach(d => {
+    return onSnapshot(q, (snap) => {
+      const attMap: Record<string, { in: string; out: string; sys: string }> = {};
+      snap.docs.forEach((d) => {
         const data = d.data();
         const sessions = data.sessions || [];
         if (sessions.length > 0) {
+          const fmt = (ts: any) =>
+            ts ? ts.toDate().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : "--:--";
           const first = sessions[0];
           const last = sessions[sessions.length - 1];
-          const formatTime = (ts: any) => {
-            if (!ts) return "--:--";
-            return ts.toDate().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-          };
-
           let addedMins = 0;
           if (!last.checkOut) {
-            if (data.date === getTodayDateStr()) {
-              addedMins = Math.floor((Date.now() - last.checkIn.toMillis()) / 60000);
-            } else {
-              addedMins = Math.max(0, 9 * 60 - data.totalMinutes);
-            }
+            if (data.date === getTodayDateStr()) addedMins = Math.floor((Date.now() - last.checkIn.toMillis()) / 60000);
+            else addedMins = Math.max(0, 9 * 60 - data.totalMinutes);
           }
-          const finalMins = data.totalMinutes + addedMins;
-
           attMap[data.date] = {
-            in: formatTime(first.checkIn),
-            out: formatTime(last.checkOut),
-            sys: (finalMins / 60).toFixed(1) + "h"
+            in: fmt(first.checkIn),
+            out: fmt(last.checkOut),
+            sys: ((data.totalMinutes + addedMins) / 60).toFixed(1) + "h",
           };
         }
       });
       setMonthAttendance(attMap);
     });
+  }, [user, selectedMonth]);
 
-    return () => {
-      unsubHist();
-      unsubAtt();
+  // ── Close dropdown on outside click ───────────────────────
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (projectDropdownRef.current && !projectDropdownRef.current.contains(e.target as Node))
+        setShowProjectDropdown(false);
     };
-  }, [user, historyMonth]);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
-  const isHolidayDate = (dateStr: string) => {
-    const d = new Date(dateStr);
+  // ── Helpers ────────────────────────────────────────────────
+  const isWeekendOrHoliday = (dateStr: string) => {
+    const d = new Date(dateStr + "T00:00:00");
     const day = d.getDay();
     const dateNum = d.getDate();
-    // Sunday
     if (day === 0) return true;
-    // 2nd and 4th Saturday
     if (day === 6) {
-      const weekOfMonth = Math.ceil(dateNum / 7);
-      if (weekOfMonth === 2 || weekOfMonth === 4) return true;
+      const week = Math.ceil(dateNum / 7);
+      return week === 2 || week === 4;
     }
     return false;
   };
 
+  const formatDate = (str: string) => {
+    const d = new Date(str + "T00:00:00");
+    return d.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
+  };
+
+  const resetForm = () => {
+    setProject(""); setProjectSearch(""); setShowProjectDropdown(false);
+    setTaskTitle(""); setDescription(""); setCategory(CATEGORIES[0]);
+    setStatus(STATUSES[0]); setHours(""); setEditingId(null);
+  };
+
+  // ── Group entries by date ──────────────────────────────────
+  const entriesByDate = monthEntries.reduce((acc, e) => {
+    if (!acc[e.dateStr]) acc[e.dateStr] = [];
+    acc[e.dateStr].push(e);
+    return acc;
+  }, {} as Record<string, DailySheetEntry[]>);
+
+  const sortedDates = Object.keys(entriesByDate).sort();
+  const allEntryIds = monthEntries.map((e) => e.id!);
+  const totalMonthHrs = monthEntries.reduce((acc, e) => acc + (e.hours || 0), 0);
+
+  // ── Analytics (Charts) ─────────────────────────────────────
+  const projectHrs = React.useMemo(() => {
+    const map: Record<string, number> = {};
+    monthEntries.forEach((e) => { if(e.project) map[e.project] = (map[e.project] || 0) + (e.hours || 0); });
+    const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 4);
+    const maxVal = sorted[0]?.[1] || 1;
+    const colors = ["bg-emerald-500", "bg-indigo-500", "bg-amber-400", "bg-rose-400"];
+    return sorted.map(([proj, hrs], i) => ({
+      label: proj, value: hrs, pct: Math.round((hrs / maxVal) * 100), color: colors[i] || "bg-slate-400",
+    }));
+  }, [monthEntries]);
+
+  const summaryStats = React.useMemo(() => {
+    const projects = new Set(monthEntries.filter(e => e.project).map(e => e.project));
+    const tasksCount = monthEntries.length;
+    const hoursCount = monthEntries.reduce((acc, e) => acc + (e.hours || 0), 0);
+    
+    // Normalize heights but ensure they are visible
+    const maxVal = Math.max(1, projects.size, tasksCount, hoursCount);
+    
+    return [
+      { label: "Projects", value: projects.size, suffix: "", color: "bg-fuchsia-500", pct: Math.max(8, Math.round((projects.size / maxVal) * 100)) },
+      { label: "Tasks", value: tasksCount, suffix: "", color: "bg-indigo-500", pct: Math.max(8, Math.round((tasksCount / maxVal) * 100)) },
+      { label: "Hours", value: hoursCount, suffix: "h", color: "bg-emerald-500", pct: Math.max(8, Math.round((hoursCount / maxVal) * 100)) }
+    ];
+  }, [monthEntries]);
+
+  // ── CRUD ───────────────────────────────────────────────────
   const handleSaveEntry = async (isDraft: boolean) => {
     if (!user) return;
-    // For drafts, hours are optional. For submitted entries, all fields required.
-    if (!project || !taskTitle) {
-      alert("Project and Task Title are required.");
-      return;
-    }
-    if (!isDraft && hours === "") {
-      alert("Hours are required to submit an entry.");
-      return;
-    }
-
+    if (!project || !taskTitle) { alert("Project and Task Title are required."); return; }
+    if (!isDraft && hours === "") { alert("Hours are required to submit an entry."); return; }
     setIsSubmitting(true);
     try {
-      const monthStr = selectedDate.substring(0, 7);
-
+      const monthStr = entryDate.substring(0, 7);
       const payload = {
         uid: user.uid,
         userName: userFullName || user.email?.split("@")[0] || "Unknown",
-        dateStr: selectedDate,
-        monthStr,
-        project,
-        taskTitle,
-        description,
-        category,
-        status,
-        hours: hours === "" ? 0 : Number(hours),
-        isDraft,
+        dateStr: entryDate, monthStr, project, taskTitle, description,
+        category, status, hours: hours === "" ? 0 : Number(hours), isDraft,
         updatedAt: serverTimestamp(),
       };
-
       if (editingId) {
         await updateDoc(doc(db, "dailySheets", editingId), payload);
-        setEditingId(null);
       } else {
-        await addDoc(collection(db, "dailySheets"), {
-          ...payload,
-          createdAt: serverTimestamp(),
-        });
+        await addDoc(collection(db, "dailySheets"), { ...payload, createdAt: serverTimestamp() });
       }
-
-      // If submitting (not draft): close modal and reset form
-      // If saving draft: keep modal open so user can continue editing
       if (!isDraft) {
-        setProject("");
-        setProjectSearch("");
-        setShowProjectDropdown(false);
-        setTaskTitle("");
-        setDescription("");
-        setHours("");
-        setStatus(STATUSES[0]);
-        setEditingId(null);
+        setSuccessInfo({
+          title: taskTitle,
+          project,
+          hours: hours === "" ? "0" : String(hours),
+        });
+        resetForm();
         setIsModalOpen(false);
+        setShowSuccess(true);
+        setTimeout(() => setShowSuccess(false), 1500);
       }
-      // For draft: stay in modal, let user continue editing
-    } catch (error) {
-      console.error(error);
-      alert("Failed to save entry.");
-    } finally {
-      setIsSubmitting(false);
-    }
+    } catch (err) { console.error(err); alert("Failed to save entry."); }
+    finally { setIsSubmitting(false); }
   };
 
   const handleEdit = (entry: DailySheetEntry) => {
     setEditingId(entry.id!);
-    setProject(entry.project);
-    setProjectSearch("");
-    setShowProjectDropdown(false);
-    setTaskTitle(entry.taskTitle);
-    setDescription(entry.description || "");
-    setCategory(entry.category || CATEGORIES[0]);
-    setStatus(entry.status || STATUSES[0]);
-    setHours(entry.hours);
-    setIsModalOpen(true);
+    setEntryDate(entry.dateStr);
+    setProject(entry.project); setProjectSearch("");
+    setTaskTitle(entry.taskTitle); setDescription(entry.description || "");
+    setCategory(entry.category || CATEGORIES[0]); setStatus(entry.status || STATUSES[0]);
+    setHours(entry.hours); setIsModalOpen(true);
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this entry?")) return;
-    try {
-      await deleteDoc(doc(db, "dailySheets", id));
-      if (editingId === id) setEditingId(null);
-    } catch (error) {
-      console.error(error);
-    }
+    if (!confirm("Delete this entry?")) return;
+    try { await deleteDoc(doc(db, "dailySheets", id)); if (editingId === id) setEditingId(null); }
+    catch (err) { console.error(err); }
   };
 
-  const handleMarkAsHoliday = async () => {
-    if (!user) return;
-    if (entries.length > 0) {
-      alert("Please delete existing entries for this day before marking it as a holiday.");
-      return;
-    }
-
-    try {
-      await addDoc(collection(db, "dailySheets"), {
-        uid: user.uid,
-        userName: user.email?.split("@")[0] || "Unknown",
-        dateStr: selectedDate,
-        monthStr: selectedDate.substring(0, 7),
-        project: "Holiday",
-        taskTitle: "Holiday",
-        description: "",
-        category: "Other",
-        status: "Completed",
-        hours: 0,
-        isDraft: false,
-        isHoliday: true,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const handleSubmitDay = async () => {
-    if (!confirm("Submit all entries for this day? You cannot edit them after submitting.")) return;
-    try {
-      const promises = entries.map(entry =>
-        updateDoc(doc(db, "dailySheets", entry.id!), { isDraft: false, updatedAt: serverTimestamp() })
-      );
-      await Promise.all(promises);
-      setIsDaySubmitted(true);
-      alert("Day submitted successfully!");
-    } catch (error) {
-      console.error(error);
-      alert("Failed to submit day.");
-    }
-  };
-
+  // ── Export ─────────────────────────────────────────────────
   const exportToExcel = async () => {
-    if (historyEntries.length === 0) {
-      alert("No data to export for this month.");
-      return;
-    }
-
-    // Group entries by date
-    const entriesByDate = historyEntries.reduce((acc, curr) => {
-      if (!acc[curr.dateStr]) acc[curr.dateStr] = [];
-      acc[curr.dateStr].push(curr);
-      return acc;
-    }, {} as Record<string, DailySheetEntry[]>);
-
-    const formatTime = (ts: any) => {
-      if (!ts) return "--:--";
-      return ts.toDate().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-    };
-
+    if (monthEntries.length === 0) { alert("No data to export for this month."); return; }
+    const fmt = (ts: any) =>
+      ts ? ts.toDate().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "--:--:--";
     const finalData = [];
-
-    for (const dateStr of Object.keys(entriesByDate).sort()) {
+    for (const dateStr of sortedDates) {
       const dayEntries = entriesByDate[dateStr];
-
-      // Fetch attendance for this date
-      let checkInStr = "--:--:--";
-      let checkOutStr = "--:--:--";
-      let totalSysHours = 0;
-
+      let checkInStr = "--:--:--", checkOutStr = "--:--:--", totalSysHours = 0;
       if (user) {
-        const attRef = doc(db, "attendance", `${user.uid}_${dateStr}`);
-        const snap = await getDoc(attRef);
+        const snap = await getDoc(doc(db, "attendance", `${user.uid}_${dateStr}`));
         if (snap.exists()) {
           const data = snap.data();
           const sessions = data.sessions || [];
           if (sessions.length > 0) {
-            const first = sessions[0];
-            const last = sessions[sessions.length - 1];
-            checkInStr = formatTime(first.checkIn);
-            checkOutStr = formatTime(last.checkOut);
-
+            checkInStr = fmt(sessions[0].checkIn);
+            checkOutStr = fmt(sessions[sessions.length - 1].checkOut);
             let addedMins = 0;
-            if (!last.checkOut) {
-              if (data.date === getTodayDateStr()) {
-                addedMins = Math.floor((Date.now() - last.checkIn.toMillis()) / 60000);
-              } else {
-                addedMins = Math.max(0, 9 * 60 - data.totalMinutes);
-              }
+            if (!sessions[sessions.length - 1].checkOut) {
+              if (data.date === getTodayDateStr()) addedMins = Math.floor((Date.now() - sessions[sessions.length - 1].checkIn.toMillis()) / 60000);
+              else addedMins = Math.max(0, 9 * 60 - data.totalMinutes);
             }
-            const finalMins = data.totalMinutes + addedMins;
-            totalSysHours = Number((finalMins / 60).toFixed(2));
+            totalSysHours = Number(((data.totalMinutes + addedMins) / 60).toFixed(2));
           }
         }
       }
-
-      const availableHours = 8;
-      const breakHours = 1;
-
-      let assignedTaskStr = "";
-      dayEntries.forEach((e, idx) => {
-        assignedTaskStr += `Task ${idx + 1}: ${e.taskTitle}${e.description ? " - " + e.description : ""}\n`;
-      });
-
-      const isHoliday = dayEntries.some(e => e.isHoliday);
-
+      const isHoliday = dayEntries.some((e) => e.isHoliday);
+      const taskStr = dayEntries.map((e, i) => `Task ${i + 1}: ${e.taskTitle}${e.description ? " - " + e.description : ""}`).join("\n");
       finalData.push({
-        "Date": dateStr,
+        Date: dateStr,
         "Check-In": isHoliday ? "Holiday" : checkInStr,
         "Check-Out": isHoliday ? "Holiday" : checkOutStr,
-        "Available Hours": isHoliday ? 0 : availableHours,
-        "Break Hours": isHoliday ? 0 : breakHours,
+        "Available Hours": isHoliday ? 0 : 8,
+        "Break Hours": isHoliday ? 0 : 1,
         "Total Hours": isHoliday ? 0 : totalSysHours,
-        "Assigned Task": isHoliday ? "Holiday" : assignedTaskStr.trim(),
-        "Status": dayEntries.some(e => e.isDraft) ? "Draft" : "Submitted"
+        "Assigned Task": isHoliday ? "Holiday" : taskStr,
+        Status: dayEntries.some((e) => e.isDraft) ? "Draft" : "Submitted",
       });
     }
-
     const ws = XLSX.utils.json_to_sheet(finalData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Timesheet");
-    XLSX.writeFile(wb, `TechGy_Employee_Timesheet_${historyMonth}.xlsx`);
+    XLSX.writeFile(wb, `Employee_Timesheet_${selectedMonth}.xlsx`);
   };
 
-  const isAutoHoliday = isHolidayDate(selectedDate);
-  const totalHoursToday = entries.reduce((acc, curr) => acc + curr.hours, 0);
+  // ── Checkbox logic ─────────────────────────────────────────
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = () => {
+    if (selectedIds.size === allEntryIds.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(allEntryIds));
+  };
+
+  // ── Month navigation ───────────────────────────────────────
+  const changeMonth = (delta: number) => {
+    const [y, m] = selectedMonth.split("-").map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    setSelectedIds(new Set());
+  };
+
+  const monthLabel = new Date(selectedMonth + "-01").toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   return (
-    <div className="p-4 lg:p-6 pb-24 h-full overflow-y-auto">
+    <div className="h-full overflow-y-auto bg-[#f4f6f9] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-center justify-end gap-4">
-        <div className="flex items-center gap-4">
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="p-1.5 px-3 border-none rounded-md text-sm font-medium bg-white text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm cursor-pointer"
-          />
-          {isAutoHoliday && (
-            <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-sm font-semibold">
-              Weekend/Holiday
-            </span>
+      {/* ══ BANNER ══════════════════════════════════════════════════════════ */}
+      <div className="relative overflow-hidden" style={{ height: "160px" }}>
+        <img src="/timesheet_banner.png" alt="banner" className="absolute inset-0 w-full h-full object-cover object-center" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0d1f3c]/90 via-[#0d1f3c]/65 to-transparent" />
+        <div className="relative z-10 h-full flex flex-col justify-center px-8 max-w-lg">
+          <h2 className="text-white text-xl font-extrabold leading-tight tracking-tight drop-shadow-lg">My Time Sheets</h2>
+          <p className="text-slate-300 text-xs mt-1.5 leading-relaxed">Log your tasks, track your hours, and review your personal performance.</p>
+          <div className="mt-4 flex items-center gap-2">
+             <div className="px-3 py-1 bg-white/10 backdrop-blur border border-white/20 rounded-lg text-white text-xs font-semibold">
+               {monthLabel}
+             </div>
+             <div className="px-3 py-1 bg-indigo-500 text-white text-xs font-semibold rounded-lg shadow-sm">
+               {monthEntries.length} tasks logged
+             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ══ COMPACT STATS ════════════════════════════════════════════════════ */}
+      <div className="px-6 mt-5 flex flex-wrap gap-3">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg shadow-sm text-xs">
+          <span className="opacity-70">📋</span>
+          <span className="text-slate-500 font-medium">Total Entries:</span>
+          <span className="font-bold text-slate-800">{monthEntries.length}</span>
+        </div>
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg shadow-sm text-xs">
+          <span className="opacity-70">✅</span>
+          <span className="text-slate-500 font-medium">Submitted:</span>
+          <span className="font-bold text-emerald-600">{monthEntries.filter(e => !e.isDraft).length}</span>
+        </div>
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg shadow-sm text-xs">
+          <span className="opacity-70">📝</span>
+          <span className="text-slate-500 font-medium">Drafts:</span>
+          <span className="font-bold text-amber-600">{monthEntries.filter(e => e.isDraft).length}</span>
+        </div>
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg shadow-sm text-xs">
+          <span className="opacity-70">⏱️</span>
+          <span className="text-slate-500 font-medium">Total Hours:</span>
+          <span className="font-bold text-violet-600">{totalMonthHrs}h</span>
+        </div>
+      </div>
+
+      {/* ══ CHARTS ══════════════════════════════════════════════════════════ */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 px-6 mt-4">
+        {/* Monthly Summary (Bar Chart) */}
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+          <h3 className="text-sm font-bold text-slate-800">Monthly Summary</h3>
+          <p className="text-[11px] text-slate-400 mt-0.5 mb-4">Your total projects, tasks, and hours at a glance</p>
+          <div className="flex items-end justify-center gap-12 h-36 px-4">
+            {summaryStats.map((d, i) => (
+              <div key={i} className="flex flex-col items-center gap-2 w-20 group cursor-pointer" title={`${d.value}${d.suffix} Total ${d.label}`}>
+                <span className="text-xs font-bold text-slate-700">{d.value}{d.suffix}</span>
+                <div className="w-full flex items-end justify-center" style={{ height: "100px" }}>
+                  <div className={`w-full rounded-t-lg ${d.color} group-hover:opacity-80 transition`} style={{ height: `${d.pct}%` }} />
+                </div>
+                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{d.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Project Breakdown (Horizontal Bar) */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+          <h3 className="text-sm font-bold text-slate-800 mb-1">Time by Project</h3>
+          <p className="text-[11px] text-slate-400 mb-4">Your top projects this month</p>
+          {projectHrs.length > 0 ? (
+            <div className="space-y-3">
+              {projectHrs.map((d, i) => (
+                <div key={i}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-slate-600 font-medium truncate max-w-[120px]" title={d.label}>{d.label}</span>
+                    <span className="text-xs font-bold text-slate-700">{d.value}h</span>
+                  </div>
+                  <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${d.color}`} style={{ width: `${d.pct}%`, transition: "width 1s ease" }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="h-32 flex items-center justify-center text-slate-300 text-sm">No projects logged</div>
           )}
         </div>
+      </div>
+
+      {/* ── TOOLBAR ── */}
+      <div className="mx-6 mt-5 bg-white rounded-t-xl border border-slate-200 border-b-0 px-5 py-3 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4 text-xs text-slate-500">
+          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-1 py-1">
+            <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-white rounded transition text-slate-500 hover:text-slate-800">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
+            </button>
+            <input type="month" value={selectedMonth} onChange={(e) => { setSelectedMonth(e.target.value); setSelectedIds(new Set()); }} className="text-xs font-semibold text-slate-700 bg-transparent outline-none cursor-pointer px-1"/>
+            <button onClick={() => changeMonth(1)} className="p-1 hover:bg-white rounded transition text-slate-500 hover:text-slate-800">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+          {selectedIds.size > 0 && <span className="text-indigo-600 font-semibold">{selectedIds.size} selected</span>}
+        </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={exportToExcel}
-            className="px-4 py-2 bg-emerald-600 text-white text-sm font-bold rounded-lg hover:bg-emerald-700 transition shadow-sm border-none"
-          >
-            Export
+          {selectedIds.size > 0 && (
+            <button
+              onClick={async () => {
+                if (!confirm(`Delete ${selectedIds.size} selected entries?`)) return;
+                await Promise.all([...selectedIds].map((id) => deleteDoc(doc(db, "dailySheets", id))));
+                setSelectedIds(new Set());
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 text-rose-600 text-sm font-semibold border border-rose-200 rounded-lg hover:bg-rose-100 transition"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Delete ({selectedIds.size})
+            </button>
+          )}
+            <button
+              onClick={exportToExcel}
+              className="flex items-center gap-2 px-4 py-1.5 bg-[#1a8a5a] text-white text-sm font-bold rounded-lg hover:bg-[#157a50] transition shadow-sm"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Export
+            </button>
+            <button
+              onClick={() => {
+                resetForm();
+                const todayMonth = todayStr.substring(0, 7);
+                setEntryDate(todayMonth === selectedMonth ? todayStr : `${selectedMonth}-01`);
+                setIsModalOpen(true);
+              }}
+              className="flex items-center gap-2 px-4 py-1.5 bg-[#1a2e45] text-white text-sm font-bold rounded-lg hover:bg-[#0f1b29] transition shadow-sm"
+            >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add Entry
           </button>
         </div>
       </div>
 
-      {/* Main Form Modal */}
+      {/* ── TABLE ── */}
+      <div className="mx-6 mb-6 bg-white rounded-b-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-[#f0f2f5] border-b border-slate-200">
+                <th className="px-4 py-3 w-10">
+                  <input
+                    type="checkbox"
+                    checked={allEntryIds.length > 0 && selectedIds.size === allEntryIds.length}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 rounded border-slate-300 accent-indigo-600 cursor-pointer"
+                  />
+                </th>
+                {[
+                  ["DATE", "w-32"],
+                  ["IN", "w-24"],
+                  ["OUT", "w-24"],
+                  ["TOTAL HOURS", "w-28"],
+                  ["PROJECT", "w-44"],
+                  ["TASK TITLE", ""],
+                  ["TASK HRS", "w-24"],
+                  ["STATE", "w-24"],
+                  ["ACTIONS", "w-20"],
+                ].map(([label, cls], i) => (
+                  <th
+                    key={i}
+                    className={`px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider ${cls}`}
+                  >
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {monthEntries.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="px-4 py-16 text-center">
+                    <div className="flex flex-col items-center gap-2 text-slate-400">
+                      <svg className="w-10 h-10 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                      <p className="text-sm font-medium">No entries for {monthLabel}</p>
+                      <p className="text-xs">Click &ldquo;Add Entry&rdquo; to log your first task.</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                sortedDates.map((dateStr) => {
+                  const dayEntries = entriesByDate[dateStr];
+                  const att = monthAttendance[dateStr];
+
+                  return (
+                    <React.Fragment key={dateStr}>
+                      {dayEntries.map((e, idx) => {
+                        const isSelected = selectedIds.has(e.id!);
+                        return (
+                          <tr
+                            key={e.id}
+                            className={`border-b border-slate-100 transition-colors ${
+                              isSelected
+                                ? "bg-indigo-50"
+                                : idx % 2 === 0
+                                ? "bg-white hover:bg-slate-50"
+                                : "bg-[#fafbfc] hover:bg-slate-50"
+                            }`}
+                          >
+                            <td className="px-4 py-3">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleSelect(e.id!)}
+                                className="w-4 h-4 rounded border-slate-300 accent-indigo-600 cursor-pointer"
+                              />
+                            </td>
+                            <td className="px-3 py-3 font-medium text-slate-600 whitespace-nowrap text-xs">
+                              {formatDate(e.dateStr)}
+                            </td>
+                            <td className="px-3 py-3 text-slate-500 whitespace-nowrap text-xs">
+                              {att?.in || "—"}
+                            </td>
+                            <td className="px-3 py-3 text-slate-500 whitespace-nowrap text-xs">
+                              {att?.out || "—"}
+                            </td>
+                            <td className="px-3 py-3 text-slate-600 font-semibold text-xs">
+                              {att?.sys || "—"}
+                            </td>
+                            <td className="px-3 py-3 text-slate-700 max-w-[160px]">
+                              <span className="truncate block text-xs" title={e.project}>
+                                {e.project.length > 22 ? e.project.slice(0, 20) + "…" : e.project}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 text-slate-600 max-w-[200px]">
+                              <span className="truncate block text-xs" title={e.taskTitle}>
+                                {e.taskTitle}
+                              </span>
+                              {e.description && (
+                                <span className="block text-[10px] text-slate-400 truncate" title={e.description}>
+                                  {e.description}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-3 py-3 text-slate-600 whitespace-nowrap text-xs">
+                              {e.hours ? `${e.hours}h` : "—"}
+                            </td>
+                            <td className="px-3 py-3">
+                              {e.isHoliday ? (
+                                <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">Holiday</span>
+                              ) : e.isDraft ? (
+                                <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">Draft</span>
+                              ) : (
+                                <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">Submitted</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-3 text-right">
+                              {!e.isHoliday && (
+                                <div className="flex items-center justify-end gap-1">
+                                  <button
+                                    onClick={() => handleEdit(e)}
+                                    className="p-1.5 text-indigo-500 hover:bg-indigo-50 rounded-lg transition"
+                                    title="Edit"
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(e.id!)}
+                                    className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition"
+                                    title="Delete"
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </React.Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── ADD / EDIT MODAL ── */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white p-6 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
             {/* Modal Header */}
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-slate-800">
-                {editingId ? "Edit Task Entry" : "Add Task Entry"}
-              </h2>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800">
+                  {editingId ? "Edit Entry" : "Add New Entry"}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {new Date(entryDate + "T00:00:00").toLocaleDateString("en-US", {
+                    weekday: "long", year: "numeric", month: "long", day: "numeric",
+                  })}
+                </p>
+              </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleSaveEntry(true)}
-                  disabled={isSubmitting || isDaySubmitted}
-                  className="px-4 py-1.5 text-slate-500 text-sm font-semibold bg-slate-100 hover:bg-slate-200 rounded-lg transition disabled:opacity-50"
+                  disabled={isSubmitting}
+                  className="px-3 py-1.5 text-slate-500 text-sm font-semibold bg-slate-100 hover:bg-slate-200 rounded-lg transition disabled:opacity-50"
                 >
                   Save Draft
                 </button>
                 <button
-                  onClick={() => { setIsModalOpen(false); setEditingId(null); setProject(""); setProjectSearch(""); setShowProjectDropdown(false); setTaskTitle(""); setDescription(""); setHours(""); }}
-                  className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full font-bold text-lg transition"
+                  onClick={() => { resetForm(); setIsModalOpen(false); }}
+                  className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition text-xl leading-none"
                 >
-                  &times;
+                  ×
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-2">
+            {/* Modal Body */}
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+
+              {/* Entry Date */}
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Date</label>
+                <input
+                  type="date"
+                  value={entryDate}
+                  min={`${selectedMonth}-01`}
+                  max={`${selectedMonth}-31`}
+                  onChange={(e) => setEntryDate(e.target.value)}
+                  className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 outline-none transition w-full"
+                />
+              </div>
+
+              {/* Project */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider ml-1">Project *</label>
-                <div className="relative">
+                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Project *</label>
+                <div className="relative" ref={projectDropdownRef}>
                   <button
                     type="button"
-                    onClick={() => { setShowProjectDropdown(v => !v); setProjectSearch(""); }}
-                    disabled={isDaySubmitted}
-                    className="w-full p-3 border border-slate-200 rounded-xl text-left text-slate-700 placeholder-slate-400 focus:border-violet-300 focus:ring-4 focus:ring-violet-100 outline-none transition bg-white flex items-center justify-between disabled:opacity-50"
+                    onClick={() => { setShowProjectDropdown((v) => !v); setProjectSearch(""); }}
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-left text-sm bg-white flex items-center justify-between hover:border-indigo-300 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 outline-none transition"
                   >
-                    <span className={project ? "text-slate-800" : "text-slate-400"}>{project || "Select project..."}</span>
-                    <svg className={`w-4 h-4 text-slate-400 transition-transform ${showProjectDropdown ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    <span className={project ? "text-slate-800" : "text-slate-400"}>
+                      {project || "Select project…"}
+                    </span>
+                    <svg className={`w-4 h-4 text-slate-400 transition-transform ${showProjectDropdown ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
                   </button>
                   {showProjectDropdown && (
                     <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden">
                       <div className="p-2 border-b border-slate-100">
                         <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-50 rounded-lg">
-                          <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" /></svg>
+                          <svg className="w-4 h-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
+                          </svg>
                           <input
                             autoFocus
                             type="text"
                             value={projectSearch}
-                            onChange={e => setProjectSearch(e.target.value)}
-                            placeholder="Search projects..."
+                            onChange={(e) => setProjectSearch(e.target.value)}
+                            placeholder="Search projects…"
                             className="flex-1 bg-transparent text-sm text-slate-700 placeholder-slate-400 outline-none"
                           />
                         </div>
                       </div>
                       <ul className="max-h-44 overflow-y-auto py-1">
                         {projects
-                          .filter(p => p.name.toLowerCase().includes(projectSearch.toLowerCase()))
-                          .map(p => (
+                          .filter((p) => p.name.toLowerCase().includes(projectSearch.toLowerCase()))
+                          .map((p) => (
                             <li
                               key={p.id}
                               onClick={() => { setProject(p.name); setShowProjectDropdown(false); }}
-                              className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-violet-50 hover:text-violet-700 transition ${project === p.name ? "bg-violet-50 text-violet-700 font-semibold" : "text-slate-700"
-                                }`}
+                              className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-indigo-50 hover:text-indigo-700 transition ${project === p.name ? "bg-indigo-50 text-indigo-700 font-semibold" : "text-slate-700"}`}
                             >
                               {p.name}
                             </li>
                           ))}
-                        {projects.filter(p => p.name.toLowerCase().includes(projectSearch.toLowerCase())).length === 0 && (
+                        {projects.filter((p) => p.name.toLowerCase().includes(projectSearch.toLowerCase())).length === 0 && (
                           <li className="px-4 py-3 text-sm text-slate-400 text-center">No projects found</li>
                         )}
                       </ul>
@@ -496,9 +723,9 @@ export default function DailySheetView() {
                         <div className="border-t border-slate-100 p-2">
                           <button
                             onClick={() => { setProject(projectSearch); setShowProjectDropdown(false); }}
-                            className="w-full text-left px-3 py-2 text-sm text-violet-600 font-semibold hover:bg-violet-50 rounded-lg transition"
+                            className="w-full text-left px-3 py-2 text-sm text-indigo-600 font-semibold hover:bg-indigo-50 rounded-lg transition"
                           >
-                            + Use "{projectSearch}" as custom project
+                            + Use &ldquo;{projectSearch}&rdquo; as custom project
                           </button>
                         </div>
                       )}
@@ -507,163 +734,149 @@ export default function DailySheetView() {
                 </div>
               </div>
 
+              {/* Task Title */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider ml-1">Task Title *</label>
+                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Task Title *</label>
                 <input
                   type="text"
                   value={taskTitle}
                   onChange={(e) => setTaskTitle(e.target.value)}
                   placeholder="What did you work on?"
-                  className="w-full p-3 border border-slate-200 rounded-xl text-slate-700 placeholder-slate-400 focus:border-violet-300 focus:ring-4 focus:ring-violet-100 outline-none transition"
-                  disabled={isDaySubmitted}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 placeholder-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 outline-none transition"
                 />
               </div>
 
+              {/* Description */}
               <div className="space-y-1.5 md:col-span-2">
-                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider ml-1">Description</label>
+                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Description</label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Brief description (optional)"
-                  className="w-full p-3 border border-slate-200 rounded-xl text-slate-700 placeholder-slate-400 focus:border-violet-300 focus:ring-4 focus:ring-violet-100 outline-none transition resize-none"
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 placeholder-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 outline-none transition resize-none"
                   rows={2}
-                  disabled={isDaySubmitted}
                 />
               </div>
 
+              {/* Category */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider ml-1">Category</label>
+                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Category</label>
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="w-full p-3 border border-slate-200 rounded-xl text-slate-700 focus:border-violet-300 focus:ring-4 focus:ring-violet-100 outline-none transition appearance-none bg-white"
-                  disabled={isDaySubmitted}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 outline-none transition appearance-none bg-white"
                 >
-                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-5">
+              {/* Status + Hours */}
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider ml-1">Status</label>
+                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Status</label>
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
-                    className="w-full p-3 border border-slate-200 rounded-xl text-slate-700 focus:border-violet-300 focus:ring-4 focus:ring-violet-100 outline-none transition appearance-none bg-white"
-                    disabled={isDaySubmitted}
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 outline-none transition appearance-none bg-white"
                   >
-                    {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                    {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider ml-1">Hours *</label>
+                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Hours *</label>
                   <input
                     type="number"
                     min="0.5"
                     step="0.5"
                     value={hours}
                     onChange={(e) => setHours(e.target.value ? Number(e.target.value) : "")}
-                    placeholder="1"
-                    className="w-full p-3 border border-slate-200 rounded-xl text-slate-700 focus:border-violet-300 focus:ring-4 focus:ring-violet-100 outline-none transition"
-                    disabled={isDaySubmitted}
+                    placeholder="e.g. 2"
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 outline-none transition"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="pt-8">
+            {/* Modal Footer */}
+            <div className="px-6 pb-6">
               <button
                 onClick={() => handleSaveEntry(false)}
-                disabled={isSubmitting || isDaySubmitted}
-                className="w-full py-3.5 bg-[#1a2e45] text-white text-base font-bold rounded-xl hover:bg-[#0f1b29] transition shadow-md disabled:opacity-50"
+                disabled={isSubmitting}
+                className="w-full py-3.5 bg-[#1a2e45] text-white text-sm font-bold rounded-xl hover:bg-[#0f1b29] transition shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {editingId ? "Update Entry" : "+ Add to Day"}
+                {isSubmitting ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    Saving…
+                  </>
+                ) : editingId ? "Update Entry" : "+ Add to Day"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-
-
-      {/* Daily Entries */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mt-4">
-        <div className="p-4 border-b bg-slate-50 flex items-center justify-between">
-          <h3 className="font-bold text-slate-700 flex items-center gap-2">
-            📅 Entries for {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' })}
-          </h3>
-          <div className="flex items-center gap-4">
+      {/* ── SUCCESS MODAL ── */}
+      {showSuccess && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-7 flex flex-col items-center text-center relative"
+            style={{ animation: "successPop 0.35s cubic-bezier(0.34,1.56,0.64,1) both" }}
+          >
+            {/* Close */}
             <button
-              onClick={() => setIsModalOpen(true)}
-              disabled={isDaySubmitted}
-              className="px-4 py-2 bg-[#1a2e45] text-white text-sm font-bold rounded-lg hover:bg-[#0f1b29] transition disabled:opacity-50 shadow-sm"
+              onClick={() => setShowSuccess(false)}
+              className="absolute top-4 right-4 w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition text-lg leading-none"
             >
-              + Add Entry
+              ×
             </button>
+
+            {/* Checkmark circle */}
+            <div className="relative mb-5">
+              <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center">
+                <div className="w-20 h-20 rounded-full bg-[#2ea84f] flex items-center justify-center shadow-lg">
+                  <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              </div>
+              {/* Ripple rings */}
+              <span className="absolute inset-0 rounded-full border-2 border-green-300 opacity-0" style={{ animation: "ripple 1.2s ease-out 0.2s infinite" }} />
+              <span className="absolute inset-0 rounded-full border-2 border-green-200 opacity-0" style={{ animation: "ripple 1.2s ease-out 0.6s infinite" }} />
+            </div>
+
+            {/* Title */}
+            <h3 className="text-lg font-bold text-slate-800 mb-2">Task Added Successfully!</h3>
+
+            {/* Details */}
+            <p className="text-sm text-slate-500 leading-relaxed mb-1">
+              <span className="font-semibold text-slate-700">{successInfo.title}</span> has been logged
+              {successInfo.project && (
+                <> under <span className="font-semibold text-indigo-600">{successInfo.project}</span></>
+              )}.
+            </p>
+            {successInfo.hours && Number(successInfo.hours) > 0 && (
+              <p className="text-xs text-slate-400 mb-5">
+                <span className="font-semibold text-slate-600">{successInfo.hours}h</span> recorded · Status: <span className="text-emerald-600 font-semibold">Submitted</span>
+              </p>
+            )}
           </div>
-        </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="bg-slate-100 text-slate-600 uppercase text-xs">
-              <tr>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">In</th>
-                <th className="px-4 py-3">Out</th>
-                <th className="px-4 py-3">Total Hours</th>
-                <th className="px-4 py-3">Project</th>
-                <th className="px-4 py-3">Task Title</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Task Hrs</th>
-                <th className="px-4 py-3">State</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {entries.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-slate-500">No entries for {selectedDate}</td>
-                </tr>
-              ) : (
-                entries.map(e => (
-                  <tr key={e.id} className="hover:bg-slate-50" title={e.description || e.taskTitle}>
-                    <td className="px-4 py-3 font-medium">{e.dateStr}</td>
-                    <td className="px-4 py-3 text-slate-500">{monthAttendance[e.dateStr]?.in || "--:--"}</td>
-                    <td className="px-4 py-3 text-slate-500">{monthAttendance[e.dateStr]?.out || "--:--"}</td>
-                    <td className="px-4 py-3 text-slate-500">{monthAttendance[e.dateStr]?.sys || "0.0h"}</td>
-                    <td className="px-4 py-3">{e.project}</td>
-                    <td className="px-4 py-3">{e.taskTitle}</td>
-                    <td className="px-4 py-3">{e.status}</td>
-                    <td className="px-4 py-3">{e.hours}h</td>
-                    <td className="px-4 py-3">
-                      {e.isHoliday ? (
-                        <span className="text-amber-600 text-xs font-bold">Holiday</span>
-                      ) : e.isDraft ? (
-                        <span className="text-slate-500 text-xs">Draft</span>
-                      ) : (
-                        <span className="text-emerald-600 text-xs font-bold">Submitted</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {!e.isHoliday && (
-                        <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => handleEdit(e)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                          </button>
-                          <button onClick={() => handleDelete(e.id!)} className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Delete">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          <style>{`
+            @keyframes successPop {
+              0%   { opacity: 0; transform: scale(0.7); }
+              100% { opacity: 1; transform: scale(1); }
+            }
+            @keyframes ripple {
+              0%   { transform: scale(1);   opacity: 0.6; }
+              100% { transform: scale(1.7); opacity: 0; }
+            }
+          `}</style>
         </div>
-      </div>
-
+      )}
     </div>
   );
 }
