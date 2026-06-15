@@ -543,8 +543,8 @@ export default function ZohoStyleEmployeeDashboard() {
     <div className="h-screen flex bg-white overflow-hidden">
 
       {/* ── SIDEBAR ── */}
-      <aside className={`fixed lg:static inset-y-0 left-0 z-50 bg-[#1a2e45] text-white flex flex-col transform transition-all duration-300 ${sidebarCollapsed ? "lg:w-16 w-64 lg:opacity-100 lg:translate-x-0" : "w-64 lg:opacity-100 lg:translate-x-0"} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
-        <div className="p-4 flex items-center justify-between border-b border-white/10 w-64">
+      <aside className={`fixed lg:static inset-y-0 left-0 z-50 bg-[#1a2e45] text-white flex flex-col transform transition-all duration-300 ${sidebarCollapsed ? "lg:w-16 w-52 lg:opacity-100 lg:translate-x-0" : "w-52 lg:opacity-100 lg:translate-x-0"} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+        <div className={`p-4 flex items-center justify-between border-b border-white/10 ${sidebarCollapsed && !mobileMenuOpen ? "w-16 justify-center px-0" : "w-52"}`}>
           {(!sidebarCollapsed || mobileMenuOpen) && (
             <div className="flex items-center gap-2 ml-2">
               <Image src="/logo.svg" alt="TGY CRM Logo" width={90} height={70} className="object-contain" />
@@ -557,45 +557,20 @@ export default function ZohoStyleEmployeeDashboard() {
           </button>
           <button onClick={() => setMobileMenuOpen(false)} className="lg:hidden p-2 hover:bg-white/10 rounded-lg">×</button>
         </div>
-        {(!sidebarCollapsed || mobileMenuOpen) && (
-          <div className="px-3 py-2.5 border-b border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full overflow-hidden shadow-lg shrink-0">
-                {profilePhoto ? (
-                  <img src={profilePhoto} alt="Profile" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center font-bold text-white">
-                    {user.email?.[0]?.toUpperCase()}
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium truncate text-sm">{user.email?.split("@")[0]}</p>
-                {activeBreak ? (
-                  <p className="text-xs text-amber-400 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse inline-block" />
-                    On {activeBreak.type} break
-                  </p>
-                ) : (
-                  <p className="text-xs text-white/60">Employee</p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-        <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20">
+
+        <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {getSidebarItems(userData?.accountType === "LEAD" || userData?.role === "lead").map(([id, label, icon]) => (
             <button key={id} onClick={() => { changeView(id); setMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-150 relative group ${activeView === id ? "bg-white/20 text-white shadow-sm border border-white/20" : "text-white/75 hover:bg-white/8 hover:text-white"
+              className={`w-full flex items-center ${sidebarCollapsed && !mobileMenuOpen ? "justify-center px-0 py-3.5" : "gap-3 px-3 py-2"} rounded-lg transition-all duration-150 relative group ${activeView === id ? "bg-white/20 text-white shadow-sm border border-white/20" : "text-white/75 hover:bg-white/8 hover:text-white"
                 }`}
               title={(sidebarCollapsed && !mobileMenuOpen) ? label : undefined}
             >
-              {activeView === id && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-blue-400 rounded-r-full" />}
-              <span className={`text-[15px] shrink-0 transition-transform duration-150 ${activeView === id ? "scale-110" : "group-hover:scale-105"}`}>{icon}</span>
+              {activeView === id && <span className={`absolute left-0 top-1/2 -translate-y-1/2 ${sidebarCollapsed && !mobileMenuOpen ? "w-1.5 h-6 rounded-r-md" : "w-1 h-5 rounded-r-full"} bg-blue-400`} />}
+              <span className={`${sidebarCollapsed && !mobileMenuOpen ? "text-xl drop-shadow-sm" : "text-[15px]"} shrink-0 transition-transform duration-150 ${activeView === id ? (sidebarCollapsed && !mobileMenuOpen ? "scale-110" : "scale-110") : (sidebarCollapsed && !mobileMenuOpen ? "group-hover:scale-110" : "group-hover:scale-105")}`}>{icon}</span>
               {(!sidebarCollapsed || mobileMenuOpen) && <span className="text-[13px] font-medium truncate">{label}</span>}
               {id === "notifications" && totalNotifications > 0 && (
                 (sidebarCollapsed && !mobileMenuOpen)
-                  ? <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+                  ? <span className="absolute top-2 right-4 w-2 h-2 bg-red-500 rounded-full shadow-sm animate-pulse" />
                   : <span className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full font-semibold shrink-0">{totalNotifications}</span>
               )}
               {(sidebarCollapsed && !mobileMenuOpen) && (

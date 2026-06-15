@@ -48,6 +48,7 @@ export default function DailySheetView() {
 
   // Form fields
   const [project, setProject] = useState("");
+  const [customProject, setCustomProject] = useState("");
   const [taskTitle, setTaskTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0]);
@@ -167,6 +168,7 @@ export default function DailySheetView() {
 
   const resetForm = () => {
     setProject(""); setProjectSearch(""); setShowProjectDropdown(false);
+    setCustomProject("");
     setTaskTitle(""); setDescription(""); setCategory(CATEGORIES[0]);
     setStatus(STATUSES[0]); setHours(""); setEditingId(null);
   };
@@ -212,7 +214,8 @@ export default function DailySheetView() {
   // ── CRUD ───────────────────────────────────────────────────
   const handleSaveEntry = async (isDraft: boolean) => {
     if (!user) return;
-    if (!project || !taskTitle) { alert("Project and Task Title are required."); return; }
+    const finalProject = project === "Other / Custom Entry" ? customProject.trim() : project.trim();
+    if (!finalProject || !taskTitle.trim()) { alert("Project and Task Title are required."); return; }
     if (!isDraft && hours === "") { alert("Hours are required to submit an entry."); return; }
     setIsSubmitting(true);
     try {
@@ -220,7 +223,7 @@ export default function DailySheetView() {
       const payload = {
         uid: user.uid,
         userName: userFullName || user.email?.split("@")[0] || "Unknown",
-        dateStr: entryDate, monthStr, project, taskTitle, description,
+        dateStr: entryDate, monthStr, project: finalProject, taskTitle: taskTitle.trim(), description,
         category, status, hours: hours === "" ? 0 : Number(hours), isDraft,
         updatedAt: serverTimestamp(),
       };
@@ -247,7 +250,17 @@ export default function DailySheetView() {
   const handleEdit = (entry: DailySheetEntry) => {
     setEditingId(entry.id!);
     setEntryDate(entry.dateStr);
-    setProject(entry.project); setProjectSearch("");
+    
+    // If the project isn't in the list, we set it as "Other" and pre-fill custom
+    const isKnownProject = projects.some(p => p.name === entry.project);
+    if (entry.project && !isKnownProject) {
+      setProject("Other / Custom Entry");
+      setCustomProject(entry.project);
+    } else {
+      setProject(entry.project);
+      setCustomProject("");
+    }
+    setProjectSearch("");
     setTaskTitle(entry.taskTitle); setDescription(entry.description || "");
     setCategory(entry.category || CATEGORIES[0]); setStatus(entry.status || STATUSES[0]);
     setHours(entry.hours); setIsModalOpen(true);
@@ -718,6 +731,12 @@ export default function DailySheetView() {
                         {projects.filter((p) => p.name.toLowerCase().includes(projectSearch.toLowerCase())).length === 0 && (
                           <li className="px-4 py-3 text-sm text-slate-400 text-center">No projects found</li>
                         )}
+                        <li
+                          onClick={() => { setProject("Other / Custom Entry"); setShowProjectDropdown(false); }}
+                          className={`px-4 py-2.5 text-sm cursor-pointer border-t border-slate-100 hover:bg-indigo-50 hover:text-indigo-700 transition ${project === "Other / Custom Entry" ? "bg-indigo-50 text-indigo-700 font-semibold" : "text-slate-700"}`}
+                        >
+                          Other / Custom Entry
+                        </li>
                       </ul>
                       {projectSearch && (
                         <div className="border-t border-slate-100 p-2">
@@ -732,6 +751,18 @@ export default function DailySheetView() {
                     </div>
                   )}
                 </div>
+                {project === "Other / Custom Entry" && (
+                  <div className="mt-3 animate-fade-in">
+                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Custom Project Name *</label>
+                    <input
+                      type="text"
+                      value={customProject}
+                      onChange={(e) => setCustomProject(e.target.value)}
+                      placeholder="Enter manual project name"
+                      className="w-full mt-1.5 px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 placeholder-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 outline-none transition"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Task Title */}
@@ -764,7 +795,7 @@ export default function DailySheetView() {
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 outline-none transition appearance-none bg-white"
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 outline-none transition bg-white"
                 >
                   {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
@@ -777,7 +808,7 @@ export default function DailySheetView() {
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 outline-none transition appearance-none bg-white"
+                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 outline-none transition bg-white"
                   >
                     {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
