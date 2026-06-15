@@ -96,6 +96,7 @@ export default function AdminDailySheetsView() {
   const [search, setSearch] = useState("");
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
 
   // Sort state
   const [sortKey, setSortKey] = useState<SortKey>("date");
@@ -536,10 +537,13 @@ export default function AdminDailySheetsView() {
                 paginated.map((e, idx) => {
                   const name = empName(e.uid);
                   const att = attendanceMap[`${e.uid}_${e.dateStr}`];
+                  const isExpanded = expandedRowId === e.id;
                   return (
-                    <tr key={e.id}
-                      className={`border-b border-slate-100 transition-colors ${idx % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-[#fafbfc] hover:bg-slate-50"}`}>
-                      <td className="px-4 py-2.5">
+                    <React.Fragment key={e.id}>
+                    <tr
+                      onClick={() => setExpandedRowId(isExpanded ? null : e.id!)}
+                      className={`border-b border-slate-100 transition-colors cursor-pointer ${idx % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-[#fafbfc] hover:bg-slate-50"}`}>
+                      <td className="px-4 py-2.5" onClick={(ev) => ev.stopPropagation()}>
                         <input type="checkbox" className="w-4 h-4 rounded border-slate-300 accent-indigo-600 cursor-pointer" />
                       </td>
                       <td className="px-3 py-2.5">
@@ -572,6 +576,23 @@ export default function AdminDailySheetsView() {
                         )}
                       </td>
                     </tr>
+                    {isExpanded && (
+                      <tr className="bg-indigo-50/40 border-b border-indigo-100">
+                        <td colSpan={10} className="px-6 py-4">
+                          <div className="text-xs text-slate-700 space-y-2 pl-6 border-l-2 border-indigo-300">
+                            <div><span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Project:</span> <span className="ml-1 font-medium text-slate-800">{e.project}</span></div>
+                            <div><span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Task Title:</span> <span className="ml-1 font-medium text-slate-800">{e.taskTitle}</span></div>
+                            {e.description && (
+                              <div>
+                                <div className="font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-1">Description:</div>
+                                <div className="bg-white border border-slate-200 rounded p-3 text-slate-600 whitespace-pre-wrap leading-relaxed shadow-sm">{e.description}</div>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   );
                 })
               )}

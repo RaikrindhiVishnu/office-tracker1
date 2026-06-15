@@ -52,10 +52,10 @@ type ChatWindow = {
 
 /* ---------------- NOTIFICATION COMPONENT ---------------- */
 
-const ChatNotification = ({ 
-  notification, 
-  onClose 
-}: { 
+const ChatNotification = ({
+  notification,
+  onClose
+}: {
   notification: {
     id: string;
     title: string;
@@ -81,7 +81,7 @@ const ChatNotification = ({
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
               <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.149-.67.149-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521.075-.148.669-1.611.916-2.206.242-.579.487-.501.669-.51l.57-.01c.198 0 .52.074.792.372s1.04 1.016 1.04 2.479 1.065 2.876 1.065 2.876 1.065 5.45-4.436 9.884-9.888 9.884-2.64 0-5.122-1.03-6.988-2.898a9.825 9.825 0 01-2.893-6.994c-.003-5.45 4.437-9.884 9.885-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.149-.67.149-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521.075-.148.669-1.611.916-2.206.242-.579.487-.501.669-.51l.57-.01c.198 0 .52.074.792.372s1.04 1.016 1.04 2.479 1.065 2.876 1.065 2.876 1.065 5.45-4.436 9.884-9.888 9.884-2.64 0-5.122-1.03-6.988-2.898a9.825 9.825 0 01-2.893-6.994c-.003-5.45 4.437-9.884 9.885-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
               </svg>
             </div>
             <span className="font-semibold text-sm">WhatsApp</span>
@@ -132,16 +132,16 @@ const ChatNotification = ({
 
 /* ---------------- PROFESSIONAL CHAT COMPONENT ---------------- */
 
-const ProfessionalChatPopup = ({ 
-  chatWindow, 
-  onClose, 
-  onMinimize, 
+const ProfessionalChatPopup = ({
+  chatWindow,
+  onClose,
+  onMinimize,
   onPositionChange,
-  allUsers 
-}: { 
-  chatWindow: ChatWindow; 
-  onClose: () => void; 
-  onMinimize: () => void; 
+  allUsers
+}: {
+  chatWindow: ChatWindow;
+  onClose: () => void;
+  onMinimize: () => void;
   onPositionChange: (position: { x: number; y: number }) => void;
   allUsers: User[];
 }) => {
@@ -254,18 +254,18 @@ const ProfessionalChatPopup = ({
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
-    
+
     const newPosition = {
       x: e.clientX - dragStart.x,
       y: e.clientY - dragStart.y,
     };
-    
+
     // Keep within viewport bounds
     const boundedPosition = {
       x: Math.max(0, Math.min(window.innerWidth - 320, newPosition.x)),
       y: Math.max(0, Math.min(window.innerHeight - 480, newPosition.y)),
     };
-    
+
     onPositionChange(boundedPosition);
   };
 
@@ -394,11 +394,10 @@ const ProfessionalChatPopup = ({
               )}
               <div className={`max-w-[70%] ${mine ? "items-end" : "items-start"}`}>
                 <div
-                  className={`px-3 py-2 rounded-lg text-sm ${
-                    mine
+                  className={`px-3 py-2 rounded-lg text-sm ${mine
                       ? "bg-blue-600 text-white rounded-br-none"
                       : "bg-white text-gray-800 rounded-bl-none border border-gray-200"
-                  }`}
+                    }`}
                 >
                   {m.deleted ? (
                     <i className="text-xs opacity-60">Message deleted</i>
@@ -512,7 +511,7 @@ const ProfessionalChatPopup = ({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
             </svg>
           </button>
-          
+
           <button
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
             className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
@@ -547,11 +546,10 @@ const ProfessionalChatPopup = ({
           <button
             onClick={sendText}
             disabled={!text.trim()}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-              text.trim()
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${text.trim()
                 ? "bg-blue-600 text-white hover:bg-blue-700"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
-            }`}
+              }`}
           >
             <svg className="w-4 h-4 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -565,16 +563,16 @@ const ProfessionalChatPopup = ({
 
 /* ---------------- SINGLE CHAT VIEW ---------------- */
 
-const SingleChatView = ({ 
-  user, 
-  onBack, 
-  allUsers, 
+const SingleChatView = ({
+  user,
+  onBack,
+  allUsers,
   onUserSelect,
-  onNewNotification 
-}: { 
-  user: User; 
-  onBack: () => void; 
-  allUsers: User[]; 
+  onNewNotification
+}: {
+  user: User;
+  onBack: () => void;
+  allUsers: User[];
   onUserSelect: (user: User) => void;
   onNewNotification?: (notification: {
     id: string;
@@ -638,7 +636,7 @@ const SingleChatView = ({
                 senderName: user.name || user.email,
                 timestamp: m.createdAt,
               };
-              
+
               onNewNotification(newNotification);
             }
           }
@@ -764,11 +762,10 @@ const SingleChatView = ({
               )}
               <div className={`max-w-[70%] ${mine ? "items-end" : "items-start"}`}>
                 <div
-                  className={`px-3 py-2 rounded-lg text-sm ${
-                    mine
+                  className={`px-3 py-2 rounded-lg text-sm ${mine
                       ? "bg-green-600 text-white rounded-br-none"
                       : "bg-white text-gray-800 rounded-bl-none border border-gray-200"
-                  }`}
+                    }`}
                 >
                   {m.deleted ? (
                     <i className="text-xs opacity-60">Message deleted</i>
@@ -882,7 +879,7 @@ const SingleChatView = ({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
             </svg>
           </button>
-          
+
           <button
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
             className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
@@ -917,11 +914,10 @@ const SingleChatView = ({
           <button
             onClick={sendText}
             disabled={!text.trim()}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-              text.trim()
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${text.trim()
                 ? "bg-green-600 text-white hover:bg-green-700"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
-            }`}
+              }`}
           >
             <svg className="w-4 h-4 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -985,7 +981,7 @@ export default function ProfessionalChatSystem({ users, onClose }: { users: User
               <div className="bg-green-600 text-white px-4 py-3 rounded-t-lg flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.149-.67.149-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521.075-.148.669-1.611.916-2.206.242-.579.487-.501.669-.51l.57-.01c.198 0 .52.074.792.372s1.04 1.016 1.04 2.479 1.065 2.876 1.065 2.876 1.065 5.45-4.436 9.884-9.888 9.884-2.64 0-5.122-1.03-6.988-2.898a9.825 9.825 0 01-2.893-6.994c-.003-5.45 4.437-9.884 9.885-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.149-.67.149-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521.075-.148.669-1.611.916-2.206.242-.579.487-.501.669-.51l.57-.01c.198 0 .52.074.792.372s1.04 1.016 1.04 2.479 1.065 2.876 1.065 2.876 1.065 5.45-4.436 9.884-9.888 9.884-2.64 0-5.122-1.03-6.988-2.898a9.825 9.825 0 01-2.893-6.994c-.003-5.45 4.437-9.884 9.885-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
                   </svg>
                   <h2 className="text-lg font-semibold">chat</h2>
                 </div>
@@ -1047,8 +1043,8 @@ export default function ProfessionalChatSystem({ users, onClose }: { users: User
           ) : (
             <>
               {/* Chat View */}
-              <SingleChatView 
-                user={selectedUser} 
+              <SingleChatView
+                user={selectedUser}
                 onBack={() => setSelectedUser(null)}
                 allUsers={users}
                 onUserSelect={openChat}

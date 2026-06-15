@@ -36,6 +36,7 @@ export default function DailySheetView() {
   const [monthAttendance, setMonthAttendance] = useState<Record<string, { in: string; out: string; sys: string }>>({});
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -556,17 +557,19 @@ export default function DailySheetView() {
                     <React.Fragment key={dateStr}>
                       {dayEntries.map((e, idx) => {
                         const isSelected = selectedIds.has(e.id!);
+                        const isExpanded = expandedRowId === e.id;
                         return (
+                          <React.Fragment key={e.id}>
                           <tr
-                            key={e.id}
-                            className={`border-b border-slate-100 transition-colors ${isSelected
+                            onClick={() => setExpandedRowId(isExpanded ? null : e.id!)}
+                            className={`border-b border-slate-100 transition-colors cursor-pointer ${isSelected
                                 ? "bg-indigo-50"
                                 : idx % 2 === 0
                                   ? "bg-white hover:bg-slate-50"
                                   : "bg-[#fafbfc] hover:bg-slate-50"
                               }`}
                           >
-                            <td className="px-4 py-3">
+                            <td className="px-4 py-3" onClick={(ev) => ev.stopPropagation()}>
                               <input
                                 type="checkbox"
                                 checked={isSelected}
@@ -613,7 +616,7 @@ export default function DailySheetView() {
                                 <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">Submitted</span>
                               )}
                             </td>
-                            <td className="px-3 py-3 text-right">
+                            <td className="px-3 py-3 text-right" onClick={(ev) => ev.stopPropagation()}>
                               {!e.isHoliday && (
                                 <div className="flex items-center justify-end gap-1">
                                   <button
@@ -638,6 +641,23 @@ export default function DailySheetView() {
                               )}
                             </td>
                           </tr>
+                          {isExpanded && (
+                            <tr className="bg-indigo-50/40 border-b border-indigo-100">
+                              <td colSpan={10} className="px-6 py-4">
+                                <div className="text-xs text-slate-700 space-y-2 pl-6 border-l-2 border-indigo-300">
+                                  <div><span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Project:</span> <span className="ml-1 font-medium text-slate-800">{e.project}</span></div>
+                                  <div><span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Task Title:</span> <span className="ml-1 font-medium text-slate-800">{e.taskTitle}</span></div>
+                                  {e.description && (
+                                    <div>
+                                      <div className="font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-1">Description:</div>
+                                      <div className="bg-white border border-slate-200 rounded p-3 text-slate-600 whitespace-pre-wrap leading-relaxed shadow-sm">{e.description}</div>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                          </React.Fragment>
                         );
                       })}
                     </React.Fragment>

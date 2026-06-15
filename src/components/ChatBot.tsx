@@ -39,6 +39,50 @@ export default function ChatBot({ isInline = false }: { isInline?: boolean }) {
   const [hasSubmittedToday, setHasSubmittedToday] = useState(true);
   const [isWorkUpdateFlowActive, setIsWorkUpdateFlowActive] = useState(false);
 
+  // Dragging state
+  const [position, setPosition] = useState({ right: 24, bottom: 24 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragInfo = useRef({ startX: 0, startY: 0, initRight: 0, initBottom: 0, wasDragged: false });
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Check if the click originated from the header or the main button
+    const target = e.target as HTMLElement;
+    if (target.closest('.chat-dragger')) {
+      setIsDragging(true);
+      dragInfo.current = { startX: e.clientX, startY: e.clientY, initRight: position.right, initBottom: position.bottom, wasDragged: false };
+    }
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+      const dx = e.clientX - dragInfo.current.startX;
+      const dy = e.clientY - dragInfo.current.startY;
+      
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        dragInfo.current.wasDragged = true;
+      }
+      
+      setPosition({
+        right: Math.max(0, Math.min(window.innerWidth - 80, dragInfo.current.initRight - dx)),
+        bottom: Math.max(0, Math.min(window.innerHeight - 80, dragInfo.current.initBottom - dy)),
+      });
+    };
+    const handleMouseUp = () => {
+      // Delay resetting isDragging so onClick handlers can check wasDragged if needed
+      setTimeout(() => setIsDragging(false), 50);
+    };
+
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
+
   const MENU_CATEGORIES = [
     { id: "attendance", label: "Attendance",    icon: "🟢",
       options: ["Check me in", "Check me out", "My attendance today"] },
@@ -365,7 +409,11 @@ export default function ChatBot({ isInline = false }: { isInline?: boolean }) {
   if (!userData) return null;
 
   return (
-    <div className={isInline ? "flex flex-col h-[calc(100vh-140px)] w-full relative" : "fixed bottom-6 right-6 z-[9999] flex flex-col items-end"}>
+    <div 
+      className={isInline ? "flex flex-col h-[calc(100vh-140px)] w-full relative" : "fixed z-[9999] flex flex-col items-end"}
+      style={isInline ? undefined : { right: position.right, bottom: position.bottom }}
+      onMouseDown={isInline ? undefined : handleMouseDown}
+    >
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -378,8 +426,8 @@ export default function ChatBot({ isInline = false }: { isInline?: boolean }) {
             style={isInline ? { height: "100%", maxHeight: "100%" } : { height: "500px", maxHeight: "80vh" }}
           >
             {/* Header */}
-            <div className="bg-linear-to-r from-[#0b3a5a] to-[#1a5276] p-4 flex justify-between items-center shadow-md z-10">
-              <div className="flex items-center gap-3">
+            <div className="bg-linear-to-r from-[#0b3a5a] to-[#1a5276] p-4 flex justify-between items-center shadow-md z-10 chat-dragger cursor-move">
+              <div className="flex items-center gap-3 pointer-events-none">
                 <div className="bg-white/20 p-2 rounded-lg">
                   <Bot size={20} className="text-white" />
                 </div>
@@ -580,8 +628,10 @@ export default function ChatBot({ isInline = false }: { isInline?: boolean }) {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => setIsOpen(!isOpen)}
-            className="bg-linear-to-r from-[#0b3a5a] to-[#1a5276] text-white p-4 rounded-full shadow-xl hover:shadow-2xl transition-all flex items-center justify-center border-2 border-white/20 cursor-pointer"
+            onClick={(e) => {
+              if (!dragInfo.current.wasDragged) setIsOpen(!isOpen);
+            }}
+            className="bg-linear-to-r from-[#0b3a5a] to-[#1a5276] text-white p-4 rounded-full shadow-xl hover:shadow-2xl transition-all flex items-center justify-center border-2 border-white/20 cursor-pointer chat-dragger cursor-move"
           >
             {isOpen ? <X size={24} /> : <MessageCircle size={24} />}
           </motion.button>

@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/firebaseAdmin";
 import { sendEmail } from "@/lib/email";
+import path from "path";
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,12 +41,19 @@ export async function POST(req: NextRequest) {
         // Replace {name} placeholder for personalisation
         const personalBody = body.replace(/\{name\}/gi, r.name || r.email);
 
+        const logoPath = path.join(process.cwd(), "public", "logo.svg");
+        const logoAttachment = {
+          filename: "logo.svg",
+          path: logoPath,
+          cid: "companylogo"
+        };
+        const allAttachments = [...attachments, logoAttachment];
+
         await sendEmail({
           to: r.email,
           subject: subject.trim(),
           html: buildMailHtml(personalBody, r.name, priority),
-          // Pass attachments if your sendEmail helper supports it
-          ...(attachments.length > 0 ? { attachments } : {}),
+          attachments: allAttachments,
         });
 
         await db.collection("greetingLogs").add({
@@ -98,21 +106,21 @@ export async function POST(req: NextRequest) {
 
 function buildMailHtml(body: string, recipientName: string, priority: string): string {
   const isHigh = priority === "high";
+  const cleanBody = body.trim().replace(/\n/g, '<br/>');
 
-  const cleanBody = body.trim();
-  const content = `
-    <div style="font-size:15px;color:#334155;line-height:1.75;white-space:pre-line;">
-${cleanBody}
+  return `
+    <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.6; max-width: 600px; margin: 0 auto; padding: 20px;">
+      ${isHigh ? '<p style="color: #dc2626; font-weight: bold;">[High Priority]</p>' : ''}
+      <p>Hi ${recipientName || 'Team'},</p>
+      <div style="margin-top: 15px; margin-bottom: 30px;">
+        ${cleanBody}
+      </div>
+      <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 13px; color: #666;">
+        <img src="cid:companylogo" alt="Techgy Innovations Logo" style="max-width: 130px; height: auto; margin-bottom: 10px;" />
+        <p style="margin: 0; font-weight: bold; color: #1e3a8a;">HR Team</p>
+        <p style="margin: 3px 0 0 0;">Techgy Innovations</p>
+        <a href="https://techgyinnovations.com" style="color: #2563eb; text-decoration: none;">www.techgyinnovations.com</a>
+      </div>
     </div>
   `;
-
-  const { buildMncEmailHtml } = require("@/lib/emailTemplate");
-  
-  return buildMncEmailHtml(
-    isHigh ? "Important Message" : "Message from HR",
-    isHigh ? "🔴" : "✉️",
-    isHigh ? "This is a high priority message — please read carefully." : "",
-    recipientName || "Team Member",
-    content
-  );
 }
