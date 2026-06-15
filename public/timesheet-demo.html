@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>TechGy Innovations – Time Sheets Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --p:#7c3aed;--pl:#a78bfa;--pd:#5b21b6;
+  --g:#10b981;--o:#f59e0b;
+}
+
+/* ── BODY: soft white animated gradient ── */
+body{
+  font-family:'Inter',sans-serif;overflow:hidden;
+  width:100vw;height:100vh;
+  display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,#f0ebff 0%,#e8f0fe 30%,#edfcf5 60%,#fff8ec 85%,#f0ebff 100%);
+  background-size:400% 400%;
+  animation:bgShift 20s ease infinite;
+}
+@keyframes bgShift{
+  0%{background-position:0% 50%}
+  50%{background-position:100% 50%}
+  100%{background-position:0% 50%}
+}
+
+/* ── STAGE ── */
+#stage{
+  position:relative;width:1280px;height:720px;
+  background:#ffffff;
+  border-radius:20px;overflow:hidden;
+  border:1px solid rgba(124,58,237,.15);
+  box-shadow:
+    0 0 0 1px rgba(124,58,237,.08),
+    0 8px 32px rgba(124,58,237,.12),
+    0 32px 80px rgba(0,0,0,.12),
+    inset 0 1px 0 rgba(255,255,255,.9);
+}
+
+/* ── MESH CANVAS ── */
+#mesh{position:absolute;inset:0;z-index:0;opacity:.35}
+
+/* ── SCENES ── */
+.scene{
+  position:absolute;inset:0;z-index:2;
+  opacity:0;transition:opacity .38s ease;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+}
+.scene.active{opacity:1}
+.screen-scene{
+  background:#f8f9fc;
+  flex-direction:column;
+}
+
+/* ── INTRO ── */
+#s0{
+  background:
+    radial-gradient(ellipse at 25% 35%,rgba(124,58,237,.12) 0%,transparent 55%),
+    radial-gradient(ellipse at 80% 70%,rgba(16,185,129,.10) 0%,transparent 50%),
+    radial-gradient(ellipse at 60% 20%,rgba(96,165,250,.10) 0%,transparent 40%),
+    linear-gradient(135deg,#faf8ff 0%,#f0f9ff 100%);
+}
+.intro-logo{display:flex;align-items:center;gap:14px;margin-bottom:24px;animation:fadeUp .7s ease both}
+.intro-icon{width:62px;height:62px;border-radius:16px;
+  background:linear-gradient(135deg,var(--p),var(--pl));
+  display:flex;align-items:center;justify-content:center;
+  font-size:26px;font-weight:900;color:#fff;
+  box-shadow:0 8px 30px rgba(124,58,237,.35)}
+.intro-brand{font-size:26px;font-weight:800;letter-spacing:-.5px;color:#1e1b3a}
+.intro-brand span{color:var(--p)}
+.intro-headline{font-size:48px;font-weight:900;text-align:center;
+  line-height:1.12;letter-spacing:-1.5px;color:#1e1b3a;
+  animation:fadeUp .7s .15s ease both}
+.intro-headline em{font-style:normal;
+  background:linear-gradient(90deg,#7c3aed,#3b82f6,#10b981);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.intro-sub{margin-top:16px;font-size:17px;color:#64748b;
+  text-align:center;max-width:560px;line-height:1.7;
+  animation:fadeUp .7s .3s ease both}
+.intro-pills{margin-top:28px;display:flex;gap:10px;animation:fadeUp .7s .45s ease both}
+.pill{padding:8px 20px;border-radius:50px;font-size:12px;font-weight:700;
+  letter-spacing:.8px;text-transform:uppercase;
+  border:1px solid rgba(124,58,237,.2);
+  background:rgba(124,58,237,.07);color:var(--p)}
+.pill.active{background:linear-gradient(90deg,var(--p),var(--pd));
+  border-color:transparent;color:#fff;
+  box-shadow:0 4px 18px rgba(124,58,237,.3)}
+
+/* ── SCENE HEADER ── */
+.scene-header{
+  position:absolute;top:0;left:0;right:0;height:52px;
+  display:flex;align-items:center;padding:0 28px;
+  background:rgba(255,255,255,.96);backdrop-filter:blur(16px);
+  border-bottom:1px solid rgba(124,58,237,.12);z-index:10;
+  gap:10px;
+}
+.scene-badge{
+  padding:4px 13px;border-radius:20px;font-size:10px;
+  font-weight:700;letter-spacing:.8px;text-transform:uppercase;
+  background:linear-gradient(90deg,var(--p),var(--pd));color:#fff;
+  box-shadow:0 2px 10px rgba(124,58,237,.25)}
+.scene-title{font-size:13px;font-weight:600;color:#334155}
+.scene-step{margin-left:auto;font-size:11px;color:#94a3b8;font-weight:500}
+
+.screen-container{
+  margin-top:52px;flex:1;
+  display:flex;align-items:center;justify-content:center;
+  padding:12px 32px 8px;position:relative;
+}
+.mockup{
+  width:100%;max-width:1100px;border-radius:10px;overflow:hidden;
+  box-shadow:
+    0 0 0 1px rgba(124,58,237,.14),
+    0 4px 20px rgba(124,58,237,.08),
+    0 16px 40px rgba(0,0,0,.1);
+  position:relative;
+}
+
+/* ── VO BAR ── */
+#vo-bar{
+  position:absolute;bottom:0;left:0;right:0;z-index:22;
+  padding:14px 32px 18px;
+  background:linear-gradient(to top,rgba(255,255,255,.99) 0%,rgba(255,255,255,.92) 65%,transparent 100%);
+}
+#vo-text{
+  font-size:15px;line-height:1.72;color:#334155;
+  max-width:950px;margin:0 auto;text-align:center;min-height:44px;
+  transition:opacity .3s;
+}
+#vo-text strong{color:var(--p)}
+#vo-text em{font-style:normal;color:#059669}
+
+/* ── VOICE INDICATOR ── */
+#vi{
+  position:absolute;top:13px;left:50%;transform:translateX(-50%);
+  z-index:32;display:none;align-items:center;gap:5px;
+  background:#fff;border:1px solid rgba(124,58,237,.25);
+  border-radius:20px;padding:4px 12px;font-size:10px;
+  color:var(--p);font-weight:600;letter-spacing:.5px;
+  box-shadow:0 2px 8px rgba(124,58,237,.12);
+}
+#vi.show{display:flex}
+.vb{width:2.5px;background:var(--pl);border-radius:3px;
+  animation:vib .55s ease infinite alternate}
+.vb:nth-child(1){height:4px;animation-delay:0s}
+.vb:nth-child(2){height:10px;animation-delay:.1s}
+.vb:nth-child(3){height:15px;animation-delay:.2s}
+.vb:nth-child(4){height:10px;animation-delay:.3s}
+.vb:nth-child(5){height:4px;animation-delay:.4s}
+
+/* ── CURSOR ── */
+#cursor{
+  position:absolute;width:20px;height:20px;z-index:30;pointer-events:none;
+  transition:left .75s cubic-bezier(.4,0,.2,1),top .75s cubic-bezier(.4,0,.2,1);
+  display:none;
+}
+#cursor svg{width:20px;height:20px;filter:drop-shadow(0 2px 5px rgba(0,0,0,.5))}
+#cursor.click{animation:cClick .22s ease}
+.rdot{position:absolute;width:14px;height:14px;border-radius:50%;
+  background:rgba(124,58,237,.65);pointer-events:none;
+  animation:rip .45s ease forwards;
+  transform-origin:center;margin-left:-7px;margin-top:-7px;z-index:29}
+
+/* ── PROGRESS ── */
+#prog-wrap{position:absolute;bottom:0;left:0;right:0;height:2.5px;z-index:42}
+#prog{height:100%;width:0%;
+  background:linear-gradient(90deg,#7c3aed,#a78bfa,#60a5fa,#34d399);
+  transition:width .25s linear}
+
+/* ── PLAY OVERLAY ── */
+#ply-overlay{
+  position:absolute;inset:0;z-index:50;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  background:
+    radial-gradient(ellipse at 40% 40%,rgba(124,58,237,.08) 0%,transparent 55%),
+    radial-gradient(ellipse at 70% 65%,rgba(16,185,129,.07) 0%,transparent 50%),
+    #ffffff;
+}
+#ply-btn{
+  width:86px;height:86px;border-radius:50%;
+  background:linear-gradient(135deg,var(--p),var(--pl));
+  border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 0 16px rgba(124,58,237,.08),0 8px 36px rgba(124,58,237,.35);
+  transition:transform .2s,box-shadow .2s;
+  animation:pulse 2.5s ease infinite;
+}
+#ply-btn:hover{transform:scale(1.1)}
+#ply-btn svg{width:34px;height:34px;fill:#fff;margin-left:4px}
+.ply-label{margin-top:20px;font-size:15px;color:#475569;letter-spacing:.4px;font-weight:600}
+.ply-badge{
+  margin-top:8px;padding:5px 16px;border-radius:20px;
+  background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);
+  font-size:12px;color:var(--p);font-weight:600;
+}
+.ply-note{margin-top:12px;font-size:11px;color:#64748b;
+  background:rgba(124,58,237,.05);border:1px solid rgba(124,58,237,.12);
+  padding:5px 14px;border-radius:10px}
+
+/* ── TIMELINE ── */
+#tl{
+  position:absolute;bottom:84px;left:50%;transform:translateX(-50%);
+  display:none;gap:6px;z-index:26;
+}
+.tld{width:7px;height:7px;border-radius:50%;
+  background:rgba(124,58,237,.18);transition:all .35s ease;cursor:pointer}
+.tld.active{background:var(--p);box-shadow:0 0 7px rgba(124,58,237,.35);
+  width:22px;border-radius:3.5px}
+.tld.done{background:rgba(124,58,237,.38)}
+
+/* ── CONTROLS ── */
+#ctrl{
+  position:absolute;bottom:66px;right:28px;z-index:26;
+  display:none;gap:8px;
+}
+.cbtn{
+  width:34px;height:34px;border-radius:50%;
+  border:1px solid rgba(124,58,237,.2);
+  background:rgba(255,255,255,.9);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  color:#7c3aed;font-size:12px;transition:background .2s;
+  box-shadow:0 2px 8px rgba(0,0,0,.08);
+}
+.cbtn:hover{background:var(--p);color:#fff;border-color:var(--p)}
+
+/* ── DROPDOWN ── */
+.ddmock{
+  position:absolute;background:#fff;border-radius:11px;
+  box-shadow:0 14px 44px rgba(0,0,0,.25);padding:9px;min-width:215px;
+  z-index:22;opacity:0;transform:scale(.94) translateY(-6px);
+  transition:opacity .3s ease,transform .3s ease;pointer-events:none;
+}
+.ddmock.open{opacity:1;transform:scale(1) translateY(0)}
+.ddi{display:flex;align-items:center;gap:9px;padding:9px 11px;
+  border-radius:7px;font-size:13px;font-weight:500;color:#334155;cursor:default}
+.ddi.sel{background:#f5f3ff;color:var(--p);font-weight:600}
+.ddi.hl{background:#f5f3ff}
+.dchk{margin-left:auto;color:var(--p);font-size:14px}
+
+/* ── MODAL ── */
+.modal-wrap{
+  position:absolute;inset:0;background:rgba(0,0,0,.4);z-index:26;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity .35s ease;pointer-events:none;
+}
+.modal-wrap.open{opacity:1;pointer-events:auto}
+.modal-box{
+  background:#fff;border-radius:14px;padding:24px 26px;width:490px;
+  box-shadow:0 20px 60px rgba(0,0,0,.3);
+  transform:translateY(16px);transition:transform .35s ease;
+}
+.modal-wrap.open .modal-box{transform:translateY(0)}
+.fl{font-size:9px;font-weight:700;text-transform:uppercase;
+  letter-spacing:1px;color:#94a3b8;margin-bottom:5px}
+.fi{border:1px solid #e2e8f0;border-radius:7px;padding:8px 10px;
+  font-size:12px;color:#334155;background:#fff;width:100%;font-family:Inter,sans-serif}
+.fi.filled{background:#f8f7ff;border-color:#c4b5fd;color:#334155}
+.fi.typed{border-color:#7c3aed;background:#faf5ff}
+
+/* ── HIGHLIGHT RING ── */
+.hring{
+  position:absolute;border-radius:6px;
+  border:2px solid rgba(124,58,237,.8);
+  background:rgba(124,58,237,.1);
+  box-shadow:0 0 0 4px rgba(124,58,237,.2),0 0 16px rgba(124,58,237,.25);
+  pointer-events:none;
+  opacity:0;transition:all .45s cubic-bezier(.34,1.56,.64,1);
+}
+.hring.show{opacity:1}
+
+/* ── WATERMARK ── */
+#wm{position:absolute;top:12px;right:16px;z-index:13;
+  font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  color:rgba(124,58,237,.25)}
+
+/* ── OUTRO ── */
+#s6{
+  background:
+    radial-gradient(ellipse at 25% 30%,rgba(124,58,237,.1) 0%,transparent 50%),
+    radial-gradient(ellipse at 78% 70%,rgba(16,185,129,.1) 0%,transparent 48%),
+    radial-gradient(ellipse at 55% 55%,rgba(96,165,250,.08) 0%,transparent 45%),
+    linear-gradient(135deg,#faf8ff 0%,#f0f9ff 100%);
+}
+.outro-inner{text-align:center;animation:fadeUp .7s ease both}
+.outro-logo{font-size:42px;font-weight:900;letter-spacing:-1px;
+  background:linear-gradient(90deg,#7c3aed,#3b82f6,#10b981);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.outro-tag{margin-top:10px;font-size:19px;color:#64748b}
+.outro-stats{margin-top:32px;display:flex;gap:44px;justify-content:center}
+.ostat .sn{font-size:34px;font-weight:900;color:var(--p)}
+.ostat .sl{font-size:11px;color:#94a3b8;margin-top:3px;font-weight:500;letter-spacing:.5px;text-transform:uppercase}
+.outro-cta{
+  margin-top:32px;display:inline-block;
+  padding:14px 44px;border-radius:50px;
+  background:linear-gradient(90deg,var(--p),var(--pd));
+  font-size:15px;font-weight:700;color:#fff;border:none;cursor:pointer;
+  box-shadow:0 8px 28px rgba(124,58,237,.3);
+  transition:transform .2s,box-shadow .2s;
+}
+.outro-cta:hover{transform:translateY(-2px);box-shadow:0 12px 36px rgba(124,58,237,.4)}
+.outro-divider{
+  margin:20px auto 0;width:120px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(124,58,237,.3),transparent);
+}
+
+/* ── EXPORT SUCCESS ── */
+#export-success{
+  display:none;
+  background:linear-gradient(135deg,#f0fdf4,#dcfce7);
+  border:1.5px solid #86efac;border-radius:10px;
+  padding:18px 22px;margin-bottom:12px;text-align:center;
+  animation:fadeUp .45s ease;
+}
+
+/* ── PROJ DROPDOWN ── */
+.pdi{padding:10px 12px;font-size:12px;color:#334155;cursor:default;
+  border-bottom:1px solid #f8f7ff;transition:background .15s}
+.pdi.hl{background:#f5f3ff;color:var(--p);font-weight:600}
+.pdi:last-child{border-bottom:none}
+
+/* ── ANIMS ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{
+  0%,100%{box-shadow:0 0 0 16px rgba(124,58,237,.12),0 8px 36px rgba(124,58,237,.5)}
+  50%{box-shadow:0 0 0 24px rgba(124,58,237,.06),0 8px 50px rgba(124,58,237,.3)}}
+@keyframes cClick{0%{transform:scale(1)}40%{transform:scale(.72)}100%{transform:scale(1)}}
+@keyframes rip{0%{transform:scale(0);opacity:.7}100%{transform:scale(2.6);opacity:0}}
+@keyframes vib{from{transform:scaleY(.5)}to{transform:scaleY(1)}}
+@keyframes succPop{from{opacity:0;transform:scale(.88)}to{opacity:1;transform:scale(1)}}
+@keyframes rowIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="mesh"></canvas>
+  <div id="wm">TechGy Innovations</div>
+  <div id="vi"><div class="vb"></div><div class="vb"></div><div class="vb"></div><div class="vb"></div><div class="vb"></div><span style="margin-left:5px;font-size:10px;">Speaking</span></div>
+
+  <!-- PLAY OVERLAY -->
+  <div id="ply-overlay">
+    <button id="ply-btn"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+    <div class="ply-label">Time Sheets Feature Demo</div>
+    <div class="ply-badge">⏱ ~2:30 min · With Live Voice</div>
+    <div class="ply-note">🔊 Ensure speakers are on — this demo narrates itself</div>
+  </div>
+
+  <!-- ═══ S0 INTRO ═══ -->
+  <div class="scene" id="s0">
+    <div class="intro-logo">
+      <div class="intro-icon">T</div>
+      <div class="intro-brand">Tech<span>Gy</span> Innovations</div>
+    </div>
+    <div class="intro-headline">Master <em>Time Sheets</em><br/>from Entry to Export</div>
+    <div class="intro-sub">A complete walkthrough of the Time Sheets module — from how employees log daily tasks, to how administrators track, filter, and export team-wide data.</div>
+    <div class="intro-pills">
+      <div class="pill active">Employee View</div>
+      <div class="pill">Admin Overview</div>
+      <div class="pill">Filters & Export</div>
+    </div>
+  </div>
+
+  <!-- ═══ S1 EMPLOYEE DAILY SHEET ═══ -->
+  <div class="scene screen-scene" id="s1">
+    <div class="scene-header">
+      <span class="scene-badge">Employee</span>
+      <span class="scene-title">Daily Time Sheet — Personal View</span>
+      <span class="scene-step">1 of 6</span>
+    </div>
+    <div class="screen-container">
+      <div class="mockup" style="background:#f8f7ff;font-family:Inter,sans-serif;">
+        <!-- Topbar -->
+        <div style="background:#1e293b;padding:9px 18px;display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="background:linear-gradient(135deg,#7c3aed,#a78bfa);width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:12px;">T</div>
+            <div style="font-size:10px;font-weight:800;color:#fff;line-height:1.3;">TechGy<br/><span style="color:#a78bfa;font-size:8px;font-weight:500;">Innovations</span></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:7px;">
+            <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:20px;padding:3px 10px;font-size:10px;font-weight:700;color:#856404;">⏱ 05:14:32</div>
+            <div style="background:#dcfce7;border:1px solid #86efac;border-radius:20px;padding:3px 10px;font-size:10px;font-weight:600;color:#166534;">🟢 Working ▾</div>
+            <div style="background:linear-gradient(90deg,#dc2626,#ef4444);color:#fff;padding:4px 12px;border-radius:7px;font-size:10px;font-weight:600;">Check Out</div>
+            <div style="width:28px;height:28px;background:linear-gradient(135deg,#7c3aed,#a78bfa);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:11px;">R</div>
+          </div>
+        </div>
+        <div style="display:flex;height:380px;">
+          <!-- Sidebar -->
+          <div style="width:148px;background:#1e293b;padding:10px 0;flex-shrink:0;">
+            <div style="padding:6px 0;text-align:center;margin-bottom:6px;">
+              <div style="width:32px;height:32px;background:linear-gradient(135deg,#7c3aed,#a78bfa);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:11px;margin-bottom:3px;">R</div>
+              <div style="font-size:9px;font-weight:600;color:#e2e8f0;">raikrindhiv</div>
+              <div style="font-size:8px;color:#475569;">employee</div>
+            </div>
+            <div style="padding:6px 13px;font-size:10px;display:flex;align-items:center;gap:5px;color:#64748b;">🏠<span>Dashboard</span></div>
+            <div style="padding:6px 13px;font-size:10px;display:flex;align-items:center;gap:5px;color:#64748b;">✅<span>My Tasks</span></div>
+            <div style="padding:6px 13px;font-size:10px;display:flex;align-items:center;gap:5px;color:#64748b;">📝<span>Work Update</span></div>
+            <div style="padding:6px 13px;font-size:10px;background:rgba(124,58,237,.22);border-left:3px solid #7c3aed;display:flex;align-items:center;gap:5px;">📄<span style="color:#fff;font-weight:600;">Time Sheet</span></div>
+            <div style="padding:6px 13px;font-size:10px;display:flex;align-items:center;gap:5px;color:#64748b;">📋<span>Attendance</span></div>
+            <div style="padding:6px 13px;font-size:10px;display:flex;align-items:center;gap:5px;color:#64748b;">📁<span>Projects</span></div>
+            <div style="padding:6px 13px;font-size:10px;display:flex;align-items:center;gap:5px;color:#64748b;">💰<span>Payslips</span></div>
+            <div style="padding:6px 13px;font-size:10px;display:flex;align-items:center;gap:5px;color:#64748b;">🌴<span>Apply Leave</span></div>
+            <div style="padding:6px 13px;font-size:10px;display:flex;align-items:center;gap:5px;color:#64748b;">👤<span>Profile</span></div>
+            <div style="padding:6px 13px;font-size:10px;display:flex;align-items:center;gap:5px;color:#64748b;">❓<span>Help</span></div>
+          </div>
+          <!-- Content -->
+          <div style="flex:1;padding:14px 18px;background:#f8f7ff;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <div style="font-size:16px;font-weight:800;color:#1e1b3a;display:flex;align-items:center;gap:7px;">📋 <span>Time Sheet</span></div>
+              <div style="display:flex;align-items:center;gap:7px;">
+                <input type="date" value="2026-06-12" style="border:1px solid #e2e8f0;border-radius:7px;padding:4px 9px;font-size:11px;color:#334155;"/>
+                <button style="background:linear-gradient(90deg,#059669,#10b981);color:#fff;border:none;padding:5px 14px;border-radius:7px;font-size:11px;font-weight:600;box-shadow:0 3px 10px rgba(16,185,129,.35);">Export</button>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <div style="font-size:12px;font-weight:700;color:#334155;">📋 Entries for Fri, June 12, 2026</div>
+              <button id="add-entry-btn" style="background:linear-gradient(90deg,#1e293b,#334155);color:#fff;border:none;padding:5px 13px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.18);">+ Add Entry</button>
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:11px;background:#fff;border-radius:8px;border:1px solid #e8e5f5;overflow:hidden;">
+              <thead><tr style="border-bottom:1px solid #e8e5f5;background:#fafafa;">
+                <th style="text-align:left;padding:7px 9px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;letter-spacing:.5px;">Date</th>
+                <th style="text-align:left;padding:7px 9px;color:#7c3aed;font-size:8.5px;text-transform:uppercase;font-weight:700;">IN</th>
+                <th style="text-align:left;padding:7px 9px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">OUT</th>
+                <th style="text-align:left;padding:7px 9px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">Total Hrs</th>
+                <th style="text-align:left;padding:7px 9px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">Project</th>
+                <th style="text-align:left;padding:7px 9px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">Task Title</th>
+                <th style="text-align:left;padding:7px 9px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">Status</th>
+                <th style="text-align:left;padding:7px 9px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">Task HRS</th>
+                <th style="text-align:left;padding:7px 9px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">State</th>
+                <th style="text-align:left;padding:7px 9px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">Actions</th>
+              </tr></thead>
+              <tbody id="emp-tbody">
+                <tr style="border-bottom:1px solid #f1f5f9;">
+                  <td style="padding:8px 9px;color:#64748b;">2026-06-12</td>
+                  <td style="padding:8px 9px;color:#7c3aed;font-weight:600;">01:45 PM</td>
+                  <td style="padding:8px 9px;color:#94a3b8;">-:-</td>
+                  <td style="padding:8px 9px;color:#334155;">5.4h</td>
+                  <td style="padding:8px 9px;color:#334155;">GLC CCS</td>
+                  <td style="padding:8px 9px;color:#334155;">qcdswdf</td>
+                  <td style="padding:8px 9px;color:#059669;font-weight:600;">Completed</td>
+                  <td style="padding:8px 9px;color:#334155;">1h</td>
+                  <td style="padding:8px 9px;"><span style="color:#f59e0b;font-weight:600;font-size:10px;">Submitted</span></td>
+                  <td style="padding:8px 9px;"><span style="color:#7c3aed;margin-right:5px;cursor:pointer;font-size:12px;">✏️</span><span style="color:#ef4444;cursor:pointer;font-size:12px;">🗑</span></td>
+                </tr>
+              </tbody>
+            </table>
+            <!-- ADD TASK MODAL -->
+            <div class="modal-wrap" id="add-modal">
+              <div class="modal-box">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+                  <div style="font-size:16px;font-weight:700;color:#1e1b3a;">Add Task Entry</div>
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <button style="background:#f1f5f9;border:1px solid #e2e8f0;color:#64748b;padding:5px 12px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;">Save Draft</button>
+                    <button id="mcls" style="background:none;border:none;font-size:16px;color:#94a3b8;cursor:pointer;">✕</button>
+                  </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                  <div style="position:relative;">
+                    <div class="fl">Project *</div>
+                    <div id="proj-trigger" style="border:1px solid #e2e8f0;border-radius:7px;padding:8px 10px;font-size:12px;color:#94a3b8;background:#fff;display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+                      <span id="proj-txt">Select project...</span><span style="font-size:10px;color:#94a3b8;">▾</span>
+                    </div>
+                    <div id="pdrop" style="position:absolute;top:56px;left:0;right:0;background:#fff;border-radius:9px;box-shadow:0 10px 32px rgba(0,0,0,.18);z-index:55;border:1px solid #e8e5f5;overflow:hidden;opacity:0;transform:translateY(-6px) scale(.97);transition:all .28s ease;pointer-events:none;">
+                      <div style="padding:7px 9px;border-bottom:1px solid #f1f5f9;">
+                        <div style="display:flex;align-items:center;gap:5px;background:#f8f7ff;border-radius:6px;padding:5px 9px;font-size:11px;color:#94a3b8;">🔍 Search projects...</div>
+                      </div>
+                      <div class="pdi" data-v="CRM">CRM</div>
+                      <div class="pdi" data-v="GLC - Role Manager">GLC - Role Manager</div>
+                      <div class="pdi" data-v="Eco World">Eco World</div>
+                      <div class="pdi" data-v="Veda Bharath Admin Dashboard">Veda Bharath Admin Dashboard</div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="fl">Task Title *</div>
+                    <input class="fi" id="ttitle" type="text" placeholder="What did you work on?"/>
+                  </div>
+                </div>
+                <div style="margin-bottom:12px;">
+                  <div class="fl">Description</div>
+                  <textarea class="fi" placeholder="Brief description (optional)" style="height:50px;resize:none;font-family:Inter,sans-serif;"></textarea>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px;">
+                  <div><div class="fl">Category</div><input class="fi filled" value="Development" type="text"/></div>
+                  <div><div class="fl">Status</div><input class="fi filled" value="Completed" type="text"/></div>
+                  <div><div class="fl">Hours *</div><input class="fi" id="thrs" value="2" type="number" min="0.5" step="0.5"/></div>
+                </div>
+                <button id="add-day-btn" style="width:100%;background:linear-gradient(90deg,#1e293b,#334155);color:#fff;border:none;padding:12px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;transition:transform .2s,box-shadow .2s;box-shadow:0 4px 14px rgba(0,0,0,.2);">+ Add to Day</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ S2 ADMIN VIEW ═══ -->
+  <div class="scene screen-scene" id="s2">
+    <div class="scene-header">
+      <span class="scene-badge">Admin</span>
+      <span class="scene-title">Team Time Sheets — Administrator Overview</span>
+      <span class="scene-step">2 of 6</span>
+    </div>
+    <div class="screen-container">
+      <div class="mockup" style="background:#f8f7ff;font-family:Inter,sans-serif;">
+        <div style="background:#fff;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e8e5f5;">
+          <div style="display:flex;align-items:center;gap:7px;">
+            <div style="background:linear-gradient(135deg,#7c3aed,#a78bfa);width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:11px;">T</div>
+            <div style="font-size:10px;font-weight:800;color:#1e1b3a;">TechGy<br/><span style="color:#a78bfa;font-size:8px;">Innovations</span></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:7px;">
+            <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:20px;padding:3px 10px;font-size:10px;font-weight:700;color:#856404;">⏱ 06:09:09</div>
+            <div style="font-size:10px;color:#94a3b8;">● Not Checked In</div>
+            <div style="background:linear-gradient(90deg,#7c3aed,#5b21b6);color:#fff;padding:4px 14px;border-radius:7px;font-size:10px;font-weight:600;">Check In</div>
+            <div style="width:28px;height:28px;background:#7c3aed;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:11px;">M</div>
+            <div style="font-size:9px;color:#64748b;line-height:1.3;">madhurikatnam<br/><span style="color:#94a3b8;">Administrator</span></div>
+          </div>
+        </div>
+        <div style="display:flex;height:395px;">
+          <div style="width:152px;background:#1e1b3a;padding:12px 0;flex-shrink:0;">
+            <div style="padding:6px 12px;font-size:10px;display:flex;align-items:center;gap:5px;color:#64748b;">🏠<span>Dashboard</span></div>
+            <div style="padding:6px 12px;font-size:10px;display:flex;align-items:center;gap:5px;color:#64748b;">✨<span>AI Insights</span></div>
+            <div style="padding:6px 12px;font-size:10px;display:flex;align-items:center;gap:5px;color:#64748b;">👥<span>Employees</span></div>
+            <div style="padding:6px 12px;font-size:10px;display:flex;align-items:center;gap:5px;color:#64748b;">📋<span>Attendances</span></div>
+            <div style="padding:6px 12px;font-size:10px;display:flex;align-items:center;gap:5px;color:#64748b;">🌿<span>Leave Requests</span></div>
+            <div style="padding:6px 12px;font-size:10px;display:flex;align-items:center;gap:5px;color:#64748b;">📊<span>Project Mgmt</span></div>
+            <div style="padding:6px 12px;font-size:10px;background:rgba(124,58,237,.22);border-left:3px solid #7c3aed;display:flex;align-items:center;gap:5px;">📄<span style="color:#fff;font-weight:600;">Time Sheets</span></div>
+            <div style="padding:6px 12px;font-size:10px;display:flex;align-items:center;gap:5px;color:#64748b;">📢<span>Announcements</span></div>
+            <div style="padding:6px 12px;font-size:10px;display:flex;align-items:center;gap:5px;color:#64748b;">❓<span>Queries</span></div>
+            <div style="padding:6px 12px;font-size:10px;display:flex;align-items:center;gap:5px;color:#64748b;">💼<span>Accounts</span></div>
+            <div style="padding:6px 12px;font-size:10px;display:flex;align-items:center;gap:5px;color:#64748b;">🖥<span>IT Assets</span></div>
+          </div>
+          <div style="flex:1;padding:16px 18px;overflow:auto;">
+            <div style="font-size:18px;font-weight:800;color:#1e1b3a;margin-bottom:2px;">Time Sheet</div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:12px;">Friday, 12 June 2026</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <div style="display:flex;align-items:center;gap:7px;">
+                <span style="font-size:12px;font-weight:600;color:#334155;">📋 Team Time Sheets</span>
+                <select style="border:1px solid #e2e8f0;border-radius:7px;padding:4px 8px;font-size:11px;color:#334155;background:#fff;"><option>All Employees</option></select>
+                <input type="date" value="2026-06-12" style="border:1px solid #e2e8f0;border-radius:7px;padding:4px 8px;font-size:11px;color:#334155;"/>
+              </div>
+              <button style="background:linear-gradient(90deg,#059669,#10b981);color:#fff;border:none;padding:6px 16px;border-radius:7px;font-size:11px;font-weight:600;box-shadow:0 3px 10px rgba(16,185,129,.35);">Export</button>
+            </div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:7px;">Tasks on Jun 12 · 1 entry</div>
+            <table style="width:100%;border-collapse:collapse;font-size:10.5px;">
+              <thead><tr style="border-bottom:2px solid #e8e5f5;">
+                <th style="text-align:left;padding:6px 7px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;letter-spacing:.5px;">Employee</th>
+                <th style="text-align:left;padding:6px 7px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">Date</th>
+                <th style="text-align:left;padding:6px 7px;color:#7c3aed;font-size:8.5px;text-transform:uppercase;font-weight:700;">IN</th>
+                <th style="text-align:left;padding:6px 7px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">OUT</th>
+                <th style="text-align:left;padding:6px 7px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">SYS HRS</th>
+                <th style="text-align:left;padding:6px 7px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">Project</th>
+                <th style="text-align:left;padding:6px 7px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">Task Title</th>
+                <th style="text-align:left;padding:6px 7px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">Status</th>
+                <th style="text-align:left;padding:6px 7px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">Task HRS</th>
+                <th style="text-align:left;padding:6px 7px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">State</th>
+              </tr></thead>
+              <tbody><tr style="border-bottom:1px solid #f1f5f9;" id="admin-row">
+                <td style="padding:9px 7px;"><div style="display:flex;align-items:center;gap:6px;"><div style="width:24px;height:24px;background:linear-gradient(135deg,#7c3aed,#a78bfa);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:8px;font-weight:700;">RV</div><span style="color:#334155;font-weight:500;">Raikrindi vishnu</span></div></td>
+                <td style="padding:9px 7px;color:#64748b;">2026-06-12</td>
+                <td style="padding:9px 7px;color:#7c3aed;font-weight:600;">01:45 PM</td>
+                <td style="padding:9px 7px;color:#94a3b8;">--:--</td>
+                <td style="padding:9px 7px;color:#334155;">6.0h</td>
+                <td style="padding:9px 7px;color:#334155;">GLC-CCS</td>
+                <td style="padding:9px 7px;color:#334155;">qcdswdf</td>
+                <td style="padding:9px 7px;"><span style="color:#059669;font-weight:600;">Completed</span></td>
+                <td style="padding:9px 7px;color:#334155;">1h</td>
+                <td style="padding:9px 7px;"><span style="background:#dcfce7;color:#166534;padding:2px 7px;border-radius:20px;font-size:9px;font-weight:600;">Submitted</span></td>
+              </tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ S3 DATE FILTERS ═══ -->
+  <div class="scene screen-scene" id="s3">
+    <div class="scene-header">
+      <span class="scene-badge">Admin</span>
+      <span class="scene-title">Date Range Filters — This Week / This Month / Custom</span>
+      <span class="scene-step">3 of 6</span>
+    </div>
+    <div class="screen-container">
+      <div class="mockup" style="background:#f8f7ff;padding:20px 26px;min-height:395px;position:relative;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:9px;padding:6px 12px;font-size:12px;font-weight:600;color:#334155;">Raikrindhi vishnu ▾</div>
+          <div style="background:#f5f3ff;border:1.5px solid #7c3aed;border-radius:22px;padding:6px 14px;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#7c3aed;">
+            📅 <span id="dpill-txt">This Week</span> · <span id="dpill-range">Jun 8 — Jun 13, 2026</span> ▲
+          </div>
+        </div>
+        <div id="ddd" class="ddmock open" style="left:126px;top:50px;position:absolute;">
+          <div class="ddi" id="dw"><span>📅</span> This Week <span class="dchk" id="ckw">✓</span></div>
+          <div class="ddi" id="dm"><span>📅</span> This Month <span class="dchk" id="ckm" style="display:none;">✓</span></div>
+          <div class="ddi" id="dc"><span>✏️</span> Custom Range <span class="dchk" id="ckc" style="display:none;">✓</span></div>
+          <div id="dmonth-sel" style="padding:8px 11px;border-top:1px solid #f1f5f9;margin-top:4px;">
+            <div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:6px;">SELECT MONTH</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span style="color:#7c3aed;font-size:16px;cursor:pointer;">‹</span>
+              <span id="mlabel" style="font-size:13px;font-weight:700;color:#1e1b3a;">Jun 2026</span>
+              <span style="color:#7c3aed;font-size:16px;cursor:pointer;">›</span>
+            </div>
+          </div>
+          <div id="dcustom-range" style="padding:8px 11px;border-top:1px solid #f1f5f9;display:none;">
+            <div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:5px;">DATE RANGE</div>
+            <div style="margin-bottom:5px;border:1px solid #e2e8f0;border-radius:7px;padding:6px 9px;font-size:11px;color:#334155;">
+              <span style="color:#94a3b8;font-size:9px;">From</span> 12/06/2026 📅
+            </div>
+            <div style="border:1px solid #e2e8f0;border-radius:7px;padding:6px 9px;font-size:11px;color:#334155;">
+              <span style="color:#94a3b8;font-size:9px;">To</span> 12/06/2026 📅
+            </div>
+          </div>
+          <div style="padding:7px 5px 3px;">
+            <button style="width:100%;background:linear-gradient(90deg,#7c3aed,#5b21b6);color:#fff;border:none;padding:9px;border-radius:7px;font-size:12px;font-weight:700;">Apply</button>
+          </div>
+        </div>
+        <div style="background:#fff;border-radius:9px;padding:12px 16px;margin-top:8px;border:1px solid #e8e5f5;">
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:8px;" id="fcount">Tasks Jun 8 – Jun 13 · 1 entry</div>
+          <table style="width:100%;border-collapse:collapse;font-size:11px;">
+            <thead><tr style="border-bottom:1px solid #f1f5f9;">
+              <th style="text-align:left;padding:5px 6px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">Employee</th>
+              <th style="text-align:left;padding:5px 6px;color:#7c3aed;font-size:8.5px;text-transform:uppercase;font-weight:700;">IN</th>
+              <th style="text-align:left;padding:5px 6px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">OUT</th>
+              <th style="text-align:left;padding:5px 6px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">SYS HRS</th>
+              <th style="text-align:left;padding:5px 6px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">Status</th>
+              <th style="text-align:left;padding:5px 6px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">State</th>
+            </tr></thead>
+            <tbody><tr>
+              <td style="padding:7px 6px;"><div style="display:flex;align-items:center;gap:5px;"><div style="width:20px;height:20px;background:linear-gradient(135deg,#7c3aed,#a78bfa);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:7px;font-weight:700;">RV</div>Raikrindi vishnu</div></td>
+              <td style="padding:7px 6px;color:#7c3aed;font-weight:600;">01:45 PM</td>
+              <td style="padding:7px 6px;color:#94a3b8;">--:--</td>
+              <td style="padding:7px 6px;color:#334155;">6.0h</td>
+              <td style="padding:7px 6px;color:#059669;font-weight:600;">Completed</td>
+              <td style="padding:7px 6px;"><span style="background:#dcfce7;color:#166534;padding:1px 6px;border-radius:20px;font-size:8.5px;font-weight:600;">Submitted</span></td>
+            </tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ S4 CUSTOM RANGE ═══ -->
+  <div class="scene screen-scene" id="s4">
+    <div class="scene-header">
+      <span class="scene-badge">Admin</span>
+      <span class="scene-title">Custom Date Range — Calendar Picker</span>
+      <span class="scene-step">4 of 6</span>
+    </div>
+    <div class="screen-container">
+      <div class="mockup" style="background:#f8f7ff;padding:20px 26px;min-height:430px;position:relative;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:9px;padding:6px 12px;font-size:12px;font-weight:600;color:#334155;">Raikrindhi vishnu ▾</div>
+          <div style="background:#f5f3ff;border:1.5px solid #7c3aed;border-radius:22px;padding:6px 14px;font-size:12px;font-weight:600;color:#7c3aed;">📅 Custom Range · Jun 12 — Jun 12, 2026 ▲</div>
+        </div>
+        <div class="ddmock open" style="left:126px;top:50px;position:absolute;min-width:240px;">
+          <div class="ddi"><span>📅</span> This Week</div>
+          <div class="ddi"><span>📅</span> This Month</div>
+          <div class="ddi sel"><span>✏️</span> Custom Range <span class="dchk">✓</span></div>
+          <div style="padding:8px 11px;border-top:1px solid #f1f5f9;margin-top:4px;">
+            <div style="font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:5px;">DATE RANGE</div>
+            <div style="margin-bottom:5px;border:1px solid #e2e8f0;border-radius:7px;padding:6px 9px;font-size:11px;color:#334155;display:flex;justify-content:space-between;"><span style="color:#94a3b8;font-size:9px;">From</span>12/06/2026 <span>📅</span></div>
+            <div style="border:1px solid #e2e8f0;border-radius:7px;padding:6px 9px;font-size:11px;color:#334155;display:flex;justify-content:space-between;"><span style="color:#94a3b8;font-size:9px;">To</span>12/06/2026 <span>📅</span></div>
+          </div>
+          <div style="padding:7px 5px 3px;">
+            <button style="width:100%;background:linear-gradient(90deg,#7c3aed,#5b21b6);color:#fff;border:none;padding:9px;border-radius:7px;font-size:12px;font-weight:700;">Apply</button>
+          </div>
+        </div>
+        <div id="calpop" class="ddmock" style="left:385px;top:50px;position:absolute;width:246px;">
+          <div style="display:flex;align-items:center;gap:6px;padding:5px 9px;margin-bottom:3px;">
+            <input type="date" value="2026-06-12" style="border:1px solid #e2e8f0;border-radius:5px;padding:3px 6px;font-size:10px;flex:1;"/>
+            <button style="background:#059669;color:#fff;border:none;padding:4px 9px;border-radius:5px;font-size:10px;font-weight:600;white-space:nowrap;">Export</button>
+          </div>
+          <div style="font-size:12px;font-weight:700;color:#334155;padding:3px 9px;display:flex;align-items:center;gap:4px;">June 2026 <span style="font-size:8px;color:#7c3aed;">▾</span></div>
+          <div style="padding:3px 7px;">
+            <div style="display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:9px;font-weight:600;color:#94a3b8;margin-bottom:2px;">
+              <span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span>
+            </div>
+            <div id="cal" style="display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:10px;gap:1px;"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:4px 9px;border-top:1px solid #f1f5f9;margin-top:2px;">
+            <span style="color:#7c3aed;font-size:10px;font-weight:600;cursor:pointer;">Clear</span>
+            <span style="color:#7c3aed;font-size:10px;font-weight:600;cursor:pointer;">Today</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ S5 EXPORT ═══ -->
+  <div class="scene screen-scene" id="s5">
+    <div class="scene-header">
+      <span class="scene-badge">Admin</span>
+      <span class="scene-title">One-Click Export — Generate Reports Instantly</span>
+      <span class="scene-step">5 of 6</span>
+    </div>
+    <div class="screen-container">
+      <div class="mockup" style="background:#f8f7ff;padding:16px 20px;min-height:390px;position:relative;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:7px;">
+            <span style="font-size:12px;font-weight:600;color:#334155;">📋 Team Time Sheets</span>
+            <select style="border:1px solid #e2e8f0;border-radius:7px;padding:4px 8px;font-size:11px;color:#334155;background:#fff;"><option>All Employees</option></select>
+            <input type="date" value="2026-06-12" style="border:1px solid #e2e8f0;border-radius:7px;padding:4px 8px;font-size:11px;color:#334155;"/>
+          </div>
+          <button id="expbtn" style="background:linear-gradient(90deg,#059669,#10b981);color:#fff;border:none;padding:7px 20px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(16,185,129,.38);transition:all .25s;">⬇ Export</button>
+        </div>
+        <div id="exp-succ" style="display:none;background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1.5px solid #86efac;border-radius:9px;padding:16px 20px;margin-bottom:12px;text-align:center;animation:succPop .4s ease;">
+          <div style="font-size:32px;margin-bottom:7px;">📊</div>
+          <div style="font-size:16px;font-weight:700;color:#166534;margin-bottom:3px;">Export Successful!</div>
+          <div style="font-size:11px;color:#4ade80;">TimeSheet_Jun2026_AllEmployees.xlsx is ready</div>
+          <div style="margin-top:10px;display:flex;justify-content:center;gap:9px;">
+            <button style="background:#059669;color:#fff;border:none;padding:6px 16px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;">📁 Open File</button>
+            <button style="background:#fff;color:#059669;border:1px solid #86efac;padding:6px 16px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;">Share</button>
+          </div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:11px;background:#fff;border-radius:9px;border:1px solid #e8e5f5;">
+          <thead><tr style="border-bottom:1px solid #e8e5f5;background:#fafafa;">
+            <th style="text-align:left;padding:7px 9px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">Employee</th>
+            <th style="text-align:left;padding:7px 9px;color:#7c3aed;font-size:8.5px;text-transform:uppercase;font-weight:700;">IN</th>
+            <th style="text-align:left;padding:7px 9px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">OUT</th>
+            <th style="text-align:left;padding:7px 9px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">SYS HRS</th>
+            <th style="text-align:left;padding:7px 9px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">Task HRS</th>
+            <th style="text-align:left;padding:7px 9px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">Status</th>
+            <th style="text-align:left;padding:7px 9px;color:#94a3b8;font-size:8.5px;text-transform:uppercase;">State</th>
+          </tr></thead>
+          <tbody>
+            <tr><td style="padding:8px 9px;"><div style="display:flex;align-items:center;gap:5px;"><div style="width:22px;height:22px;background:linear-gradient(135deg,#7c3aed,#a78bfa);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:7px;font-weight:700;">RV</div>Raikrindi vishnu</div></td>
+            <td style="padding:8px 9px;color:#7c3aed;font-weight:600;">01:45 PM</td>
+            <td style="padding:8px 9px;color:#94a3b8;">--:--</td>
+            <td style="padding:8px 9px;">6.0h</td>
+            <td style="padding:8px 9px;">1.0h</td>
+            <td style="padding:8px 9px;color:#059669;font-weight:600;">Completed</td>
+            <td style="padding:8px 9px;"><span style="background:#dcfce7;color:#166534;padding:2px 7px;border-radius:12px;font-size:8.5px;font-weight:600;">Submitted</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ S6 OUTRO ═══ -->
+  <div class="scene" id="s6">
+    <div class="outro-inner">
+      <div class="outro-logo">TechGy Innovations</div>
+      <div style="color:#a78bfa;font-size:12px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;margin-top:6px;">Time Sheets Module</div>
+      <div class="outro-tag">Smart tracking. Seamless management.</div>
+      <div class="outro-divider"></div>
+      <div class="outro-stats">
+        <div class="ostat"><div class="sn">100%</div><div class="sl">Transparency</div></div>
+        <div class="ostat"><div class="sn">Real-time</div><div class="sl">Status Updates</div></div>
+        <div class="ostat"><div class="sn">1-Click</div><div class="sl">Export Reports</div></div>
+      </div>
+      <button class="outro-cta" onclick="resetDemo()">▶ Watch Again</button>
+      <div style="margin-top:16px;font-size:10px;color:rgba(255,255,255,.2);">© 2026 TechGy Innovations · All Rights Reserved</div>
+    </div>
+  </div>
+
+  <!-- CURSOR -->
+  <div id="cursor">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M4 2L20 12L12 13.5L8 21L4 2Z" fill="white" stroke="#7c3aed" stroke-width="1.5"/></svg>
+  </div>
+
+  <!-- VO BAR -->
+  <div id="vo-bar"><div id="vo-text"></div></div>
+
+  <!-- TIMELINE -->
+  <div id="tl">
+    <div class="tld active" onclick="jumpTo(0)"></div>
+    <div class="tld" onclick="jumpTo(1)"></div>
+    <div class="tld" onclick="jumpTo(2)"></div>
+    <div class="tld" onclick="jumpTo(3)"></div>
+    <div class="tld" onclick="jumpTo(4)"></div>
+    <div class="tld" onclick="jumpTo(5)"></div>
+    <div class="tld" onclick="jumpTo(6)"></div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div id="ctrl">
+    <button class="cbtn" id="pbtn" onclick="togglePause()" title="Pause/Resume">⏸</button>
+    <button class="cbtn" onclick="prevScene()">◀</button>
+    <button class="cbtn" onclick="nextScene()">▶</button>
+  </div>
+
+  <!-- PROGRESS -->
+  <div id="prog-wrap"><div id="prog"></div></div>
+</div>
+
+<script>
+// ══════════════════════════════════
+// SCENE CONFIG — employee first!
+// ══════════════════════════════════
+const SCENES=[
+  {id:'s0', dur:12000},  // 0 intro
+  {id:'s1', dur:28000},  // 1 employee daily sheet + add task
+  {id:'s2', dur:20000},  // 2 admin overview
+  {id:'s3', dur:26000},  // 3 date filters
+  {id:'s4', dur:20000},  // 4 custom range
+  {id:'s5', dur:18000},  // 5 export
+  {id:'s6', dur:12000},  // 6 outro
+];
+const TOTAL=SCENES.reduce((a,s)=>a+s.dur,0);
+
+const VO_PLAIN=[
+  "Welcome to TechGy Innovations Time Sheets — a complete feature for both employees and administrators. Let's start with how an employee logs their daily work, and then see how admins review it all.",
+  "This is the employee's Time Sheet view. The sidebar shows quick access to Dashboard, My Tasks, Work Update, Time Sheet, and more. The employee can see their entries for today — June 12, 2026. To add a new task, they click the Plus Add Entry button. The Add Task Entry modal opens. They select their project — choosing from CRM, GLC Role Manager, Eco World, or Veda Bharath Admin Dashboard. After selecting the project, they enter their task title, set the category, status, and hours logged, then click Plus Add to Day to save the entry.",
+  "Now switching to the Administrator view. Here the admin sees the full Team Time Sheets — every employee's check-in time, check-out, system hours, project, task title, status, task hours, and submission state, all in one place. This gives complete team visibility at a glance.",
+  "Administrators can filter data effortlessly. Clicking the date filter shows three options: This Week, showing records from June 8 to June 13. Switching to This Month gives a full month view — perfect for payroll and performance reviews. And the Custom Range option lets admins define any specific start and end date.",
+  "The Custom Range picker opens an intuitive calendar. Simply click the date fields, navigate June 2026, and pick your exact range. Whether it's a billing period, a sprint, or a project deadline — the calendar makes it precise and simple.",
+  "When the data is ready, the admin clicks the green Export button. In seconds, the full time sheet report is generated as a spreadsheet, ready to share with stakeholders, the accounting team, or clients. Instant, clean, and professional.",
+  "TechGy Innovations Time Sheets. Smart tracking, seamless management. Thank you for watching.",
+];
+const VO_HTML=[
+  "Welcome to <strong>TechGy Innovations Time Sheets</strong> — a complete module for employees and admins. We'll start with how employees log work, then see the admin's full picture.",
+  "Employees see their <strong>personal Time Sheet</strong> with sidebar navigation. Clicking <em>+ Add Entry</em> opens the task modal — select your <strong>project</strong> (CRM, GLC Role Manager, Eco World, Veda Bharath), fill the task title, hours, and click <strong>+ Add to Day</strong>.",
+  "Admins get a <strong>full team overview</strong> — every employee's check-in, check-out, system hours, project, task title, status and submission state in one comprehensive table.",
+  "Use quick filters to view <strong>This Week</strong>, <strong>This Month</strong>, or select a <strong>Custom Range</strong> for precise billing periods, payroll cycles, or project sprints.",
+  "The <strong>Custom Range</strong> calendar picker lets you define any exact start and end date — navigate any month and click to select your dates instantly.",
+  "Click the green <strong>Export</strong> button and your complete time sheet report is instantly generated — ready to share with stakeholders, accounting, or clients.",
+  "<strong>TechGy Innovations Time Sheets.</strong> Smart tracking, seamless management. <em>Thank you for watching.</em>",
+];
+
+// ══════════════════════════════════
+// STATE
+// ══════════════════════════════════
+let cur=-1, stimer=null, praf=null, paused=false, atouts=[];
+
+const cursor=document.getElementById('cursor');
+const voTxt=document.getElementById('vo-text');
+const prog=document.getElementById('prog');
+const tlds=document.querySelectorAll('.tld');
+const pbtn=document.getElementById('pbtn');
+const vi=document.getElementById('vi');
+
+// ── MESH BACKGROUND ──
+(function(){
+  const c=document.getElementById('mesh');
+  const x=c.getContext('2d');
+  c.width=1280;c.height=720;
+  const pts=Array.from({length:70},()=>({
+    x:Math.random()*1280,y:Math.random()*720,
+    vx:(Math.random()-.5)*.35,vy:(Math.random()-.5)*.35,
+    r:Math.random()*1.8+.4,
+    hue:Math.random()<.5?260+Math.random()*30:160+Math.random()*30,
+    a:Math.random()*.55+.1,
+  }));
+  function draw(){
+    x.clearRect(0,0,1280,720);
+    // draw connections
+    pts.forEach((a,i)=>{
+      pts.slice(i+1).forEach(b=>{
+        const d=Math.hypot(a.x-b.x,a.y-b.y);
+        if(d<160){
+          x.beginPath();x.moveTo(a.x,a.y);x.lineTo(b.x,b.y);
+          x.strokeStyle=`rgba(124,58,237,${.07*(1-d/160)})`;
+          x.lineWidth=.6;x.stroke();
+        }
+      });
+    });
+    pts.forEach(p=>{
+      x.beginPath();x.arc(p.x,p.y,p.r,0,Math.PI*2);
+      x.fillStyle=`hsla(${p.hue},65%,72%,${p.a*0.7})`;x.fill();
+      p.x+=p.vx;p.y+=p.vy;
+      if(p.x<0||p.x>1280)p.vx*=-1;
+      if(p.y<0||p.y>720)p.vy*=-1;
+    });
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+// ── CALENDAR ──
+(function(){
+  const g=document.getElementById('cal');if(!g)return;
+  [null,null,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30].forEach(d=>{
+    const c=document.createElement('div');
+    c.style.cssText='padding:2px 1px;border-radius:50%;font-size:9px;';
+    if(!d){c.textContent='';}
+    else if(d===12){c.textContent=d;c.style.background='#7c3aed';c.style.color='#fff';c.style.fontWeight='700';}
+    else{c.textContent=d;c.style.color=d>13?'#cbd5e1':'#334155';}
+    g.appendChild(c);
+  });
+})();
+
+// ── VOICE ──
+function speak(txt,onEnd){
+  if(!window.speechSynthesis){onEnd&&onEnd();return;}
+  window.speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(txt);
+  u.rate=1.0;u.pitch=1.0;u.volume=1;
+  const vs=window.speechSynthesis.getVoices();
+  const v=vs.find(v=>v.lang.startsWith('en')&&!v.localService)
+    ||vs.find(v=>v.lang.startsWith('en-US'))
+    ||vs.find(v=>v.lang.startsWith('en'));
+  if(v)u.voice=v;
+  u.onstart=()=>vi.classList.add('show');
+  u.onend=()=>{vi.classList.remove('show');onEnd&&onEnd();};
+  u.onerror=()=>{vi.classList.remove('show');onEnd&&onEnd();};
+  window.speechSynthesis.speak(u);
+}
+function stopSpeak(){window.speechSynthesis&&window.speechSynthesis.cancel();vi.classList.remove('show');}
+
+// ── CURSOR ──
+function mv(x,y){cursor.style.left=x+'px';cursor.style.top=y+'px';}
+function click(x,y){
+  mv(x,y);
+  return new Promise(r=>{
+    setTimeout(()=>{
+      cursor.classList.add('click');
+      const d=document.createElement('div');d.className='rdot';
+      d.style.left=x+'px';d.style.top=y+'px';
+      document.getElementById('stage').appendChild(d);
+      setTimeout(()=>d.remove(),500);
+      setTimeout(()=>{cursor.classList.remove('click');r();},250);
+    },80);
+  });
+}
+function dl(ms){return new Promise(r=>{const t=setTimeout(r,ms);atouts.push(t);})}
+function clrA(){atouts.forEach(clearTimeout);atouts=[];}
+
+// ── PROGRESS ──
+function startProg(idx){
+  cancelAnimationFrame(praf);
+  const done=SCENES.slice(0,idx).reduce((a,s)=>a+s.dur,0);
+  const dur=SCENES[idx].dur, t0=Date.now();
+  (function tick(){
+    if(paused)return;
+    const el=Date.now()-t0;
+    prog.style.width=Math.min(100,((done+el)/TOTAL)*100)+'%';
+    if(el<dur)praf=requestAnimationFrame(tick);
+  })();
+}
+
+// ── ANIMATIONS PER SCENE ──
+async function runA(idx){
+  clrA();
+
+  if(idx===0){mv(640,360);}
+
+  else if(idx===1){
+    // reset state
+    const tb=document.getElementById('emp-tbody');
+    while(tb.children.length>1)tb.removeChild(tb.lastChild);
+    const modal=document.getElementById('add-modal');modal.classList.remove('open');
+    const pd=document.getElementById('pdrop');pd.style.opacity='0';pd.style.transform='translateY(-6px) scale(.97)';pd.style.pointerEvents='none';
+    const ti=document.getElementById('ttitle');if(ti)ti.value='';
+    const pt=document.getElementById('proj-txt');pt.textContent='Select project...';pt.style.color='#94a3b8';
+
+    mv(780,200); await dl(1400);
+    // hover + Add Entry
+    mv(870,160); await dl(700);
+    await click(870,160);
+    // open modal
+    modal.classList.add('open'); await dl(700);
+
+    // click project field
+    mv(640,318); await dl(600);
+    await click(640,318);
+    // open dropdown
+    pd.style.opacity='1';pd.style.transform='translateY(0) scale(1)';pd.style.pointerEvents='auto'; await dl(500);
+
+    // hover items
+    const items=pd.querySelectorAll('.pdi');
+    mv(700,360);items[0].classList.add('hl'); await dl(700);
+    items[0].classList.remove('hl');items[1].classList.add('hl');
+    mv(700,385); await dl(700);
+    items[1].classList.remove('hl');items[2].classList.add('hl');
+    mv(700,410); await dl(500);
+    // select Eco World
+    items[2].classList.remove('hl');
+    await click(700,410);
+    pt.textContent='Eco World';pt.style.color='#334155';
+    pd.style.opacity='0';pd.style.transform='translateY(-6px) scale(.97)';pd.style.pointerEvents='none'; await dl(700);
+
+    // type task title
+    const titleInput=document.getElementById('ttitle');
+    mv(875,318); await dl(500); await click(875,318);
+    const txt='UI Dashboard Enhancement';
+    for(let i=0;i<txt.length;i++){await dl(50);titleInput.value=txt.slice(0,i+1);titleInput.className='fi typed';}
+    await dl(700);
+
+    // click Add to Day
+    mv(665,510); await dl(500);
+    const adbtn=document.getElementById('add-day-btn');
+    if(adbtn){adbtn.style.transform='scale(.97)';await dl(150);adbtn.style.transform='scale(1)';}
+    await click(665,510);
+
+    // close modal, add row
+    modal.classList.remove('open'); await dl(300);
+    const nr=document.createElement('tr');
+    nr.style.cssText='border-bottom:1px solid #f1f5f9;background:#f5f3ff;animation:rowIn .4s ease;';
+    nr.innerHTML=`
+      <td style="padding:8px 9px;color:#64748b;">2026-06-12</td>
+      <td style="padding:8px 9px;color:#7c3aed;font-weight:600;">01:45 PM</td>
+      <td style="padding:8px 9px;color:#94a3b8;">-:-</td>
+      <td style="padding:8px 9px;color:#334155;">5.4h</td>
+      <td style="padding:8px 9px;color:#334155;">Eco World</td>
+      <td style="padding:8px 9px;color:#334155;">UI Dashboard Enhancement</td>
+      <td style="padding:8px 9px;color:#059669;font-weight:600;">Completed</td>
+      <td style="padding:8px 9px;color:#334155;">2h</td>
+      <td style="padding:8px 9px;"><span style="background:#f3e8ff;color:#7c3aed;padding:1px 6px;border-radius:20px;font-size:10px;font-weight:600;">Pending</span></td>
+      <td style="padding:8px 9px;"><span style="color:#7c3aed;margin-right:4px;cursor:pointer;font-size:11px;">✏️</span><span style="color:#ef4444;cursor:pointer;font-size:11px;">🗑</span></td>
+    `;
+    tb.appendChild(nr); mv(500,380);
+  }
+
+  else if(idx===2){
+    mv(900,200); await dl(1500);
+    // highlight IN column
+    await click(545,230); await dl(1000);
+    // highlight SYS HRS
+    await click(680,230); await dl(1000);
+    // highlight STATUS
+    await click(810,230); await dl(1200);
+    // move to Export
+    mv(990,132); await dl(800);
+  }
+
+  else if(idx===3){
+    // reset filter state
+    ['dw','dm','dc'].forEach(id=>{const el=document.getElementById(id);el.classList.remove('sel','hl');});
+    document.getElementById('dw').classList.add('sel');
+    document.getElementById('ckw').style.display='block';
+    document.getElementById('ckm').style.display='none';
+    document.getElementById('ckc').style.display='none';
+    document.getElementById('dmonth-sel').style.display='block';
+    document.getElementById('dcustom-range').style.display='none';
+    document.getElementById('dpill-txt').textContent='This Week';
+    document.getElementById('dpill-range').textContent='Jun 8 — Jun 13, 2026';
+    document.getElementById('fcount').textContent='Tasks Jun 8 – Jun 13 · 1 entry';
+
+    mv(310,74); await dl(900);
+    await click(310,74); await dl(600);
+
+    // hover This Week
+    mv(310,152);document.getElementById('dw').classList.add('hl'); await dl(900);
+    await click(310,152);
+    document.getElementById('dpill-txt').textContent='This Week';
+    document.getElementById('dpill-range').textContent='Jun 8 — Jun 13, 2026';
+    document.getElementById('fcount').textContent='Tasks Jun 8 – Jun 13 · 1 entry'; await dl(1600);
+
+    // This Month
+    document.getElementById('dw').classList.remove('sel','hl');
+    document.getElementById('dm').classList.add('hl');
+    mv(310,184); await dl(700);
+    await click(310,184);
+    document.getElementById('dm').classList.add('sel');
+    document.getElementById('ckw').style.display='none';document.getElementById('ckm').style.display='block';
+    document.getElementById('dpill-txt').textContent='This Month';
+    document.getElementById('dpill-range').textContent='Jun 1 — Jun 30, 2026';
+    document.getElementById('fcount').textContent='Tasks Jun 1 – Jun 30 · 8 entries'; await dl(1800);
+
+    // Custom
+    document.getElementById('dm').classList.remove('sel','hl');
+    document.getElementById('dc').classList.add('hl');
+    mv(310,218); await dl(600);
+    await click(310,218);
+    document.getElementById('dc').classList.add('sel');
+    document.getElementById('ckm').style.display='none';document.getElementById('ckc').style.display='block';
+    document.getElementById('dpill-txt').textContent='Custom Range';
+    document.getElementById('dpill-range').textContent='Jun 12 — Jun 12, 2026';
+    document.getElementById('dmonth-sel').style.display='none';
+    document.getElementById('dcustom-range').style.display='block'; await dl(1400);
+    mv(400,420);
+  }
+
+  else if(idx===4){
+    mv(420,110); await dl(1400);
+    // click calendar From
+    await click(530,220);
+    const cp=document.getElementById('calpop');
+    cp.style.opacity='1';cp.style.transform='scale(1) translateY(0)'; await dl(1200);
+    mv(610,340); await dl(1500);
+    mv(570,290); await dl(1500);
+    mv(650,380); await dl(1000);
+  }
+
+  else if(idx===5){
+    mv(700,180); await dl(1200);
+    mv(1000,132); await dl(900);
+    await click(1000,132);
+    const eb=document.getElementById('expbtn');
+    if(eb){eb.style.transform='scale(.94)';await dl(200);eb.style.transform='scale(1.04)';await dl(180);eb.style.transform='scale(1)';}
+    await dl(600);
+    const es=document.getElementById('exp-succ');if(es)es.style.display='block'; mv(640,400);
+  }
+
+  else if(idx===6){mv(640,360);}
+}
+
+// ── SHOW SCENE ──
+function showScene(idx){
+  document.querySelectorAll('.scene').forEach(s=>s.classList.remove('active'));
+  if(idx>=0&&idx<SCENES.length)document.getElementById(SCENES[idx].id).classList.add('active');
+  // fade VO
+  voTxt.style.opacity='0';
+  setTimeout(()=>{voTxt.innerHTML=VO_HTML[idx]||'';voTxt.style.opacity='1';},200);
+  // update timeline
+  tlds.forEach((d,i)=>{
+    d.classList.remove('active','done');
+    if(i<idx)d.classList.add('done');
+    else if(i===idx)d.classList.add('active');
+  });
+  runA(idx);
+  stopSpeak();
+  if(idx>=0&&idx<VO_PLAIN.length)setTimeout(()=>speak(VO_PLAIN[idx]),400);
+}
+
+function go(idx){
+  if(idx>=SCENES.length){showScene(SCENES.length-1);return;}
+  cur=idx;showScene(idx);startProg(idx);
+  clearTimeout(stimer);
+  stimer=setTimeout(()=>go(idx+1),SCENES[idx].dur);
+}
+
+function startDemo(){
+  document.getElementById('ply-overlay').style.display='none';
+  cursor.style.display='block';
+  document.getElementById('tl').style.display='flex';
+  document.getElementById('ctrl').style.display='flex';
+  window.speechSynthesis&&window.speechSynthesis.getVoices();
+  go(0);
+}
+
+function togglePause(){
+  paused=!paused;pbtn.textContent=paused?'▶':'⏸';
+  if(paused){clearTimeout(stimer);clrA();stopSpeak();}
+  else go(cur);
+}
+function nextScene(){clearTimeout(stimer);clrA();stopSpeak();go(Math.min(cur+1,SCENES.length-1));}
+function prevScene(){clearTimeout(stimer);clrA();stopSpeak();go(Math.max(cur-1,0));}
+function jumpTo(idx){clearTimeout(stimer);clrA();stopSpeak();go(idx);}
+
+function resetDemo(){
+  clearTimeout(stimer);clrA();stopSpeak();
+  document.querySelectorAll('.scene').forEach(s=>s.classList.remove('active'));
+  prog.style.width='0%';
+  document.getElementById('ply-overlay').style.display='flex';
+  cur=-1;paused=false;pbtn.textContent='⏸';
+  const es=document.getElementById('exp-succ');if(es)es.style.display='none';
+  const m=document.getElementById('add-modal');if(m)m.classList.remove('open');
+}
+
+// Init
+document.getElementById('tl').style.display='none';
+document.getElementById('ctrl').style.display='none';
+cursor.style.display='none';
+document.getElementById('ply-btn').addEventListener('click',startDemo);
+window.speechSynthesis&&window.speechSynthesis.addEventListener('voiceschanged',()=>window.speechSynthesis.getVoices());
+</script>
+</body>
+</html>

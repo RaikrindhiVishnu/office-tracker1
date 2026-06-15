@@ -19,4 +19,5 @@ export type View =
   | "invoices"
   | "it-assets"
   | "ai-insights"
-  | "departments";
+  | "departments"
+  | "daily-sheet";

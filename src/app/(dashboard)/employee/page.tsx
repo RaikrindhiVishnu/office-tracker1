@@ -32,6 +32,7 @@ import {
 
 import DashboardView from "./views/DashboardView";
 import WorkUpdateView from "./views/WorkUpdateView";
+import DailySheetView from "./views/DailySheetView";
 import AttendanceView from "./views/AttendanceView";
 import UnifiedNotificationsView from "./views/NotificationsView";
 import CalendarModal from "./views/CalendarView";
@@ -52,7 +53,7 @@ import MeetChatAppUpdated from "@/components/MeetChatAppUpdated";
 
 // ── Types ─────────────────────────────────────────────────
 type ViewType =
-  | "dashboard" | "work-update" | "attendance" | "notifications"
+  | "dashboard" | "work-update" | "daily-sheet" | "attendance" | "notifications"
   | "calendar" | "holidays" | "leave-history" | "leave-request"
   | "profile" | "help" | "projects" | "meet"
   | "tasks" | "team" | "reports" | "settings" | "payslips";
@@ -118,6 +119,7 @@ const getSidebarItems = (isLead: boolean): [ViewType, string, string][] => [
   ...(isLead ? [["team", "Team Tasks", "👥"] as [ViewType, string, string]] : []),
   ["tasks", "My Tasks", "✅"],
   ["work-update", "Work Update", "📝"],
+  ["daily-sheet", "Time Sheet", "📅"],
   ["attendance", "Attendance", "⏰"],
   ["projects", "Projects", "📁"],
   ["payslips", "Payslips", "💰"],
@@ -624,7 +626,8 @@ export default function ZohoStyleEmployeeDashboard() {
           <div className="hidden lg:flex items-center justify-between w-full h-full">
             <div className="flex items-center min-w-0 shrink-0">
               <h1 className="text-lg font-bold capitalize flex items-center gap-2 whitespace-nowrap text-gray-900">
-                📊 <span>{activeView.replace(/-/g, " ")}</span>
+                {getSidebarItems(!!userData?.isLead).find(([key]) => key === activeView)?.[2] ?? "📊"}{" "}
+                <span>{getSidebarItems(!!userData?.isLead).find(([key]) => key === activeView)?.[1] ?? activeView.replace(/-/g, " ")}</span>
               </h1>
             </div>
             <div className="flex items-center gap-2">
@@ -740,7 +743,7 @@ export default function ZohoStyleEmployeeDashboard() {
                 <button onClick={() => setMobileMenuOpen(true)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-all" aria-label="Open menu">
                   <svg className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
                 </button>
-                <h1 className="text-sm font-bold capitalize truncate max-w-36 text-gray-900">📊 {activeView.replace(/-/g, " ")}</h1>
+                <h1 className="text-sm font-bold capitalize truncate max-w-36 text-gray-900">📊 {activeView === "daily-sheet" ? "time sheet" : activeView.replace(/-/g, " ")}</h1>
               </div>
               <div className="flex items-center gap-1">
                 <div className="relative" ref={mobileNotifDropdownRef}>
@@ -883,6 +886,7 @@ export default function ZohoStyleEmployeeDashboard() {
               />
             )}
             {activeView === "attendance" && <EmployeeAttendanceView />}
+            {activeView === "daily-sheet" && <DailySheetView />}
             {activeView === "work-update" && <WorkUpdateView />}
             {activeView === "projects" && <ProjectManagement user={{ ...user, ...userData }} projects={projects} users={users} setSidebarCollapsed={setSidebarCollapsed} />}
             {activeView === "notifications" && (
