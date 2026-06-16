@@ -950,6 +950,7 @@ export default function AdminDailySheetsView() {
                                   <span className="font-bold text-slate-700">Task {i + 1}: </span>
                                   <span className="font-medium text-slate-700">{t.project} - {t.taskTitle}</span> {t.description && `- ${t.description}`}
                                   <span className="text-[10px] ml-1 text-slate-400 font-bold">({t.hours}h)</span>
+                                  {t.status && <span className="ml-2 inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">{t.status}</span>}
                                 </div>
                               ))}
                             </div>
@@ -959,7 +960,7 @@ export default function AdminDailySheetsView() {
                                 <div className="flex flex-col gap-0.5 min-w-0">
                                   {dayTasks.map((t: any, i: number) => (
                                     <span key={t.taskId || i} className="font-medium text-slate-700 truncate group-hover:text-indigo-600 transition-colors">
-                                      Task {i + 1} - {t.taskTitle}
+                                      Task {i + 1} - {t.taskTitle} {t.status && `[${t.status}]`}
                                     </span>
                                   ))}
                                 </div>
@@ -971,7 +972,7 @@ export default function AdminDailySheetsView() {
                         )}
                       </td>
                       <td className="px-3 py-2.5 text-xs text-slate-600 whitespace-nowrap align-middle">
-                        {e.status || "—"}
+                        {e.status || (dayTasks.length > 0 ? dayTasks[dayTasks.length - 1].status : null) || "—"}
                       </td>
                       <td className="px-3 py-2.5 align-middle">
                         {e.isHoliday ? (
