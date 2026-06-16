@@ -9,11 +9,37 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Ba
 export default function TeamTasksView({ user }: { user: any }) {
   const [tasks, setTasks] = useState<any[]>([]);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [allProjects, setAllProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterStatus, setFilterStatus] = useState<"All" | "Assigned" | "Working" | "Completed">("All");
+  const [filterStatus, setFilterStatus] = useState<"All" | "New" | "Dev In Progress" | "Testing" | "Done">("All");
   const [filterMember, setFilterMember] = useState<string>("All");
+  const [filterProject, setFilterProject] = useState<string>("All");
+  const [showCustomDatePopup, setShowCustomDatePopup] = useState(false);
+
+  const getMappedStatus = (raw: string) => {
+    if (!raw) return "New";
+    const lastIdx = raw.lastIndexOf("_");
+    let norm = raw;
+    if (lastIdx > -1) {
+      const suffix = raw.substring(lastIdx + 1);
+      if (suffix.length > 5 && /^[a-z0-9]+$/i.test(suffix)) {
+        norm = raw.substring(0, lastIdx);
+      }
+    }
+    const map: Record<string, string> = {
+      new: "New",
+      dev_in_progress: "Dev In Progress",
+      unit_testing: "Testing",
+      ready_for_qa: "Testing",
+      testing_in_progress: "Testing",
+      reopened: "New",
+      done: "Done",
+      Completed: "Done"
+    };
+    return map[norm] || "New";
+  };
 
   const [filterTime, setFilterTime] = useState<"All Time" | "This Month" | "Today" | "Custom">("All Time");
   const [customStart, setCustomStart] = useState("");
@@ -50,6 +76,12 @@ export default function TeamTasksView({ user }: { user: any }) {
 
       const unsubscribeFunctions: (() => void)[] = [];
       const allTasksMap = new Map();
+
+      // Fetch all projects
+      const unsubProjects = onSnapshot(collection(db, "projects"), (snap) => {
+        setAllProjects(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+      unsubscribeFunctions.push(unsubProjects);
 
       // Firestore 'in' queries are limited to 10 elements
       const chunks = [];
@@ -136,19 +168,27 @@ export default function TeamTasksView({ user }: { user: any }) {
 
 
   // --- Filtering Logic ---
-  const filteredTasks = useMemo(() => {
+  const uniqueProjects = useMemo(() => {
+    const pSet = new Set<string>();
+    
+    // Add all project names from DB
+    allProjects.forEach(p => {
+      if (p.name) pSet.add(p.name);
+    });
+
+    // Also include projects from tasks as fallback
+    tasks.forEach((t: any) => {
+      if (t.projectName) pSet.add(t.projectName);
+      else if (t.project) pSet.add(t.project);
+    });
+    return Array.from(pSet).sort();
+  }, [tasks, allProjects]);
+
+  const baseFilteredTasks = useMemo(() => {
     return tasks.filter((t: any) => {
       const title = t.title || t.taskName || "";
       const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             (t.description || "").toLowerCase().includes(searchQuery.toLowerCase());
-      
-      const isCompleted = t.status === "done" || t.status === "Completed";
-      const isWorking = t.status === "in progress" || t.status === "In Progress";
-      
-      let matchesStatus = true;
-      if (filterStatus === "Completed") matchesStatus = isCompleted;
-      if (filterStatus === "Working") matchesStatus = isWorking;
-      if (filterStatus === "Assigned") matchesStatus = !isCompleted && !isWorking;
       
       let matchesMember = true;
       if (filterMember !== "All") {
@@ -172,14 +212,42 @@ export default function TeamTasksView({ user }: { user: any }) {
         }
       }
       
-      return matchesSearch && matchesStatus && matchesMember && matchesTime;
+      let matchesProject = true;
+      if (filterProject !== "All") {
+        let pName = t.projectName || t.project;
+        if (!pName && t.projectId) {
+          const matchedProject = allProjects.find(p => p.id === t.projectId);
+          if (matchedProject) pName = matchedProject.name;
+        }
+        matchesProject = pName === filterProject;
+      }
+      
+      return matchesSearch && matchesMember && matchesTime && matchesProject;
     });
-  }, [tasks, searchQuery, filterStatus, filterMember, filterTime, customStart, customEnd]);
+  }, [tasks, searchQuery, filterMember, filterTime, customStart, customEnd, filterProject, allProjects]);
+
+  const filteredTasks = useMemo(() => {
+    return baseFilteredTasks.filter((t: any) => {
+      const mappedStatus = getMappedStatus(t.status);
+      return filterStatus === "All" || mappedStatus === filterStatus;
+    });
+  }, [baseFilteredTasks, filterStatus]);
 
   // --- Analytics Calculations ---
   const stats = useMemo(() => {
-    // If no tasks, provide some dummy data so the graphs look "real and working"
-    const analyticsTasks = tasks.length > 0 ? tasks : [
+    // Apply project filter to analytics tasks
+    const projectFilteredTasks = filterProject === "All" 
+      ? tasks 
+      : tasks.filter((t: any) => {
+          let pName = t.projectName || t.project;
+          if (!pName && t.projectId) {
+            const matchedProject = allProjects.find(p => p.id === t.projectId);
+            if (matchedProject) pName = matchedProject.name;
+          }
+          return pName === filterProject;
+        });
+
+    const analyticsTasks = projectFilteredTasks.length > 0 ? projectFilteredTasks : [
       { status: "Completed", completionStatus: "Completed On Time", qualityReview: "Totally Correct", assignedTo: "team_frontend" },
       { status: "Completed", completionStatus: "Completed On Time", qualityReview: "Totally Correct", assignedTo: "team_backend" },
       { status: "Completed", completionStatus: "Completed On Time", qualityReview: "Partially Correct", assignedTo: "team_uiux" },
@@ -194,7 +262,7 @@ export default function TeamTasksView({ user }: { user: any }) {
     let totallyCorrect = 0, partiallyCorrect = 0, totallyWrong = 0;
 
     analyticsTasks.forEach(t => {
-      if (t.status === "Completed") completed++;
+      if (getMappedStatus(t.status) === "Done") completed++;
       else pending++;
 
       if (t.completionStatus === "Late Completion") late++;
@@ -230,7 +298,7 @@ export default function TeamTasksView({ user }: { user: any }) {
       const memberId = m.uid || m.id;
       // Get real tasks assigned to employees in this team
       const eTasks = analyticsTasks.filter((t: any) => t.assignedTo === memberId);
-      const eCompleted = eTasks.filter((t: any) => t.status === "Completed" || t.status === "done").length;
+      const eCompleted = eTasks.filter((t: any) => getMappedStatus(t.status) === "Done").length;
       const ePending = eTasks.length - eCompleted;
       
       const eCorrect = eTasks.filter((t: any) => t.qualityReview === "Totally Correct").length;
@@ -261,7 +329,7 @@ export default function TeamTasksView({ user }: { user: any }) {
     }).sort((a: any, b: any) => b.performance - a.performance).slice(0, 8); // Limit to top 8 so chart doesn't overflow
 
     return { completed, pending, late, statusData, qualityData, employeeStats, total: analyticsTasks.length };
-  }, [tasks, TEAMS, teamMembers, user]);
+  }, [tasks, filterProject, teamMembers, user]);
 
   const CustomBarTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
@@ -294,7 +362,20 @@ export default function TeamTasksView({ user }: { user: any }) {
           <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Team Dashboard</h2>
           <p className="text-sm text-gray-500 mt-1">Manage tasks and view analytics for {user.department}</p>
         </div>
-        <div className="flex items-center gap-3 mt-4 sm:mt-0">
+        <div className="flex flex-wrap items-center gap-3 mt-4 sm:mt-0">
+          <div className="relative">
+            <select
+              value={filterProject}
+              onChange={(e) => setFilterProject(e.target.value)}
+              className="pl-3 pr-8 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer appearance-none w-full md:w-[180px] bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2224%22%20height%3D%2224%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20stroke%3D%22%236b7280%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:calc(100%-10px)_center] bg-[length:16px]"
+            >
+              <option value="All">All Projects</option>
+              {uniqueProjects.map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          </div>
+          
           <button
             onClick={() => setShowAnalytics(!showAnalytics)}
             className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 hover:border-gray-300 text-gray-700 text-sm font-semibold rounded-lg shadow-sm transition-all"
@@ -386,32 +467,37 @@ export default function TeamTasksView({ user }: { user: any }) {
       {/* Task List (Data Grid) - Hidden when viewing analytics */}
       {!showAnalytics && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 mt-4 animate-[popup_0.2s_ease-out]">
-          <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex flex-col md:flex-row md:items-center gap-6">
-              <div className="relative">
+          <div className="p-4 border-b border-gray-100 flex flex-wrap items-center gap-4">
+              <div className="relative flex-shrink-0">
                 <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                 <input 
                   type="text" 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search task, description..." 
-                  className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-[13px] w-full md:w-64 focus:outline-none focus:border-gray-300 focus:ring-0 text-gray-700 placeholder-gray-400 transition-colors" 
+                  className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-[13px] w-full sm:w-64 focus:outline-none focus:border-gray-300 focus:ring-0 text-gray-700 placeholder-gray-400 transition-colors" 
                 />
               </div>
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-                <button onClick={() => setFilterStatus("All")} className={`px-4 py-1.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-colors ${filterStatus === 'All' ? 'bg-[#0f172a] text-white' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'}`}>All ({tasks.length})</button>
-                <button onClick={() => setFilterStatus("Assigned")} className={`px-4 py-1.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-colors ${filterStatus === 'Assigned' ? 'bg-[#0f172a] text-white' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'}`}>Assigned ({tasks.filter((t:any) => t.status !== 'Completed' && t.status !== 'done' && t.status !== 'in progress' && t.status !== 'In Progress').length})</button>
-                <button onClick={() => setFilterStatus("Working")} className={`px-4 py-1.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-colors ${filterStatus === 'Working' ? 'bg-[#0f172a] text-white' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'}`}>Working ({tasks.filter((t:any) => t.status === 'in progress' || t.status === 'In Progress').length})</button>
-                <button onClick={() => setFilterStatus("Completed")} className={`px-4 py-1.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-colors ${filterStatus === 'Completed' ? 'bg-[#0f172a] text-white' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'}`}>Completed ({tasks.filter((t:any) => t.status === 'Completed' || t.status === 'done').length})</button>
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar flex-shrink-0">
+                <button onClick={() => setFilterStatus("All")} className={`px-4 py-1.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-colors ${filterStatus === 'All' ? 'bg-[#0f172a] text-white' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'}`}>All ({baseFilteredTasks.length})</button>
+                <button onClick={() => setFilterStatus("New")} className={`px-4 py-1.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-colors ${filterStatus === 'New' ? 'bg-[#0f172a] text-white' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'}`}>New ({baseFilteredTasks.filter((t:any) => getMappedStatus(t.status) === 'New').length})</button>
+                <button onClick={() => setFilterStatus("Dev In Progress")} className={`px-4 py-1.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-colors ${filterStatus === 'Dev In Progress' ? 'bg-[#0f172a] text-white' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'}`}>Dev In Progress ({baseFilteredTasks.filter((t:any) => getMappedStatus(t.status) === 'Dev In Progress').length})</button>
+                <button onClick={() => setFilterStatus("Testing")} className={`px-4 py-1.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-colors ${filterStatus === 'Testing' ? 'bg-[#0f172a] text-white' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'}`}>Testing ({baseFilteredTasks.filter((t:any) => getMappedStatus(t.status) === 'Testing').length})</button>
+                <button onClick={() => setFilterStatus("Done")} className={`px-4 py-1.5 rounded-full text-[13px] font-bold whitespace-nowrap transition-colors ${filterStatus === 'Done' ? 'bg-[#0f172a] text-white' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'}`}>Done ({baseFilteredTasks.filter((t:any) => getMappedStatus(t.status) === 'Done').length})</button>
               </div>
-            </div>
             
-            <div className="flex flex-wrap items-center gap-4 pt-1">  
-              <div className="flex items-center gap-2">
+              <div className="relative flex-shrink-0 z-20 flex items-center gap-2">
                 <select
                   value={filterTime}
-                  onChange={(e: any) => setFilterTime(e.target.value)}
-                  className="px-3 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-[13px] font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer"
+                  onChange={(e: any) => {
+                    setFilterTime(e.target.value);
+                    if (e.target.value === "Custom") {
+                      setShowCustomDatePopup(true);
+                    } else {
+                      setShowCustomDatePopup(false);
+                    }
+                  }}
+                  className="px-3 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-[13px] font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer w-[130px]"
                 >
                   <option value="All Time">All Time</option>
                   <option value="Today">Today</option>
@@ -420,25 +506,46 @@ export default function TeamTasksView({ user }: { user: any }) {
                 </select>
 
                 {filterTime === "Custom" && (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="date"
-                      value={customStart}
-                      onChange={(e) => setCustomStart(e.target.value)}
-                      className="px-2 py-1.5 border border-gray-200 rounded-lg text-[13px] text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <span className="text-gray-400 text-xs">to</span>
-                    <input
-                      type="date"
-                      value={customEnd}
-                      onChange={(e) => setCustomEnd(e.target.value)}
-                      className="px-2 py-1.5 border border-gray-200 rounded-lg text-[13px] text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                  <button 
+                    onClick={() => setShowCustomDatePopup(!showCustomDatePopup)} 
+                    className={`p-2 rounded-lg border transition-colors ${showCustomDatePopup ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+                    title="Edit Dates"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                  </button>
+                )}
+
+                {showCustomDatePopup && (
+                  <div className="absolute top-full right-0 mt-2 p-4 bg-white border border-gray-200 rounded-xl shadow-xl z-50 flex flex-col gap-3 w-64 animate-[popup_0.2s_ease-out]">
+                    <div className="flex items-center justify-between border-b border-gray-50 pb-2">
+                      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Custom Date Range</p>
+                      <button onClick={() => setShowCustomDatePopup(false)} className="text-gray-400 hover:text-red-500 transition-colors">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-gray-600 block mb-1">Start Date</label>
+                      <input
+                        type="date"
+                        value={customStart}
+                        onChange={(e) => setCustomStart(e.target.value)}
+                        className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-[13px] text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-gray-600 block mb-1">End Date</label>
+                      <input
+                        type="date"
+                        value={customEnd}
+                        onChange={(e) => setCustomEnd(e.target.value)}
+                        className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-[13px] text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
                   </div>
                 )}
               </div>
 
-              <div className="relative">
+              <div className="relative flex-shrink-0">
                 <select
                   value={filterMember}
                   onChange={(e) => setFilterMember(e.target.value)}
@@ -451,7 +558,6 @@ export default function TeamTasksView({ user }: { user: any }) {
                   ))}
                 </select>
               </div>
-            </div>
           </div>
 
           {loading ? (
@@ -465,7 +571,7 @@ export default function TeamTasksView({ user }: { user: any }) {
                 <thead>
                   <tr className="bg-white border-b border-gray-100 text-[12px] text-slate-500 whitespace-nowrap">
                     <th className="px-3 py-4 font-semibold">Task</th>
-                    <th className="px-3 py-4 font-semibold text-center">Assigned To</th>
+                    <th className="px-3 py-4 font-semibold">Assigned To</th>
                     <th className="px-3 py-4 font-semibold text-center">Priority</th>
                     <th className="px-3 py-4 font-semibold whitespace-nowrap text-center">Assigned At</th>
                     <th className="px-3 py-4 font-semibold whitespace-nowrap text-center">Deadline</th>
@@ -485,15 +591,25 @@ export default function TeamTasksView({ user }: { user: any }) {
                     filteredTasks.map((t: any) => (
                       <tr key={t.id} className="hover:bg-slate-50/50 transition-colors group">
                         <td className="px-3 py-3">
+                          {(() => {
+                            let dispName = t.projectName || t.project;
+                            if (!dispName && t.projectId) {
+                              const matchedProject = allProjects.find(p => p.id === t.projectId);
+                              if (matchedProject) dispName = matchedProject.name;
+                            }
+                            return dispName ? (
+                              <p className="text-[10px] font-bold text-blue-600 mb-0.5 tracking-wider uppercase">{dispName}</p>
+                            ) : null;
+                          })()}
                           <p className="text-sm font-semibold text-slate-800 break-words whitespace-normal line-clamp-2">{t.title || (t as any).taskName}</p>
                           <p className="text-[12px] text-slate-500 mt-0.5 break-words whitespace-normal line-clamp-1">{t.description}</p>
                         </td>
                         <td className="px-3 py-3">
-                          <div className="flex items-center justify-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-500 text-white flex items-center justify-center text-xs font-bold shadow-sm">
+                          <div className="flex items-center justify-start gap-2">
+                            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-500 text-white flex items-center justify-center text-xs font-bold shadow-sm flex-shrink-0">
                               {t.assignedToName?.charAt(0).toUpperCase() || "U"}
                             </div>
-                            <span className="text-[13px] font-medium text-slate-700">{t.assignedToName || "Unassigned"}</span>
+                            <span className="text-[13px] font-medium text-slate-700 truncate max-w-[150px]">{t.assignedToName || "Unassigned"}</span>
                           </div>
                         </td>
                         <td className="px-3 py-3 text-center">
@@ -520,7 +636,7 @@ export default function TeamTasksView({ user }: { user: any }) {
                             const deadlineStr = (t as any).dueDate || (t as any).expectedCompletionDate;
                             if (!deadlineStr) return <span className="text-slate-400">-</span>;
                             const d = new Date(deadlineStr);
-                            const isLate = d < new Date() && t.status !== 'Completed' && t.status !== 'done';
+                            const isLate = d < new Date() && getMappedStatus(t.status) !== 'Done';
                             return (
                               <div className={`flex flex-col items-center justify-center ${isLate ? 'text-red-600 font-bold' : 'text-slate-600'}`}>
                                 <span className="whitespace-nowrap">{d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
@@ -531,7 +647,7 @@ export default function TeamTasksView({ user }: { user: any }) {
                         </td>
                         <td className="px-3 py-3 text-[11px] text-slate-600 text-center">
                           {(() => {
-                            if ((t.status !== 'done' && t.status !== 'Completed') || !(t as any).updatedAt) return "-";
+                            if (getMappedStatus(t.status) !== 'Done' || !(t as any).updatedAt) return "-";
                             const d = new Date((t as any).updatedAt?.seconds * 1000 || Date.now());
                             return (
                               <div className="flex flex-col items-center justify-center">
@@ -543,23 +659,17 @@ export default function TeamTasksView({ user }: { user: any }) {
                         </td>
                         <td className="px-3 py-3">
                           <div className="flex items-center justify-center gap-2">
-                            <span className="text-[13px] font-medium text-slate-700">
-                              {( {
-                                new: "New",
-                                dev_in_progress: "Dev In Progress",
-                                unit_testing: "Unit Testing",
-                                ready_for_qa: "Ready For QA",
-                                testing_in_progress: "Testing In Progress",
-                                reopened: "Reopened",
-                                done: "Done",
-                                r_and_d: "R & D",
-                                Completed: "Done"
-                              } as Record<string, string> )[t.status as string] || (t.status as string) || 'New'}
+                            <span className={`text-[13px] font-bold px-3 py-1 rounded-full whitespace-nowrap
+                              ${getMappedStatus(t.status) === 'Done' ? 'bg-emerald-100 text-emerald-700' : 
+                                getMappedStatus(t.status) === 'Testing' ? 'bg-purple-100 text-purple-700' : 
+                                getMappedStatus(t.status) === 'Dev In Progress' ? 'bg-amber-100 text-amber-700' : 
+                                'bg-slate-100 text-slate-700'}`}>
+                              {getMappedStatus(t.status)}
                             </span>
                           </div>
                         </td>
                         <td className="px-3 py-3 text-right">
-                          {(t.status === "done" || t.status === "Completed") && !(t as any).qualityReview ? (
+                          {getMappedStatus(t.status) === "Done" && !(t as any).qualityReview ? (
                             <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                               <ReviewDropdown onReview={(val: any) => handleReviewTask(t.id, val)} />
                             </div>

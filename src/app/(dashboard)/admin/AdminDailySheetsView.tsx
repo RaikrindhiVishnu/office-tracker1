@@ -235,7 +235,6 @@ export default function AdminDailySheetsView() {
         case "date": return dir * a.dateStr.localeCompare(b.dateStr);
         case "in": return dir * (attA?.in ?? "").localeCompare(attB?.in ?? "");
         case "out": return dir * (attA?.out ?? "").localeCompare(attB?.out ?? "");
-        case "avail": return dir * ((a.isHoliday ? 0 : 8) - (b.isHoliday ? 0 : 8));
         case "sys": return dir * parseFloat(attA?.sys ?? "0") - dir * parseFloat(attB?.sys ?? "0");
         case "task": {
           const tA = a.tasks ? a.tasks[0]?.taskTitle : a.taskTitle;
@@ -268,133 +267,71 @@ export default function AdminDailySheetsView() {
   const exportToExcel = () => {
     if (!sorted.length) { alert("No data to export."); return; }
 
-    // Group by Team Name
-    const teamGroups: Record<string, DailySheetEntry[]> = {};
-    sorted.forEach((e) => {
-      const emp = employees.find(em => em.uid === e.uid);
-      const team = emp?.department || "Other";
-      if (!teamGroups[team]) teamGroups[team] = [];
-      teamGroups[team].push(e);
+    const exportRows: any[] = [];
+    
+    // Sort all entries by Date (desc), then Team, then Employee Name
+    const sortedEntries = [...sorted].sort((a, b) => {
+      if (a.dateStr !== b.dateStr) return b.dateStr.localeCompare(a.dateStr);
+      
+      const empA = employees.find(em => em.uid === a.uid);
+      const empB = employees.find(em => em.uid === b.uid);
+      const teamA = empA?.department || "Other";
+      const teamB = empB?.department || "Other";
+      if (teamA !== teamB) return teamA.localeCompare(teamB);
+      
+      const aName = empName(a.uid);
+      const bName = empName(b.uid);
+      return aName.localeCompare(bName);
     });
 
-    const exportRows: any[] = [];
-    const merges: any[] = [];
-    let currentRowIdx = 1; // 0 is the column headers
+    sortedEntries.forEach((e) => {
+      const att = attendanceMap[`${e.uid}_${e.dateStr}`];
+      const statusText = att?.in && att.in !== "--:--" ? "Present" : e.isHoliday ? "Holiday" : "Absent";
+      const inTime = att?.in || "--:--";
+      const outTime = att?.out || "--:--";
+      const sysHrs = att?.sys || "0";
+      
+      const emp = employees.find(em => em.uid === e.uid);
+      const teamName = emp?.department || "Other";
+      const eodStatus = e.status || "In Progress";
+      const totalHrs = e.hours ? `${e.hours}h` : "0h";
 
-    Object.entries(teamGroups).forEach(([teamName, teamEntries]) => {
-      // 1. Add Team Heading Row
-      exportRows.push({
-        "S.No": teamName,
-        "Employee Name": "",
-        "Date": "",
-        "In Time": "",
-        "Out Time": "",
-        "Attendance": "",
-        "Avail Hrs": "",
-        "System Hrs": "",
-        "Team Name": "",
-        "Project Name": "",
-        "Task Assigned": "",
-        "Task Hrs": "",
-        "EOD Status": "",
-        "Total Hrs Done": ""
-      });
-      // Merge Team Heading row (from col 0 to col 13)
-      merges.push({ s: { r: currentRowIdx, c: 0 }, e: { r: currentRowIdx, c: 13 } });
-      currentRowIdx++;
+      const tasksList = e.tasks && e.tasks.length > 0 ? e.tasks : [{ project: e.project || "", taskTitle: e.taskTitle || "", description: e.description || "", hours: e.hours || 0 }];
 
-      // 2. Group by Employee within this team
-      const empGroups: Record<string, DailySheetEntry[]> = {};
-
-      const sortedEntries = [...teamEntries].sort((a, b) => {
-        const aName = empName(a.uid);
-        const bName = empName(b.uid);
-        if (aName !== bName) return aName.localeCompare(bName);
-        if (a.dateStr !== b.dateStr) return b.dateStr.localeCompare(a.dateStr); // newest first
-        return 0;
-      });
-
-      sortedEntries.forEach((e) => {
-        const key = `${e.uid}_${e.dateStr}`;
-        if (!empGroups[key]) empGroups[key] = [];
-        empGroups[key].push(e);
-      });
-
-      let sNo = 1;
-
-      Object.values(empGroups).forEach((entries) => {
-        const startRow = currentRowIdx;
-
-        entries.forEach((e, idx) => {
-          const isFirst = idx === 0;
-          const att = attendanceMap[`${e.uid}_${e.dateStr}`];
-          const statusText = att?.in && att.in !== "--:--" ? "Present" : e.isHoliday ? "Holiday" : "Absent";
-          const inTime = att?.in || "--:--";
-          const outTime = att?.out || "--:--";
-          const sysHrs = att?.sys || "0";
-          const availHrs = e.isHoliday ? "0" : "8";
-
-          const tasksList = e.tasks && e.tasks.length > 0 ? e.tasks : [{ project: e.project || "", taskTitle: e.taskTitle || "", description: e.description || "", hours: e.hours || 0 }];
-
-          tasksList.forEach((t: any, tIdx: number) => {
-            const isFirstTask = tIdx === 0 && isFirst;
-            exportRows.push({
-              "S.No": isFirstTask ? sNo : "",
-              "Employee Name": isFirstTask ? empName(e.uid) : "",
-              "Date": isFirstTask ? e.dateStr : "",
-              "In Time": isFirstTask ? inTime : "",
-              "Out Time": isFirstTask ? outTime : "",
-              "Attendance": isFirstTask ? statusText : "",
-              "Avail Hrs": isFirstTask ? availHrs : "",
-              "System Hrs": isFirstTask ? sysHrs : "",
-              "Team Name": isFirstTask ? teamName : "",
-              "Project Name": t.project,
-              "Task Assigned": t.taskTitle + (t.description ? `\n${t.description}` : ""),
-              "Task Hrs": t.hours ? `${t.hours}h` : "",
-              "EOD Status": isFirstTask ? (e.status || "In Progress") : "",
-              "Total Hrs Done": isFirstTask ? (e.hours ? `${e.hours}h` : "") : ""
-            });
-            currentRowIdx++;
-          });
+      tasksList.forEach((t: any) => {
+        exportRows.push({
+          "Date": e.dateStr,
+          "Team Name": teamName,
+          "Employee Name": empName(e.uid),
+          "Attendance": statusText,
+          "In Time": inTime,
+          "Out Time": outTime,
+          "System Hrs": sysHrs,
+          "Project Name": t.project || "N/A",
+          "Task Assigned": t.taskTitle + (t.description ? ` - ${t.description}` : ""),
+          "Task Hrs": t.hours ? `${t.hours}h` : "0h",
+          "Total Hrs Done": totalHrs,
+          "EOD Status": eodStatus
         });
-
-        if (currentRowIdx - startRow > 1) {
-          merges.push({ s: { r: startRow, c: 0 }, e: { r: currentRowIdx - 1, c: 0 } });
-          merges.push({ s: { r: startRow, c: 1 }, e: { r: currentRowIdx - 1, c: 1 } });
-          merges.push({ s: { r: startRow, c: 2 }, e: { r: currentRowIdx - 1, c: 2 } });
-          merges.push({ s: { r: startRow, c: 3 }, e: { r: currentRowIdx - 1, c: 3 } });
-          merges.push({ s: { r: startRow, c: 4 }, e: { r: currentRowIdx - 1, c: 4 } });
-          merges.push({ s: { r: startRow, c: 5 }, e: { r: currentRowIdx - 1, c: 5 } });
-          merges.push({ s: { r: startRow, c: 6 }, e: { r: currentRowIdx - 1, c: 6 } });
-          merges.push({ s: { r: startRow, c: 7 }, e: { r: currentRowIdx - 1, c: 7 } });
-          merges.push({ s: { r: startRow, c: 8 }, e: { r: currentRowIdx - 1, c: 8 } });
-          merges.push({ s: { r: startRow, c: 12 }, e: { r: currentRowIdx - 1, c: 12 } });
-          merges.push({ s: { r: startRow, c: 13 }, e: { r: currentRowIdx - 1, c: 13 } });
-        }
-
-        sNo++;
       });
     });
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(exportRows);
 
-    ws["!merges"] = merges;
     ws["!cols"] = [
-      { wch: 8 },  // S.No
-      { wch: 20 }, // Employee Name
       { wch: 12 }, // Date
+      { wch: 15 }, // Team Name
+      { wch: 20 }, // Employee Name
+      { wch: 12 }, // Attendance
       { wch: 10 }, // In Time
       { wch: 10 }, // Out Time
-      { wch: 15 }, // Attendance
-      { wch: 10 }, // Avail Hrs
       { wch: 10 }, // System Hrs
-      { wch: 15 }, // Team Name
       { wch: 20 }, // Project Name
       { wch: 50 }, // Task Assigned
       { wch: 10 }, // Task Hrs
-      { wch: 15 }, // EOD Status
-      { wch: 15 }  // Total Hrs Done
+      { wch: 15 }, // Total Hrs Done
+      { wch: 15 }  // EOD Status
     ];
 
     XLSX.utils.book_append_sheet(wb, ws, "Daily Task sheet");
@@ -413,7 +350,6 @@ export default function AdminDailySheetsView() {
     { label: "NAME", key: "name", cls: "min-w-[140px]" },
     { label: "IN", key: "in", cls: "w-20" },
     { label: "OUT", key: "out", cls: "w-20" },
-    { label: "AVAIL HRS", key: "avail", cls: "w-20" },
     { label: "TOTAL HRS", key: "sys", cls: "w-24" },
     { label: "ASSIGNED TASKS", key: "task", cls: "min-w-[160px]" },
     { label: "STATUS", key: "status", cls: "w-24" },
@@ -709,7 +645,6 @@ export default function AdminDailySheetsView() {
                       </td>
                       <td className="px-3 py-2.5 text-indigo-600 font-medium text-xs whitespace-nowrap align-middle">{att?.in ?? "—"}</td>
                       <td className="px-3 py-2.5 text-slate-500 text-xs whitespace-nowrap align-middle">{att?.out ?? "—"}</td>
-                      <td className="px-3 py-2.5 text-slate-500 text-xs whitespace-nowrap align-middle">{e.isHoliday ? "0" : "8"}</td>
                       <td className="px-3 py-2.5 text-slate-700 font-semibold text-xs whitespace-nowrap align-middle">{att?.sys ?? "—"}</td>
                       <td className="px-3 py-2.5 align-top pt-3 cursor-pointer" onClick={(ev) => { ev.stopPropagation(); setExpandedRowId(isExpanded ? null : docId); }}>
                         {dayTasks.length > 0 ? (

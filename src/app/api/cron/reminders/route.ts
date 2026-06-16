@@ -34,8 +34,14 @@ export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get("type");
   const auth = req.headers.get("Authorization");
   
-  // Protect cron route
-  if (auth !== `Bearer ${process.env.SCHEDULER_SECRET}`) {
+  // Protect cron route (allow both custom scheduler secret and Vercel's native CRON_SECRET)
+  const validSecrets = [
+    `Bearer ${process.env.SCHEDULER_SECRET}`,
+    `Bearer ${process.env.CRON_SECRET}`
+  ];
+  
+  if (!auth || !validSecrets.includes(auth)) {
+    console.error("[Cron API] Unauthorized attempt. Headers:", req.headers);
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -48,7 +54,7 @@ export async function GET(req: NextRequest) {
     for (const userDoc of usersSnap.docs) {
       const userData = userDoc.data();
       const phone = userData?.phone || userData?.mobile;
-      if (!phone) continue;
+      if (!phone && !userData.email) continue;
 
       // Check if on leave
       const leavesSnap = await adminDb.collection("leaveRequests")
@@ -69,17 +75,27 @@ export async function GET(req: NextRequest) {
         const attId = `${userDoc.id}_${todayStr}`;
         const attSnap = await adminDb.collection("attendance").doc(attId).get();
         if (!attSnap.exists) {
-          await sendWhatsApp(phone, `Hey ${userData.name || 'there'}! It's time to start your day. Don't forget to check in on Office Tracker! Reply "check me in" to Tracker Bot.`);
+          if (phone) {
+            await sendWhatsApp(phone, `Hey ${userData.name || 'there'}! It's time to start your day. Don't forget to check in on Office Tracker! Reply "check me in" to Tracker Bot.`);
+          }
           
           if (userData.email) {
             await sendEmail({
               to: userData.email,
-              subject: "Please Check In Today",
+              subject: "Daily Check-in Reminder – Please Check In Before 10:15 AM",
               html: `
-                <p>Hi ${userData.name || 'there'},</p>
-                <p>We noticed you haven't checked in today. Please check in on the Office Tracker as soon as possible.</p>
-                <p><em>Note: Checking in after 10:15 AM may be considered a late mark unless previously approved.</em></p>
-                <p>Best,<br/>HR Team</p>
+                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+                  <h2 style="color: #0f172a; font-size: 20px; margin-bottom: 20px;">Daily Check-in Reminder – Please Check In Before 10:15 AM</h2>
+                  <p style="color: #475569; font-size: 16px;">Dear Team,</p>
+                  <p style="color: #475569; font-size: 16px;">This is a friendly reminder to complete your <strong>daily check-in every working day before 10:15 AM</strong>.</p>
+                  <div style="background-color: #fef2f2; padding: 15px; border-left: 4px solid #ef4444; margin: 20px 0;">
+                    <strong style="color: #991b1b;">⚠️ Warning:</strong> <span style="color: #7f1d1d;">Check-ins submitted after <strong>10:15 AM may be flagged as a late mark</strong> as per the attendance policy.</span>
+                  </div>
+                  <p style="color: #475569; font-size: 16px;">Please make it a habit to check in daily and ensure your attendance is recorded on time.</p>
+                  <p style="color: #475569; font-size: 16px;">Thank you for your cooperation.</p>
+                  <a href="https://office-tracker.com" style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 10px; margin-bottom: 20px;">Check In Now</a>
+                  <p style="color: #64748b; font-size: 14px; margin-top: 10px;">Best regards,<br/>techgyinnovations Team</p>
+                </div>
               `
             });
           }
@@ -102,16 +118,22 @@ export async function GET(req: NextRequest) {
           .get();
         
         if (sheetsSnap.empty) {
-          await sendWhatsApp(phone, `Good evening ${userData.name || 'there'}! Your day is almost over. Don't forget to submit your Time Sheet on Office Tracker!`);
+          if (phone) {
+            await sendWhatsApp(phone, `Good evening ${userData.name || 'there'}! Your day is almost over. Don't forget to submit your Time Sheet on Office Tracker!`);
+          }
           
           if (userData.email) {
             await sendEmail({
               to: userData.email,
-              subject: "Reminder: Fill Your Time Sheet",
+              subject: "Action Required: Daily Timesheet Pending",
               html: `
-                <p>Hi ${userData.name || 'there'},</p>
-                <p>You haven't filled your time sheet for today yet. Please submit your entries as soon as possible.</p>
-                <p>Best,<br/>HR Team</p>
+                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
+                  <h2 style="color: #0f172a;">Good Evening, ${userData.name || 'there'}! 🌇</h2>
+                  <p style="color: #475569; font-size: 16px;">We hope you had a productive day! We noticed that your timesheet for today (${todayStr}) is still pending.</p>
+                  <p style="color: #475569; font-size: 16px;">Please log in to the Office Tracker and log your tasks before wrapping up for the day.</p>
+                  <a href="https://office-tracker.com" style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 10px;">Fill Timesheet</a>
+                  <p style="color: #64748b; font-size: 14px; margin-top: 30px;">Best regards,<br/>HR & Admin Team</p>
+                </div>
               `
             });
           }
