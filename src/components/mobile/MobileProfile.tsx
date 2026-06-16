@@ -259,7 +259,7 @@ export const MobileProfile = () => {
           {renderField("Date of Joining", "dateOfJoining", "date")}
           {renderField("Employment Type", "employmentType", "text", ["Full Time", "Part Time", "Contract", "Internship"])}
           {renderField("Work Location", "workLocation", "text", ["On-site", "Remote", "Hybrid"])}
-          {renderField("Reporting Lead", "reportingTo", true, leadsList.map(l => ({ value: l.id, label: l.name })))}
+          {renderField("Reporting Lead", "reportingTo", "text", leadsList.map((l: any) => ({ value: l.id, label: l.name })))}
           {renderField("Work Experience", "workExperience")}
         </>
       ))}

@@ -286,15 +286,21 @@ export default function AdminDailySheetsView() {
       exportRows.push({
         "S.No": teamName,
         "Employee Name": "",
+        "Date": "",
+        "In Time": "",
+        "Out Time": "",
         "Attendance": "",
+        "Avail Hrs": "",
+        "System Hrs": "",
         "Team Name": "",
         "Project Name": "",
         "Task Assigned": "",
+        "Task Hrs": "",
         "EOD Status": "",
         "Total Hrs Done": ""
       });
-      // Merge Team Heading row (from col 0 to col 7)
-      merges.push({ s: { r: currentRowIdx, c: 0 }, e: { r: currentRowIdx, c: 7 } });
+      // Merge Team Heading row (from col 0 to col 13)
+      merges.push({ s: { r: currentRowIdx, c: 0 }, e: { r: currentRowIdx, c: 13 } });
       currentRowIdx++;
 
       // 2. Group by Employee within this team
@@ -323,29 +329,47 @@ export default function AdminDailySheetsView() {
           const isFirst = idx === 0;
           const att = attendanceMap[`${e.uid}_${e.dateStr}`];
           const statusText = att?.in && att.in !== "--:--" ? "Present" : e.isHoliday ? "Holiday" : "Absent";
+          const inTime = att?.in || "--:--";
+          const outTime = att?.out || "--:--";
+          const sysHrs = att?.sys || "0";
+          const availHrs = e.isHoliday ? "0" : "8";
 
-          exportRows.push({
-            "S.No": isFirst ? sNo : "",
-            "Employee Name": isFirst ? empName(e.uid) : "",
-            "Attendance": isFirst ? statusText : "",
-            "Team Name": isFirst ? teamName : "",
-            "Project Name": e.project,
-            "Task Assigned": e.taskTitle + (e.description ? `\n${e.description}` : ""),
-            "EOD Status": e.status || "In Progress",
-            "Total Hrs Done": e.hours ? `${e.hours}h` : ""
+          const tasksList = e.tasks && e.tasks.length > 0 ? e.tasks : [{ project: e.project || "", taskTitle: e.taskTitle || "", description: e.description || "", hours: e.hours || 0 }];
+
+          tasksList.forEach((t: any, tIdx: number) => {
+            const isFirstTask = tIdx === 0 && isFirst;
+            exportRows.push({
+              "S.No": isFirstTask ? sNo : "",
+              "Employee Name": isFirstTask ? empName(e.uid) : "",
+              "Date": isFirstTask ? e.dateStr : "",
+              "In Time": isFirstTask ? inTime : "",
+              "Out Time": isFirstTask ? outTime : "",
+              "Attendance": isFirstTask ? statusText : "",
+              "Avail Hrs": isFirstTask ? availHrs : "",
+              "System Hrs": isFirstTask ? sysHrs : "",
+              "Team Name": isFirstTask ? teamName : "",
+              "Project Name": t.project,
+              "Task Assigned": t.taskTitle + (t.description ? `\n${t.description}` : ""),
+              "Task Hrs": t.hours ? `${t.hours}h` : "",
+              "EOD Status": isFirstTask ? (e.status || "In Progress") : "",
+              "Total Hrs Done": isFirstTask ? (e.hours ? `${e.hours}h` : "") : ""
+            });
+            currentRowIdx++;
           });
-          currentRowIdx++;
         });
 
-        if (entries.length > 1) {
-          // Merge S.No (col 0)
+        if (currentRowIdx - startRow > 1) {
           merges.push({ s: { r: startRow, c: 0 }, e: { r: currentRowIdx - 1, c: 0 } });
-          // Merge Employee Name (col 1)
           merges.push({ s: { r: startRow, c: 1 }, e: { r: currentRowIdx - 1, c: 1 } });
-          // Merge Attendance (col 2)
           merges.push({ s: { r: startRow, c: 2 }, e: { r: currentRowIdx - 1, c: 2 } });
-          // Merge Team Name (col 3)
           merges.push({ s: { r: startRow, c: 3 }, e: { r: currentRowIdx - 1, c: 3 } });
+          merges.push({ s: { r: startRow, c: 4 }, e: { r: currentRowIdx - 1, c: 4 } });
+          merges.push({ s: { r: startRow, c: 5 }, e: { r: currentRowIdx - 1, c: 5 } });
+          merges.push({ s: { r: startRow, c: 6 }, e: { r: currentRowIdx - 1, c: 6 } });
+          merges.push({ s: { r: startRow, c: 7 }, e: { r: currentRowIdx - 1, c: 7 } });
+          merges.push({ s: { r: startRow, c: 8 }, e: { r: currentRowIdx - 1, c: 8 } });
+          merges.push({ s: { r: startRow, c: 12 }, e: { r: currentRowIdx - 1, c: 12 } });
+          merges.push({ s: { r: startRow, c: 13 }, e: { r: currentRowIdx - 1, c: 13 } });
         }
 
         sNo++;
@@ -359,10 +383,16 @@ export default function AdminDailySheetsView() {
     ws["!cols"] = [
       { wch: 8 },  // S.No
       { wch: 20 }, // Employee Name
+      { wch: 12 }, // Date
+      { wch: 10 }, // In Time
+      { wch: 10 }, // Out Time
       { wch: 15 }, // Attendance
+      { wch: 10 }, // Avail Hrs
+      { wch: 10 }, // System Hrs
       { wch: 15 }, // Team Name
-      { wch: 25 }, // Project Name
-      { wch: 60 }, // Task Assigned
+      { wch: 20 }, // Project Name
+      { wch: 50 }, // Task Assigned
+      { wch: 10 }, // Task Hrs
       { wch: 15 }, // EOD Status
       { wch: 15 }  // Total Hrs Done
     ];
