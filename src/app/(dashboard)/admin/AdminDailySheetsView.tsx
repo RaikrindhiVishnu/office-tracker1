@@ -364,17 +364,7 @@ export default function AdminDailySheetsView() {
       img.onerror = () => resolve("");
     });
 
-    if (imgData) {
-      // Adjust dimensions/position based on logo aspect ratio
-      pdf.addImage(imgData, "PNG", 40, 20, 100, 30);
-      pdf.setFontSize(14);
-      pdf.text(`Admin Task Sheets`, 40, 70);
-    } else {
-      pdf.setFontSize(18);
-      pdf.text("TECHGY INNOVATIONS", 40, 40);
-      pdf.setFontSize(14);
-      pdf.text(`Admin Task Sheets`, 40, 60);
-    }
+    // The logo will be rendered inside the date loop
 
     const pdfRows: any[][] = [];
     let currentDate = "";
@@ -422,21 +412,33 @@ export default function AdminDailySheetsView() {
         fullDate = d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
       } catch (err) { }
 
-      // Print Date heading above the table
-      pdf.setFontSize(14);
-      pdf.setTextColor(15, 23, 42); // slate-900
+      let currentY = 40; // Reset for each date initially if needed, but we track globally
 
       // If we are about to overflow the page, add new page
-      if (currentY > pdf.internal.pageSize.height - 50) {
+      if (currentY > pdf.internal.pageSize.height - 80 && currentY > 50) {
         pdf.addPage();
         currentY = 40;
       }
 
-      pdf.setFont("helvetica", 'bold');
       const pageWidth = pdf.internal.pageSize.width;
-      pdf.text(fullDate, pageWidth - 40, currentY, { align: 'right' });
+      
+      // Left: Logo
+      if (imgData) {
+        pdf.addImage(imgData, "PNG", 40, currentY, 100, 30);
+      }
+
+      // Middle: Title
+      pdf.setFont("helvetica", 'bold');
+      pdf.setFontSize(16);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text("Admin Task Sheets", pageWidth / 2, currentY + 20, { align: 'center' });
+
+      // Right: Date
+      pdf.setFontSize(14);
+      pdf.text(fullDate, pageWidth - 40, currentY + 20, { align: 'right' });
+      
       pdf.setFont("helvetica", 'normal');
-      currentY += 15;
+      currentY += 40;
 
       const dateRows = groupedByDate[dateStr];
       const pdfBodyRows: any[][] = [];
@@ -461,13 +463,21 @@ export default function AdminDailySheetsView() {
           const taskPrefix = tasksList.length > 1 || t.taskTitle ? `Task ${index + 1}: ` : "";
           const taskText = taskPrefix + (t.taskTitle || "") + (t.description ? ` - ${t.description}` : "");
 
-          pdfBodyRows.push([
-            isFirst ? empName(e.uid) : "",
-            isFirst ? statusText : "",
-            t.project || "N/A",
-            taskText,
-            isFirst ? eodStatus : ""
-          ]);
+          if (isFirst) {
+            pdfBodyRows.push([
+              { content: empName(e.uid), rowSpan: tasksList.length, styles: { valign: 'top' } },
+              { content: statusText, rowSpan: tasksList.length, styles: { valign: 'top' } },
+              t.project || "N/A",
+              taskText,
+              eodStatus
+            ]);
+          } else {
+            pdfBodyRows.push([
+              t.project || "N/A",
+              taskText,
+              ""
+            ]);
+          }
         });
       });
 
@@ -511,10 +521,12 @@ export default function AdminDailySheetsView() {
       table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 12px; }
       th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
       th { background-color: #64748b; color: white; }
-      .date-title { display: flex; justify-content: flex-end; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; margin-top: 30px; margin-bottom: 10px; font-weight: bold; font-size: 14px; color: #475569; }
+      .header-container { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-top: 30px; margin-bottom: 20px; }
+      .header-logo { flex: 1; text-align: left; }
+      .header-title { flex: 1; text-align: center; font-size: 20px; font-weight: bold; color: #0f172a; }
+      .header-date { flex: 1; text-align: right; font-weight: bold; font-size: 14px; color: #475569; }
       .team-header { color: white; font-weight: bold; background-color: #0f172a; }
     </style></head><body>
-    <h2>Admin Task Sheets - ${selectedMonth}</h2>
     `;
 
     const groupedByDate: Record<string, any[]> = {};
@@ -531,8 +543,14 @@ export default function AdminDailySheetsView() {
         fullDate = d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
       } catch (err) { }
 
-      // Add Date Title Above Table
-      html += `<div class="date-title">${fullDate}</div>`;
+      // Add 3-column Header Above Table
+      html += `
+        <div class="header-container">
+          <div class="header-logo"><img src="/logo (2).png" alt="Techgy" style="height: 35px;" onerror="this.style.display='none'" /></div>
+          <div class="header-title">Admin Task Sheets</div>
+          <div class="header-date">${fullDate}</div>
+        </div>
+      `;
 
       // Start table for this date
       html += `
@@ -569,15 +587,25 @@ export default function AdminDailySheetsView() {
           const taskPrefix = tasksList.length > 1 || t.taskTitle ? `Task ${index + 1}: ` : "";
           const taskText = taskPrefix + (t.taskTitle || "") + (t.description ? ` - ${t.description}` : "");
 
-          html += `
-            <tr>
-              <td>${isFirst ? empName(e.uid) : ""}</td>
-              <td>${isFirst ? statusText : ""}</td>
-              <td>${t.project || "N/A"}</td>
-              <td>${taskText}</td>
-              <td>${isFirst ? eodStatus : ""}</td>
-            </tr>
-          `;
+          if (isFirst) {
+            html += `
+              <tr>
+                <td rowspan="${tasksList.length}" style="vertical-align: top;">${empName(e.uid)}</td>
+                <td rowspan="${tasksList.length}" style="vertical-align: top;">${statusText}</td>
+                <td>${t.project || "N/A"}</td>
+                <td>${taskText}</td>
+                <td>${eodStatus}</td>
+              </tr>
+            `;
+          } else {
+            html += `
+              <tr>
+                <td>${t.project || "N/A"}</td>
+                <td>${taskText}</td>
+                <td></td>
+              </tr>
+            `;
+          }
         });
       });
 
