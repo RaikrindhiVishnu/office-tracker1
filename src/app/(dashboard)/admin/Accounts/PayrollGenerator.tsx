@@ -349,7 +349,7 @@ export default function PayrollGenerator() {
     await loadEmployees();
     setLoadingAll(false); setBulkProgress(null);
     if (!fail.length) alert(`✅ ${success} payslips generated!`);
-    else alert(`✅ ${success} generated.\n❌ Failed: ${fail.join(", ")}`);
+    else alert(`✅ ${success} generated.\n❌ Failed: ${fail.join(", ")}\n\n💡 Make sure you have configured the Salary Structure for these employees!`);
   };
 
   /* ─── Sub-views ─────────────────────────────────────────────────────────── */
@@ -467,9 +467,9 @@ export default function PayrollGenerator() {
                         {downloadingUid === emp.uid ? "Preparing…" : "⬇ Download"}
                       </button>
                     ) : (
-                      <button disabled
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-400 rounded-lg text-xs font-medium cursor-not-allowed bg-gray-50">
-                        ⬇ Download
+                      <button onClick={() => handleGenerateSingle(emp.uid)} disabled={generatingUid === emp.uid}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-emerald-500 text-emerald-600 rounded-lg text-xs font-medium hover:bg-emerald-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                        {generatingUid === emp.uid ? "Generating…" : "⚙ Generate"}
                       </button>
                     )}
                   </td>
