@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/firebaseAdmin";
 import { sendEmail } from "@/lib/email";
 import { buildMncEmailHtml } from "@/lib/emailTemplate";
+import * as XLSX from "xlsx";
 
 export async function GET(request: Request) {
   // Add simple auth so only Vercel cron or admin can hit this endpoint
@@ -148,18 +149,53 @@ export async function GET(request: Request) {
       contentHtml
     );
 
-    // 6. Send to all admins
+    // 6. Build Excel Attachment
+    const excelRows: any[][] = [];
+    excelRows.push(["Date", "Employee Name", "Attendance", "Team Name", "Project Name", "Task Assigned", "EOD Status"]);
+    
+    for (const team of sortedTeams) {
+      const teamRows = teams[team];
+      if (teamRows.length === 0) continue;
+      
+      excelRows.push([team]); // Section header
+      teamRows.forEach(row => {
+        excelRows.push([
+          dateStr,
+          row.name,
+          row.attendance,
+          team,
+          row.project || "N/A",
+          row.task || "-",
+          row.attendance === "Absent" ? "-" : row.eod
+        ]);
+      });
+      excelRows.push([]); // Empty row
+    }
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(excelRows);
+    ws['!cols'] = [{ wch: 12 }, { wch: 20 }, { wch: 15 }, { wch: 18 }, { wch: 20 }, { wch: 50 }, { wch: 15 }];
+    XLSX.utils.book_append_sheet(wb, ws, "Daily Sheets");
+    const excelBuffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+    const attachments = [{
+      filename: `Daily_Task_Sheets_${dateStr}.xlsx`,
+      content: excelBuffer
+    }];
+
+    // 7. Send to all admins
     let sentCount = 0;
     for (const adminEmail of adminEmails) {
       try {
         await sendEmail({
           to: adminEmail,
-          subject: \`📋 Daily Task Sheet Report - \${dateStr}\`,
+          subject: `📋 Daily Task Sheet Report - ${dateStr}`,
           html: emailHtml,
+          attachments,
         });
         sentCount++;
       } catch (err) {
-        console.error(\`Failed to send to \${adminEmail}\`, err);
+        console.error(`Failed to send to ${adminEmail}`, err);
       }
     }
 

@@ -108,6 +108,8 @@ export default function AdminDailySheetsView() {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+
   // Refs for scrolling and search focus
   const tableRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -268,17 +270,17 @@ export default function AdminDailySheetsView() {
     if (!sorted.length) { alert("No data to export."); return; }
 
     const exportRows: any[] = [];
-    
+
     // Sort all entries by Date (desc), then Team, then Employee Name
     const sortedEntries = [...sorted].sort((a, b) => {
       if (a.dateStr !== b.dateStr) return b.dateStr.localeCompare(a.dateStr);
-      
+
       const empA = employees.find(em => em.uid === a.uid);
       const empB = employees.find(em => em.uid === b.uid);
       const teamA = empA?.department || "Other";
       const teamB = empB?.department || "Other";
       if (teamA !== teamB) return teamA.localeCompare(teamB);
-      
+
       const aName = empName(a.uid);
       const bName = empName(b.uid);
       return aName.localeCompare(bName);
@@ -290,7 +292,7 @@ export default function AdminDailySheetsView() {
       const inTime = att?.in || "--:--";
       const outTime = att?.out || "--:--";
       const sysHrs = att?.sys || "0";
-      
+
       const emp = employees.find(em => em.uid === e.uid);
       const teamName = emp?.department || "Other";
       const eodStatus = e.status || "In Progress";
@@ -334,8 +336,270 @@ export default function AdminDailySheetsView() {
       { wch: 15 }  // EOD Status
     ];
 
-    XLSX.utils.book_append_sheet(wb, ws, "Daily Task sheet");
-    XLSX.writeFile(wb, `Daily_Task_Sheet_${selectedDate || selectedMonth || "Export"}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, "Daily Sheets");
+    XLSX.writeFile(wb, `Admin_Task_Sheets_${selectedMonth}.xlsx`);
+  };
+
+  const exportToPDF = async () => {
+    if (!sorted.length) { alert("No data to export."); return; }
+
+    const { default: jsPDF } = await import("jspdf");
+    const { default: autoTable } = await import("jspdf-autotable");
+
+    const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+
+    // Try to load Techgy Logo
+    const imgData = await new Promise<string>((resolve) => {
+      const img = new Image();
+      img.src = "/logo (2).png"; // Path to Techgy logo
+      img.crossOrigin = "Anonymous";
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL("image/png"));
+      };
+      img.onerror = () => resolve("");
+    });
+
+    if (imgData) {
+      // Adjust dimensions/position based on logo aspect ratio
+      pdf.addImage(imgData, "PNG", 40, 20, 100, 30);
+      pdf.setFontSize(14);
+      pdf.text(`Admin Task Sheets`, 40, 70);
+    } else {
+      pdf.setFontSize(18);
+      pdf.text("TECHGY INNOVATIONS", 40, 40);
+      pdf.setFontSize(14);
+      pdf.text(`Admin Task Sheets`, 40, 60);
+    }
+
+    const pdfRows: any[][] = [];
+    let currentDate = "";
+    let currentTeam = "";
+
+    const teamColors = [
+      [15, 23, 42],     // slate-900 (Dark Blue)
+      [5, 150, 105],    // emerald-600 (Green)
+      [225, 29, 72],    // rose-600 (Red)
+      [217, 119, 6],    // amber-600 (Orange)
+      [8, 145, 178],    // cyan-600 (Cyan)
+      [192, 38, 211],   // fuchsia-600 (Fuchsia)
+    ];
+    const teamColorMap: Record<string, number[]> = {};
+    let colorIndex = 0;
+
+    // Sort all entries by Date (desc), then Team, then Employee Name
+    const sortedEntries = [...sorted].sort((a, b) => {
+      if (a.dateStr !== b.dateStr) return b.dateStr.localeCompare(a.dateStr);
+
+      const empA = employees.find(em => em.uid === a.uid);
+      const empB = employees.find(em => em.uid === b.uid);
+      const teamA = empA?.department || "Other";
+      const teamB = empB?.department || "Other";
+      if (teamA !== teamB) return teamA.localeCompare(teamB);
+
+      const aName = empName(a.uid);
+      const bName = empName(b.uid);
+      return aName.localeCompare(bName);
+    });
+
+    const groupedByDate: Record<string, any[]> = {};
+    sortedEntries.forEach(e => {
+      if (!groupedByDate[e.dateStr]) groupedByDate[e.dateStr] = [];
+      groupedByDate[e.dateStr].push(e);
+    });
+
+    let currentY = imgData ? 80 : 70;
+
+    // Loop through each date
+    Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a)).forEach((dateStr) => {
+      let fullDate = dateStr;
+      try {
+        const d = new Date(`${dateStr}T00:00:00`);
+        fullDate = d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      } catch (err) { }
+
+      // Print Date heading above the table
+      pdf.setFontSize(14);
+      pdf.setTextColor(15, 23, 42); // slate-900
+
+      // If we are about to overflow the page, add new page
+      if (currentY > pdf.internal.pageSize.height - 50) {
+        pdf.addPage();
+        currentY = 40;
+      }
+
+      pdf.setFont(undefined, 'bold');
+      pdf.text(fullDate, 40, currentY);
+      pdf.setFont(undefined, 'normal');
+      currentY += 15;
+
+      const dateRows = groupedByDate[dateStr];
+      const pdfBodyRows: any[][] = [];
+      let currentTeam = "";
+
+      dateRows.forEach((e) => {
+        const emp = employees.find(em => em.uid === e.uid);
+        const teamName = emp?.department || "Other";
+
+        if (teamName !== currentTeam) {
+          currentTeam = teamName;
+          if (!teamColorMap[teamName]) {
+            teamColorMap[teamName] = teamColors[colorIndex % teamColors.length];
+            colorIndex++;
+          }
+          pdfBodyRows.push([{ content: `Team: ${teamName}`, colSpan: 5, styles: { fillColor: teamColorMap[teamName], textColor: [255, 255, 255], fontStyle: 'bold' } }]);
+        }
+
+        const att = attendanceMap[`${e.uid}_${e.dateStr}`];
+        const statusText = att?.in && att.in !== "--:--" ? "Present" : e.isHoliday ? "Holiday" : "Absent";
+        const eodStatus = e.status || "In Progress";
+        const tasksList = e.tasks && e.tasks.length > 0 ? e.tasks : [{ project: e.project || "", taskTitle: e.taskTitle || "", description: e.description || "" }];
+
+        tasksList.forEach((t: any, index: number) => {
+          const isFirst = index === 0;
+          const taskPrefix = tasksList.length > 1 || t.taskTitle ? `Task ${index + 1}: ` : "";
+          const taskText = taskPrefix + (t.taskTitle || "") + (t.description ? ` - ${t.description}` : "");
+
+          pdfBodyRows.push([
+            isFirst ? empName(e.uid) : "",
+            isFirst ? statusText : "",
+            t.project || "N/A",
+            taskText,
+            isFirst ? eodStatus : ""
+          ]);
+        });
+      });
+
+      autoTable(pdf, {
+        startY: currentY,
+        head: [["Employee Name", "Attendance", "Project", "Task Assigned", "EOD Status"]],
+        body: pdfBodyRows,
+        theme: 'grid',
+        headStyles: { fillColor: [79, 70, 229] },
+        styles: { fontSize: 9, cellPadding: 4 },
+        columnStyles: { 3: { cellWidth: 300 } },
+        margin: { bottom: 30 }
+      });
+
+      currentY = (pdf as any).lastAutoTable.finalY + 30; // space before next date
+    });
+
+    pdf.save(`Admin_Task_Sheets_${selectedMonth}.pdf`);
+  };
+
+  const printAsTable = () => {
+    if (!sorted.length) { alert("No data to export."); return; }
+
+    // Sort all entries by Date (desc), then Team, then Employee Name
+    const sortedEntries = [...sorted].sort((a, b) => {
+      if (a.dateStr !== b.dateStr) return b.dateStr.localeCompare(a.dateStr);
+
+      const empA = employees.find(em => em.uid === a.uid);
+      const empB = employees.find(em => em.uid === b.uid);
+      const teamA = empA?.department || "Other";
+      const teamB = empB?.department || "Other";
+      if (teamA !== teamB) return teamA.localeCompare(teamB);
+
+      const aName = empName(a.uid);
+      const bName = empName(b.uid);
+      return aName.localeCompare(bName);
+    });
+
+    let html = `<html><head><title>Daily Sheets Print</title><style>
+      body { font-family: sans-serif; margin: 20px; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 12px; }
+      th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+      th { background-color: #4f46e5; color: white; }
+      .date-title { color: #0f172a; font-weight: bold; font-size: 18px; margin-top: 30px; margin-bottom: 10px; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; }
+      .team-header { color: white; font-weight: bold; }
+    </style></head><body>
+    <h2>Admin Task Sheets - ${selectedMonth}</h2>
+    `;
+
+    const groupedByDate: Record<string, any[]> = {};
+    sortedEntries.forEach(e => {
+      if (!groupedByDate[e.dateStr]) groupedByDate[e.dateStr] = [];
+      groupedByDate[e.dateStr].push(e);
+    });
+
+    const colors = ["#0f172a", "#059669", "#e11d48", "#d97706", "#0891b2", "#c026d3"];
+    let colorIdx = 0;
+    const tMap: Record<string, string> = {};
+
+    Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a)).forEach((dateStr) => {
+      let fullDate = dateStr;
+      try {
+        const d = new Date(`${dateStr}T00:00:00`);
+        fullDate = d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      } catch (err) { }
+
+      // Add Date Title Above Table
+      html += `<div class="date-title">${fullDate}</div>`;
+
+      // Start table for this date
+      html += `
+        <table>
+          <thead>
+            <tr>
+              <th>Employee Name</th>
+              <th>Attendance</th>
+              <th>Project</th>
+              <th>Task Assigned</th>
+              <th>EOD Status</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      let currentTeam = "";
+      groupedByDate[dateStr].forEach((e) => {
+        const emp = employees.find(em => em.uid === e.uid);
+        const teamName = emp?.department || "Other";
+
+        if (teamName !== currentTeam) {
+          currentTeam = teamName;
+          if (!tMap[teamName]) {
+            tMap[teamName] = colors[colorIdx % colors.length];
+            colorIdx++;
+          }
+          html += `<tr class="team-header" style="background-color: ${tMap[teamName]};"><td colspan="5">Team: ${teamName}</td></tr>`;
+        }
+
+        const att = attendanceMap[`${e.uid}_${e.dateStr}`];
+        const statusText = att?.in && att.in !== "--:--" ? "Present" : e.isHoliday ? "Holiday" : "Absent";
+        const eodStatus = e.status || "In Progress";
+        const tasksList = e.tasks && e.tasks.length > 0 ? e.tasks : [{ project: e.project || "", taskTitle: e.taskTitle || "", description: e.description || "" }];
+
+        tasksList.forEach((t: any, index: number) => {
+          const isFirst = index === 0;
+          const taskPrefix = tasksList.length > 1 || t.taskTitle ? `Task ${index + 1}: ` : "";
+          const taskText = taskPrefix + (t.taskTitle || "") + (t.description ? ` - ${t.description}` : "");
+
+          html += `
+            <tr>
+              <td>${isFirst ? empName(e.uid) : ""}</td>
+              <td>${isFirst ? statusText : ""}</td>
+              <td>${t.project || "N/A"}</td>
+              <td>${taskText}</td>
+              <td>${isFirst ? eodStatus : ""}</td>
+            </tr>
+          `;
+        });
+      });
+
+      html += `</tbody></table>`;
+    });
+
+    html += `<script>window.print();</script></body></html>`;
+    const win = window.open("", "_blank");
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+    }
   };
 
   // ── View More → scroll to table ───────────────────────────────────────────
@@ -530,13 +794,25 @@ export default function AdminDailySheetsView() {
           <span className="bg-indigo-50 text-indigo-600 text-xs px-3 py-1.5 rounded-full font-semibold">
             {sorted.reduce((s, e) => s + (e.hours || 0), 0)}h total
           </span>
-          <button onClick={exportToExcel}
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-[#1a8a5a] text-white text-xs font-bold rounded-lg hover:bg-[#157a50] active:bg-[#0f5c3a] transition shadow-sm">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Export
-          </button>
+          <div className="relative">
+            <button onClick={() => setExportMenuOpen(!exportMenuOpen)}
+              className="flex items-center gap-1.5 px-4 py-1.5 bg-[#1a8a5a] text-white text-xs font-bold rounded-lg hover:bg-[#157a50] active:bg-[#0f5c3a] transition shadow-sm">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Export Options
+              <svg className="w-3 h-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {exportMenuOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                <button onClick={() => { setExportMenuOpen(false); exportToExcel(); }} className="w-full text-left px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition border-b border-slate-100 flex items-center gap-2">📊 Export as Excel</button>
+                <button onClick={() => { setExportMenuOpen(false); exportToPDF(); }} className="w-full text-left px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition border-b border-slate-100 flex items-center gap-2">📎 Export as PDF</button>
+                <button onClick={() => { setExportMenuOpen(false); printAsTable(); }} className="w-full text-left px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition flex items-center gap-2">🖨️ Print / View Table</button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -736,5 +1012,23 @@ export default function AdminDailySheetsView() {
         )}
       </div>
     </div>
+  );
+}
+{
+  [
+    { icon: "M9 5l7 7-7 7", fn: () => setPage((p) => Math.min(totalPages, p + 1)), dis: page === totalPages },
+    { icon: "M13 5l7 7-7 7M5 5l7 7-7 7", fn: () => setPage(totalPages), dis: page === totalPages },
+  ].map((b, i) => (
+    <button key={i} onClick={b.fn} disabled={b.dis}
+      className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-200 disabled:opacity-30 transition">
+      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={b.icon} /></svg>
+    </button>
+  ))
+}
+            </div >
+          </div >
+        )}
+      </div >
+    </div >
   );
 }
