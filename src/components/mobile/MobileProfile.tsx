@@ -8,6 +8,8 @@ import {
   ChevronDown, HeartPulse, CreditCard, AlertCircle, Laptop 
 } from "lucide-react";
 import { uploadToCloudinary } from "@/lib/cloudinary";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 const EMPTY_FORM = {
   name:"", email:"", phone:"", dateOfBirth:"", gender:"", bloodGroup:"",
@@ -30,6 +32,15 @@ export const MobileProfile = () => {
 
   const [photoPreview, setPhotoPreview] = useState("");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [leadsList, setLeadsList] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    getDocs(query(collection(db, "users"), where("role", "==", "lead")))
+      .then(snap => {
+        setLeadsList(snap.docs.map(d => ({ id: d.id, name: d.data().name || d.data().email })));
+      })
+      .catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (userData) {
