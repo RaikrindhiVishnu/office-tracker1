@@ -13,7 +13,8 @@ export const PWAInstallPrompt: React.FC = () => {
 
   useEffect(() => {
     // Detect mobile device
-    setIsMobile(/Mobi|Android|iPhone/i.test(navigator.userAgent));
+    const isMob = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    setIsMobile(isMob);
 
     const handleBeforeInstallPrompt = (e: Event) => {
       // Prevent the default Chrome 67+ install banner
@@ -21,8 +22,10 @@ export const PWAInstallPrompt: React.FC = () => {
       // Stash the event so it can be triggered later.
       setDeferredPrompt(e);
       
-      // Always show prompt when available for easy testing
-      setShowPrompt(true);
+      // Only show prompt on mobile devices
+      if (isMob) {
+        setShowPrompt(true);
+      }
     };
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);

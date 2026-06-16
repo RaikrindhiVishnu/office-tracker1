@@ -466,10 +466,10 @@ export default function DailySheetView() {
       <div className="relative overflow-hidden" style={{ height: "160px" }}>
         <img src="/timesheet_banner.png" alt="banner" className="absolute inset-0 w-full h-full object-cover object-center" />
         <div className="absolute inset-0 bg-gradient-to-r from-[#0d1f3c]/90 via-[#0d1f3c]/65 to-transparent" />
-        <div className="relative z-10 h-full flex flex-col justify-center px-8 max-w-lg">
-          <h2 className="text-white text-xl font-extrabold leading-tight tracking-tight drop-shadow-lg">My Time Sheets</h2>
-          <p className="text-slate-300 text-xs mt-1.5 leading-relaxed">Log your tasks, track your hours, and review your personal performance.</p>
-          <div className="mt-4 flex items-center gap-2">
+        <div className="relative z-10 h-full flex flex-col justify-center px-4 sm:px-8 max-w-lg">
+          <h2 className="text-white text-lg sm:text-xl font-extrabold leading-tight tracking-tight drop-shadow-lg">My Time Sheets</h2>
+          <p className="text-slate-300 text-[11px] sm:text-xs mt-1.5 leading-relaxed">Log your tasks, track your hours, and review your personal performance.</p>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
             <div className="px-3 py-1 bg-white/10 backdrop-blur border border-white/20 rounded-lg text-white text-xs font-semibold">
               {monthLabel}
             </div>
@@ -481,7 +481,7 @@ export default function DailySheetView() {
       </div>
 
       {/* ══ COMPACT STATS ════════════════════════════════════════════════════ */}
-      <div className="px-6 mt-5 flex flex-wrap gap-3">
+      <div className="px-3 sm:px-6 mt-5 flex flex-wrap gap-2 sm:gap-3">
         <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg shadow-sm text-xs">
           <span className="opacity-70">📋</span>
           <span className="text-slate-500 font-medium">Total Entries:</span>
@@ -505,7 +505,7 @@ export default function DailySheetView() {
       </div>
 
       {/* ══ CHARTS ══════════════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 px-6 mt-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 px-3 sm:px-6 mt-4">
         {/* Monthly Summary (Bar Chart) */}
         <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
           <h3 className="text-sm font-bold text-slate-800">Monthly Summary</h3>
@@ -548,8 +548,8 @@ export default function DailySheetView() {
       </div>
 
       {/* ── TOOLBAR ── */}
-      <div className="mx-6 mt-5 bg-white rounded-t-xl border border-slate-200 border-b-0 px-5 py-3 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4 text-xs text-slate-500">
+      <div className="mx-2 sm:mx-6 mt-5 bg-white rounded-t-xl border border-slate-200 border-b-0 px-3 sm:px-5 py-3 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-slate-500">
           <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-1 py-1">
             <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-white rounded transition text-slate-500 hover:text-slate-800">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
@@ -561,7 +561,7 @@ export default function DailySheetView() {
           </div>
           {selectedIds.size > 0 && <span className="text-indigo-600 font-semibold">{selectedIds.size} selected</span>}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {selectedIds.size > 0 && (
             <button
               onClick={async () => {
@@ -604,9 +604,9 @@ export default function DailySheetView() {
       </div>
 
       {/* ── TABLE ── */}
-      <div className="mx-6 mb-6 bg-white rounded-b-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+      <div className="mx-2 sm:mx-6 mb-6 bg-white rounded-b-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300">
+          <table className="w-full text-sm min-w-[800px]">
             <thead>
               <tr className="bg-[#f0f2f5] border-b border-slate-200">
                 <th className="px-4 py-3 w-10">
