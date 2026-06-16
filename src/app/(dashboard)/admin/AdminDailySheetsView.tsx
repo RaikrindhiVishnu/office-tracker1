@@ -958,11 +958,11 @@ export default function AdminDailySheetsView() {
                             <div className="text-xs text-slate-600 flex items-start justify-between group hover:text-indigo-600 cursor-pointer transition py-1">
                               <div className="flex-1 pr-4 flex gap-2">
                                 <div className="flex flex-col gap-0.5 min-w-0">
-                                  {dayTasks.map((t: any, i: number) => (
-                                    <span key={t.taskId || i} className="font-medium text-slate-700 truncate group-hover:text-indigo-600 transition-colors">
-                                      Task {i + 1} - {t.taskTitle} {t.status && `[${t.status}]`}
-                                    </span>
-                                  ))}
+                                    {dayTasks.map((t: any, i: number) => (
+                                      <span key={t.taskId || i} className="font-medium text-slate-700 whitespace-normal break-words group-hover:text-indigo-600 transition-colors">
+                                        Task {i + 1} - {t.taskTitle} {t.status && `[${t.status}]`}
+                                      </span>
+                                    ))}
                                 </div>
                               </div>
                             </div>
