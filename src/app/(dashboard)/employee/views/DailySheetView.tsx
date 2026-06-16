@@ -12,6 +12,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   serverTimestamp,
 } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
@@ -40,7 +41,8 @@ export default function DailySheetView() {
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingDocId, setEditingDocId] = useState<string | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successInfo, setSuccessInfo] = useState({ title: "", project: "", hours: "" });
@@ -123,23 +125,22 @@ export default function DailySheetView() {
             ts ? ts.toDate().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : "--:--";
           const first = sessions[0];
           const last = sessions[sessions.length - 1];
-          let addedMins = 0;
-          if (!last.checkOut) {
-            if (data.date === getTodayDateStr()) {
-              const start = last.checkIn.toDate();
-              const end = new Date();
-              const bStart = new Date(start); bStart.setHours(10, 0, 0, 0);
-              const bEnd = new Date(start); bEnd.setHours(19, 0, 0, 0);
-              const effStart = new Date(Math.max(start.getTime(), bStart.getTime()));
-              const effEnd = new Date(Math.min(end.getTime(), bEnd.getTime()));
-              if (effEnd > effStart) addedMins = Math.floor((effEnd.getTime() - effStart.getTime()) / 60000);
+          let effectiveMins = 0;
+          sessions.forEach((s: any) => {
+            const start = s.checkIn.toDate();
+            const end = s.checkOut ? s.checkOut.toDate() : (data.date === getTodayDateStr() ? new Date() : null);
+            const bStart = new Date(start); bStart.setHours(10, 0, 0, 0);
+            const bEnd = new Date(start); bEnd.setHours(19, 0, 0, 0);
+            const effStart = new Date(Math.max(start.getTime(), bStart.getTime()));
+            const effEnd = end ? new Date(Math.min(end.getTime(), bEnd.getTime())) : bEnd;
+            if (effEnd > effStart) {
+              effectiveMins += Math.floor((effEnd.getTime() - effStart.getTime()) / 60000);
             }
-            else addedMins = Math.max(0, 9 * 60 - data.totalMinutes);
-          }
+          });
           attMap[data.date] = {
             in: fmt(first.checkIn),
             out: fmt(last.checkOut),
-            sys: ((data.totalMinutes + addedMins) / 60).toFixed(1) + "h",
+            sys: (effectiveMins / 60).toFixed(1) + "h",
           };
         }
       });
@@ -179,7 +180,7 @@ export default function DailySheetView() {
     setProject(""); setProjectSearch(""); setShowProjectDropdown(false);
     setCustomProject("");
     setTaskTitle(""); setDescription(""); setCategory(CATEGORIES[0]);
-    setStatus(STATUSES[0]); setHours(""); setEditingId(null);
+    setStatus(STATUSES[0]); setHours(""); setEditingDocId(null); setEditingTaskId(null);
   };
 
   // ── Group entries by date ──────────────────────────────────
@@ -190,25 +191,40 @@ export default function DailySheetView() {
   }, {} as Record<string, DailySheetEntry[]>);
 
   const sortedDates = Object.keys(entriesByDate).sort();
+  // ── Normalize entries ────────────────────────────────────────
+  const normalizedTasks = React.useMemo(() => {
+    const list: any[] = [];
+    monthEntries.forEach(entry => {
+       if (entry.tasks && entry.tasks.length > 0) {
+          entry.tasks.forEach(t => {
+             list.push({ ...entry, ...t, entryId: entry.id, taskId: t.id });
+          });
+       } else if (entry.taskTitle) {
+          list.push({ ...entry, entryId: entry.id, taskId: "legacy_" + entry.id });
+       }
+    });
+    return list;
+  }, [monthEntries]);
+
   const allEntryIds = monthEntries.map((e) => e.id!);
-  const totalMonthHrs = monthEntries.reduce((acc, e) => acc + (e.hours || 0), 0);
+  const totalMonthHrs = normalizedTasks.reduce((acc, t) => acc + (t.hours || 0), 0);
 
   // ── Analytics (Charts) ─────────────────────────────────────
   const projectHrs = React.useMemo(() => {
     const map: Record<string, number> = {};
-    monthEntries.forEach((e) => { if (e.project) map[e.project] = (map[e.project] || 0) + (e.hours || 0); });
+    normalizedTasks.forEach((t) => { if (t.project) map[t.project] = (map[t.project] || 0) + (t.hours || 0); });
     const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 4);
     const maxVal = sorted[0]?.[1] || 1;
     const colors = ["bg-emerald-500", "bg-indigo-500", "bg-amber-400", "bg-rose-400"];
     return sorted.map(([proj, hrs], i) => ({
       label: proj, value: hrs, pct: Math.round((hrs / maxVal) * 100), color: colors[i] || "bg-slate-400",
     }));
-  }, [monthEntries]);
+  }, [normalizedTasks]);
 
   const summaryStats = React.useMemo(() => {
-    const projects = new Set(monthEntries.filter(e => e.project).map(e => e.project));
-    const tasksCount = monthEntries.length;
-    const hoursCount = monthEntries.reduce((acc, e) => acc + (e.hours || 0), 0);
+    const projects = new Set(normalizedTasks.filter(t => t.project).map(t => t.project));
+    const tasksCount = normalizedTasks.length;
+    const hoursCount = normalizedTasks.reduce((acc, t) => acc + (t.hours || 0), 0);
 
     // Normalize heights but ensure they are visible
     const maxVal = Math.max(1, projects.size, tasksCount, hoursCount);
@@ -218,7 +234,7 @@ export default function DailySheetView() {
       { label: "Tasks", value: tasksCount, suffix: "", color: "bg-indigo-500", pct: Math.max(8, Math.round((tasksCount / maxVal) * 100)) },
       { label: "Hours", value: hoursCount, suffix: "h", color: "bg-emerald-500", pct: Math.max(8, Math.round((hoursCount / maxVal) * 100)) }
     ];
-  }, [monthEntries]);
+  }, [normalizedTasks]);
 
   // ── CRUD ───────────────────────────────────────────────────
   const handleSaveEntry = async (isDraft: boolean) => {
@@ -229,18 +245,79 @@ export default function DailySheetView() {
     setIsSubmitting(true);
     try {
       const monthStr = entryDate.substring(0, 7);
-      const payload = {
-        uid: user.uid,
-        userName: userFullName || user.email?.split("@")[0] || "Unknown",
-        dateStr: entryDate, monthStr, project: finalProject, taskTitle: taskTitle.trim(), description,
-        category, status, hours: hours === "" ? 0 : Number(hours), isDraft,
-        updatedAt: serverTimestamp(),
+      const newTask = {
+        id: "task_" + Date.now().toString(),
+        project: finalProject,
+        taskTitle: taskTitle.trim(),
+        description,
+        category,
+        status,
+        hours: hours === "" ? 0 : Number(hours)
       };
-      if (editingId) {
-        await updateDoc(doc(db, "dailySheets", editingId), payload);
+
+      if (editingDocId) {
+        const existingEntry = monthEntries.find(e => e.id === editingDocId);
+        if (existingEntry) {
+          let updatedTasks = existingEntry.tasks || [];
+          if (!existingEntry.tasks && existingEntry.taskTitle) {
+            updatedTasks = [{
+              id: "legacy_" + existingEntry.id,
+              project: existingEntry.project || "",
+              taskTitle: existingEntry.taskTitle || "",
+              description: existingEntry.description || "",
+              category: existingEntry.category || "",
+              status: existingEntry.status || "",
+              hours: existingEntry.hours || 0,
+            }];
+          }
+          if (editingTaskId && !editingTaskId.startsWith("legacy_")) {
+             updatedTasks = updatedTasks.map(t => t.id === editingTaskId ? { ...t, ...newTask, id: t.id } : t);
+          } else if (editingTaskId && editingTaskId.startsWith("legacy_")) {
+             // overwriting the legacy array element
+             updatedTasks[0] = { ...updatedTasks[0], ...newTask, id: updatedTasks[0].id };
+          } else {
+             updatedTasks.push(newTask);
+          }
+          await updateDoc(doc(db, "dailySheets", editingDocId), {
+            tasks: updatedTasks,
+            updatedAt: serverTimestamp(),
+            isDraft: isDraft
+          });
+        }
       } else {
-        await addDoc(collection(db, "dailySheets"), { ...payload, createdAt: serverTimestamp() });
+        const existingForDate = monthEntries.find(e => e.dateStr === entryDate);
+        if (existingForDate) {
+          let updatedTasks = existingForDate.tasks || [];
+          if (!existingForDate.tasks && existingForDate.taskTitle) {
+            updatedTasks = [{
+              id: "legacy_" + existingForDate.id,
+              project: existingForDate.project || "",
+              taskTitle: existingForDate.taskTitle || "",
+              description: existingForDate.description || "",
+              category: existingForDate.category || "",
+              status: existingForDate.status || "",
+              hours: existingForDate.hours || 0,
+            }];
+          }
+          updatedTasks.push(newTask);
+          await updateDoc(doc(db, "dailySheets", existingForDate.id!), {
+            tasks: updatedTasks,
+            updatedAt: serverTimestamp(),
+            isDraft: isDraft
+          });
+        } else {
+          const payload = {
+            uid: user.uid,
+            userName: userFullName || user.email?.split("@")[0] || "Unknown",
+            dateStr: entryDate, monthStr, isDraft,
+            tasks: [newTask],
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          };
+          await addDoc(collection(db, "dailySheets"), payload);
+        }
       }
+
       if (!isDraft) {
         setSuccessInfo({
           title: taskTitle,
@@ -256,29 +333,47 @@ export default function DailySheetView() {
     finally { setIsSubmitting(false); }
   };
 
-  const handleEdit = (entry: DailySheetEntry) => {
-    setEditingId(entry.id!);
-    setEntryDate(entry.dateStr);
+  const handleEditTask = (docId: string, task: any) => {
+    setEditingDocId(docId);
+    setEditingTaskId(task.id);
+    const entry = monthEntries.find(e => e.id === docId);
+    if (entry) setEntryDate(entry.dateStr);
 
-    // If the project isn't in the list, we set it as "Other" and pre-fill custom
-    const isKnownProject = projects.some(p => p.name === entry.project);
-    if (entry.project && !isKnownProject) {
+    const isKnownProject = projects.some(p => p.name === task.project);
+    if (task.project && !isKnownProject) {
       setProject("Other / Custom Entry");
-      setCustomProject(entry.project);
+      setCustomProject(task.project);
     } else {
-      setProject(entry.project);
+      setProject(task.project);
       setCustomProject("");
     }
     setProjectSearch("");
-    setTaskTitle(entry.taskTitle); setDescription(entry.description || "");
-    setCategory(entry.category || CATEGORIES[0]); setStatus(entry.status || STATUSES[0]);
-    setHours(entry.hours); setIsModalOpen(true);
+    setTaskTitle(task.taskTitle); setDescription(task.description || "");
+    setCategory(task.category || CATEGORIES[0]); setStatus(task.status || STATUSES[0]);
+    setHours(task.hours); setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this entry?")) return;
-    try { await deleteDoc(doc(db, "dailySheets", id)); if (editingId === id) setEditingId(null); }
-    catch (err) { console.error(err); }
+  const handleDeleteTask = async (docId: string, taskId: string | null) => {
+    if (!confirm("Delete this task?")) return;
+    try {
+      const existingEntry = monthEntries.find(e => e.id === docId);
+      if (!existingEntry) return;
+
+      let updatedTasks = existingEntry.tasks || [];
+      if (!existingEntry.tasks && existingEntry.taskTitle) {
+        await deleteDoc(doc(db, "dailySheets", docId));
+        if (editingDocId === docId) resetForm();
+        return;
+      }
+      
+      updatedTasks = updatedTasks.filter(t => t.id !== taskId);
+      if (updatedTasks.length === 0) {
+        await deleteDoc(doc(db, "dailySheets", docId));
+      } else {
+        await updateDoc(doc(db, "dailySheets", docId), { tasks: updatedTasks });
+      }
+      if (editingTaskId === taskId) resetForm();
+    } catch (err) { console.error(err); }
   };
 
   // ── Export ─────────────────────────────────────────────────
@@ -289,6 +384,14 @@ export default function DailySheetView() {
     const finalData = [];
     for (const dateStr of sortedDates) {
       const dayEntries = entriesByDate[dateStr];
+      const dayTasks: any[] = [];
+      dayEntries.forEach(entry => {
+        if (entry.tasks && entry.tasks.length > 0) {
+          entry.tasks.forEach(t => dayTasks.push(t));
+        } else if (entry.taskTitle) {
+          dayTasks.push(entry);
+        }
+      });
       let checkInStr = "--:--:--", checkOutStr = "--:--:--", totalSysHours = 0;
       if (user) {
         const snap = await getDoc(doc(db, "attendance", `${user.uid}_${dateStr}`));
@@ -298,25 +401,24 @@ export default function DailySheetView() {
           if (sessions.length > 0) {
             checkInStr = fmt(sessions[0].checkIn);
             checkOutStr = fmt(sessions[sessions.length - 1].checkOut);
-            let addedMins = 0;
-            if (!sessions[sessions.length - 1].checkOut) {
-              if (data.date === getTodayDateStr()) {
-                const start = sessions[sessions.length - 1].checkIn.toDate();
-                const end = new Date();
-                const bStart = new Date(start); bStart.setHours(10, 0, 0, 0);
-                const bEnd = new Date(start); bEnd.setHours(19, 0, 0, 0);
-                const effStart = new Date(Math.max(start.getTime(), bStart.getTime()));
-                const effEnd = new Date(Math.min(end.getTime(), bEnd.getTime()));
-                if (effEnd > effStart) addedMins = Math.floor((effEnd.getTime() - effStart.getTime()) / 60000);
+            let effectiveMins = 0;
+            sessions.forEach((s: any) => {
+              const start = s.checkIn.toDate();
+              const end = s.checkOut ? s.checkOut.toDate() : (data.date === getTodayDateStr() ? new Date() : null);
+              const bStart = new Date(start); bStart.setHours(10, 0, 0, 0);
+              const bEnd = new Date(start); bEnd.setHours(19, 0, 0, 0);
+              const effStart = new Date(Math.max(start.getTime(), bStart.getTime()));
+              const effEnd = end ? new Date(Math.min(end.getTime(), bEnd.getTime())) : bEnd;
+              if (effEnd > effStart) {
+                effectiveMins += Math.floor((effEnd.getTime() - effStart.getTime()) / 60000);
               }
-              else addedMins = Math.max(0, 9 * 60 - data.totalMinutes);
-            }
-            totalSysHours = Number(((data.totalMinutes + addedMins) / 60).toFixed(2));
+            });
+            totalSysHours = Number((effectiveMins / 60).toFixed(2));
           }
         }
       }
       const isHoliday = dayEntries.some((e) => e.isHoliday);
-      const taskStr = dayEntries.map((e, i) => `Task ${i + 1}: ${e.taskTitle}${e.description ? " - " + e.description : ""}`).join("\n");
+      const taskStr = dayTasks.map((t, i) => `Task ${i + 1}: ${t.taskTitle}${t.description ? " - " + t.description : ""}`).join("\n");
       finalData.push({
         Date: dateStr,
         "Check-In": isHoliday ? "Holiday" : checkInStr,
@@ -516,15 +618,15 @@ export default function DailySheetView() {
                   />
                 </th>
                 {[
-                  ["DATE", "w-32"],
-                  ["IN", "w-24"],
-                  ["OUT", "w-24"],
-                  ["TOTAL HOURS", "w-28"],
-                  ["PROJECT", "w-44"],
-                  ["TASK TITLE", ""],
-                  ["TASK HRS", "w-24"],
-                  ["STATE", "w-24"],
-                  ["ACTIONS", "w-20"],
+                  ["DATE", "w-28"],
+                  ["IN", "w-20"],
+                  ["OUT", "w-20"],
+                  ["AVAIL HRS", "w-20"],
+                  ["TOTAL HRS", "w-24"],
+                  ["ASSIGNED TASKS", ""],
+                  ["STATUS", "w-24"],
+                  ["STATE", "w-20"],
+                  ["ACTIONS", "w-24"],
                 ].map(([label, cls], i) => (
                   <th
                     key={i}
@@ -549,119 +651,130 @@ export default function DailySheetView() {
                   </td>
                 </tr>
               ) : (
-                sortedDates.map((dateStr) => {
+                sortedDates.map((dateStr, idx) => {
                   const dayEntries = entriesByDate[dateStr];
                   const att = monthAttendance[dateStr];
+                  const docId = dayEntries[0].id!;
+
+                  const dayTasks = normalizedTasks.filter(t => t.dateStr === dateStr);
+                  const totalTaskHrs = dayTasks.reduce((acc, t) => acc + (t.hours || 0), 0);
+                  const isHoliday = dayEntries.some(e => e.isHoliday);
+                  const isDraft = dayEntries.some(e => e.isDraft);
+                  const status = dayEntries[0]?.status;
+
+                  const isSelected = selectedIds.has(docId);
+                  const isExpanded = expandedRowId === docId;
 
                   return (
-                    <React.Fragment key={dateStr}>
-                      {dayEntries.map((e, idx) => {
-                        const isSelected = selectedIds.has(e.id!);
-                        const isExpanded = expandedRowId === e.id;
-                        return (
-                          <React.Fragment key={e.id}>
-                          <tr
-                            onClick={() => setExpandedRowId(isExpanded ? null : e.id!)}
-                            className={`border-b border-slate-100 transition-colors cursor-pointer ${isSelected
-                                ? "bg-indigo-50"
-                                : idx % 2 === 0
-                                  ? "bg-white hover:bg-slate-50"
-                                  : "bg-[#fafbfc] hover:bg-slate-50"
-                              }`}
-                          >
-                            <td className="px-4 py-3" onClick={(ev) => ev.stopPropagation()}>
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleSelect(e.id!)}
-                                className="w-4 h-4 rounded border-slate-300 accent-indigo-600 cursor-pointer"
-                              />
-                            </td>
-                            <td className="px-3 py-3 font-medium text-slate-600 whitespace-nowrap text-xs">
-                              {formatDate(e.dateStr)}
-                            </td>
-                            <td className="px-3 py-3 text-slate-500 whitespace-nowrap text-xs">
-                              {att?.in || "—"}
-                            </td>
-                            <td className="px-3 py-3 text-slate-500 whitespace-nowrap text-xs">
-                              {att?.out || "—"}
-                            </td>
-                            <td className="px-3 py-3 text-slate-600 font-semibold text-xs">
-                              {att?.sys || "—"}
-                            </td>
-                            <td className="px-3 py-3 text-slate-700 max-w-[160px]">
-                              <span className="truncate block text-xs" title={e.project}>
-                                {e.project.length > 22 ? e.project.slice(0, 20) + "…" : e.project}
-                              </span>
-                            </td>
-                            <td className="px-3 py-3 text-slate-600 max-w-[200px]">
-                              <span className="truncate block text-xs" title={e.taskTitle}>
-                                {e.taskTitle}
-                              </span>
-                              {e.description && (
-                                <span className="block text-[10px] text-slate-400 truncate" title={e.description}>
-                                  {e.description}
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-3 py-3 text-slate-600 whitespace-nowrap text-xs">
-                              {e.hours ? `${e.hours}h` : "—"}
-                            </td>
-                            <td className="px-3 py-3">
-                              {e.isHoliday ? (
-                                <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">Holiday</span>
-                              ) : e.isDraft ? (
-                                <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">Draft</span>
-                              ) : (
-                                <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">Submitted</span>
-                              )}
-                            </td>
-                            <td className="px-3 py-3 text-right" onClick={(ev) => ev.stopPropagation()}>
-                              {!e.isHoliday && (
-                                <div className="flex items-center justify-end gap-1">
-                                  <button
-                                    onClick={() => handleEdit(e)}
-                                    className="p-1.5 text-indigo-500 hover:bg-indigo-50 rounded-lg transition"
-                                    title="Edit"
-                                  >
-                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                    </svg>
-                                  </button>
-                                  <button
-                                    onClick={() => handleDelete(e.id!)}
-                                    className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition"
-                                    title="Delete"
-                                  >
-                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                  </button>
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                          {isExpanded && (
-                            <tr className="bg-indigo-50/40 border-b border-indigo-100">
-                              <td colSpan={10} className="px-6 py-4">
-                                <div className="text-xs text-slate-700 space-y-2 pl-6 border-l-2 border-indigo-300">
-                                  <div><span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Project:</span> <span className="ml-1 font-medium text-slate-800">{e.project}</span></div>
-                                  <div><span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Task Title:</span> <span className="ml-1 font-medium text-slate-800">{e.taskTitle}</span></div>
-                                  {e.description && (
-                                    <div>
-                                      <div className="font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-1">Description:</div>
-                                      <div className="bg-white border border-slate-200 rounded p-3 text-slate-600 whitespace-pre-wrap leading-relaxed shadow-sm">{e.description}</div>
+                    <tr
+                        key={dateStr}
+                        className={`border-b border-slate-100 transition-colors ${isSelected
+                            ? "bg-indigo-50"
+                            : idx % 2 === 0
+                              ? "bg-white hover:bg-slate-50"
+                              : "bg-[#fafbfc] hover:bg-slate-50"
+                          }`}
+                      >
+                        <td className="px-4 py-3 align-middle">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelect(docId)}
+                            className="w-4 h-4 rounded border-slate-300 accent-indigo-600 cursor-pointer mt-1"
+                          />
+                        </td>
+                        <td className="px-3 py-3 font-medium text-slate-600 whitespace-nowrap text-xs align-middle">
+                          {formatDate(dateStr)}
+                        </td>
+                        <td className="px-3 py-3 text-slate-500 whitespace-nowrap text-xs align-middle">
+                          {att?.in || "—"}
+                        </td>
+                        <td className="px-3 py-3 text-slate-500 whitespace-nowrap text-xs align-middle">
+                          {att?.out || "—"}
+                        </td>
+                        <td className="px-3 py-3 text-slate-500 whitespace-nowrap text-xs align-middle">
+                          {isHoliday ? "0" : "8"}
+                        </td>
+                        <td className="px-3 py-3 text-slate-600 font-semibold text-xs align-middle">
+                          {att?.sys || "—"}
+                        </td>
+                        <td className="px-3 py-3 align-top" onClick={(e) => { e.stopPropagation(); setExpandedRowId(isExpanded ? null : docId); }}>
+                          {dayTasks.length > 0 ? (
+                            isExpanded ? (
+                              <div className="space-y-2 cursor-pointer">
+
+                                {dayTasks.map((t, i) => (
+                                  <div key={t.taskId || i} className="text-xs text-slate-600 border border-slate-100 rounded-lg p-2.5 bg-white shadow-sm relative pr-12 group">
+                                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                                      <button onClick={(e) => { e.stopPropagation(); handleEditTask(docId, t); }} className="text-indigo-400 hover:text-indigo-600" title="Edit Task">
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                      </button>
+                                      <button onClick={(e) => { e.stopPropagation(); handleDeleteTask(t.entryId, t.taskId); }} className="text-rose-400 hover:text-rose-600" title="Delete Task">
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                      </button>
                                     </div>
-                                  )}
+                                    <span className="font-bold text-slate-700">Task {i + 1}: </span>
+                                    <span className="font-medium text-slate-700">{t.project} - {t.taskTitle}</span> {t.description && `- ${t.description}`} 
+                                    <span className="text-[10px] ml-1 text-slate-400 font-bold">({t.hours}h)</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-slate-600 flex items-start justify-between group hover:text-indigo-600 cursor-pointer transition py-1">
+                                <div className="flex-1 pr-4 flex gap-2">
+                                  <div className="flex flex-col gap-0.5 min-w-0">
+                                    {dayTasks.map((t: any, i: number) => (
+                                      <span key={t.taskId || i} className="font-medium text-slate-700 truncate group-hover:text-indigo-600 transition-colors">
+                                        Task {i + 1} - {t.taskTitle}
+                                      </span>
+                                    ))}
+                                  </div>
                                 </div>
-                              </td>
-                            </tr>
+                              </div>
+                            )
+                          ) : (
+                            <div className="text-xs text-slate-400 italic pt-1">No tasks logged</div>
                           )}
-                          </React.Fragment>
-                        );
-                      })}
-                    </React.Fragment>
-                  );
+                        </td>
+                        <td className="px-3 py-3 text-xs text-slate-600 whitespace-nowrap align-middle">
+                          {status || "—"}
+                        </td>
+                        <td className="px-3 py-3 align-middle">
+                          {isHoliday ? (
+                            <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">Holiday</span>
+                          ) : isDraft ? (
+                            <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">Draft</span>
+                          ) : (
+                            <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">Submitted</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-right align-middle">
+                          {!isHoliday && (
+                            <div className="flex items-center justify-end gap-1 flex-col sm:flex-row">
+                              <button
+                                onClick={() => {
+                                  resetForm();
+                                  setEntryDate(dateStr);
+                                  setIsModalOpen(true);
+                                }}
+                                className="px-2 py-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded transition w-full sm:w-auto text-center whitespace-nowrap"
+                              >
+                                + Add Task
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTask(docId, null)}
+                                className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
+                                title="Delete Entire Day"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
                 })
               )}
             </tbody>
@@ -677,7 +790,7 @@ export default function DailySheetView() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div>
                 <h3 className="text-lg font-bold text-slate-800">
-                  {editingId ? "Edit Entry" : "Add New Entry"}
+                  {editingTaskId ? "Edit Entry" : "Add New Entry"}
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
                   {new Date(entryDate + "T00:00:00").toLocaleDateString("en-US", {
@@ -878,7 +991,7 @@ export default function DailySheetView() {
                     </svg>
                     Saving…
                   </>
-                ) : editingId ? "Update Entry" : "+ Add to Day"}
+                ) : editingTaskId ? "Update Entry" : "+ Add to Day"}
               </button>
             </div>
           </div>

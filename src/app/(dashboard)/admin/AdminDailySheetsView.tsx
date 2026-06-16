@@ -21,7 +21,7 @@ function avatarColor(name: string) {
   return colors[h];
 }
 
-type SortKey = "name" | "date" | "in" | "out" | "sys" | "task" | "status" | "hours" | "state";
+type SortKey = "name" | "date" | "in" | "out" | "sys" | "task" | "status" | "hours" | "state" | "avail";
 type SortDir = "asc" | "desc";
 
 // ── Bar Chart ────────────────────────────────────────────────────────────────
@@ -84,15 +84,21 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function AdminDailySheetsView() {
   const [allEntries, setAllEntries] = useState<DailySheetEntry[]>([]);
-  const [employees, setEmployees] = useState<{ uid: string; name: string }[]>([]);
+  const [employees, setEmployees] = useState<{ uid: string; name: string; department?: string }[]>([]);
   const [attendanceMap, setAttendanceMap] = useState<Record<string, { in: string; out: string; sys: string }>>({});
   const [bannerSlide, setBannerSlide] = useState(0);
   const [chartView, setChartView] = useState<"raw" | "centers">("raw");
 
   // Filters
   const [selectedEmployee, setSelectedEmployee] = useState("ALL");
-  const [selectedMonth, setSelectedMonth] = useState(todayStr.substring(0, 7));
-  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
   const [search, setSearch] = useState("");
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
@@ -120,12 +126,12 @@ export default function AdminDailySheetsView() {
         const data = snap.docs.map((d) => ({ id: d.id, ...d.data() } as DailySheetEntry));
         setAllEntries(data);
         const uniqueUids = Array.from(new Set(data.map((e) => e.uid)));
-        const list: { uid: string; name: string }[] = [];
+        const list: { uid: string; name: string; department?: string }[] = [];
         for (const uid of uniqueUids) {
           const us = await getDocs(query(collection(db, "users"), where("uid", "==", uid)));
           if (!us.empty) {
             const p = us.docs[0].data();
-            list.push({ uid, name: p.name ?? p.displayName ?? p.email?.split("@")[0] ?? "Unknown" });
+            list.push({ uid, name: p.name ?? p.displayName ?? p.email?.split("@")[0] ?? "Unknown", department: p.department || p.team });
           } else {
             list.push({ uid, name: data.find((e) => e.uid === uid)?.userName ?? uid });
           }
@@ -148,12 +154,20 @@ export default function AdminDailySheetsView() {
           const att = as.data(); const sessions = att.sessions || [];
           if (sessions.length > 0) {
             const first = sessions[0]; const last = sessions[sessions.length - 1];
-            let add = 0;
-            if (!last.checkOut) {
+            let effectiveMins = 0;
+            sessions.forEach((s: any) => {
+              const start = s.checkIn.toDate();
               const ds = key.split("_").slice(1).join("_");
-              add = ds === todayStr ? Math.floor((Date.now() - last.checkIn.toMillis()) / 60000) : Math.max(0, 9 * 60 - (att.totalMinutes || 0));
-            }
-            map[key] = { in: fmt(first.checkIn), out: last.checkOut ? fmt(last.checkOut) : "--:--", sys: `${Number(((att.totalMinutes || 0) + add) / 60).toFixed(1)}h` };
+              const end = s.checkOut ? s.checkOut.toDate() : (ds === todayStr ? new Date() : null);
+              const bStart = new Date(start); bStart.setHours(10, 0, 0, 0);
+              const bEnd = new Date(start); bEnd.setHours(19, 0, 0, 0);
+              const effStart = new Date(Math.max(start.getTime(), bStart.getTime()));
+              const effEnd = end ? new Date(Math.min(end.getTime(), bEnd.getTime())) : bEnd;
+              if (effEnd > effStart) {
+                effectiveMins += Math.floor((effEnd.getTime() - effStart.getTime()) / 60000);
+              }
+            });
+            map[key] = { in: fmt(first.checkIn), out: last.checkOut ? fmt(last.checkOut) : "--:--", sys: `${(effectiveMins / 60).toFixed(1)}h` };
           }
         }
       }));
@@ -165,13 +179,19 @@ export default function AdminDailySheetsView() {
 
   // ── Analytics ─────────────────────────────────────────────────────────────
   const monthEntries = useMemo(() => allEntries.filter((e) => e.monthStr === selectedMonth), [allEntries, selectedMonth]);
-  const totalMonthHrs = useMemo(() => monthEntries.reduce((s, e) => s + (e.hours || 0), 0), [monthEntries]);
+
+  const getEntryHours = (e: any) => {
+    if (e.tasks && e.tasks.length > 0) return e.tasks.reduce((a: number, t: any) => a + (Number(t.hours) || 0), 0);
+    return Number(e.hours) || 0;
+  };
+
+  const totalMonthHrs = useMemo(() => monthEntries.reduce((s, e) => s + getEntryHours(e), 0), [monthEntries]);
   const submittedCount = useMemo(() => monthEntries.filter((e) => !e.isDraft && !e.isHoliday).length, [monthEntries]);
   const draftCount = useMemo(() => monthEntries.filter((e) => e.isDraft).length, [monthEntries]);
 
   const teamPerf = useMemo(() => {
     const map: Record<string, number> = {};
-    monthEntries.forEach((e) => { map[e.uid] = (map[e.uid] || 0) + (e.hours || 0); });
+    monthEntries.forEach((e) => { map[e.uid] = (map[e.uid] || 0) + getEntryHours(e); });
     return Object.entries(map)
       .map(([uid, hrs]) => ({ label: empName(uid).split(" ")[0], value: hrs }))
       .sort((a, b) => b.value - a.value).slice(0, 7);
@@ -180,7 +200,7 @@ export default function AdminDailySheetsView() {
   const empPerfData = useMemo(() => {
     if (!employees.length) return [];
     const map: Record<string, number> = {};
-    monthEntries.forEach((e) => { map[e.uid] = (map[e.uid] || 0) + (e.hours || 0); });
+    monthEntries.forEach((e) => { map[e.uid] = (map[e.uid] || 0) + getEntryHours(e); });
     const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 4);
     const maxVal = sorted[0]?.[1] || 1;
     const colors = ["bg-emerald-500", "bg-indigo-500", "bg-amber-400", "bg-rose-400"];
@@ -196,7 +216,9 @@ export default function AdminDailySheetsView() {
     if (selectedDate && e.dateStr !== selectedDate) return false;
     if (search) {
       const q = search.toLowerCase();
-      if (!empName(e.uid).toLowerCase().includes(q) && !e.taskTitle.toLowerCase().includes(q) && !e.project.toLowerCase().includes(q)) return false;
+      const inTasks = e.tasks ? e.tasks.some((t: any) => (t.taskTitle || "").toLowerCase().includes(q) || (t.project || "").toLowerCase().includes(q)) : false;
+      const inLegacy = e.taskTitle ? ((e.taskTitle || "").toLowerCase().includes(q) || (e.project || "").toLowerCase().includes(q)) : false;
+      if (!empName(e.uid).toLowerCase().includes(q) && !inTasks && !inLegacy) return false;
     }
     return true;
   }), [allEntries, selectedEmployee, selectedMonth, selectedDate, search, empName]);
@@ -213,10 +235,15 @@ export default function AdminDailySheetsView() {
         case "date": return dir * a.dateStr.localeCompare(b.dateStr);
         case "in": return dir * (attA?.in ?? "").localeCompare(attB?.in ?? "");
         case "out": return dir * (attA?.out ?? "").localeCompare(attB?.out ?? "");
+        case "avail": return dir * ((a.isHoliday ? 0 : 8) - (b.isHoliday ? 0 : 8));
         case "sys": return dir * parseFloat(attA?.sys ?? "0") - dir * parseFloat(attB?.sys ?? "0");
-        case "task": return dir * a.taskTitle.localeCompare(b.taskTitle);
+        case "task": {
+          const tA = a.tasks ? a.tasks[0]?.taskTitle : a.taskTitle;
+          const tB = b.tasks ? b.tasks[0]?.taskTitle : b.taskTitle;
+          return dir * (tA || "").localeCompare(tB || "");
+        }
         case "status": return dir * (a.status ?? "").localeCompare(b.status ?? "");
-        case "hours": return dir * ((a.hours || 0) - (b.hours || 0));
+        case "hours": return dir * (getEntryHours(a) - getEntryHours(b));
         case "state": {
           const st = (e: DailySheetEntry) => e.isHoliday ? "Holiday" : e.isDraft ? "Draft" : "Submitted";
           return dir * st(a).localeCompare(st(b));
@@ -240,18 +267,108 @@ export default function AdminDailySheetsView() {
   // ── Export ────────────────────────────────────────────────────────────────
   const exportToExcel = () => {
     if (!sorted.length) { alert("No data to export."); return; }
-    const rows = sorted.map((e) => ({
-      Employee: empName(e.uid), Date: e.dateStr,
-      In: attendanceMap[`${e.uid}_${e.dateStr}`]?.in ?? "--",
-      Out: attendanceMap[`${e.uid}_${e.dateStr}`]?.out ?? "--",
-      "Sys Hrs": attendanceMap[`${e.uid}_${e.dateStr}`]?.sys ?? "--",
-      Project: e.project, "Task Title": e.taskTitle, Status: e.status,
-      "Task Hrs": `${e.hours}h`,
-      State: e.isHoliday ? "Holiday" : e.isDraft ? "Draft" : "Submitted",
-    }));
+
+    // Group by Team Name
+    const teamGroups: Record<string, DailySheetEntry[]> = {};
+    sorted.forEach((e) => {
+      const emp = employees.find(em => em.uid === e.uid);
+      const team = emp?.department || "Other";
+      if (!teamGroups[team]) teamGroups[team] = [];
+      teamGroups[team].push(e);
+    });
+
+    const exportRows: any[] = [];
+    const merges: any[] = [];
+    let currentRowIdx = 1; // 0 is the column headers
+
+    Object.entries(teamGroups).forEach(([teamName, teamEntries]) => {
+      // 1. Add Team Heading Row
+      exportRows.push({
+        "S.No": teamName,
+        "Employee Name": "",
+        "Attendance": "",
+        "Team Name": "",
+        "Project Name": "",
+        "Task Assigned": "",
+        "EOD Status": "",
+        "Total Hrs Done": ""
+      });
+      // Merge Team Heading row (from col 0 to col 7)
+      merges.push({ s: { r: currentRowIdx, c: 0 }, e: { r: currentRowIdx, c: 7 } });
+      currentRowIdx++;
+
+      // 2. Group by Employee within this team
+      const empGroups: Record<string, DailySheetEntry[]> = {};
+
+      const sortedEntries = [...teamEntries].sort((a, b) => {
+        const aName = empName(a.uid);
+        const bName = empName(b.uid);
+        if (aName !== bName) return aName.localeCompare(bName);
+        if (a.dateStr !== b.dateStr) return b.dateStr.localeCompare(a.dateStr); // newest first
+        return 0;
+      });
+
+      sortedEntries.forEach((e) => {
+        const key = `${e.uid}_${e.dateStr}`;
+        if (!empGroups[key]) empGroups[key] = [];
+        empGroups[key].push(e);
+      });
+
+      let sNo = 1;
+
+      Object.values(empGroups).forEach((entries) => {
+        const startRow = currentRowIdx;
+
+        entries.forEach((e, idx) => {
+          const isFirst = idx === 0;
+          const att = attendanceMap[`${e.uid}_${e.dateStr}`];
+          const statusText = att?.in && att.in !== "--:--" ? "Present" : e.isHoliday ? "Holiday" : "Absent";
+
+          exportRows.push({
+            "S.No": isFirst ? sNo : "",
+            "Employee Name": isFirst ? empName(e.uid) : "",
+            "Attendance": isFirst ? statusText : "",
+            "Team Name": isFirst ? teamName : "",
+            "Project Name": e.project,
+            "Task Assigned": e.taskTitle + (e.description ? `\n${e.description}` : ""),
+            "EOD Status": e.status || "In Progress",
+            "Total Hrs Done": e.hours ? `${e.hours}h` : ""
+          });
+          currentRowIdx++;
+        });
+
+        if (entries.length > 1) {
+          // Merge S.No (col 0)
+          merges.push({ s: { r: startRow, c: 0 }, e: { r: currentRowIdx - 1, c: 0 } });
+          // Merge Employee Name (col 1)
+          merges.push({ s: { r: startRow, c: 1 }, e: { r: currentRowIdx - 1, c: 1 } });
+          // Merge Attendance (col 2)
+          merges.push({ s: { r: startRow, c: 2 }, e: { r: currentRowIdx - 1, c: 2 } });
+          // Merge Team Name (col 3)
+          merges.push({ s: { r: startRow, c: 3 }, e: { r: currentRowIdx - 1, c: 3 } });
+        }
+
+        sNo++;
+      });
+    });
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), "Timesheets");
-    XLSX.writeFile(wb, `Timesheets_${selectedMonth}.xlsx`);
+    const ws = XLSX.utils.json_to_sheet(exportRows);
+
+    ws["!merges"] = merges;
+    ws["!cols"] = [
+      { wch: 8 },  // S.No
+      { wch: 20 }, // Employee Name
+      { wch: 15 }, // Attendance
+      { wch: 15 }, // Team Name
+      { wch: 25 }, // Project Name
+      { wch: 60 }, // Task Assigned
+      { wch: 15 }, // EOD Status
+      { wch: 15 }  // Total Hrs Done
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws, "Daily Task sheet");
+    XLSX.writeFile(wb, `Daily_Task_Sheet_${selectedDate || selectedMonth || "Export"}.xlsx`);
   };
 
   // ── View More → scroll to table ───────────────────────────────────────────
@@ -263,13 +380,13 @@ export default function AdminDailySheetsView() {
 
   // ── Column definitions ────────────────────────────────────────────────────
   const cols: { label: string; key: SortKey; cls: string }[] = [
-    { label: "NAME", key: "name", cls: "min-w-[160px]" },
+    { label: "NAME", key: "name", cls: "min-w-[140px]" },
     { label: "IN", key: "in", cls: "w-20" },
     { label: "OUT", key: "out", cls: "w-20" },
-    { label: "SYS HRS", key: "sys", cls: "w-24" },
-    { label: "TASK TITLE", key: "task", cls: "min-w-[160px]" },
+    { label: "AVAIL HRS", key: "avail", cls: "w-20" },
+    { label: "TOTAL HRS", key: "sys", cls: "w-24" },
+    { label: "ASSIGNED TASKS", key: "task", cls: "min-w-[160px]" },
     { label: "STATUS", key: "status", cls: "w-24" },
-    { label: "TASK HRS", key: "hours", cls: "w-20" },
     { label: "STATE", key: "state", cls: "w-24" },
   ];
 
@@ -419,7 +536,7 @@ export default function AdminDailySheetsView() {
 
         <select
           value={selectedEmployee}
-          onChange={(e) => { setSelectedEmployee(e.target.value); setSelectedDate(""); }}
+          onChange={(e) => { setSelectedEmployee(e.target.value); }}
           className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-700 outline-none font-medium focus:ring-2 focus:ring-indigo-200"
         >
           <option value="ALL">All Employees</option>
@@ -438,13 +555,7 @@ export default function AdminDailySheetsView() {
           className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 bg-white outline-none cursor-pointer focus:ring-2 focus:ring-indigo-200"
         />
 
-        {selectedDate && (
-          <button onClick={() => setSelectedDate("")}
-            className="text-xs text-rose-400 hover:text-rose-600 px-2 py-1 hover:bg-rose-50 rounded-lg transition flex items-center gap-1">
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-            Clear
-          </button>
-        )}
+
 
         <div className="ml-auto flex items-center gap-2">
           <span className="bg-slate-100 text-xs text-slate-600 px-3 py-1.5 rounded-full font-medium">
@@ -537,16 +648,25 @@ export default function AdminDailySheetsView() {
                 paginated.map((e, idx) => {
                   const name = empName(e.uid);
                   const att = attendanceMap[`${e.uid}_${e.dateStr}`];
-                  const isExpanded = expandedRowId === e.id;
+                  const docId = e.id!;
+
+                  const dayTasks: any[] = [];
+                  if (e.tasks && e.tasks.length > 0) {
+                    e.tasks.forEach((t: any) => dayTasks.push({ ...t, entryId: docId, taskId: t.id }));
+                  } else if (e.taskTitle) {
+                    dayTasks.push({ ...e, entryId: docId, taskId: "legacy_" + docId });
+                  }
+
+                  const isExpanded = expandedRowId === docId;
+
                   return (
-                    <React.Fragment key={e.id}>
                     <tr
-                      onClick={() => setExpandedRowId(isExpanded ? null : e.id!)}
-                      className={`border-b border-slate-100 transition-colors cursor-pointer ${idx % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-[#fafbfc] hover:bg-slate-50"}`}>
-                      <td className="px-4 py-2.5" onClick={(ev) => ev.stopPropagation()}>
+                      key={docId}
+                      className={`border-b border-slate-100 transition-colors ${idx % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-[#fafbfc] hover:bg-slate-50"}`}>
+                      <td className="px-4 py-2.5 align-middle">
                         <input type="checkbox" className="w-4 h-4 rounded border-slate-300 accent-indigo-600 cursor-pointer" />
                       </td>
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-2.5 align-middle">
                         <div className="flex items-center gap-2">
                           <div className={`w-7 h-7 rounded-full ${avatarColor(name)} text-white flex items-center justify-center text-[10px] font-bold shrink-0`}>
                             {initials(name)}
@@ -557,16 +677,44 @@ export default function AdminDailySheetsView() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-2.5 text-indigo-600 font-medium text-xs whitespace-nowrap">{att?.in ?? "—"}</td>
-                      <td className="px-3 py-2.5 text-slate-500 text-xs whitespace-nowrap">{att?.out ?? "—"}</td>
-                      <td className="px-3 py-2.5 text-slate-700 font-semibold text-xs whitespace-nowrap">{att?.sys ?? "—"}</td>
-                      <td className="px-3 py-2.5 max-w-[180px]">
-                        <p className="text-xs font-medium text-slate-700 truncate" title={e.taskTitle}>{e.taskTitle}</p>
-                        {e.project && <p className="text-[10px] text-slate-400 truncate">{e.project}</p>}
+                      <td className="px-3 py-2.5 text-indigo-600 font-medium text-xs whitespace-nowrap align-middle">{att?.in ?? "—"}</td>
+                      <td className="px-3 py-2.5 text-slate-500 text-xs whitespace-nowrap align-middle">{att?.out ?? "—"}</td>
+                      <td className="px-3 py-2.5 text-slate-500 text-xs whitespace-nowrap align-middle">{e.isHoliday ? "0" : "8"}</td>
+                      <td className="px-3 py-2.5 text-slate-700 font-semibold text-xs whitespace-nowrap align-middle">{att?.sys ?? "—"}</td>
+                      <td className="px-3 py-2.5 align-top pt-3 cursor-pointer" onClick={(ev) => { ev.stopPropagation(); setExpandedRowId(isExpanded ? null : docId); }}>
+                        {dayTasks.length > 0 ? (
+                          isExpanded ? (
+                            <div className="space-y-2 cursor-pointer">
+
+                              {dayTasks.map((t, i) => (
+                                <div key={t.taskId || i} className="text-xs text-slate-600 border border-slate-100 rounded-lg p-2.5 bg-white shadow-sm relative pr-3 group">
+                                  <span className="font-bold text-slate-700">Task {i + 1}: </span>
+                                  <span className="font-medium text-slate-700">{t.project} - {t.taskTitle}</span> {t.description && `- ${t.description}`}
+                                  <span className="text-[10px] ml-1 text-slate-400 font-bold">({t.hours}h)</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-slate-600 flex items-start justify-between group hover:text-indigo-600 cursor-pointer transition py-1">
+                              <div className="flex-1 pr-4 flex gap-2">
+                                <div className="flex flex-col gap-0.5 min-w-0">
+                                  {dayTasks.map((t: any, i: number) => (
+                                    <span key={t.taskId || i} className="font-medium text-slate-700 truncate group-hover:text-indigo-600 transition-colors">
+                                      Task {i + 1} - {t.taskTitle}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        ) : (
+                          <div className="text-xs text-slate-400 italic pt-1">No tasks logged</div>
+                        )}
                       </td>
-                      <td className="px-3 py-2.5 text-xs text-slate-500 whitespace-nowrap">{e.status || "—"}</td>
-                      <td className="px-3 py-2.5 text-xs font-semibold text-slate-700 whitespace-nowrap">{e.hours ? `${e.hours}h` : "—"}</td>
-                      <td className="px-3 py-2.5">
+                      <td className="px-3 py-2.5 text-xs text-slate-600 whitespace-nowrap align-middle">
+                        {e.status || "—"}
+                      </td>
+                      <td className="px-3 py-2.5 align-middle">
                         {e.isHoliday ? (
                           <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">Holiday</span>
                         ) : e.isDraft ? (
@@ -576,23 +724,6 @@ export default function AdminDailySheetsView() {
                         )}
                       </td>
                     </tr>
-                    {isExpanded && (
-                      <tr className="bg-indigo-50/40 border-b border-indigo-100">
-                        <td colSpan={10} className="px-6 py-4">
-                          <div className="text-xs text-slate-700 space-y-2 pl-6 border-l-2 border-indigo-300">
-                            <div><span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Project:</span> <span className="ml-1 font-medium text-slate-800">{e.project}</span></div>
-                            <div><span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Task Title:</span> <span className="ml-1 font-medium text-slate-800">{e.taskTitle}</span></div>
-                            {e.description && (
-                              <div>
-                                <div className="font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-1">Description:</div>
-                                <div className="bg-white border border-slate-200 rounded p-3 text-slate-600 whitespace-pre-wrap leading-relaxed shadow-sm">{e.description}</div>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                    </React.Fragment>
                   );
                 })
               )}
@@ -617,7 +748,8 @@ export default function AdminDailySheetsView() {
                 </button>
               ))}
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                const pg = Math.max(1, Math.min(page - 2 + i, totalPages - Math.min(4, totalPages - 1) + i));
+                const startPage = Math.max(1, Math.min(page - 2, totalPages - 4));
+                const pg = startPage + i;
                 return (
                   <button key={pg} onClick={() => setPage(pg)}
                     className={`w-8 h-8 rounded-lg text-xs font-semibold transition ${pg === page ? "bg-[#1a2e45] text-white" : "text-slate-500 hover:bg-slate-200"}`}>

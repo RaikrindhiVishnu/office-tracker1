@@ -13,7 +13,7 @@ const EMPTY_FORM = {
   name:"", email:"", phone:"", dateOfBirth:"", gender:"", bloodGroup:"",
   maritalStatus:"", nationality:"", address:"", city:"", postalCode:"",
   employeeId:"", designation:"", department:"", dateOfJoining:"",
-  employmentType:"", workLocation:"", reportingManager:"", workExperience:"",
+  employmentType:"", workLocation:"", reportingTo:"", workExperience:"",
   salary:"", bankName:"", accountNumber:"", ifscCode:"", panNumber:"", aadharNumber:"",
   emergencyContactName:"", emergencyContactRelation:"", emergencyContactPhone:"",
   assetSource: "Own", assetName: "", assetType: "laptop", assetSerial: "", 
@@ -107,7 +107,7 @@ export const MobileProfile = () => {
   }
 
   // Helper for rendering form fields
-  const renderField = (label: string, field: keyof typeof EMPTY_FORM, type = "text", options?: string[]) => {
+  const renderField = (label: string, field: keyof typeof EMPTY_FORM, type = "text", options?: any[]) => {
     const isEditing = editingSection !== null;
     return (
       <div className="flex flex-col gap-1.5 py-2 border-b border-gray-50 last:border-0">
@@ -116,13 +116,21 @@ export const MobileProfile = () => {
           options ? (
             <select value={form[field]} onChange={setF(field)} className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
               <option value="">Select...</option>
-              {options.map(o => <option key={o} value={o}>{o}</option>)}
+              {options.map(o => (
+                <option key={typeof o === 'string' ? o : o.value} value={typeof o === 'string' ? o : o.value}>
+                  {typeof o === 'string' ? o : o.label}
+                </option>
+              ))}
             </select>
           ) : (
             <input type={type} value={form[field]} onChange={setF(field)} className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
           )
         ) : (
-          <p className="text-sm font-bold text-gray-900 px-1">{form[field] || "—"}</p>
+          <p className="text-sm font-bold text-gray-900 px-1">
+            {options ? (
+               typeof options[0] === 'string' ? form[field] : (options.find(o => o.value === form[field])?.label || form[field])
+            ) : form[field] || "—"}
+          </p>
         )}
       </div>
     );
@@ -251,7 +259,7 @@ export const MobileProfile = () => {
           {renderField("Date of Joining", "dateOfJoining", "date")}
           {renderField("Employment Type", "employmentType", "text", ["Full Time", "Part Time", "Contract", "Internship"])}
           {renderField("Work Location", "workLocation", "text", ["On-site", "Remote", "Hybrid"])}
-          {renderField("Reporting Manager", "reportingManager")}
+          {renderField("Reporting Lead", "reportingTo", true, leadsList.map(l => ({ value: l.id, label: l.name })))}
           {renderField("Work Experience", "workExperience")}
         </>
       ))}

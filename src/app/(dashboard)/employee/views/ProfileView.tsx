@@ -11,7 +11,7 @@ const EMPTY = {
   name:"", email:"", phone:"", dateOfBirth:"", gender:"", bloodGroup:"",
   maritalStatus:"", nationality:"", address:"", city:"", postalCode:"",
   employeeId:"", designation:"", department:"", dateOfJoining:"",
-  employmentType:"", workLocation:"", reportingManager:"", workExperience:"",
+  employmentType:"", workLocation:"", reportingTo:"", workExperience:"",
   salary:"", bankName:"", accountNumber:"", ifscCode:"", panNumber:"", aadharNumber:"",
   emergencyContactName:"", emergencyContactRelation:"", emergencyContactPhone:"",
   assetSource: "Own",
@@ -285,18 +285,18 @@ export default function ProfileView() {
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-slate-700 transition-colors">Reporting To (Lead)</label>
                 {isEditing ? (
                   <select
-                    value={form.reportingManager || ""}
-                    onChange={(e) => setF("reportingManager")(e.target.value)}
+                    value={form.reportingTo || ""}
+                    onChange={(e) => setF("reportingTo")(e.target.value)}
                     className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg focus:border-blue-100 focus:ring-2 focus:ring-blue-100 outline-none transition-all text-sm text-slate-900 appearance-none bg-no-repeat bg-[right_12px_top_50%]"
                     style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")` }}
                   >
                     <option value="">No Reporting Lead</option>
-                    {leadsList.map(l => <option key={l.id} value={l.name}>{l.name}</option>)}
+                    {leadsList.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                   </select>
                 ) : (
                   <div className="px-3 py-1.5 bg-slate-50/80 rounded-lg border border-slate-100 min-h-[34px] flex items-center group-hover:bg-slate-50 group-hover:border-slate-300 transition-all duration-200">
                     <p className="text-sm font-medium text-slate-800 truncate">
-                      {leadsList.find(l => l.name === form.reportingManager)?.name || form.reportingManager || <span className="text-slate-400 font-normal">—</span>}
+                      {leadsList.find(l => l.id === form.reportingTo)?.name || form.reportingTo || <span className="text-slate-400 font-normal">—</span>}
                     </p>
                   </div>
                 )}
