@@ -15,6 +15,10 @@ export default function TeamTasksView({ user }: { user: any }) {
   const [filterStatus, setFilterStatus] = useState<"All" | "Assigned" | "Working" | "Completed">("All");
   const [filterMember, setFilterMember] = useState<string>("All");
 
+  const [filterTime, setFilterTime] = useState<"All Time" | "This Month" | "Today" | "Custom">("All Time");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+
   // Define TEAMS statically so they are available immediately on first render
   const TEAMS = useMemo(() => [
     { id: "team_frontend", name: "Front End Team", email: "frontend@team" },
@@ -151,9 +155,26 @@ export default function TeamTasksView({ user }: { user: any }) {
         matchesMember = t.assignedTo === filterMember;
       }
       
-      return matchesSearch && matchesStatus && matchesMember;
+      let matchesTime = true;
+      if (t.createdAt && filterTime !== "All Time") {
+        const d = new Date(t.createdAt.seconds * 1000);
+        const now = new Date();
+        if (filterTime === "Today") {
+          matchesTime = d.toDateString() === now.toDateString();
+        } else if (filterTime === "This Month") {
+          matchesTime = d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        } else if (filterTime === "Custom") {
+          if (customStart && customEnd) {
+            const start = new Date(customStart + "T00:00:00");
+            const end = new Date(customEnd + "T23:59:59");
+            matchesTime = d >= start && d <= end;
+          }
+        }
+      }
+      
+      return matchesSearch && matchesStatus && matchesMember && matchesTime;
     });
-  }, [tasks, searchQuery, filterStatus, filterMember]);
+  }, [tasks, searchQuery, filterStatus, filterMember, filterTime, customStart, customEnd]);
 
   // --- Analytics Calculations ---
   const stats = useMemo(() => {
@@ -386,6 +407,37 @@ export default function TeamTasksView({ user }: { user: any }) {
             </div>
             
             <div className="flex flex-wrap items-center gap-4 pt-1">  
+              <div className="flex items-center gap-2">
+                <select
+                  value={filterTime}
+                  onChange={(e: any) => setFilterTime(e.target.value)}
+                  className="px-3 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-[13px] font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm cursor-pointer"
+                >
+                  <option value="All Time">All Time</option>
+                  <option value="Today">Today</option>
+                  <option value="This Month">This Month</option>
+                  <option value="Custom">Custom Date</option>
+                </select>
+
+                {filterTime === "Custom" && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={customStart}
+                      onChange={(e) => setCustomStart(e.target.value)}
+                      className="px-2 py-1.5 border border-gray-200 rounded-lg text-[13px] text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <span className="text-gray-400 text-xs">to</span>
+                    <input
+                      type="date"
+                      value={customEnd}
+                      onChange={(e) => setCustomEnd(e.target.value)}
+                      className="px-2 py-1.5 border border-gray-200 rounded-lg text-[13px] text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                )}
+              </div>
+
               <div className="relative">
                 <select
                   value={filterMember}

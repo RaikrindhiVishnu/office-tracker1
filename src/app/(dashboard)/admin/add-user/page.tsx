@@ -145,11 +145,14 @@ export default function AddUserPage() {
             </select> 
 
             {/* 🔹 Department */}
-            <select
+            <input
+              list="department-options"
               value={department}
               onChange={(e) => setDepartment(e.target.value)}
+              placeholder="Select or type department"
               className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-orange-400"
-            >
+            />
+            <datalist id="department-options">
               <option value="Frontend Team">Frontend Team</option>
               <option value="Backend Team">Backend Team</option>
               <option value="Testing Team">Testing Team</option>
@@ -157,8 +160,9 @@ export default function AddUserPage() {
               <option value="DevOps Team">DevOps Team</option>
               <option value="Sales">Sales</option>
               <option value="Operations">Operations</option>
+              <option value="Business Operations">Business Operations</option>
               <option value="HR">HR</option>
-            </select>
+            </datalist>
 
             {/* 🔹 Reporting To (Lead) */}
             <select

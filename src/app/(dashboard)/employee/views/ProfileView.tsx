@@ -275,7 +275,7 @@ export default function ProfileView() {
             <div className="grid grid-cols-2 gap-3">
               <Field label="Employee ID" value={form.employeeId} editing={false} onChange={setF("employeeId")} />
               <Field label="Designation" value={form.designation} editing={false} onChange={setF("designation")} />
-              <SelectField label="Department" value={form.department} editing={isEditing} onChange={setF("department")} options={["Frontend Team", "Backend Team", "UI/UX Team", "Testing Team", "DevOps Team", "AI Team", "Mobile Team", "3D Max Team", "QA Team", "Sales", "Operations", "HR"]} />
+              <SelectField label="Department" value={form.department} editing={isEditing} onChange={setF("department")} options={["Frontend Team", "Backend Team", "UI/UX Team", "Testing Team", "DevOps Team", "AI Team", "Mobile Team", "3D Max Team", "QA Team", "Sales", "Operations", "Business Operations", "HR"]} />
               <Field label="Date of Joining" value={form.dateOfJoining} editing={false} onChange={setF("dateOfJoining")} type="date" />
               <SelectField label="Employment Type" value={form.employmentType} editing={false} onChange={setF("employmentType")} options={["Full-time", "Part-time", "Contract", "Intern"]} />
               <Field label="Location" value={form.workLocation} editing={isEditing} onChange={setF("workLocation")} />
@@ -415,6 +415,8 @@ function Field({ label, value, editing, onChange, type = "text", prefix }: Field
 }
 
 function SelectField({ label, value, editing, onChange, options }: { label: string; value: any; editing: boolean; onChange: (v: string) => void; options: string[] }) {
+  const allOptions = (value && !options.includes(value)) ? [...options, value] : options;
+  
   return (
     <div className="flex flex-col gap-1 group h-full">
       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-slate-700 transition-colors">{label}</label>
@@ -426,7 +428,7 @@ function SelectField({ label, value, editing, onChange, options }: { label: stri
           style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")` }}
         >
           <option value="">Select...</option>
-          {options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+          {allOptions.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
         </select>
       ) : (
         <div className="px-3 py-1.5 bg-slate-50/80 rounded-lg border border-slate-100 min-h-[34px] flex items-center group-hover:bg-slate-50 group-hover:border-slate-300 transition-all duration-200">

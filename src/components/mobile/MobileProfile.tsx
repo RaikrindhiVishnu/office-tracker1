@@ -123,11 +123,18 @@ export const MobileProfile = () => {
     return (
       <div className="flex flex-col gap-1.5 py-2 border-b border-gray-50 last:border-0">
         <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider pl-1">{label}</label>
-        {isEditing ? (
-          options ? (
+        {isEditing ? (() => {
+          let allOptions = options;
+          if (options && form[field]) {
+            const hasVal = options.some(o => (typeof o === 'string' ? o : o.value) === form[field]);
+            if (!hasVal) {
+              allOptions = [...options, typeof options[0] === 'string' ? form[field] : { value: form[field], label: form[field] }];
+            }
+          }
+          return allOptions ? (
             <select value={form[field]} onChange={setF(field)} className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
               <option value="">Select...</option>
-              {options.map(o => (
+              {allOptions.map(o => (
                 <option key={typeof o === 'string' ? o : o.value} value={typeof o === 'string' ? o : o.value}>
                   {typeof o === 'string' ? o : o.label}
                 </option>
@@ -135,8 +142,8 @@ export const MobileProfile = () => {
             </select>
           ) : (
             <input type={type} value={form[field]} onChange={setF(field)} className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-          )
-        ) : (
+          );
+        })() : (
           <p className="text-sm font-bold text-gray-900 px-1">
             {options ? (
                typeof options[0] === 'string' ? form[field] : (options.find(o => o.value === form[field])?.label || form[field])
@@ -266,7 +273,7 @@ export const MobileProfile = () => {
         <>
           {renderField("Employee ID", "employeeId")}
           {renderField("Designation", "designation")}
-          {renderField("Department", "department")}
+          {renderField("Department", "department", "text", ["Frontend Team", "Backend Team", "UI/UX Team", "Testing Team", "DevOps Team", "AI Team", "Mobile Team", "3D Max Team", "QA Team", "Sales", "Operations", "Business Operations", "HR"])}
           {renderField("Date of Joining", "dateOfJoining", "date")}
           {renderField("Employment Type", "employmentType", "text", ["Full Time", "Part Time", "Contract", "Internship"])}
           {renderField("Work Location", "workLocation", "text", ["On-site", "Remote", "Hybrid"])}

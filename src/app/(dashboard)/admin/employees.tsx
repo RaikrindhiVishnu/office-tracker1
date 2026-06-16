@@ -521,20 +521,28 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                 </select>
 
                 {/* DEPARTMENT */}
-                <select
+                <input
+                  list="employees-department-options"
                   value={department}
                   onChange={(e) => setDepartment(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5"
-                >
-                  <option value="">No Department</option>  {/* ✅ added */}
-
-                  <option value="SALES">Sales</option>
-                  <option value="FINANCE">Finance</option>
-                  <option value="MARKETING">Marketing</option>
-                  <option value="EXECUTIVE">Executive</option>
-                  <option value="OPERATIONS">Operations</option>
-                  <option value="CUSTOMER_SUPPORT">Customer Support</option>
-                </select>
+                  placeholder="Select or type department"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-indigo-400 outline-none"
+                />
+                <datalist id="employees-department-options">
+                  <option value="Frontend Team">Frontend Team</option>
+                  <option value="Backend Team">Backend Team</option>
+                  <option value="Testing Team">Testing Team</option>
+                  <option value="UI/UX Team">UI/UX Team</option>
+                  <option value="DevOps Team">DevOps Team</option>
+                  <option value="Sales">Sales</option>
+                  <option value="Finance">Finance</option>
+                  <option value="Marketing">Marketing</option>
+                  <option value="Executive">Executive</option>
+                  <option value="Operations">Operations</option>
+                  <option value="Business Operations">Business Operations</option>
+                  <option value="HR">HR</option>
+                  <option value="Customer Support">Customer Support</option>
+                </datalist>
 
                 {/* Info Box */}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
