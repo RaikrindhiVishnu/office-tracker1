@@ -469,13 +469,13 @@ export default function AdminDailySheetsView() {
               { content: statusText, rowSpan: tasksList.length, styles: { valign: 'top' } },
               t.project || "N/A",
               taskText,
-              eodStatus
+              t.status || e.status || "In Progress"
             ]);
           } else {
             pdfBodyRows.push([
               t.project || "N/A",
               taskText,
-              ""
+              t.status || e.status || "In Progress"
             ]);
           }
         });
@@ -594,7 +594,7 @@ export default function AdminDailySheetsView() {
                 <td rowspan="${tasksList.length}" style="vertical-align: top;">${statusText}</td>
                 <td>${t.project || "N/A"}</td>
                 <td>${taskText}</td>
-                <td>${eodStatus}</td>
+                <td>${t.status || e.status || "In Progress"}</td>
               </tr>
             `;
           } else {
@@ -602,7 +602,7 @@ export default function AdminDailySheetsView() {
               <tr>
                 <td>${t.project || "N/A"}</td>
                 <td>${taskText}</td>
-                <td></td>
+                <td>${t.status || e.status || "In Progress"}</td>
               </tr>
             `;
           }
