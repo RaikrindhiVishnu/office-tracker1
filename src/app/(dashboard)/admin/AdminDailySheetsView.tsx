@@ -432,9 +432,10 @@ export default function AdminDailySheetsView() {
         currentY = 40;
       }
 
-      pdf.setFont(undefined, 'bold');
-      pdf.text(fullDate, 40, currentY);
-      pdf.setFont(undefined, 'normal');
+      pdf.setFont("helvetica", 'bold');
+      const pageWidth = pdf.internal.pageSize.width;
+      pdf.text(fullDate, pageWidth - 40, currentY, { align: 'right' });
+      pdf.setFont("helvetica", 'normal');
       currentY += 15;
 
       const dateRows = groupedByDate[dateStr];
@@ -447,11 +448,7 @@ export default function AdminDailySheetsView() {
 
         if (teamName !== currentTeam) {
           currentTeam = teamName;
-          if (!teamColorMap[teamName]) {
-            teamColorMap[teamName] = teamColors[colorIndex % teamColors.length];
-            colorIndex++;
-          }
-          pdfBodyRows.push([{ content: `Team: ${teamName}`, colSpan: 5, styles: { fillColor: teamColorMap[teamName], textColor: [255, 255, 255], fontStyle: 'bold' } }]);
+          pdfBodyRows.push([{ content: `Team: ${teamName}`, colSpan: 5, styles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold' } }]);
         }
 
         const att = attendanceMap[`${e.uid}_${e.dateStr}`];
@@ -479,7 +476,7 @@ export default function AdminDailySheetsView() {
         head: [["Employee Name", "Attendance", "Project", "Task Assigned", "EOD Status"]],
         body: pdfBodyRows,
         theme: 'grid',
-        headStyles: { fillColor: [79, 70, 229] },
+        headStyles: { fillColor: [100, 116, 139] }, // slate-500 grey
         styles: { fontSize: 9, cellPadding: 4 },
         columnStyles: { 3: { cellWidth: 300 } },
         margin: { bottom: 30 }
@@ -513,9 +510,9 @@ export default function AdminDailySheetsView() {
       body { font-family: sans-serif; margin: 20px; }
       table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 12px; }
       th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-      th { background-color: #4f46e5; color: white; }
-      .date-title { color: #0f172a; font-weight: bold; font-size: 18px; margin-top: 30px; margin-bottom: 10px; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; }
-      .team-header { color: white; font-weight: bold; }
+      th { background-color: #64748b; color: white; }
+      .date-title { display: flex; justify-content: flex-end; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; margin-top: 30px; margin-bottom: 10px; font-weight: bold; font-size: 14px; color: #475569; }
+      .team-header { color: white; font-weight: bold; background-color: #0f172a; }
     </style></head><body>
     <h2>Admin Task Sheets - ${selectedMonth}</h2>
     `;
@@ -526,9 +523,6 @@ export default function AdminDailySheetsView() {
       groupedByDate[e.dateStr].push(e);
     });
 
-    const colors = ["#0f172a", "#059669", "#e11d48", "#d97706", "#0891b2", "#c026d3"];
-    let colorIdx = 0;
-    const tMap: Record<string, string> = {};
 
     Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a)).forEach((dateStr) => {
       let fullDate = dateStr;
@@ -562,11 +556,7 @@ export default function AdminDailySheetsView() {
 
         if (teamName !== currentTeam) {
           currentTeam = teamName;
-          if (!tMap[teamName]) {
-            tMap[teamName] = colors[colorIdx % colors.length];
-            colorIdx++;
-          }
-          html += `<tr class="team-header" style="background-color: ${tMap[teamName]};"><td colspan="5">Team: ${teamName}</td></tr>`;
+          html += `<tr class="team-header"><td colspan="5">Team: ${teamName}</td></tr>`;
         }
 
         const att = attendanceMap[`${e.uid}_${e.dateStr}`];
@@ -1012,23 +1002,5 @@ export default function AdminDailySheetsView() {
         )}
       </div>
     </div>
-  );
-}
-{
-  [
-    { icon: "M9 5l7 7-7 7", fn: () => setPage((p) => Math.min(totalPages, p + 1)), dis: page === totalPages },
-    { icon: "M13 5l7 7-7 7M5 5l7 7-7 7", fn: () => setPage(totalPages), dis: page === totalPages },
-  ].map((b, i) => (
-    <button key={i} onClick={b.fn} disabled={b.dis}
-      className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-200 disabled:opacity-30 transition">
-      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={b.icon} /></svg>
-    </button>
-  ))
-}
-            </div >
-          </div >
-        )}
-      </div >
-    </div >
   );
 }
