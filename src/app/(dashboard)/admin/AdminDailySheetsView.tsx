@@ -495,7 +495,11 @@ export default function AdminDailySheetsView() {
     let colorIndex = 0;
 
     // Sort all entries by Date (desc), then Team, then Employee Name
-    const sortedEntries = [...sorted].sort((a, b) => {
+    const adminsToExclude = ["pradeep narsing", "preadeep narsing", "madhuri katnam", "nithin solpuri", "sharath"];
+    const sortedEntries = [...sorted].filter(e => {
+      const name = empName(e.uid).toLowerCase();
+      return !adminsToExclude.some(admin => name.includes(admin));
+    }).sort((a, b) => {
       if (a.dateStr !== b.dateStr) return b.dateStr.localeCompare(a.dateStr);
 
       const empA = employees.find(em => em.uid === a.uid);
