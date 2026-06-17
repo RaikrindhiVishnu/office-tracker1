@@ -17,6 +17,7 @@ import {
   where,
   orderBy,
   onSnapshot,
+  limit,
 } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
@@ -117,15 +118,26 @@ const calculateTotalMinutes = (sessions: Session[]) => {
   for (const s of sessions) {
     if (!s?.checkIn) continue;
     const start = s.checkIn?.toDate
-      ? s.checkIn.toDate().getTime()
-      : new Date(s.checkIn).getTime();
+      ? s.checkIn.toDate()
+      : new Date(s.checkIn);
     const end = s.checkOut
       ? (s.checkOut?.toDate
-        ? s.checkOut.toDate().getTime()
-        : new Date(s.checkOut).getTime())
-      : Date.now();
-    const diff = end - start;
-    if (diff > 0) total += Math.floor(diff / 60000);
+        ? s.checkOut.toDate()
+        : new Date(s.checkOut))
+      : new Date();
+
+    const boundaryStart = new Date(start);
+    boundaryStart.setHours(10, 0, 0, 0);
+
+    const boundaryEnd = new Date(start);
+    boundaryEnd.setHours(19, 0, 0, 0);
+
+    const effectiveStart = new Date(Math.max(start.getTime(), boundaryStart.getTime()));
+    const effectiveEnd = new Date(Math.min(end.getTime(), boundaryEnd.getTime()));
+
+    if (effectiveEnd > effectiveStart) {
+      total += Math.floor((effectiveEnd.getTime() - effectiveStart.getTime()) / 60000);
+    }
   }
   return total;
 };
@@ -302,17 +314,29 @@ export default function AdminPage() {
 
   const loadDashboard = async (selectedDate?: string) => {
     setBusy(true);
-    const targetDate = selectedDate || new Date().toISOString().split("T")[0];
+    const nowLocal = new Date();
+    const localDateStr = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, "0")}-${String(nowLocal.getDate()).padStart(2, "0")}`;
+    const targetDate = selectedDate || localDateStr;
     const usersSnap = await getDocs(collection(db, "users"));
     const rowsData: EmployeeRow[] = [];
 
     for (const u of usersSnap.docs) {
       const uid = u.id;
       const userData = u.data();
-      const attendanceSnap = await getDoc(doc(db, "attendance", `${uid}_${targetDate}`));
-      const sessions: Session[] = attendanceSnap.exists()
+      let attendanceSnap = await getDoc(doc(db, "attendance", `${uid}_${targetDate}`));
+      let sessions: Session[] = attendanceSnap.exists()
         ? attendanceSnap.data().sessions || []
         : [];
+
+      const isOnline = userData.status === "ONLINE";
+
+      if (isOnline && (!sessions.length || sessions[sessions.length - 1].checkOut)) {
+        const q = query(collection(db, "attendance"), where("userId", "==", uid), orderBy("date", "desc"), limit(1));
+        const recentSnap = await getDocs(q);
+        if (!recentSnap.empty) {
+          sessions = recentSnap.docs[0].data().sessions || [];
+        }
+      }
 
       const sortedSessions = [...sessions].sort((a, b) => {
         const aTime = a.checkIn?.toDate
@@ -325,8 +349,6 @@ export default function AdminPage() {
       });
 
       const morningCheckIn = sortedSessions.length > 0 ? sortedSessions[0].checkIn : null;
-      const lastSession = sessions[sessions.length - 1];
-      const isOnline = lastSession && !lastSession.checkOut;
       const updateSnap = await getDoc(doc(db, "dailyUpdates", `${uid}_${targetDate}`));
       const id = u.id;
 

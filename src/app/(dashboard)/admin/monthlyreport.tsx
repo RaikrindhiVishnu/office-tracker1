@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { getDoc, doc } from "firebase/firestore";
+import { getDoc, doc, collection, query, where, getDocs } from "firebase/firestore";
 import type { AttendanceType } from "@/types/attendance";
 import {
   calcTotalBreakMinutes,
@@ -595,53 +595,67 @@ export default function AttendanceDashboard({
       setLoadingData(true);
       const daysInMonth = new Date(year, month + 1, 0).getDate();
       const newData: Record<string, Record<string, DaySessionNode>> = {};
-      const promises: Promise<void>[] = [];
+      const startDateStr = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+      const endDateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
 
-      for (const emp of users) {
-        for (let day = 1; day <= daysInMonth; day++) {
-          const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-          const docId   = `${emp.uid}_${dateStr}`;
-          promises.push(
-            getDoc(doc(db, "attendance", docId)).then((snap) => {
-              if (!snap.exists()) return;
-              const data     = snap.data();
-              const sessions: any[] = data.sessions || [];
-              const rawBreaks: Break[] = data.breaks || [];
-              const breakMins          = calcTotalBreakMinutes(rawBreaks);
-              const sorted = [...sessions].sort((a, b) => {
-                const aT = a.checkIn?.toDate ? a.checkIn.toDate().getTime() : new Date(a.checkIn).getTime();
-                const bT = b.checkIn?.toDate ? b.checkIn.toDate().getTime() : new Date(b.checkIn).getTime();
-                return aT - bT;
-              });
-              const first = sorted[0];
-              const last  = sorted[sorted.length - 1];
-              const checkInTs  = first?.checkIn?.toDate ? first.checkIn.toDate() : first?.checkIn ? new Date(first.checkIn) : null;
-              const checkOutTs = last?.checkOut?.toDate ? last.checkOut.toDate() : last?.checkOut ? new Date(last.checkOut) : null;
-              let totalMins = 0;
-              for (const s of sorted) {
-                if (!s.checkIn) continue;
-                const start = s.checkIn?.toDate ? s.checkIn.toDate().getTime() : new Date(s.checkIn).getTime();
-                const end   = s.checkOut ? (s.checkOut?.toDate ? s.checkOut.toDate().getTime() : new Date(s.checkOut).getTime()) : Date.now();
-                const diff  = end - start;
-                if (diff > 0) totalMins += Math.floor(diff / 60000);
-              }
-              totalMins = Math.min(totalMins, 540);
-              const fmt = (d: Date) => `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
-              if (!newData[emp.uid]) newData[emp.uid] = {};
-              newData[emp.uid][dateStr] = {
-                checkIn:      checkInTs  ? fmt(checkInTs)  : null,
-                checkOut:     checkOutTs ? fmt(checkOutTs) : null,
-                totalMins,
-                breakMins,
-                breaks:    rawBreaks,
-                hasData:   true,
-                sessionCount: sorted.length,
-              };
-            }).catch(() => {})
-          );
-        }
+      try {
+        const q = query(
+          collection(db, "attendance"),
+          where("date", ">=", startDateStr),
+          where("date", "<=", endDateStr)
+        );
+        const snap = await getDocs(q);
+
+        const userIds = new Set(users.map(u => u.uid));
+
+        snap.forEach((docSnap) => {
+          const data = docSnap.data();
+          const empUid = data.userId;
+          const dateStr = data.date;
+          
+          if (!empUid || !dateStr || !userIds.has(empUid)) return;
+
+          const sessions: any[] = data.sessions || [];
+          const rawBreaks: Break[] = data.breaks || [];
+          const breakMins          = calcTotalBreakMinutes(rawBreaks);
+          
+          const sorted = [...sessions].sort((a, b) => {
+            const aT = a.checkIn?.toDate ? a.checkIn.toDate().getTime() : new Date(a.checkIn).getTime();
+            const bT = b.checkIn?.toDate ? b.checkIn.toDate().getTime() : new Date(b.checkIn).getTime();
+            return aT - bT;
+          });
+          
+          const first = sorted[0];
+          const last  = sorted[sorted.length - 1];
+          const checkInTs  = first?.checkIn?.toDate ? first.checkIn.toDate() : first?.checkIn ? new Date(first.checkIn) : null;
+          const checkOutTs = last?.checkOut?.toDate ? last.checkOut.toDate() : last?.checkOut ? new Date(last.checkOut) : null;
+          
+          let totalMins = 0;
+          for (const s of sorted) {
+            if (!s.checkIn) continue;
+            const start = s.checkIn?.toDate ? s.checkIn.toDate().getTime() : new Date(s.checkIn).getTime();
+            const end   = s.checkOut ? (s.checkOut?.toDate ? s.checkOut.toDate().getTime() : new Date(s.checkOut).getTime()) : Date.now();
+            const diff  = end - start;
+            if (diff > 0) totalMins += Math.floor(diff / 60000);
+          }
+          totalMins = Math.min(totalMins, 540);
+          
+          const fmt = (d: Date) => `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+          
+          if (!newData[empUid]) newData[empUid] = {};
+          newData[empUid][dateStr] = {
+            checkIn:      checkInTs  ? fmt(checkInTs)  : null,
+            checkOut:     checkOutTs ? fmt(checkOutTs) : null,
+            totalMins,
+            breakMins,
+            breaks:    rawBreaks,
+            hasData:   true,
+            sessionCount: sorted.length,
+          };
+        });
+      } catch (err) {
+        console.error("Failed to load month attendance data:", err);
       }
-      await Promise.all(promises);
       setMonthlySessionData(newData);
       setLoadingData(false);
     };
@@ -1370,6 +1384,19 @@ const STYLES = `
   @media print {
     * { print-color-adjust:exact !important; -webkit-print-color-adjust:exact !important; }
     @page { size:A4 landscape; margin:10mm 12mm; }
+
+    /* FORCE FULL HEIGHT FOR PRINTING: Disable scrollbars and fixed heights on layout parents */
+    html, body, div, main, aside, section {
+      height: auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      overflow: visible !important;
+    }
+    
+    .h-screen, .min-h-screen {
+      height: auto !important;
+      min-height: 0 !important;
+    }
 
     /* Hide everything on screen by default */
     .adash-root > *:not(.all-emp-print-panel) { display:none !important; }

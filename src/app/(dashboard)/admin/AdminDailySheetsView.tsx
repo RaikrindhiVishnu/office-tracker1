@@ -495,7 +495,7 @@ export default function AdminDailySheetsView() {
     let colorIndex = 0;
 
     // Sort all entries by Date (desc), then Team, then Employee Name
-    const adminsToExclude = ["pradeep narsing", "preadeep narsing", "madhuri katnam", "nithin solpuri", "sharath"];
+    const adminsToExclude = ["pradeep", "nithin", "nitin", "sharat", "sharath", "madhuri"];
     const sortedEntries = [...sorted].filter(e => {
       const name = empName(e.uid).toLowerCase();
       return !adminsToExclude.some(admin => name.includes(admin));
@@ -577,6 +577,14 @@ export default function AdminDailySheetsView() {
           pdfBodyRows.push([
             { content: empName(e.uid), styles: { fillColor: [255, 255, 255], textColor: [51, 65, 85] } },
             { content: "Absent", colSpan: 4, styles: { fillColor: [254, 226, 226], textColor: [185, 28, 28], fontStyle: 'bold', halign: 'center' } }
+          ]);
+          return;
+        }
+
+        if (statusText === "Not Filled") {
+          pdfBodyRows.push([
+            { content: empName(e.uid), styles: { fillColor: [255, 255, 255], textColor: [51, 65, 85] } },
+            { content: "NOT FILLED", colSpan: 4, styles: { fillColor: [254, 243, 199], textColor: [180, 83, 9], fontStyle: 'bold', halign: 'center' } }
           ]);
           return;
         }
@@ -713,6 +721,16 @@ export default function AdminDailySheetsView() {
             <tr>
               <td style="background-color: white; border-right: 1px solid #fee2e2; color: #334155;">${empName(e.uid)}</td>
               <td colspan="4" style="background-color: #fee2e2; color: #b91c1c; text-align: center; font-weight: bold; letter-spacing: 1px;">Absent</td>
+            </tr>
+          `;
+          return;
+        }
+
+        if (statusText === "Not Filled") {
+          html += `
+            <tr>
+              <td style="background-color: white; border-right: 1px solid #fef3c7; color: #334155;">${empName(e.uid)}</td>
+              <td colspan="4" style="background-color: #fef3c7; color: #b45309; text-align: center; font-weight: bold; letter-spacing: 1px;">NOT FILLED</td>
             </tr>
           `;
           return;
