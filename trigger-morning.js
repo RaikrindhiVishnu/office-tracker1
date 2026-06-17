@@ -67,6 +67,7 @@ async function run() {
           from: `"Office Tracker" <${process.env.GMAIL_USER}>`,
           to: userData.email,
           subject: "Daily Check-in Reminder – Please Check In Before 10:15 AM",
+          text: `Dear Team,\n\nThis is a friendly reminder to complete your daily check-in every working day before 10:15 AM.\n\n⚠️ Warning: Check-ins submitted after 10:15 AM may be flagged as a late mark as per the attendance policy.\n\nPlease make it a habit to check in daily and ensure your attendance is recorded on time.\nThank you for your cooperation.\n\nCheck In Now: https://office-tracker.com\n\nBest regards,\ntechgyinnovations Team`,
           html: `
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
               <h2 style="color: #0f172a; font-size: 20px; margin-bottom: 20px;">Daily Check-in Reminder – Please Check In Before 10:15 AM</h2>
@@ -83,6 +84,9 @@ async function run() {
           `,
         });
         sentCount++;
+        
+        // Add a 2-second delay to help prevent rate-limiting/spam flags by Gmail
+        await new Promise(resolve => setTimeout(resolve, 2000));
       } catch (err) {
         console.error(`Failed to send to ${userData.email}:`, err);
       }

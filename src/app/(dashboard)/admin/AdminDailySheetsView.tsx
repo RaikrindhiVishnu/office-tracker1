@@ -7,6 +7,7 @@ import {
 import type { DailySheetEntry } from "@/types/dailySheet";
 import { getTodayDateStr } from "@/lib/breakTracking";
 import * as XLSX from "xlsx";
+import { sendTimesheetRemindersAction } from "@/app/actions/sendReminders";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const todayStr = getTodayDateStr();
@@ -88,6 +89,7 @@ export default function AdminDailySheetsView() {
   const [attendanceMap, setAttendanceMap] = useState<Record<string, { in: string; out: string; sys: string }>>({});
   const [bannerSlide, setBannerSlide] = useState(0);
   const [chartView, setChartView] = useState<"raw" | "centers">("raw");
+  const [isSendingReminders, setIsSendingReminders] = useState(false);
 
   // Filters
   const [selectedEmployee, setSelectedEmployee] = useState("ALL");
@@ -122,60 +124,92 @@ export default function AdminDailySheetsView() {
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
   useEffect(() => {
-    const unsub = onSnapshot(
+    const unsubDaily = onSnapshot(
       query(collection(db, "dailySheets"), orderBy("createdAt", "desc")),
-      async (snap) => {
+      (snap) => {
         const data = snap.docs.map((d) => ({ id: d.id, ...d.data() } as DailySheetEntry));
         setAllEntries(data);
-        const uniqueUids = Array.from(new Set(data.map((e) => e.uid)));
+      }
+    );
+
+    const unsubUsers = onSnapshot(
+      collection(db, "users"),
+      (snap) => {
         const list: { uid: string; name: string; department?: string }[] = [];
-        for (const uid of uniqueUids) {
-          const us = await getDocs(query(collection(db, "users"), where("uid", "==", uid)));
-          if (!us.empty) {
-            const p = us.docs[0].data();
-            list.push({ uid, name: p.name ?? p.displayName ?? p.email?.split("@")[0] ?? "Unknown", department: p.department || p.team });
-          } else {
-            list.push({ uid, name: data.find((e) => e.uid === uid)?.userName ?? uid });
-          }
-        }
+        snap.docs.forEach((doc) => {
+          const p = doc.data();
+          // Optionally filter out SUPERADMIN or similar here if needed.
+          // For now, tracking all users in the system:
+          list.push({
+            uid: p.uid || doc.id,
+            name: p.name ?? p.displayName ?? p.email?.split("@")[0] ?? "Unknown",
+            department: p.department || p.team
+          });
+        });
         setEmployees(list);
       }
     );
-    return () => unsub();
+
+    return () => {
+      unsubDaily();
+      unsubUsers();
+    };
   }, []);
 
   useEffect(() => {
     (async () => {
-      const snap = await getDocs(query(collection(db, "dailySheets"), where("monthStr", "==", selectedMonth)));
-      const pairs = Array.from(new Set(snap.docs.map((d) => `${d.data().uid}_${d.data().dateStr}`)));
+      const [y, m] = selectedMonth.split("-").map(Number);
+      const daysInMonth = new Date(y, m, 0).getDate();
+      const today = new Date();
+      const isCurrentMonth = today.getFullYear() === y && today.getMonth() + 1 === m;
+      const isFutureMonth = new Date(y, m - 1, 1) > today;
+      const maxDay = isFutureMonth ? 0 : (isCurrentMonth ? today.getDate() : daysInMonth);
+
+      const dates: string[] = [];
+      for (let i = 1; i <= maxDay; i++) {
+        dates.push(`${selectedMonth}-${String(i).padStart(2, "0")}`);
+      }
+
+      const pairs: string[] = [];
+      employees.forEach(emp => {
+        dates.forEach(dateStr => {
+          pairs.push(`${emp.uid}_${dateStr}`);
+        });
+      });
+
       const fmt = (ts: any) => ts ? ts.toDate().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : "--:--";
       const map: Record<string, { in: string; out: string; sys: string }> = {};
-      await Promise.all(pairs.map(async (key) => {
-        const as = await getDoc(doc(db, "attendance", key));
-        if (as.exists()) {
-          const att = as.data(); const sessions = att.sessions || [];
-          if (sessions.length > 0) {
-            const first = sessions[0]; const last = sessions[sessions.length - 1];
-            let effectiveMins = 0;
-            sessions.forEach((s: any) => {
-              const start = s.checkIn.toDate();
-              const ds = key.split("_").slice(1).join("_");
-              const end = s.checkOut ? s.checkOut.toDate() : (ds === todayStr ? new Date() : null);
-              const bStart = new Date(start); bStart.setHours(10, 0, 0, 0);
-              const bEnd = new Date(start); bEnd.setHours(19, 0, 0, 0);
-              const effStart = new Date(Math.max(start.getTime(), bStart.getTime()));
-              const effEnd = end ? new Date(Math.min(end.getTime(), bEnd.getTime())) : bEnd;
-              if (effEnd > effStart) {
-                effectiveMins += Math.floor((effEnd.getTime() - effStart.getTime()) / 60000);
-              }
-            });
-            map[key] = { in: fmt(first.checkIn), out: last.checkOut ? fmt(last.checkOut) : "--:--", sys: `${(effectiveMins / 60).toFixed(1)}h` };
+
+      // Fetch in chunks of 50 to avoid slamming the network if there are many employees
+      for (let i = 0; i < pairs.length; i += 50) {
+        const chunk = pairs.slice(i, i + 50);
+        await Promise.all(chunk.map(async (key) => {
+          const as = await getDoc(doc(db, "attendance", key));
+          if (as.exists()) {
+            const att = as.data(); const sessions = att.sessions || [];
+            if (sessions.length > 0) {
+              const first = sessions[0]; const last = sessions[sessions.length - 1];
+              let effectiveMins = 0;
+              sessions.forEach((s: any) => {
+                const start = s.checkIn.toDate();
+                const ds = key.split("_").slice(1).join("_");
+                const end = s.checkOut ? s.checkOut.toDate() : (ds === todayStr ? new Date() : null);
+                const bStart = new Date(start); bStart.setHours(10, 0, 0, 0);
+                const bEnd = new Date(start); bEnd.setHours(19, 0, 0, 0);
+                const effStart = new Date(Math.max(start.getTime(), bStart.getTime()));
+                const effEnd = end ? new Date(Math.min(end.getTime(), bEnd.getTime())) : bEnd;
+                if (effEnd > effStart) {
+                  effectiveMins += Math.floor((effEnd.getTime() - effStart.getTime()) / 60000);
+                }
+              });
+              map[key] = { in: fmt(first.checkIn), out: last.checkOut ? fmt(last.checkOut) : "--:--", sys: `${(effectiveMins / 60).toFixed(1)}h` };
+            }
           }
-        }
-      }));
+        }));
+      }
       setAttendanceMap(map);
     })();
-  }, [selectedMonth]);
+  }, [selectedMonth, employees]);
 
   const empName = useCallback((uid: string) => employees.find((e) => e.uid === uid)?.name ?? uid, [employees]);
 
@@ -211,8 +245,85 @@ export default function AdminDailySheetsView() {
     }));
   }, [monthEntries, empName, employees.length]);
 
+  const validDatesInMonth = useMemo(() => {
+    if (!selectedMonth) return [];
+    const [y, m] = selectedMonth.split("-").map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const today = new Date();
+    const isCurrentMonth = today.getFullYear() === y && today.getMonth() + 1 === m;
+    const isFutureMonth = new Date(y, m - 1, 1) > today;
+    const maxDay = isFutureMonth ? 0 : (isCurrentMonth ? today.getDate() : daysInMonth);
+
+    const dates: string[] = [];
+    for (let i = 1; i <= maxDay; i++) {
+      dates.push(`${selectedMonth}-${String(i).padStart(2, "0")}`);
+    }
+    return dates;
+  }, [selectedMonth]);
+
+  const allVirtualEntries = useMemo(() => {
+    const list: any[] = [];
+
+    // Lookup for actual entries
+    const entryLookup: Record<string, DailySheetEntry[]> = {};
+    allEntries.forEach(e => {
+      const key = `${e.uid}_${e.dateStr}`;
+      if (!entryLookup[key]) entryLookup[key] = [];
+      entryLookup[key].push(e);
+    });
+
+    const now = new Date();
+    const currentHour = now.getHours();
+
+    for (const emp of employees) {
+      for (const dateStr of validDatesInMonth) {
+        const key = `${emp.uid}_${dateStr}`;
+        const actuals = entryLookup[key];
+        if (actuals && actuals.length > 0) {
+          list.push(...actuals);
+        } else {
+          const att = attendanceMap[key];
+          const checkedIn = !!(att && att.in && att.in !== "--:--");
+          const d = new Date(dateStr + "T00:00:00");
+          const day = d.getDay();
+          const dateNum = d.getDate();
+          let isWeekend = false;
+          if (day === 0) isWeekend = true;
+          if (day === 6) {
+            const week = Math.ceil(dateNum / 7);
+            if (week === 2 || week === 4) isWeekend = true;
+          }
+
+          const isToday = dateStr === todayStr;
+          const pastDeadline = dateStr < todayStr || (isToday && currentHour >= 19);
+
+          let stateType = "Pending";
+          if (isWeekend) stateType = "Weekend";
+          else if (checkedIn) stateType = "Not Filled";
+          else if (pastDeadline) stateType = "Absent";
+
+          list.push({
+            id: `missing_${key}`,
+            uid: emp.uid,
+            dateStr: dateStr,
+            monthStr: selectedMonth,
+            isMissing: true,
+            stateType: stateType,
+            userName: emp.name
+          } as any);
+        }
+      }
+    }
+
+    const virtualSet = new Set(list.map(e => e.id));
+    for (const e of allEntries) {
+      if (!virtualSet.has(e.id)) list.push(e);
+    }
+    return list;
+  }, [allEntries, employees, validDatesInMonth, attendanceMap, selectedMonth]);
+
   // ── Filtering ─────────────────────────────────────────────────────────────
-  const filtered = useMemo(() => allEntries.filter((e) => {
+  const filtered = useMemo(() => allVirtualEntries.filter((e) => {
     if (selectedEmployee !== "ALL" && e.uid !== selectedEmployee) return false;
     if (selectedMonth && e.monthStr !== selectedMonth) return false;
     if (selectedDate && e.dateStr !== selectedDate) return false;
@@ -223,7 +334,7 @@ export default function AdminDailySheetsView() {
       if (!empName(e.uid).toLowerCase().includes(q) && !inTasks && !inLegacy) return false;
     }
     return true;
-  }), [allEntries, selectedEmployee, selectedMonth, selectedDate, search, empName]);
+  }), [allVirtualEntries, selectedEmployee, selectedMonth, selectedDate, search, empName]);
 
   // ── Sorting ───────────────────────────────────────────────────────────────
   const sorted = useMemo(() => {
@@ -246,7 +357,7 @@ export default function AdminDailySheetsView() {
         case "status": return dir * (a.status ?? "").localeCompare(b.status ?? "");
         case "hours": return dir * (getEntryHours(a) - getEntryHours(b));
         case "state": {
-          const st = (e: DailySheetEntry) => e.isHoliday ? "Holiday" : e.isDraft ? "Draft" : "Submitted";
+          const st = (e: any) => e.isMissing ? e.stateType : (e.isHoliday ? "Holiday" : e.isDraft ? "Draft" : "Submitted");
           return dir * st(a).localeCompare(st(b));
         }
         default: return 0;
@@ -286,19 +397,21 @@ export default function AdminDailySheetsView() {
       return aName.localeCompare(bName);
     });
 
-    sortedEntries.forEach((e) => {
+    sortedEntries.forEach((e: any) => {
       const att = attendanceMap[`${e.uid}_${e.dateStr}`];
-      const statusText = att?.in && att.in !== "--:--" ? "Present" : e.isHoliday ? "Holiday" : "Absent";
+      const statusText = e.isMissing ? e.stateType : (att?.in && att.in !== "--:--" ? "Present" : e.isHoliday ? "Holiday" : "Absent");
       const inTime = att?.in || "--:--";
       const outTime = att?.out || "--:--";
       const sysHrs = att?.sys || "0";
 
       const emp = employees.find(em => em.uid === e.uid);
       const teamName = emp?.department || "Other";
-      const eodStatus = e.status || "In Progress";
+      const eodStatus = e.isMissing ? e.stateType : (e.status || "In Progress");
       const totalHrs = e.hours ? `${e.hours}h` : "0h";
 
-      const tasksList = e.tasks && e.tasks.length > 0 ? e.tasks : [{ project: e.project || "", taskTitle: e.taskTitle || "", description: e.description || "", hours: e.hours || 0 }];
+      const tasksList = e.isMissing
+        ? [{ project: e.stateType, taskTitle: e.stateType, description: "", hours: 0 }]
+        : (e.tasks && e.tasks.length > 0 ? e.tasks : [{ project: e.project || "", taskTitle: e.taskTitle || "", description: e.description || "", hours: e.hours || 0 }]);
 
       tasksList.forEach((t: any) => {
         exportRows.push({
@@ -421,14 +534,14 @@ export default function AdminDailySheetsView() {
       }
 
       const pageWidth = pdf.internal.pageSize.width;
-      
+
       // Left: Logo
       if (imgData) {
         pdf.addImage(imgData, "PNG", 40, currentY, 100, 30);
       }
 
       // Middle: Title
-      pdf.setFont("helvetica", 'bold');
+      pdf.setFont("times", 'bold');
       pdf.setFontSize(16);
       pdf.setTextColor(15, 23, 42);
       pdf.text("Admin Task Sheets", pageWidth / 2, currentY + 20, { align: 'center' });
@@ -436,8 +549,8 @@ export default function AdminDailySheetsView() {
       // Right: Date
       pdf.setFontSize(14);
       pdf.text(fullDate, pageWidth - 40, currentY + 20, { align: 'right' });
-      
-      pdf.setFont("helvetica", 'normal');
+
+      pdf.setFont("times", 'normal');
       currentY += 40;
 
       const dateRows = groupedByDate[dateStr];
@@ -450,13 +563,24 @@ export default function AdminDailySheetsView() {
 
         if (teamName !== currentTeam) {
           currentTeam = teamName;
-          pdfBodyRows.push([{ content: `Team: ${teamName}`, colSpan: 5, styles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold' } }]);
+          pdfBodyRows.push([{ content: `Team: ${teamName}`, colSpan: 5, styles: { fillColor: [51, 65, 85], textColor: [255, 255, 255], fontStyle: 'bold' } }]);
         }
 
         const att = attendanceMap[`${e.uid}_${e.dateStr}`];
-        const statusText = att?.in && att.in !== "--:--" ? "Present" : e.isHoliday ? "Holiday" : "Absent";
-        const eodStatus = e.status || "In Progress";
-        const tasksList = e.tasks && e.tasks.length > 0 ? e.tasks : [{ project: e.project || "", taskTitle: e.taskTitle || "", description: e.description || "" }];
+        const statusText = e.isMissing ? e.stateType : (att?.in && att.in !== "--:--" ? "Present" : e.isHoliday ? "Holiday" : "Absent");
+
+        if (statusText === "Absent") {
+          pdfBodyRows.push([
+            { content: empName(e.uid), styles: { fillColor: [255, 255, 255], textColor: [51, 65, 85] } },
+            { content: "Absent", colSpan: 4, styles: { fillColor: [254, 226, 226], textColor: [185, 28, 28], fontStyle: 'bold', halign: 'center' } }
+          ]);
+          return;
+        }
+
+        const eodStatus = e.isMissing ? e.stateType : (e.status || "In Progress");
+        const tasksList = e.isMissing
+          ? [{ project: e.stateType, taskTitle: e.stateType, description: "" }]
+          : (e.tasks && e.tasks.length > 0 ? e.tasks : [{ project: e.project || "", taskTitle: e.taskTitle || "", description: e.description || "" }]);
 
         tasksList.forEach((t: any, index: number) => {
           const isFirst = index === 0;
@@ -469,13 +593,13 @@ export default function AdminDailySheetsView() {
               { content: statusText, rowSpan: tasksList.length, styles: { valign: 'top' } },
               t.project || "N/A",
               taskText,
-              t.status || e.status || "In Progress"
+              t.status || eodStatus
             ]);
           } else {
             pdfBodyRows.push([
               t.project || "N/A",
               taskText,
-              t.status || e.status || "In Progress"
+              t.status || eodStatus
             ]);
           }
         });
@@ -487,7 +611,7 @@ export default function AdminDailySheetsView() {
         body: pdfBodyRows,
         theme: 'grid',
         headStyles: { fillColor: [100, 116, 139] }, // slate-500 grey
-        styles: { fontSize: 9, cellPadding: 4 },
+        styles: { font: "times", fontSize: 9, cellPadding: 4 },
         columnStyles: { 3: { cellWidth: 300 } },
         margin: { bottom: 30 }
       });
@@ -517,7 +641,7 @@ export default function AdminDailySheetsView() {
     });
 
     let html = `<html><head><title>Daily Sheets Print</title><style>
-      body { font-family: sans-serif; margin: 20px; }
+      body { font-family: Georgia, "Times New Roman", serif; margin: 20px; }
       table { width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 12px; }
       th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
       th { background-color: #64748b; color: white; }
@@ -525,7 +649,7 @@ export default function AdminDailySheetsView() {
       .header-logo { flex: 1; text-align: left; }
       .header-title { flex: 1; text-align: center; font-size: 20px; font-weight: bold; color: #0f172a; }
       .header-date { flex: 1; text-align: right; font-weight: bold; font-size: 14px; color: #475569; }
-      .team-header { color: white; font-weight: bold; background-color: #0f172a; }
+      .team-header { color: white; font-weight: bold; background-color: #0d151fff; }
     </style></head><body>
     `;
 
@@ -578,9 +702,22 @@ export default function AdminDailySheetsView() {
         }
 
         const att = attendanceMap[`${e.uid}_${e.dateStr}`];
-        const statusText = att?.in && att.in !== "--:--" ? "Present" : e.isHoliday ? "Holiday" : "Absent";
-        const eodStatus = e.status || "In Progress";
-        const tasksList = e.tasks && e.tasks.length > 0 ? e.tasks : [{ project: e.project || "", taskTitle: e.taskTitle || "", description: e.description || "" }];
+        const statusText = e.isMissing ? e.stateType : (att?.in && att.in !== "--:--" ? "Present" : e.isHoliday ? "Holiday" : "Absent");
+
+        if (statusText === "Absent") {
+          html += `
+            <tr>
+              <td style="background-color: white; border-right: 1px solid #fee2e2; color: #334155;">${empName(e.uid)}</td>
+              <td colspan="4" style="background-color: #fee2e2; color: #b91c1c; text-align: center; font-weight: bold; letter-spacing: 1px;">Absent</td>
+            </tr>
+          `;
+          return;
+        }
+
+        const eodStatus = e.isMissing ? e.stateType : (e.status || "In Progress");
+        const tasksList = e.isMissing
+          ? [{ project: e.stateType, taskTitle: e.stateType, description: "" }]
+          : (e.tasks && e.tasks.length > 0 ? e.tasks : [{ project: e.project || "", taskTitle: e.taskTitle || "", description: e.description || "" }]);
 
         tasksList.forEach((t: any, index: number) => {
           const isFirst = index === 0;
@@ -812,6 +949,32 @@ export default function AdminDailySheetsView() {
           <span className="bg-indigo-50 text-indigo-600 text-xs px-3 py-1.5 rounded-full font-semibold">
             {sorted.reduce((s, e) => s + (e.hours || 0), 0)}h total
           </span>
+          <button
+            onClick={async () => {
+              setIsSendingReminders(true);
+              const res = await sendTimesheetRemindersAction();
+              setIsSendingReminders(false);
+              if (res.success) {
+                alert(`Successfully sent reminders to ${res.data?.sentCount || 0} employees!`);
+              } else {
+                alert(`Failed to send reminders: ${res.error}`);
+              }
+            }}
+            disabled={isSendingReminders}
+            className={`flex items-center gap-1.5 px-4 py-1.5 ${isSendingReminders ? 'bg-slate-400' : 'bg-rose-500 hover:bg-rose-600'} text-white text-xs font-bold rounded-lg transition shadow-sm`}
+          >
+            {isSendingReminders ? (
+              <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            )}
+            {isSendingReminders ? "Sending..." : "Remind Pending Employees"}
+          </button>
           <div className="relative">
             <button onClick={() => setExportMenuOpen(!exportMenuOpen)}
               className="flex items-center gap-1.5 px-4 py-1.5 bg-[#1a8a5a] text-white text-xs font-bold rounded-lg hover:bg-[#157a50] active:bg-[#0f5c3a] transition shadow-sm">
@@ -905,10 +1068,105 @@ export default function AdminDailySheetsView() {
                   </td>
                 </tr>
               ) : (
-                paginated.map((e, idx) => {
+                paginated.map((e: any, idx) => {
                   const name = empName(e.uid);
                   const att = attendanceMap[`${e.uid}_${e.dateStr}`];
                   const docId = e.id!;
+
+                  if (e.isMissing) {
+                    if (e.stateType === "Weekend") {
+                      return (
+                        <tr key={docId} className="bg-slate-200 border-b border-slate-300">
+                          <td className="px-4 py-2.5 align-middle bg-slate-200"></td>
+                          <td className="px-3 py-2.5 align-middle border-r border-slate-300">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-7 h-7 rounded-full ${avatarColor(name)} text-white flex items-center justify-center text-[10px] font-bold shrink-0 opacity-50`}>
+                                {initials(name)}
+                              </div>
+                              <div>
+                                <p className="text-xs font-semibold text-slate-500 leading-tight">{name}</p>
+                                <p className="text-[10px] text-slate-400">{e.dateStr}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td colSpan={6} className="px-3 py-2.5 text-center font-bold text-slate-500 uppercase text-xs tracking-wider">
+                            {new Date(e.dateStr + "T00:00:00").toLocaleDateString("en-US", { weekday: "long" })}
+                          </td>
+                        </tr>
+                      );
+                    }
+                    if (e.stateType === "Absent") {
+                      return (
+                        <tr key={docId} className={`border-b border-slate-100 transition-colors ${idx % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-[#fafbfc] hover:bg-slate-50"}`}>
+                          <td className="px-4 py-2.5 align-middle"></td>
+                          <td className="px-3 py-2.5 align-middle">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-7 h-7 rounded-full ${avatarColor(name)} text-white flex items-center justify-center text-[10px] font-bold shrink-0`}>
+                                {initials(name)}
+                              </div>
+                              <div>
+                                <p className="text-xs font-semibold text-slate-800 leading-tight">{name}</p>
+                                <p className="text-[10px] text-slate-400">{e.dateStr}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 text-slate-400 text-xs whitespace-nowrap align-middle">—</td>
+                          <td className="px-3 py-2.5 text-slate-400 text-xs whitespace-nowrap align-middle">—</td>
+                          <td className="px-3 py-2.5 text-slate-400 text-xs whitespace-nowrap align-middle">—</td>
+                          <td className="px-3 py-2.5 text-center align-middle" colSpan={3}>
+                            <div className="bg-red-100 text-red-700 font-bold text-[10px] uppercase tracking-wider py-1 rounded w-full">Absent</div>
+                          </td>
+                        </tr>
+                      );
+                    }
+                    if (e.stateType === "Not Filled") {
+                      return (
+                        <tr key={docId} className={`border-b border-slate-100 transition-colors ${idx % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-[#fafbfc] hover:bg-slate-50"}`}>
+                          <td className="px-4 py-2.5 align-middle"></td>
+                          <td className="px-3 py-2.5 align-middle">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-7 h-7 rounded-full ${avatarColor(name)} text-white flex items-center justify-center text-[10px] font-bold shrink-0`}>
+                                {initials(name)}
+                              </div>
+                              <div>
+                                <p className="text-xs font-semibold text-slate-800 leading-tight">{name}</p>
+                                <p className="text-[10px] text-slate-400">{e.dateStr}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 text-indigo-600 font-medium text-xs whitespace-nowrap align-middle">{att?.in ?? "—"}</td>
+                          <td className="px-3 py-2.5 text-slate-500 text-xs whitespace-nowrap align-middle">{att?.out ?? "—"}</td>
+                          <td className="px-3 py-2.5 text-slate-700 font-semibold text-xs whitespace-nowrap align-middle">{att?.sys ?? "—"}</td>
+                          <td className="px-3 py-2.5 text-center align-middle" colSpan={3}>
+                            <div className="bg-amber-100 text-amber-700 font-bold text-[10px] uppercase tracking-wider py-1 rounded w-full">Not Filled</div>
+                          </td>
+                        </tr>
+                      );
+                    }
+                    // Pending state
+                    return (
+                      <tr key={docId} className={`border-b border-slate-100 transition-colors ${idx % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-[#fafbfc] hover:bg-slate-50"}`}>
+                        <td className="px-4 py-2.5 align-middle"></td>
+                        <td className="px-3 py-2.5 align-middle">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-7 h-7 rounded-full ${avatarColor(name)} text-white flex items-center justify-center text-[10px] font-bold shrink-0 opacity-50`}>
+                              {initials(name)}
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold text-slate-800 leading-tight">{name}</p>
+                              <p className="text-[10px] text-slate-400">{e.dateStr}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2.5 text-indigo-600 font-medium text-xs whitespace-nowrap align-middle">{att?.in ?? "—"}</td>
+                        <td className="px-3 py-2.5 text-slate-500 text-xs whitespace-nowrap align-middle">{att?.out ?? "—"}</td>
+                        <td className="px-3 py-2.5 text-slate-700 font-semibold text-xs whitespace-nowrap align-middle">{att?.sys ?? "—"}</td>
+                        <td className="px-3 py-2.5 text-center align-middle" colSpan={3}>
+                          <div className="bg-red-100 text-red-700 font-bold text-[10px] uppercase tracking-wider py-1 rounded w-full">Not Checked In</div>
+                        </td>
+                      </tr>
+                    );
+                  }
 
                   const dayTasks: any[] = [];
                   if (e.tasks && e.tasks.length > 0) {
@@ -958,11 +1216,11 @@ export default function AdminDailySheetsView() {
                             <div className="text-xs text-slate-600 flex items-start justify-between group hover:text-indigo-600 cursor-pointer transition py-1">
                               <div className="flex-1 pr-4 flex gap-2">
                                 <div className="flex flex-col gap-0.5 min-w-0">
-                                    {dayTasks.map((t: any, i: number) => (
-                                      <span key={t.taskId || i} className="font-medium text-slate-700 whitespace-normal break-words group-hover:text-indigo-600 transition-colors">
-                                        Task {i + 1} - {t.taskTitle} {t.status && `[${t.status}]`}
-                                      </span>
-                                    ))}
+                                  {dayTasks.map((t: any, i: number) => (
+                                    <span key={t.taskId || i} className="font-medium text-slate-700 whitespace-normal break-words group-hover:text-indigo-600 transition-colors">
+                                      Task {i + 1} - {t.taskTitle} {t.status && `[${t.status}]`}
+                                    </span>
+                                  ))}
                                 </div>
                               </div>
                             </div>

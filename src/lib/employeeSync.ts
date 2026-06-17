@@ -26,6 +26,7 @@ type UpdateEmployeeParams = {
   updates: Partial<Employee>;
   updatedBy: string;
   role: string;
+  companyId?: string | null;
 };
 
 export async function updateEmployeeData({
@@ -33,12 +34,16 @@ export async function updateEmployeeData({
   updates,
   updatedBy,
   role,
+  companyId,
 }: UpdateEmployeeParams): Promise<void> {
   if (!userId) {
     throw new Error("updateEmployeeData: userId is undefined");
   }
 
-  const userRef = doc(db, "users", userId);
+  const userRef = companyId
+    ? doc(db, "companies", companyId, "users", userId)
+    : doc(db, "users", userId);
+  const legacyUserRef = doc(db, "users", userId);
 
   // 🔥 Get existing data to detect changes
   const existingSnap = await getDoc(userRef);
@@ -50,12 +55,24 @@ export async function updateEmployeeData({
     return JSON.stringify(oldValue) !== JSON.stringify(newValue);
   });
 
-  // ✅ Update employee
-  await updateDoc(userRef, {
+  const updatePayload = {
     ...updates,
     lastUpdated: serverTimestamp(),
     lastUpdatedBy: updatedBy,
-  });
+  };
+
+  // ✅ Update active path
+  if (existingSnap.exists()) {
+    await updateDoc(userRef, updatePayload);
+  }
+
+  // ✅ Also update legacy path if different (to keep backward compatibility)
+  if (companyId) {
+    const legacySnap = await getDoc(legacyUserRef);
+    if (legacySnap.exists()) {
+      await updateDoc(legacyUserRef, updatePayload);
+    }
+  }
 
   // 🔔 Notify admins only if something changed
   if (changedFields.length > 0 && existingData?.name) {

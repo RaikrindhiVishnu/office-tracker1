@@ -133,7 +133,6 @@ const getSidebarItems = (isLead: boolean): [ViewType, string, React.ReactNode][]
   ["dashboard", "Dashboard", <LayoutGrid key="dashboard" className="w-5 h-5" />],
   ...(isLead ? [["team", "Team Tasks", <Users key="team" className="w-5 h-5" />] as [ViewType, string, React.ReactNode]] : []),
   ["tasks", "My Tasks", <FileCheck key="tasks" className="w-5 h-5" />],
-  ["work-update", "Work Update", <ClipboardList key="work-update" className="w-5 h-5" />],
   ["daily-sheet", "Time Sheet", <Calendar key="daily-sheet" className="w-5 h-5" />],
   ["attendance", "Attendance", <Clock key="attendance" className="w-5 h-5" />],
   ["projects", "Projects", <Folder key="projects" className="w-5 h-5" />],

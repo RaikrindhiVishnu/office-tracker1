@@ -25,7 +25,7 @@ const EMPTY = {
 type FK = keyof typeof EMPTY;
 
 export default function ProfileView() {
-  const { user, userData } = useAuth();
+  const { user, userData, companyId } = useAuth();
   const [localData, setLocalData] = useState<any>(null);
   const [photoPreview, setPhotoPreview] = useState("");
   const [profilePhoto, setProfilePhoto] = useState<File|null>(null);
@@ -108,7 +108,7 @@ export default function ProfileView() {
       }
       
       const updated = {...form, salary: form.salary ? Number(form.salary) : 0, profilePhoto: photoURL};
-      await updateEmployeeData({ userId: user.uid, updates: updated, updatedBy: user.uid, role: userData?.role||"employee" });
+      await updateEmployeeData({ userId: user.uid, updates: updated, updatedBy: user.uid, role: userData?.role||"employee", companyId });
       
       // Handle IT Assets sync
       const assetsRef = collection(db, "it_assets");
