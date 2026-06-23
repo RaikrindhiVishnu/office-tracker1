@@ -21,7 +21,7 @@ export function getRoleRedirect(
   }
 
   // ✅ ADMIN ROUTES
-  if (r === "superadmin") return "/superadmin";
+  if (r === "superadmin") return "/admin";
   if (r === "admin") return "/admin";
   if (r === "hr") return "/hr";
 

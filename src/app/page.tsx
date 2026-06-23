@@ -28,7 +28,7 @@ export default function HomePage() {
 
     // Superadmin goes directly to superadmin panel
     if (isSuperAdmin) {
-      router.replace("/superadmin");
+      router.replace("/admin");
       return;
     }
 
