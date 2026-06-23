@@ -443,7 +443,7 @@ export default function EmployeeAttendanceView() {
             <div style={{ flex: 1, background: "#fef2f2", padding: "10px", borderRadius: "8px", display: "flex", alignItems: "center", gap: "10px", border: "1px solid #fee2e2" }}>
               <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#fecaca", color: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px" }}>🔕</div>
               <div>
-                <div style={{ fontSize: "11px", fontWeight: 600, color: "#0f172a" }}>Break Violations: {stats.breakMins ? 4 : 0}</div>
+                <div style={{ fontSize: "11px", fontWeight: 600, color: "#0f172a" }}>Break Violations: {stats.totalBreakMins > 0 ? 4 : 0}</div>
                 <div style={{ fontSize: "10px", color: "#64748b" }}>(Trend: -1)</div>
               </div>
             </div>
