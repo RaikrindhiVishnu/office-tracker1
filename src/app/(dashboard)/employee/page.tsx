@@ -47,7 +47,7 @@ import JobsView from "./views/JobsView";
 import OrgChartView from "./views/OrgChartView";
 import CompanyPoliciesView from "./views/CompanyPoliciesView";
 import FeedbackView from "./views/FeedbackView";
-import SelfieCaptureModal from "@/components/SelfieCaptureModal";
+
 import HelpView from "./views/HelpView";
 import ProjectManagement from "./views/projectmanagement";
 import { LeaveType } from "@/types/leave";
@@ -182,7 +182,7 @@ export default function ZohoStyleEmployeeDashboard() {
   // ── ✅ NEW: MeetChat overlay state ──────────────────────
   const [showMeetChat, setShowMeetChat] = useState(false);
   const [chatTargetUid, setChatTargetUid] = useState<string | null>(null);
-  const [showSelfieModal, setShowSelfieModal] = useState(false);
+
 
   const [showCalendar, setShowCalendar] = useState(false);
   const [totalSeconds, setTotalSeconds] = useState<number>(0);
@@ -584,14 +584,9 @@ export default function ZohoStyleEmployeeDashboard() {
   };
 
   const doCheckIn = async () => {
-    setShowSelfieModal(true);
-  };
-
-  const handleSelfieCapture = async (photoUrl: string) => {
-    setShowSelfieModal(false);
     setBusy(true);
     const loc = await getGeoLocation();
-    await checkIn(user.uid, loc, photoUrl);
+    await checkIn(user.uid, loc, null);
     setBusy(false);
   };
 
@@ -1034,13 +1029,7 @@ export default function ZohoStyleEmployeeDashboard() {
         targetUid={chatTargetUid}
       />
 
-      {showSelfieModal && (
-        <SelfieCaptureModal
-          uid={user.uid}
-          onCapture={handleSelfieCapture}
-          onCancel={() => setShowSelfieModal(false)}
-        />
-      )}
+
 
       <style jsx>{`
         @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
