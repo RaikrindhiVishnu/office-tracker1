@@ -2394,13 +2394,13 @@ function ProjectsPage({ user, projects, users, allProjectTasks, onOpenProject, o
           {projects.map((project: any) => {
             const projPerms = getPermissions(user, project);
             const status = project.status || "Planning";
-            const sc = {
+            const sc = ({
               "Planning": { bg: "#f3f4f6", color: "#6b7280" },
               "In Progress": { bg: "#eff6ff", color: "#3b82f6" },
               "Completed": { bg: "#dcfce7", color: "#22c55e" },
               "On Hold": { bg: "#fee2e2", color: "#ef4444" },
               "Archived": { bg: "#f3f4f6", color: "#6b7280" }
-            }[status] || { bg: "#f3f4f6", color: "#6b7280" };
+            } as Record<string, { bg: string, color: string }>)[status] || { bg: "#f3f4f6", color: "#6b7280" };
 
             const pc = { bg: "#F3F4F6", color: "#4B5563" }; // Neutral priority
             const memberList = project.members?.slice(0, 5).map((uid: string) => users.find((u: any) => u.uid === uid)).filter(Boolean);
@@ -3259,13 +3259,13 @@ export default function ProjectManagement({ user, projects, users, setSidebarCol
                 <div className="divide-y divide-gray-50 max-h-[320px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
                   {myProjects.map((p: any) => {
                     const status = p.status || "Planning";
-                    const sc = {
+                    const sc = ({
                       "Planning": { bg: "#f3f4f6", color: "#6b7280" }, // Same as main dashboard T.text2
                       "In Progress": { bg: "#eff6ff", color: "#3b82f6" },
                       "Completed": { bg: "#dcfce7", color: "#22c55e" },
                       "On Hold": { bg: "#fee2e2", color: "#ef4444" },
                       "Archived": { bg: "#f3f4f6", color: "#6b7280" }
-                    }[status] || { bg: "#f3f4f6", color: "#6b7280" };
+                    } as Record<string, { bg: string, color: string }>)[status] || { bg: "#f3f4f6", color: "#6b7280" };
 
                     return (
                       <div key={p.id} onClick={() => { setActiveProject(p); setViewMode("kanban"); }} className="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 transition group">
