@@ -13,6 +13,12 @@ function today(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
+async function isPayrollLocked(dateStr: string): Promise<boolean> {
+  const month = dateStr.substring(0, 7); // YYYY-MM
+  const snap = await getDoc(doc(db, "payroll_locks", month));
+  return snap.exists() && snap.data().locked === true;
+}
+
 /** 
  * Gets bounded minutes between 10:00 AM and 7:00 PM.
  * If time is completely outside this window, returns 0.
@@ -43,8 +49,13 @@ export async function getTodayAttendance(userId: string) {
 }
 
 /** Check In */
-export async function checkIn(userId: string) {
-  const id = `${userId}_${today()}`;
+export async function checkIn(userId: string, location: { lat: number, lng: number } | null = null, photoUrl: string | null = null) {
+  const dateStr = today();
+  if (await isPayrollLocked(dateStr)) {
+    throw new Error("Attendance is locked for this month (Payroll generated)");
+  }
+
+  const id = `${userId}_${dateStr}`;
   const ref = doc(db, "attendance", id);
   const snap = await getDoc(ref);
 
@@ -60,6 +71,8 @@ export async function checkIn(userId: string) {
           checkIn: now,
           checkOut: null,
           durationMinutes: 0,
+          locationIn: location,
+          photoIn: photoUrl,
         },
       ],
       totalMinutes: 0,
@@ -84,6 +97,8 @@ export async function checkIn(userId: string) {
         checkIn: now,
         checkOut: null,
         durationMinutes: 0,
+        locationIn: location,
+        photoIn: photoUrl,
       },
     ],
   });
@@ -92,8 +107,13 @@ export async function checkIn(userId: string) {
 }
 
 /** Check Out */
-export async function checkOut(userId: string) {
-  const id = `${userId}_${today()}`;
+export async function checkOut(userId: string, location: { lat: number, lng: number } | null = null, photoUrl: string | null = null) {
+  const dateStr = today();
+  if (await isPayrollLocked(dateStr)) {
+    throw new Error("Attendance is locked for this month (Payroll generated)");
+  }
+
+  const id = `${userId}_${dateStr}`;
   const ref = doc(db, "attendance", id);
   const snap = await getDoc(ref);
 
@@ -114,6 +134,8 @@ export async function checkOut(userId: string) {
 
   last.checkOut = now;
   last.durationMinutes = durationMinutes;
+  last.locationOut = location;
+  last.photoOut = photoUrl;
 
   const totalMinutes = sessions.reduce(
     (sum, s) => sum + (s.durationMinutes || 0),

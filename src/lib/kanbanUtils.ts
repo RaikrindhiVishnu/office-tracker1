@@ -26,7 +26,9 @@ export interface Task {
   assignedTo?: string | null;
   assignedToName?: string | null;
   assignedDate?: string;
+  startDate?: string;
   dueDate?: string;
+  blockedBy?: string[];
   priority: string;
   status: string;
   estimatedHours?: number;

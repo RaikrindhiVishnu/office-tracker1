@@ -296,7 +296,7 @@ export default function LoginPage() {
               )}
 
               {/* Form */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }} onKeyDown={handleKeyDown}>
+              <form onSubmit={(e) => { e.preventDefault(); handleLogin(); }} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 <input
                   type="email" placeholder="Email address" value={email}
                   onChange={e => setEmail(e.target.value)} disabled={loading} autoComplete="email"
@@ -338,7 +338,7 @@ export default function LoginPage() {
                 </div>
 
                 {/* Sign In */}
-                <button onClick={handleLogin} disabled={loading}
+                <button type="submit" disabled={loading}
                   style={{
                     marginTop: 4, padding: "14px",
                     background: loading ? "#334155" : "#163333",
@@ -359,7 +359,7 @@ export default function LoginPage() {
                     Forgot Password?
                   </button>
                 </div>
-              </div>
+              </form>
 
               {/* Back */}
               <button className="back-btn" onClick={goBack} disabled={loading}

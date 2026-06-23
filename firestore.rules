@@ -44,6 +44,10 @@ service cloud.firestore {
         allow read, write: if isSuperAdmin() || belongsToCompany(companyId);
       }
 
+      match /attendance_regularization/{docId} {
+        allow read, write: if isSuperAdmin() || belongsToCompany(companyId);
+      }
+
       match /leaves/{docId} {
         allow read, write: if isSuperAdmin() || belongsToCompany(companyId);
       }
@@ -89,6 +93,10 @@ service cloud.firestore {
     }
 
     match /attendance/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    match /attendance_regularization/{docId} {
       allow read, write: if isAuth();
     }
 

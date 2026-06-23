@@ -338,7 +338,7 @@ export default function Payslips() {
 
   /* ── Render ── */
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5 p-4 sm:p-6 lg:p-8 w-full max-w-7xl mx-auto">
 
       {/* Title */}
       <div>

@@ -28,7 +28,7 @@ import { triggerPushNotification, triggerEmailNotification } from "@/lib/notific
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-type LeaveType = "Casual" | "Sick" | "Work From Home" | "Annual";
+type LeaveType = "Casual" | "Sick" | "Work From Home" | "Annual" | "Half Day" | "Comp Off";
 type LeaveStatus = "Pending" | "Approved" | "Rejected";
 type HolidayType = "national" | "optional";
 
@@ -43,6 +43,8 @@ interface LeaveRequest {
   leaveType?: string;
   fromDate?: string;
   toDate?: string;
+  days?: number;
+  totalDays?: number;
   reason?: string;
   status?: string;
   createdAt?: Timestamp | null;
@@ -66,6 +68,8 @@ const LEAVE_CFG: Record<string, LeaveCfgEntry> = {
   "Sick": { bg: "#fff7ed", color: "#c2410c", dot: "#f97316", Icon: Stethoscope, balanceKey: "sick" },
   "Work From Home": { bg: "#f0fdf4", color: "#15803d", dot: "#22c55e", Icon: Home, balanceKey: null },
   "Annual": { bg: "#fdf4ff", color: "#7e22ce", dot: "#a855f7", Icon: TrendingUp, balanceKey: "annual" },
+  "Half Day": { bg: "#fdf8ea", color: "#b45309", dot: "#d97706", Icon: Clock, balanceKey: null },
+  "Comp Off": { bg: "#ecfeff", color: "#0e7490", dot: "#06b6d4", Icon: Calendar, balanceKey: null },
 };
 const LEAVE_CFG_DEFAULT: LeaveCfgEntry = {
   bg: "#f1f5f9", color: "#475569", dot: "#94a3b8", Icon: Calendar, balanceKey: null,
@@ -101,7 +105,8 @@ function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-function getDays(from: string, to: string) {
+function getDays(from: string, to: string, isHalf?: boolean) {
+  if (isHalf) return 0.5;
   if (!from || !to) return 1;
   const d = (new Date(to).getTime() - new Date(from).getTime()) / 86_400_000;
   return d >= 0 ? d + 1 : 1;
@@ -485,7 +490,7 @@ export default function AdminLeaveRequests() {
       if (newStatus === "Approved" && req.uid) {
         const lc = getLeaveCfg(req.leaveType);
         const balanceKey = lc.balanceKey;
-        const days = getDays(req.fromDate ?? "", req.toDate ?? "");
+        const days = req.days ?? req.totalDays ?? getDays(req.fromDate ?? "", req.toDate ?? "", req.leaveType === "Half Day");
         const leaveBalSnap = await getDocs(query(collection(db, "leaveBalances"), where("uid", "==", req.uid)));
 
         if (balanceKey === "casual" || balanceKey === "sick") {
@@ -928,7 +933,7 @@ export default function AdminLeaveRequests() {
                     {pageRows.map(req => {
                       const lc = getLeaveCfg(req.leaveType);
                       const sc = getStatusCfg(req.status);
-                      const days = getDays(req.fromDate ?? "", req.toDate ?? "");
+                      const days = req.days ?? req.totalDays ?? getDays(req.fromDate ?? "", req.toDate ?? "", req.leaveType === "Half Day");
                       const isPending = (req.status ?? "") === "Pending";
                       const isArmed = deleteConfirm === req.id;
                       return (

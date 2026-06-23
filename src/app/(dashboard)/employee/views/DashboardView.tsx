@@ -11,6 +11,7 @@ import NotificationsView from "./NotificationsView";
 import HelpView from "./HelpView";
 import OrgChart from "@/components/OrgChart";
 import { updateEmployeeData } from "@/lib/employeeSync";
+import ActivityFeed from "./ActivityFeed";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Props = {
@@ -42,6 +43,7 @@ type Props = {
   totalSeconds?: number;
   onGoToChat?: (chatId: string) => void;
   onOpenMeetChat?: () => void;
+  onGoToRegularization?: () => void;
   announcements?: { id: string; text: string }[];
 };
 
@@ -1288,7 +1290,7 @@ export default function DashboardView({
   formatTime = (ts: any) => { try { return ts?.toDate?.()?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) ?? "--"; } catch { return "--"; } },
   leaveType, setLeaveType, fromDate, setFromDate, toDate, setToDate,
   leaveReason, setLeaveReason, handleSubmitLeave, submitting, leaveMsg,
-  totalSeconds = 0, onGoToChat, onOpenMeetChat, announcements,
+  totalSeconds = 0, onGoToChat, onOpenMeetChat, onGoToRegularization, announcements,
 }: Props) {
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [leaveNotifications, setLeaveNotifs] = useState<any[]>([]);
@@ -1296,6 +1298,7 @@ export default function DashboardView({
   const [employeeLeaveData, setEmployeeLeaveData] = useState<any>(null);
   const [now, setNow] = useState(new Date());
   const [profile, setProfile] = useState<any>(null);
+  const [missingYesterday, setMissingYesterday] = useState(false);
 
   const close = useCallback(() => setActiveModal(null), []);
 
@@ -1305,17 +1308,43 @@ export default function DashboardView({
   useEffect(() => { if (!user) return; return onSnapshot(query(collection(db, "leaveRequests"), where("uid", "==", user.uid), where("status", "in", ["Approved", "Rejected"]), where("notificationRead", "==", false)), (s) => setLeaveNotifs(s.docs.map((d) => ({ id: d.id, ...d.data() })))); }, [user]);
   useEffect(() => { if (!user) return; return onSnapshot(query(collection(db, "employeeQueries"), where("employeeId", "==", user.uid), where("employeeUnread", "==", true)), (s) => setQueryNotifs(s.docs.map((d) => ({ id: d.id, ...d.data() })))); }, [user]);
 
+  // Check if yesterday's attendance is missing
+  useEffect(() => {
+    if (!user?.uid) return;
+    const checkYesterday = async () => {
+      const yest = new Date();
+      yest.setDate(yest.getDate() - 1);
+      if (yest.getDay() === 0 || yest.getDay() === 6) return; // Skip weekends simply
+      const yDateStr = yest.toLocaleDateString("en-CA"); // YYYY-MM-DD format usually, or whatever is used
+      // Let's format it same as getTodayDateStr() used in page.tsx:
+      const yStr = yest.getFullYear() + "-" + String(yest.getMonth() + 1).padStart(2, "0") + "-" + String(yest.getDate()).padStart(2, "0");
+
+      try {
+        const snap = await getDoc(doc(db, "attendance", `${user.uid}_${yStr}`));
+        if (!snap.exists()) {
+          setMissingYesterday(true);
+        } else {
+          const d = snap.data();
+          if (!d.sessions || d.sessions.length === 0) {
+            setMissingYesterday(true);
+          }
+        }
+      } catch (err) { }
+    };
+    checkYesterday();
+  }, [user]);
+
   const markLeaveNotifRead = (id: string) => updateDoc(doc(db, "leaveRequests", id), { notificationRead: true });
   const markQueryNotifRead = (id: string) => updateDoc(doc(db, "employeeQueries", id), { employeeUnread: false });
 
   const totalWorked = Math.max(0, Math.floor(totalSeconds / 60));
   const hour = now.getHours();
   const greeting = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
-  const greetEmoji = hour < 12 
+  const greetEmoji = hour < 12
     ? <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" className="text-[#282B3E]"><path d="M17 18a5 5 0 0 0-10 0"></path><line x1="12" y1="2" x2="12" y2="9"></line><line x1="4.22" y1="10.22" x2="5.64" y2="11.64"></line><line x1="1" y1="18" x2="3" y2="18"></line><line x1="21" y1="18" x2="23" y2="18"></line><line x1="18.36" y1="11.64" x2="19.78" y2="10.22"></line><line x1="23" y1="22" x2="1" y2="22"></line><polyline points="16 6 12 2 8 6"></polyline></svg>
-    : hour < 17 
-    ? <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" className="text-[#282B3E]"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-    : <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" className="text-[#282B3E]"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>;
+    : hour < 17
+      ? <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" className="text-[#282B3E]"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+      : <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" className="text-[#282B3E]"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>;
   const userName = profile?.name ?? profile?.displayName ?? user?.displayName ?? "Employee";
   const dateStr = now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
@@ -1395,6 +1424,24 @@ export default function DashboardView({
         <SmallNoticeTicker announcements={announcements} />
       </div>
 
+      {missingYesterday && (
+        <div style={{ marginBottom: 16, background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 20 }}>⚠️</span>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#92400E" }}>Attendance missing for yesterday.</div>
+              <div style={{ fontSize: 12, color: "#B45309" }}>Would you like to submit a regularization request?</div>
+            </div>
+          </div>
+          <button
+            onClick={onGoToRegularization}
+            style={{ padding: "8px 16px", background: "#D97706", color: "#fff", borderRadius: 8, fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer", whiteSpace: "nowrap" }}
+          >
+            Submit Request
+          </button>
+        </div>
+      )}
+
       {/* ── BENTO GRID — exact layout 1 ── */}
       {/*
         Col 1 (320px fixed) : Profile spans rows 1-2 │ Sessions row 3
@@ -1419,6 +1466,7 @@ export default function DashboardView({
           <div className="full-mobile-card"><HolidaysCard onViewAll={() => setActiveModal("holidays")} /></div>
           <div className="full-mobile-card" style={{ minWidth: 0 }}><EmployeeDirectoryCard /></div>
           <div className="full-mobile-card" style={{ minWidth: 0 }}><MyProjectsCard user={user} /></div>
+          <div className="full-mobile-card" style={{ gridColumn: "1 / -1", minWidth: 0 }}><ActivityFeed /></div>
         </div>
       </div>
     </div>

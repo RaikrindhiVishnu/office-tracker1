@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { db } from "@/lib/firebase";
 import {
-  collection, query, onSnapshot, orderBy, doc, getDoc, where, getDocs,
+  collection, query, onSnapshot, orderBy, doc, getDoc, where, getDocs, updateDoc
 } from "firebase/firestore";
 import type { DailySheetEntry } from "@/types/dailySheet";
 import { getTodayDateStr } from "@/lib/breakTracking";
@@ -374,6 +374,26 @@ export default function AdminDailySheetsView() {
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => d === "asc" ? "desc" : "asc");
     else { setSortKey(key); setSortDir("asc"); }
+  };
+
+  const handleApprove = async (docId: string, ev: React.MouseEvent) => {
+    ev.stopPropagation();
+    try {
+      await updateDoc(doc(db, "dailySheets", docId), { status: "Approved" });
+    } catch (e) {
+      console.error(e);
+      alert("Failed to approve");
+    }
+  };
+
+  const handleReject = async (docId: string, ev: React.MouseEvent) => {
+    ev.stopPropagation();
+    try {
+      await updateDoc(doc(db, "dailySheets", docId), { status: "Rejected" });
+    } catch (e) {
+      console.error(e);
+      alert("Failed to reject");
+    }
   };
 
   // ── Export ────────────────────────────────────────────────────────────────
@@ -1255,7 +1275,16 @@ export default function AdminDailySheetsView() {
                         {e.status || (dayTasks.length > 0 ? dayTasks[dayTasks.length - 1].status : null) || "—"}
                       </td>
                       <td className="px-3 py-2.5 align-middle">
-                        {e.isHoliday ? (
+                        {e.status === "Pending Approval" ? (
+                          <div className="flex gap-2">
+                            <button onClick={(ev) => handleApprove(docId, ev)} className="px-2 py-1 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded text-[10px] font-bold hover:bg-emerald-100 transition">Approve</button>
+                            <button onClick={(ev) => handleReject(docId, ev)} className="px-2 py-1 bg-rose-50 text-rose-600 border border-rose-200 rounded text-[10px] font-bold hover:bg-rose-100 transition">Reject</button>
+                          </div>
+                        ) : e.status === "Approved" ? (
+                          <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">Approved</span>
+                        ) : e.status === "Rejected" ? (
+                          <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700">Rejected</span>
+                        ) : e.isHoliday ? (
                           <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">Holiday</span>
                         ) : e.isDraft ? (
                           <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500">Draft</span>

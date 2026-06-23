@@ -20,6 +20,8 @@ import MonthlyReport        from "@/app/(dashboard)/admin/monthlyreport";
 import IncomingCallListener from "@/components/IncomingCallListener";
 import EmployeeTodayPanel   from "@/components/EmployeeTodayPanel";
 import CrossDeptFeed from "@/components/CrossDeptFeed";
+import EmployeeLifecycle from "./EmployeeLifecycle";
+import RecruitmentATS from "./RecruitmentATS";
 
 import type { AttendanceType } from "@/types/attendance";
 import type { Employee }       from "@/types/Employee";
@@ -27,7 +29,7 @@ import type { Session }        from "@/types/Employee";
 import type { EmployeeRow }    from "@/types/EmployeeRow";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type HRView = "dashboard"|"leave"|"employees"|"attendance"|"payslips"|"announcements"|"queries";
+type HRView = "dashboard"|"leave"|"employees"|"attendance"|"payslips"|"announcements"|"queries"|"lifecycle"|"recruitment";
 
 interface Notification { id:string; toUid:string; title:string; message:string; read:boolean; createdAt:Timestamp; }
 interface LeaveRequest  { id:string; uid:string; userName:string; userEmail:string; leaveType:string; fromDate:string; toDate:string; reason:string; status:"Pending"|"Approved"|"Rejected"; createdAt:any; }
@@ -372,7 +374,7 @@ function HRDashboard() {
 });
   };
 
-  const saveEmp = async()=>{ if(!editEmp) return; setEditMsg(""); await updateDoc(doc(db,"users",editEmp.id),{name:editEmp.name,designation:editEmp.designation,department:editEmp.department,salary:editEmp.salary,updatedAt:serverTimestamp()}); setSelEmp({...editEmp}); setEditing(false); setEditMsg("✅ Updated"); setTimeout(()=>setEditMsg(""),3000); await loadUsers(); };
+  const saveEmp = async()=>{ if(!editEmp) return; setEditMsg(""); await updateDoc(doc(db,"users",editEmp.id),{name:editEmp.name,designation:editEmp.designation,department:editEmp.department,salary:editEmp.salary,leaveBalance:(editEmp as any).leaveBalance||{},updatedAt:serverTimestamp()}); setSelEmp({...editEmp}); setEditing(false); setEditMsg("✅ Updated"); setTimeout(()=>setEditMsg(""),3000); await loadUsers(); };
 
   const broadcast = async()=>{
   if(!newMsg.trim()) return;
@@ -472,6 +474,8 @@ function HRDashboard() {
 
   const navItems = [
     {key:"dashboard" as HRView,label:"Dashboard",icon:"⊞"},
+    {key:"lifecycle" as HRView,label:"Lifecycle",icon:"🚀"},
+    {key:"recruitment" as HRView,label:"Recruitment",icon:"🎯"},
     {key:"leave"     as HRView,label:"Leave Management",icon:"📋",badge:pendL},
     {key:"employees" as HRView,label:"Employees",icon:"👥"},
     {key:"attendance"as HRView,label:"Attendance",icon:"📅"},
@@ -1000,6 +1004,16 @@ function HRDashboard() {
             </div>
           )}
 
+          {/* ════ LIFECYCLE ════ */}
+          {view==="lifecycle" && (
+            <EmployeeLifecycle />
+          )}
+
+          {/* ════ RECRUITMENT ════ */}
+          {view==="recruitment" && (
+            <RecruitmentATS />
+          )}
+
           {/* ════ LEAVE ════ */}
           {view==="leave"&&(
             <div className="space-y-5">
@@ -1095,6 +1109,17 @@ function HRDashboard() {
                           </div>
                         ))}
                       </div>
+                      <div className="pt-4 border-t border-gray-100">
+                        <p className="text-sm font-semibold text-gray-900 mb-3">Leave Balances (HR Adjustments)</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                          {[{label:"Casual",key:"casual"},{label:"Sick",key:"sick"},{label:"Annual",key:"annual"},{label:"Comp Off",key:"compOff"}].map(({label,key})=>(
+                            <div key={key}>
+                              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">{label}</label>
+                              <input type="number" min={0} value={(editEmp as any).leaveBalance?.[key]??(key==="casual"?12:key==="sick"?6:key==="annual"?15:0)} onChange={e=>setEditEmp({...editEmp,leaveBalance:{...((editEmp as any).leaveBalance||{}),[key]:Number(e.target.value)}} as any)} className="w-full px-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-teal-400"/>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                       <div className="flex gap-2">
                         <button onClick={saveEmp} className="px-6 py-2.5 bg-teal-600 text-white font-semibold rounded-xl hover:bg-teal-700 transition text-sm">Save</button>
                         <button onClick={()=>{setEditing(false);setEditMsg("");}} className="px-5 py-2.5 bg-gray-100 text-gray-600 font-semibold rounded-xl hover:bg-gray-200 transition text-sm">Cancel</button>
@@ -1102,7 +1127,7 @@ function HRDashboard() {
                     </div>
                   ):(
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                      {[{label:"Name",value:selEmp.name},{label:"Email",value:selEmp.email},{label:"Designation",value:(selEmp as any).designation},{label:"Department",value:(selEmp as any).department},{label:"Account Type",value:(selEmp as any).accountType},{label:"Salary",value:(selEmp as any).salary?`₹${(selEmp as any).salary.toLocaleString("en-IN")}`:undefined}].map(item=>(
+                      {[{label:"Name",value:selEmp.name},{label:"Email",value:selEmp.email},{label:"Designation",value:(selEmp as any).designation},{label:"Department",value:(selEmp as any).department},{label:"Account Type",value:(selEmp as any).accountType},{label:"Salary",value:(selEmp as any).salary?`₹${(selEmp as any).salary.toLocaleString("en-IN")}`:undefined},{label:"Casual Leaves",value:((selEmp as any).leaveBalance?.casual??12).toString()},{label:"Sick Leaves",value:((selEmp as any).leaveBalance?.sick??6).toString()},{label:"Annual Leaves",value:((selEmp as any).leaveBalance?.annual??15).toString()},{label:"Comp Off",value:((selEmp as any).leaveBalance?.compOff??0).toString()}].map(item=>(
                         <Field key={item.label} label={item.label} value={item.value||"—"}/>
                       ))}
                     </div>

@@ -57,6 +57,7 @@ export default function DailySheetView() {
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [status, setStatus] = useState(STATUSES[0]);
   const [hours, setHours] = useState<number | "">("");
+  const [isBillable, setIsBillable] = useState(true);
 
   // Project search dropdown
   const [projectSearch, setProjectSearch] = useState("");
@@ -148,6 +149,19 @@ export default function DailySheetView() {
     });
   }, [user, selectedMonth]);
 
+  // ── Fetch payroll lock ─────────────────────────────────────
+  const [isLocked, setIsLocked] = useState(false);
+  useEffect(() => {
+    const q = query(collection(db, "payroll_locks"), where("month", "==", selectedMonth));
+    return onSnapshot(q, (snap) => {
+      if (!snap.empty && snap.docs[0].data().isLocked) {
+        setIsLocked(true);
+      } else {
+        setIsLocked(false);
+      }
+    });
+  }, [selectedMonth]);
+
   // ── Close dropdown on outside click ───────────────────────
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -180,7 +194,7 @@ export default function DailySheetView() {
     setProject(""); setProjectSearch(""); setShowProjectDropdown(false);
     setCustomProject("");
     setTaskTitle(""); setDescription(""); setCategory(CATEGORIES[0]);
-    setStatus(STATUSES[0]); setHours(""); setEditingDocId(null); setEditingTaskId(null);
+    setStatus(STATUSES[0]); setHours(""); setIsBillable(true); setEditingDocId(null); setEditingTaskId(null);
   };
 
   // ── Group entries by date ──────────────────────────────────
@@ -267,7 +281,8 @@ export default function DailySheetView() {
         description,
         category,
         status,
-        hours: hours === "" ? 0 : Number(hours)
+        hours: hours === "" ? 0 : Number(hours),
+        isBillable
       };
 
       if (editingDocId) {
@@ -365,7 +380,7 @@ export default function DailySheetView() {
     setProjectSearch("");
     setTaskTitle(task.taskTitle); setDescription(task.description || "");
     setCategory(task.category || CATEGORIES[0]); setStatus(task.status || STATUSES[0]);
-    setHours(task.hours); setIsModalOpen(true);
+    setHours(task.hours); setIsBillable(task.isBillable !== false); setIsModalOpen(true);
   };
 
   const handleDeleteTask = async (docId: string, taskId: string | null) => {
@@ -389,6 +404,23 @@ export default function DailySheetView() {
       }
       if (editingTaskId === taskId) resetForm();
     } catch (err) { console.error(err); }
+  };
+
+  const handleSubmitMonthForApproval = async () => {
+    if (!confirm(`Submit all entries for ${monthLabel} for admin approval?`)) return;
+    setIsSubmitting(true);
+    try {
+      const batchPromises = monthEntries.map(entry => {
+        return updateDoc(doc(db, "dailySheets", entry.id!), { status: "Pending Approval" });
+      });
+      await Promise.all(batchPromises);
+      alert(`Successfully submitted ${monthEntries.length} entries for approval.`);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to submit entries for approval.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // ── Export ─────────────────────────────────────────────────
@@ -658,6 +690,16 @@ export default function DailySheetView() {
             Export
           </button>
           <button
+            onClick={handleSubmitMonthForApproval}
+            disabled={isSubmitting || monthEntries.length === 0}
+            className="flex items-center gap-2 px-4 py-1.5 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition shadow-sm disabled:opacity-50"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            Submit for Approval
+          </button>
+          <button
             onClick={() => {
               resetForm();
               const todayMonth = todayStr.substring(0, 7);
@@ -812,12 +854,14 @@ export default function DailySheetView() {
                         }`}
                     >
                       <td className="px-4 py-3 align-middle">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleSelect(docId)}
-                          className="w-4 h-4 rounded border-slate-300 accent-indigo-600 cursor-pointer mt-1"
-                        />
+                        {!isLocked && (
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelect(docId)}
+                            className="w-4 h-4 rounded border-slate-300 accent-indigo-600 cursor-pointer mt-1"
+                          />
+                        )}
                       </td>
                       <td className="px-3 py-3 font-medium text-slate-600 whitespace-nowrap text-xs align-middle">
                         {formatDate(dateStr)}
@@ -838,16 +882,19 @@ export default function DailySheetView() {
                         {dayTasks.length > 0 ? (
                           isExpanded ? (
                             <div className="space-y-2 cursor-pointer">
-
                               {dayTasks.map((t, i) => (
                                 <div key={t.taskId || i} className="text-xs text-slate-600 border border-slate-100 rounded-lg p-2.5 bg-white shadow-sm relative pr-12 group">
                                   <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                                    <button onClick={(e) => { e.stopPropagation(); handleEditTask(docId, t); }} className="text-indigo-400 hover:text-indigo-600" title="Edit Task">
-                                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                    </button>
-                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteTask(t.entryId, t.taskId); }} className="text-rose-400 hover:text-rose-600" title="Delete Task">
-                                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                    </button>
+                                    {!isLocked && (
+                                      <button onClick={(e) => { e.stopPropagation(); handleEditTask(docId, t); }} className="text-indigo-400 hover:text-indigo-600" title="Edit Task">
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                      </button>
+                                    )}
+                                    {!isLocked && (
+                                      <button onClick={(e) => { e.stopPropagation(); handleDeleteTask(t.entryId, t.taskId); }} className="text-rose-400 hover:text-rose-600" title="Delete Task">
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                      </button>
+                                    )}
                                   </div>
                                   <span className="font-bold text-slate-700">Task {i + 1}: </span>
                                   <span className="font-medium text-slate-700">{t.project} - {t.taskTitle}</span> {t.description && `- ${t.description}`}
@@ -888,25 +935,29 @@ export default function DailySheetView() {
                       <td className="px-3 py-3 text-right align-middle">
                         {!isHoliday && (
                           <div className="flex items-center justify-end gap-1 flex-col sm:flex-row">
-                            <button
-                              onClick={() => {
-                                resetForm();
-                                setEntryDate(dateStr);
-                                setIsModalOpen(true);
-                              }}
-                              className="px-2 py-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded transition w-full sm:w-auto text-center whitespace-nowrap"
-                            >
-                              + Add Task
-                            </button>
-                            <button
-                              onClick={() => handleDeleteTask(docId, null)}
-                              className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
-                              title="Delete Entire Day"
-                            >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
+                            {!isLocked && (
+                              <button
+                                onClick={() => {
+                                  resetForm();
+                                  setEntryDate(dateStr);
+                                  setIsModalOpen(true);
+                                }}
+                                className="px-2 py-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded transition w-full sm:w-auto text-center whitespace-nowrap"
+                              >
+                                + Add Task
+                              </button>
+                            )}
+                            {!isLocked && (
+                              <button
+                                onClick={() => handleDeleteTask(docId, null)}
+                                className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
+                                title="Delete Entire Day"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            )}
                           </div>
                         )}
                       </td>
@@ -1110,6 +1161,18 @@ export default function DailySheetView() {
                     className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50 outline-none transition"
                   />
                 </div>
+              </div>
+              
+              {/* Billable Toggle */}
+              <div className="flex items-center gap-3 pt-2">
+                <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex-1">Billable to Client?</label>
+                <button
+                  type="button"
+                  onClick={() => setIsBillable(!isBillable)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isBillable ? 'bg-indigo-500' : 'bg-slate-300'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isBillable ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
               </div>
             </div>
 

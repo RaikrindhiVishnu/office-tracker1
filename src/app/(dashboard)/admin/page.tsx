@@ -37,13 +37,21 @@ import CalendarView from "./calendar";
 import MessagesView from "./meassages";
 import MeetChatApp from "@/components/MeetChatAppUpdated";
 import AccountsDashboard from "./Accounts/AccountsDashboard";
-import AdminBreakView from "@/components/AdminBreakView";  // ← NEW
+import AdminBreakView from "@/components/AdminBreakView";
 import AdminDailySheetsView from "./AdminDailySheetsView";
-import LeadsView from "./LeadsView"; // ← NEW CRM MODULE
-import InvoicesView from "./InvoicesView"; // ← NEW BILLING MODULE
-import ITAssetsView from "./it-assets/page"; // ← NEW ASSETS MODULE
-import AIInsightsView from "./AIInsightsView"; // ← NEW AI DASHBOARD
-import DepartmentAnalytics from "./DepartmentAnalytics"; // ← NEW DEPT ANALYTICS
+import AdminRegularizationRequestsView from "./AdminRegularizationRequestsView";
+import ApprovalCenter from "./ApprovalCenter";
+import AdminExpenseView from "./AdminExpenseView";
+import ShiftManagement from "./ShiftManagement";
+import LeadsView from "./LeadsView";
+import InvoicesView from "./InvoicesView";
+import ITAssetsView from "./it-assets/page";
+import AIInsightsView from "./AIInsightsView";
+import DepartmentAnalytics from "./DepartmentAnalytics";
+import AdminAppraisalView from "./AdminAppraisalView";
+import AdminJobsView from "./AdminJobsView";
+import CompanyPoliciesView from "../employee/views/CompanyPoliciesView";
+import FeedbackView from "../employee/views/FeedbackView";
 import { Employee } from "@/types/Employee";
 import type { Session } from "@/types/Employee";
 import { EmployeeRow } from "@/types/EmployeeRow";
@@ -54,6 +62,17 @@ import Image from "next/image";
 import { checkIn, checkOut, getTodayAttendance } from "@/lib/attendance";
 import { getActiveBreak, getTodayDateStr, type Break } from "@/lib/breakTracking";
 import NavbarBreakStatus from "@/components/NavbarBreakStatus";
+import UnifiedApprovalCenter from "./UnifiedApprovalCenter";
+import AdminPayrollView from "./AdminPayrollView";
+import ProductivityReportsView from "./ProductivityReportsView";
+import AdminBudgetTracking from "./AdminBudgetTracking";
+import ProjectGanttChart from "./ProjectGanttChart";
+import ProjectMilestonesView from "./ProjectMilestonesView";
+import AdminProjectCostingView from "./AdminProjectCostingView";
+import AdminDocumentOCR from "./AdminDocumentOCR";
+import RecruitmentView from "./RecruitmentView";
+import OnboardingView from "./OnboardingView";
+import OffboardingView from "./OffboardingView";
 
 /* ================= TYPES ================= */
 type User = {
@@ -693,11 +712,112 @@ export default function AdminPage() {
             active={view === "leaveReport"}
             onClick={() => { setView("leaveReport"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
           />
+          <NavItem
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>}
+            label="Approval Center" active={view === "approval-center"}
+            onClick={() => { setView("approval-center"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
+          <NavItem
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" /></svg>}
+            label="Expenses" active={view === "expenses"}
+            onClick={() => { setView("expenses"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
+          <NavItem
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+            label="Payroll" active={view === "payroll"}
+            onClick={() => { setView("payroll"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
+          <NavItem
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+            label="Shift Management" active={view === "shift-management"}
+            onClick={() => { setView("shift-management"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
+          <NavItem
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>}
+            label="Productivity Reports" active={view === "productivity"}
+            onClick={() => { setView("productivity"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
+          <NavItem
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+            label="Budget Tracking" active={view === "budget"}
+            onClick={() => { setView("budget"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
 
           <NavItem
             icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>}
             label="Project Management" active={view === "Project Management"}
             onClick={() => { setView("Project Management"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
+          <NavItem
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>}
+            label="Gantt Chart" active={view === "gantt"}
+            onClick={() => { setView("gantt"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
+          <NavItem
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" /></svg>}
+            label="Milestones" active={view === "milestones"}
+            onClick={() => { setView("milestones"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
+          <NavItem
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+            label="Project Costing" active={view === "costing"}
+            onClick={() => { setView("costing"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
+          <NavItem
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
+            label="Document OCR" active={view === "ocr"}
+            onClick={() => { setView("ocr"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
+          <NavItem
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
+            label="Appraisals" active={view === "appraisals"}
+            onClick={() => { setView("appraisals"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
+          <NavItem
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>}
+            label="Job Postings" active={view === "jobs"}
+            onClick={() => { setView("jobs"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
+          <NavItem
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>}
+            label="ATS Board" active={view === "recruitment"}
+            onClick={() => { setView("recruitment"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
+          <NavItem
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>}
+            label="Onboarding" active={view === "onboarding"}
+            onClick={() => { setView("onboarding"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
+          <NavItem
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6" /></svg>}
+            label="Offboarding" active={view === "offboarding"}
+            onClick={() => { setView("offboarding"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
+          <NavItem
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
+            label="Policies" active={view === "policies"}
+            onClick={() => { setView("policies"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
+          <NavItem
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>}
+            label="Feedback" active={view === "feedback"}
+            onClick={() => { setView("feedback"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
           />
 
           <NavItem
@@ -735,6 +855,12 @@ export default function AdminPage() {
             icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>}
             label="Departments" active={view === "departments"}
             onClick={() => { setView("departments"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
+          <NavItem
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+            label="Regularization" active={view === "regularization"}
+            onClick={() => { setView("regularization"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
           />
 
 
@@ -881,6 +1007,34 @@ export default function AdminPage() {
             <DepartmentAnalytics />
           )}
 
+          {view === "appraisals" && (
+            <AdminAppraisalView />
+          )}
+
+          {view === "jobs" && (
+            <AdminJobsView />
+          )}
+
+          {view === "recruitment" && (
+            <RecruitmentView user={user} />
+          )}
+
+          {view === "onboarding" && (
+            <OnboardingView user={user} />
+          )}
+
+          {view === "offboarding" && (
+            <OffboardingView user={user} />
+          )}
+
+          {view === "policies" && (
+            <CompanyPoliciesView isAdmin={true} />
+          )}
+
+          {view === "feedback" && (
+            <FeedbackView isAdmin={true} />
+          )}
+
           {view === "analytics" && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -999,6 +1153,20 @@ export default function AdminPage() {
 
           {view === "leaveReport" && <LeaveRequests />}
 
+          {view === "regularization" && <AdminRegularizationRequestsView />}
+
+          {view === "approval-center" && <UnifiedApprovalCenter />}
+
+          {view === "payroll" && <AdminPayrollView />}
+
+          {view === "productivity" && <ProductivityReportsView />}
+
+          {view === "budget" && <AdminBudgetTracking />}
+
+          {view === "expenses" && <AdminExpenseView />}
+
+          {view === "shift-management" && <ShiftManagement />}
+
           {view === "queries" && (
             // @ts-ignore
             <AdminQueriesView user={user} userData={userData} />
@@ -1029,6 +1197,18 @@ export default function AdminPage() {
             </div>
           )}
 
+          {view === "gantt" && (
+            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-0 overflow-hidden max-w-full flex-1 flex flex-col min-h-0">
+              <ProjectGanttChart />
+            </div>
+          )}
+
+          {view === "milestones" && <ProjectMilestonesView />}
+
+          {view === "costing" && <AdminProjectCostingView />}
+
+          {view === "ocr" && <AdminDocumentOCR />}
+
           {view === "daily-sheet" && <AdminDailySheetsView />}
 
           {view === "Meet" && <MeetView users={users.filter((u) => u.uid !== user.uid)} />}
@@ -1036,10 +1216,10 @@ export default function AdminPage() {
           <IncomingCallListener />
           <MeetChatApp users={users} isOpen={showMeet} onClose={() => setShowMeet(false)} />
 
-          {view === "accounts" && <AccountsDashboard />}                                   
-          {view === "leads" && <LeadsView />}                                              
-          {view === "invoices" && <InvoicesView />}                                        
-          {view === "it-assets" && <ITAssetsView />}                                       
+          {view === "accounts" && <AccountsDashboard />}
+          {view === "leads" && <LeadsView />}
+          {view === "invoices" && <InvoicesView />}
+          {view === "it-assets" && <ITAssetsView />}
           {view === "ai-insights" && <AIInsightsView />}
 
           {view === "leads" && <LeadsView />}

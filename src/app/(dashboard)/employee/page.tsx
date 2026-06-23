@@ -39,13 +39,29 @@ import CalendarModal from "./views/CalendarView";
 import HolidaysView from "./views/HolidaysView";
 import LeaveHistoryView from "./views/LeaveHistoryView";
 import LeaveRequestView from "./views/LeaveRequestView";
-import ProfileView from "./views/ProfileView";
+import SettingsView from "./views/SettingsView";
+import EnhancedProfileView from "./views/EnhancedProfileView";
+import EmployeeDirectoryView from "./views/EmployeeDirectoryView";
+import AppraisalView from "./views/AppraisalView";
+import JobsView from "./views/JobsView";
+import OrgChartView from "./views/OrgChartView";
+import CompanyPoliciesView from "./views/CompanyPoliciesView";
+import FeedbackView from "./views/FeedbackView";
+import SelfieCaptureModal from "@/components/SelfieCaptureModal";
 import HelpView from "./views/HelpView";
 import ProjectManagement from "./views/projectmanagement";
 import { LeaveType } from "@/types/leave";
 import Payslips from "./views/Payslips";
 import EmployeeTasksView from "./views/EmployeeTasksView";
 import TeamTasksView from "./views/TeamTasksView";
+import RegularizationView from "./views/RegularizationView";
+import EnhancedLeaveView from "./views/EnhancedLeaveView";
+import ExpenseView from "./views/ExpenseView";
+import DocumentVaultView from "./views/DocumentVaultView";
+import AIChatBot from "./views/AIChatBot";
+import AdvanceSalaryView from "./views/AdvanceSalaryView";
+import PurchaseRequestsView from "./views/PurchaseRequestsView";
+import DocumentEditor from "./views/DocumentEditor";
 
 // ── IMPORT MeetChat overlay ──────────────────────────────
 // Change this path to wherever your MeetChatAppUpdated file lives
@@ -63,15 +79,20 @@ import {
   User,
   HelpCircle,
   Settings,
-  LogOut
+  LogOut,
+  History,
+  BarChart,
+  Briefcase,
+  MessageSquare
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────
 type ViewType =
   | "dashboard" | "work-update" | "daily-sheet" | "attendance" | "notifications"
   | "calendar" | "holidays" | "leave-history" | "leave-request"
-  | "profile" | "help" | "projects" | "meet"
-  | "tasks" | "team" | "reports" | "settings" | "payslips";
+  | "profile" | "help" | "projects" | "meet" | "regularization"
+  | "tasks" | "team" | "reports" | "settings" | "payslips"
+  | "expenses" | "enhanced-leave" | "directory" | "appraisals" | "jobs" | "org-chart" | "policies" | "feedback" | "documents" | "advance-salary" | "purchase-requests" | "live-docs";
 
 type LeaveRequest = {
   id: string;
@@ -133,11 +154,20 @@ const getSidebarItems = (isLead: boolean): [ViewType, string, React.ReactNode][]
   ["dashboard", "Dashboard", <LayoutGrid key="dashboard" className="w-5 h-5" />],
   ...(isLead ? [["team", "Team Tasks", <Users key="team" className="w-5 h-5" />] as [ViewType, string, React.ReactNode]] : []),
   ["tasks", "My Tasks", <FileCheck key="tasks" className="w-5 h-5" />],
-  ["daily-sheet", "Time Sheet", <Calendar key="daily-sheet" className="w-5 h-5" />],
+  ["daily-sheet", "Daily Sheet", <Calendar key="daily-sheet" className="w-5 h-5" />],
   ["attendance", "Attendance", <Clock key="attendance" className="w-5 h-5" />],
   ["projects", "Projects", <Folder key="projects" className="w-5 h-5" />],
   ["payslips", "Payslips", <Receipt key="payslips" className="w-5 h-5" />],
-  ["leave-request", "Apply Leave", <Palmtree key="leave-request" className="w-5 h-5" />],
+  ["appraisals", "Appraisals", <BarChart key="appraisals" className="w-5 h-5" />],
+  ["jobs", "Jobs", <Briefcase key="jobs" className="w-5 h-5" />],
+  ["policies", "Policies", <Folder key="policies" className="w-5 h-5" />],
+  ["feedback", "Feedback", <MessageSquare key="feedback" className="w-5 h-5" />],
+  ["expenses", "Expenses", <Receipt key="expenses" className="w-5 h-5" />],
+  ["purchase-requests", "Purchase Requests", <Receipt key="purchase-requests" className="w-5 h-5" />],
+  ["advance-salary", "Advance Salary", <Receipt key="advance-salary" className="w-5 h-5" />],
+  ["enhanced-leave", "Apply Leave", <Palmtree key="enhanced-leave" className="w-5 h-5" />],
+  ["regularization", "Regularization", <History key="regularization" className="w-5 h-5" />],
+  ["documents", "Documents", <Folder key="documents" className="w-5 h-5" />],
   ["profile", "Profile", <User key="profile" className="w-5 h-5" />],
   ["help", "Help", <HelpCircle key="help" className="w-5 h-5" />],
 ];
@@ -152,6 +182,7 @@ export default function ZohoStyleEmployeeDashboard() {
   // ── ✅ NEW: MeetChat overlay state ──────────────────────
   const [showMeetChat, setShowMeetChat] = useState(false);
   const [chatTargetUid, setChatTargetUid] = useState<string | null>(null);
+  const [showSelfieModal, setShowSelfieModal] = useState(false);
 
   const [showCalendar, setShowCalendar] = useState(false);
   const [totalSeconds, setTotalSeconds] = useState<number>(0);
@@ -206,7 +237,7 @@ export default function ZohoStyleEmployeeDashboard() {
       "dashboard", "work-update", "attendance", "notifications",
       "calendar", "holidays", "leave-history", "leave-request",
       "profile", "help", "projects", "meet", "tasks", "team",
-      "reports", "settings", "payslips"
+      "reports", "settings", "payslips", "live-docs"
     ];
     if (saved && validViews.includes(saved)) {
       setActiveView(saved);
@@ -541,8 +572,35 @@ export default function ZohoStyleEmployeeDashboard() {
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   };
 
-  const doCheckIn = async () => { setBusy(true); await checkIn(user.uid); setBusy(false); };
-  const doCheckOut = async () => { setBusy(true); await checkOut(user.uid); setBusy(false); };
+  const getGeoLocation = async (): Promise<{ lat: number, lng: number } | null> => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) return resolve(null);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => resolve(null),
+        { timeout: 5000, enableHighAccuracy: true }
+      );
+    });
+  };
+
+  const doCheckIn = async () => {
+    setShowSelfieModal(true);
+  };
+
+  const handleSelfieCapture = async (photoUrl: string) => {
+    setShowSelfieModal(false);
+    setBusy(true);
+    const loc = await getGeoLocation();
+    await checkIn(user.uid, loc, photoUrl);
+    setBusy(false);
+  };
+
+  const doCheckOut = async () => {
+    setBusy(true);
+    const loc = await getGeoLocation();
+    await checkOut(user.uid, loc, null);
+    setBusy(false);
+  };
   const handleSetLeaveType = (v: LeaveType) => setLeaveType(v);
 
   const todayMD = new Date().toISOString().slice(5, 10);
@@ -902,17 +960,19 @@ export default function ZohoStyleEmployeeDashboard() {
             )}
             {activeView === "holidays" && <HolidaysView holidays={holidays} />}
             {activeView === "leave-history" && <LeaveHistoryView leaveRequests={leaveRequests} />}
-            {activeView === "leave-request" && (
-              <LeaveRequestView
-                user={user}
-                leaveType={leaveType} setLeaveType={handleSetLeaveType}
-                fromDate={fromDate} setFromDate={setFromDate}
-                toDate={toDate} setToDate={setToDate}
-                leaveReason={leaveReason} setLeaveReason={setLeaveReason}
-                handleSubmitLeave={handleSubmitLeave} submitting={submitting} leaveMsg={leaveMsg}
-              />
-            )}
-            {activeView === "profile" && <ProfileView />}
+            {activeView === "directory" && <EmployeeDirectoryView />}
+            {activeView === "appraisals" && <AppraisalView user={user} />}
+            {activeView === "jobs" && <JobsView />}
+            {activeView === "org-chart" && <OrgChartView />}
+            {activeView === "policies" && <CompanyPoliciesView />}
+            {activeView === "feedback" && <FeedbackView user={user} />}
+            {activeView === "enhanced-leave" && <EnhancedLeaveView user={user} />}
+            {activeView === "expenses" && <ExpenseView user={user} />}
+            {activeView === "purchase-requests" && <PurchaseRequestsView user={user} />}
+            {activeView === "advance-salary" && <AdvanceSalaryView user={user} />}
+            {activeView === "regularization" && <RegularizationView user={{ ...user, ...userData }} />}
+            {activeView === "documents" && <DocumentVaultView />}
+            {activeView === "profile" && <EnhancedProfileView />}
             {activeView === "help" && <HelpView />}
             {activeView === "meet" && <MeetView users={users.filter((u: any) => u.uid !== user.uid)} />}
             {activeView === "tasks" && <EmployeeTasksView user={{ ...user, ...userData }} />}
@@ -974,6 +1034,14 @@ export default function ZohoStyleEmployeeDashboard() {
         targetUid={chatTargetUid}
       />
 
+      {showSelfieModal && (
+        <SelfieCaptureModal
+          uid={user.uid}
+          onCapture={handleSelfieCapture}
+          onCancel={() => setShowSelfieModal(false)}
+        />
+      )}
+
       <style jsx>{`
         @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
         .animate-shimmer { animation: shimmer 3s infinite; }
@@ -1003,24 +1071,6 @@ function ReportsView({ user, attendance }: any) {
               <p className="text-xs mt-1">This Month</p>
             </div>
           ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SettingsView({ user }: any) {
-  return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-xl shadow-lg p-5">
-        <h2 className="text-xl font-bold mb-3">Settings</h2>
-        <div className="space-y-3">
-          <div><label className="block font-semibold text-sm mb-1.5">Email Notifications</label><input type="checkbox" className="w-4 h-4" defaultChecked /></div>
-          <div>
-            <label className="block font-semibold text-sm mb-1.5">Theme</label>
-            <select className="w-full border-2 border-gray-300 rounded-lg px-3 py-2 text-sm"><option>Light</option><option>Dark</option></select>
-          </div>
-          <button className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm">Save Settings</button>
         </div>
       </div>
     </div>

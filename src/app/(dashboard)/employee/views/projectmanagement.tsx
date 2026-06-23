@@ -38,9 +38,11 @@ import {
 } from "./employeekanban";
 import { Task, KanbanColumn, TicketType, TICKET_TYPES, LABEL_COLORS, TaskLabel, getPermissions, getColStyle, getLabelStyle } from "@/lib/kanbanUtils";
 import { TaskActivityTimeline } from "../../admin/ActivityTimeline";
+import ProjectForums from "./ProjectForums";
+import CodePRIntegration from "./CodePRIntegration";
 
 /* ─── LOCAL TYPES (not needed in kanban file) ─── */
-type ViewMode = "kanban" | "list" | "timeline" | "logs" | "reports";
+type ViewMode = "kanban" | "list" | "timeline" | "logs" | "reports" | "forums" | "code";
 type AppTab = "dashboard" | "projects" | "dailysheet" | "notifications";
 
 interface WorkLog {
@@ -1231,9 +1233,15 @@ function TaskModal({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Start Date</label>
+              <input type="datetime-local" value={form.startDate || ""} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+            </div>
+            <div>
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Due Date</label>
               <input type="datetime-local" value={form.dueDate || ""} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Assignee</label>
               <select value={form.assignedTo || ""}
@@ -1266,6 +1274,18 @@ function TaskModal({
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Tags (csv)</label>
               <input value={tagsInput} onChange={e => setTagsInput(e.target.value)} placeholder="ui, backend, bug" className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+            </div>
+            <div className="col-span-3">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Blocked By (Task IDs, comma separated)</label>
+              <input 
+                value={form.blockedBy?.join(", ") || ""} 
+                onChange={e => {
+                  const ids = e.target.value.split(",").map(s => s.trim()).filter(Boolean);
+                  setForm(f => ({ ...f, blockedBy: ids }));
+                }} 
+                placeholder="TSK-001, STR-002" 
+                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" 
+              />
             </div>
           </div>
 
@@ -2820,6 +2840,8 @@ export default function ProjectManagement({ user, projects, users, setSidebarCol
                 ["kanban", "⊞ Board"],
                 ["list", "☰ List"],
                 ["timeline", "📅 Activity"],
+                ["forums", "💬 Forums"],
+                ["code", "💻 Code / PRs"],
                 ["logs", "⏱ Logs"],
                 ["reports", "📊 Reports"],
               ] as [ViewMode, string][]).map(([mode, label]) => (
@@ -3052,6 +3074,18 @@ export default function ProjectManagement({ user, projects, users, setSidebarCol
                 onTaskClick={(task) => { console.log(task); }}
                 onClose={() => setViewMode("kanban")}
               />
+            </div>
+          )}
+
+          {viewMode === "forums" && (
+            <div className="flex-1 overflow-auto p-4 sm:p-6">
+              <ProjectForums projectId={activeProject.id} user={user} projectColor={projectColor} />
+            </div>
+          )}
+
+          {viewMode === "code" && (
+            <div className="flex-1 overflow-auto p-4 sm:p-6">
+              <CodePRIntegration projectId={activeProject.id} user={user} projectColor={projectColor} />
             </div>
           )}
         </div>
