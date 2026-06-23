@@ -64,7 +64,11 @@ export default function LoginPage() {
     try {
       setLoading(true); setError(""); setSuccess(""); setIndexUrl(null); setStep("");
       setStep("Verifying credentials...");
-      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+      try {
+        await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
+      } catch (pErr) {
+        console.warn("Could not set persistence:", pErr);
+      }
       const cred = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password.trim());
 
       setStep("Loading your profile...");
@@ -95,7 +99,7 @@ export default function LoginPage() {
       else if (e.code === "auth/too-many-requests") setError("Too many attempts. Account locked temporarily.");
       else if (e.code === "auth/network-request-failed") setError("Network error. Check your connection.");
       else if (e.code === "unavailable") setError("🔌 Cannot reach database. Check your connection.");
-      else setError("Login failed. Please try again.");
+      else setError(`Login failed: ${e.code || e.message || "Please try again."}`);
     } finally { setLoading(false); }
   };
 
