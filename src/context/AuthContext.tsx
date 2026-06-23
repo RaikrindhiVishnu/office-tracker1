@@ -39,20 +39,20 @@ type AuthContextType = {
 
 // ── Normalize accountType → UserRole ─────────────────────────────────────
 // Maps your existing accountType strings to the UserRole union.
-export function normalizeRole(accountType?: string): UserRole | null {
-  switch ((accountType ?? "").toUpperCase()) {
+export function normalizeRole(accountType?: string, roleFallback?: string): UserRole | null {
+  switch ((accountType ?? roleFallback ?? "").toUpperCase()) {
     case "SUPERADMIN":     return "superadmin";
     case "ADMIN":          return "admin";
     case "BUSINESSOWNER":
     case "BUSINESS_OWNER": return "admin"; // routes to /admin — add "businessowner" to UserRole if you need a separate dashboard
     case "HR":             return "hr";
     case "FINANCE":
-case "SALES":
-case "IT":
-case "OPERATIONS":
-case "MARKETING":
-case "EXECUTIVE":
-  return "employee";
+    case "SALES":
+    case "IT":
+    case "OPERATIONS":
+    case "MARKETING":
+    case "EXECUTIVE":
+      return "employee";
     case "EMPLOYEE":       return "employee";
     default:               return null;
   }
@@ -83,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // ── Apply userData and derive role in one call ─────────────────────────
   function applyUserData(data: UserProfile | null): void {
     setUserData(data);
-    setUserRole(normalizeRole(data?.accountType));
+    setUserRole(normalizeRole(data?.accountType, data?.role));
   }
 
   // ── Logout ──────────────────────────────────────────────────────────────
