@@ -42,19 +42,16 @@ export async function GET(request: Request) {
       // We also update user/employee document leaveBalance if we are keeping them in sync
       const uid = doc.data().uid;
       if (uid) {
-        batch.update(adminDb.collection("employees").doc(uid), {
-           "leaveBalance.annual": newAnnualQuota,
-           "leaveBalance.casual": 12,
-           "leaveBalance.sick": 6,
-           "leaveBalance.compOff": 0
-        }).catch(() => {}); // might not exist
-        
-        batch.update(adminDb.collection("users").doc(uid), {
-           "leaveBalance.annual": newAnnualQuota,
-           "leaveBalance.casual": 12,
-           "leaveBalance.sick": 6,
-           "leaveBalance.compOff": 0
-        }).catch(() => {});
+        const leaveUpdates = {
+          leaveBalance: {
+            annual: newAnnualQuota,
+            casual: 12,
+            sick: 6,
+            compOff: 0
+          }
+        };
+        batch.set(adminDb.collection("employees").doc(uid), leaveUpdates, { merge: true });
+        batch.set(adminDb.collection("users").doc(uid), leaveUpdates, { merge: true });
       }
     });
 
