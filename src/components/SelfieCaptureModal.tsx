@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Camera, X } from "lucide-react";
-import { ref, uploadString, getDownloadURL } from "firebase/firestore"; // wait, storage
 import { storage } from "@/lib/firebase";
 import { ref as storageRef, uploadString as sUploadString, getDownloadURL as sGetDownloadURL } from "firebase/storage";
 
