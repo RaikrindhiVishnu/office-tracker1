@@ -3,6 +3,7 @@
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import FullPageLoader from "./FullPageLoader";
 
 type Props = {
   children: React.ReactNode;
@@ -33,7 +34,7 @@ export default function ProtectedRoute({
     }
   }, [user, userData, loading, allowedRoles, router]);
 
-  if (loading) return <p className="p-4">Loading...</p>;
+  if (loading) return <FullPageLoader />;
   if (!user) return null;
 
   return <>{children}</>;

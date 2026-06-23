@@ -83,7 +83,8 @@ import {
   History,
   BarChart,
   Briefcase,
-  MessageSquare
+  MessageSquare,
+  Bell
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────
@@ -689,8 +690,8 @@ export default function ZohoStyleEmployeeDashboard() {
               ) : (
                 <button disabled={busy} onClick={doCheckIn} className="h-8 px-4 bg-[#282B3E] text-white border border-[#282B3E] rounded-lg hover:bg-[#3E425C] disabled:opacity-40 disabled:cursor-not-allowed transition-all font-bold text-xs hover:scale-[1.02] active:scale-95 shadow-sm">Check In</button>
               )}
-              <button onClick={() => setShowCalendar(true)} className="p-2 hover:bg-gray-100 rounded-lg transition-all group relative" title="Calendar">
-                <img src="https://cdn-icons-png.flaticon.com/128/668/668278.png" alt="Calendar" className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" />
+              <button onClick={() => setShowCalendar(true)} className="p-2 hover:bg-gray-100 rounded-lg transition-all group relative text-slate-500 hover:text-slate-800" title="Calendar">
+                <Calendar className="w-5 h-5 group-hover:scale-110 transition-all duration-300" />
                 {todayBirthdayCount > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full border-2 border-white shadow-sm animate-bounce">
                     {todayBirthdayCount}
@@ -700,8 +701,8 @@ export default function ZohoStyleEmployeeDashboard() {
 
               {/* Notification bell */}
               <div className="relative" ref={notifDropdownRef}>
-                <button onClick={() => setShowNotifDropdown(prev => !prev)} className="relative p-2 hover:bg-gray-100 rounded-lg transition-all group" title="Notifications">
-                  <img src="https://cdn-icons-png.flaticon.com/128/7184/7184217.png" alt="Notifications" className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" />
+                <button onClick={() => setShowNotifDropdown(prev => !prev)} className="relative p-2 hover:bg-gray-100 rounded-lg transition-all group text-slate-500 hover:text-slate-800" title="Notifications">
+                  <Bell className="w-5 h-5 group-hover:scale-110 transition-all duration-300" />
                   {totalNotifications > 0 && (
                     <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-5 text-center shadow-lg animate-pulse">{totalNotifications}</span>
                   )}
@@ -731,14 +732,10 @@ export default function ZohoStyleEmployeeDashboard() {
               {/* ✅ MeetChat button — opens overlay instead of window.open */}
               <button
                 onClick={openMeetChat}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-all group"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-all group text-slate-500 hover:text-slate-800"
                 title="Open MeetChat"
               >
-                <img
-                  src="https://cdn-icons-png.flaticon.com/128/18114/18114578.png"
-                  alt="MeetChat"
-                  className="w-5 h-5 group-hover:scale-110 transition-transform"
-                />
+                <Users className="w-5 h-5 group-hover:scale-110 transition-all duration-300" />
               </button>
 
               {/* User menu */}

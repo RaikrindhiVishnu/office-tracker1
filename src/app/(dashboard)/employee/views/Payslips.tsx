@@ -340,57 +340,60 @@ export default function Payslips() {
   return (
     <div className="flex flex-col gap-5 p-4 sm:p-6 lg:p-8 w-full max-w-7xl mx-auto">
 
-      {/* Title */}
-      <div>
-        <h2 className="text-lg font-bold text-slate-800">My Payslips</h2>
-        <p className="text-xs text-slate-400 mt-0.5">
-          {allPayslips.length} payslip{allPayslips.length !== 1 ? "s" : ""} generated
-        </p>
-      </div>
-
-      {/* ── FILTER ── */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center w-full sm:w-fit rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="relative">
-          <select
-            value={filterYear}
-            onChange={(e) => setFilterYear(e.target.value)}
-            className="appearance-none pl-3 pr-7 py-2 text-sm font-semibold text-slate-700 bg-transparent focus:outline-none cursor-pointer"
-          >
-            {availableYears.map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
-          <svg className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <polyline points="6,9 12,15 18,9"/>
-          </svg>
+      {/* ── HEADER & FILTER ── */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        {/* Title */}
+        <div>
+          <h2 className="text-lg font-bold text-slate-800">My Payslips</h2>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {allPayslips.length} payslip{allPayslips.length !== 1 ? "s" : ""} generated
+          </p>
         </div>
 
-        <div className="h-px w-full sm:w-px sm:h-6 bg-slate-200" />
+        {/* ── FILTER ── */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center w-full sm:w-fit rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div className="relative">
+            <select
+              value={filterYear}
+              onChange={(e) => setFilterYear(e.target.value)}
+              className="appearance-none pl-3 pr-7 py-2 text-sm font-semibold text-slate-700 bg-transparent focus:outline-none cursor-pointer"
+            >
+              {availableYears.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            <svg className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <polyline points="6,9 12,15 18,9"/>
+            </svg>
+          </div>
 
-        <div className="relative">
-          <select
-            value={filterMonth}
-            onChange={(e) => setFilterMonth(e.target.value)}
-            className="appearance-none pl-3 pr-7 py-2 text-sm font-semibold text-slate-700 bg-transparent focus:outline-none cursor-pointer"
+          <div className="h-px w-full sm:w-px sm:h-6 bg-slate-200" />
+
+          <div className="relative">
+            <select
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+              className="appearance-none pl-3 pr-7 py-2 text-sm font-semibold text-slate-700 bg-transparent focus:outline-none cursor-pointer"
+            >
+              <option value="">All months</option>
+              {MONTH_NAMES.map((name, idx) => (
+                <option key={idx} value={String(idx + 1)}>{name}</option>
+              ))}
+            </select>
+            <svg className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <polyline points="6,9 12,15 18,9"/>
+            </svg>
+          </div>
+
+          <div className="h-px w-full sm:w-px sm:h-6 bg-slate-200" />
+
+          <button
+            onClick={handleSubmit}
+            className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors"
           >
-            <option value="">All months</option>
-            {MONTH_NAMES.map((name, idx) => (
-              <option key={idx} value={String(idx + 1)}>{name}</option>
-            ))}
-          </select>
-          <svg className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <polyline points="6,9 12,15 18,9"/>
-          </svg>
+            Submit
+          </button>
         </div>
-
-        <div className="h-px w-full sm:w-px sm:h-6 bg-slate-200" />
-
-        <button
-          onClick={handleSubmit}
-          className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors"
-        >
-          Submit
-        </button>
       </div>
 
       {/* ── PERIOD CARD ── */}
@@ -418,39 +421,38 @@ export default function Payslips() {
             <div className="flex items-center gap-2">
               {isGenerated ? (
                 <>
-                  <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-2.5 py-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />Generated
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block" />Generated
                   </span>
                   <button
                     onClick={() => downloadPayslip(selectedKey)}
                     disabled={downloading === selectedKey}
                     className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50"
-                    style={{ background:"#eff6ff", color:"#1d4ed8", border:"1px solid #bfdbfe" }}
+                    style={{ background:"#f8fafc", color:"#475569", border:"1px solid #cbd5e1" }}
                   >
                     {downloading === selectedKey
-                      ? <span className="w-3 h-3 rounded-full border-2 border-blue-200 border-t-blue-600 animate-spin" />
+                      ? <span className="w-3 h-3 rounded-full border-2 border-slate-300 border-t-slate-600 animate-spin" />
                       : <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     }
                     {downloading === selectedKey ? "Preparing…" : "Download PDF"}
                   </button>
                 </>
               ) : isRequested ? (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />Request Sent
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300 inline-block" />Request Sent
                 </span>
               ) : (
                 <>
-                  <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-red-600 bg-red-50 border border-red-100 rounded-lg px-2.5 py-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" />Not Generated
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-300 inline-block" />Not Generated
                   </span>
                   <button
                     onClick={() => requestGenerate(selectedKey)}
                     disabled={requesting === selectedKey}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-60"
-                    style={{ background:"linear-gradient(135deg,#1e3a8a,#2563eb)" }}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-white border border-slate-200 disabled:opacity-60 transition-colors hover:bg-slate-50"
                   >
                     {requesting === selectedKey
-                      ? <span className="w-3 h-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                      ? <span className="w-3 h-3 rounded-full border-2 border-slate-300 border-t-slate-600 animate-spin" />
                       : "⚡"
                     }
                     {requesting === selectedKey ? "Sending…" : "Request Generate"}
@@ -502,16 +504,16 @@ export default function Payslips() {
               <span className="text-sm text-slate-600">{fmtKey(monthKey)}</span>
               <div className="flex justify-center">
                 {rowGenerated ? (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 rounded-md px-2 py-0.5">
-                    <span className="w-1 h-1 rounded-full bg-emerald-400 inline-block" />✔ Generated
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 rounded-md px-2 py-0.5">
+                    Generated
                   </span>
                 ) : rowRequested ? (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 rounded-md px-2 py-0.5">
-                    <span className="w-1 h-1 rounded-full bg-amber-400 inline-block" />Requested
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 bg-slate-50 border border-slate-200 rounded-md px-2 py-0.5">
+                    Requested
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-600 bg-red-50 rounded-md px-2 py-0.5">
-                    ❌ Not Generated
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400 bg-white border border-slate-100 rounded-md px-2 py-0.5">
+                    Not Generated
                   </span>
                 )}
               </div>
@@ -520,11 +522,10 @@ export default function Payslips() {
                   <button
                     onClick={(e) => { e.stopPropagation(); downloadPayslip(monthKey); }}
                     disabled={downloading === monthKey}
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg disabled:opacity-50 transition-colors"
-                    style={{ background:"#eff6ff", color:"#1d4ed8", border:"1px solid #bfdbfe" }}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg disabled:opacity-50 transition-colors bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200"
                   >
                     {downloading === monthKey
-                      ? <span className="w-2.5 h-2.5 rounded-full border-2 border-blue-200 border-t-blue-600 animate-spin" />
+                      ? <span className="w-2.5 h-2.5 rounded-full border-2 border-slate-300 border-t-slate-600 animate-spin" />
                       : <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     }
                     ⬇ PDF
@@ -533,15 +534,10 @@ export default function Payslips() {
                   <button
                     onClick={(e) => { e.stopPropagation(); requestGenerate(monthKey); }}
                     disabled={requesting === monthKey || rowRequested}
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg disabled:opacity-50 transition-colors"
-                    style={{
-                      background: rowRequested ? "#fefce8" : "#fff7ed",
-                      color:      rowRequested ? "#92400e" : "#c2410c",
-                      border:     `1px solid ${rowRequested ? "#fde68a" : "#fed7aa"}`,
-                    }}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg disabled:opacity-50 transition-colors bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
                   >
                     {requesting === monthKey
-                      ? <span className="w-2.5 h-2.5 rounded-full border-2 border-orange-200 border-t-orange-500 animate-spin" />
+                      ? <span className="w-2.5 h-2.5 rounded-full border-2 border-slate-300 border-t-slate-600 animate-spin" />
                       : "⚡"
                     }
                     {rowRequested ? "Sent" : "Request"}

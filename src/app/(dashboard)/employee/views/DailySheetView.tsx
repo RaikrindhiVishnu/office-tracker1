@@ -244,9 +244,9 @@ export default function DailySheetView() {
     normalizedTasks.forEach((t) => { if (t.project) map[t.project] = (map[t.project] || 0) + (t.hours || 0); });
     const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 4);
     const maxVal = sorted[0]?.[1] || 1;
-    const colors = ["bg-emerald-500", "bg-indigo-500", "bg-amber-400", "bg-rose-400"];
+    const colors = ["bg-slate-500", "bg-slate-400", "bg-slate-300", "bg-slate-200"];
     return sorted.map(([proj, hrs], i) => ({
-      label: proj, value: hrs, pct: Math.round((hrs / maxVal) * 100), color: colors[i] || "bg-slate-400",
+      label: proj, value: hrs, pct: Math.round((hrs / maxVal) * 100), color: colors[i] || "bg-slate-200",
     }));
   }, [normalizedTasks]);
 
@@ -259,9 +259,9 @@ export default function DailySheetView() {
     const maxVal = Math.max(1, projects.size, tasksCount, hoursCount);
 
     return [
-      { label: "Projects", value: projects.size, suffix: "", color: "bg-fuchsia-500", pct: Math.max(8, Math.round((projects.size / maxVal) * 100)) },
-      { label: "Tasks", value: tasksCount, suffix: "", color: "bg-indigo-500", pct: Math.max(8, Math.round((tasksCount / maxVal) * 100)) },
-      { label: "Hours", value: hoursCount, suffix: "h", color: "bg-emerald-500", pct: Math.max(8, Math.round((hoursCount / maxVal) * 100)) }
+      { label: "Projects", value: projects.size, suffix: "", color: "bg-slate-300", pct: Math.max(8, Math.round((projects.size / maxVal) * 100)) },
+      { label: "Tasks", value: tasksCount, suffix: "", color: "bg-slate-400", pct: Math.max(8, Math.round((tasksCount / maxVal) * 100)) },
+      { label: "Hours", value: hoursCount, suffix: "h", color: "bg-slate-500", pct: Math.max(8, Math.round((hoursCount / maxVal) * 100)) }
     ];
   }, [normalizedTasks]);
 
@@ -689,16 +689,7 @@ export default function DailySheetView() {
             </svg>
             Export
           </button>
-          <button
-            onClick={handleSubmitMonthForApproval}
-            disabled={isSubmitting || monthEntries.length === 0}
-            className="flex items-center gap-2 px-4 py-1.5 bg-indigo-600 text-white text-sm font-bold rounded-lg hover:bg-indigo-700 transition shadow-sm disabled:opacity-50"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            Submit for Approval
-          </button>
+
           <button
             onClick={() => {
               resetForm();

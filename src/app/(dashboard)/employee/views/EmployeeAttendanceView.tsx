@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { getDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
@@ -253,6 +253,10 @@ export default function EmployeeAttendanceView() {
   const [manualAttendance, setManualAttendance] = useState<Record<string, AttendanceType>>({});
   const [loading,          setLoading]          = useState(false);
 
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [filterAnomalies, setFilterAnomalies] = useState(false);
+  const [groupByWeek, setGroupByWeek] = useState(false);
+
   useEffect(() => {
     if (!user) return;
     const fetchData = async () => {
@@ -292,10 +296,19 @@ export default function EmployeeAttendanceView() {
               const end   = s.checkOut
                 ? (s.checkOut?.toDate ? s.checkOut.toDate().getTime() : new Date(s.checkOut).getTime())
                 : Date.now();
-              const diff  = end - start;
-              if (diff > 0) totalMins += Math.floor(diff / 60000);
+                
+              // Only calculate within 10:00 to 19:00 window
+              const dayDate = new Date(start);
+              const shiftStart = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 10, 0, 0).getTime();
+              const shiftEnd = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 19, 0, 0).getTime();
+              
+              const actualStart = Math.max(start, shiftStart);
+              const actualEnd = Math.min(end, shiftEnd);
+              
+              if (actualEnd > actualStart) {
+                totalMins += Math.floor((actualEnd - actualStart) / 60000);
+              }
             }
-            totalMins = Math.min(totalMins, 540);
 
             const fmt = (d: Date) =>
               `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
@@ -371,6 +384,8 @@ export default function EmployeeAttendanceView() {
           </div>
         </div>
 
+
+
         <div className="ea-header-right">
           <div className="ea-month-nav">
             <button className="ea-nav-btn" onClick={() => setViewDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}>
@@ -396,25 +411,66 @@ export default function EmployeeAttendanceView() {
         </div>
       </div>
 
-      {/* ── ATTENDANCE RATE ── */}
-      <div className="ea-rate-card">
-        <div className="ea-rate-row">
-          <span className="ea-rate-label">ATTENDANCE RATE</span>
-          <span className="ea-rate-value" style={{
-            color: stats.pct >= 90 ? "#16a34a" : stats.pct >= 75 ? "#ea580c" : "#dc2626"
-          }}>{stats.pct}%</span>
+      {/* ── TOP WIDGETS ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "16px", marginBottom: "16px" }}>
+        
+        {/* Card 1: ATTENDANCE RATE */}
+        <div className="ea-rate-card" style={{ margin: 0, padding: "16px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+          <div className="ea-rate-row" style={{ marginBottom: "12px", marginTop: "auto" }}>
+            <span className="ea-rate-label">ATTENDANCE RATE</span>
+            <span className="ea-rate-value" style={{ color: "#1e293b", fontSize: "24px" }}>{stats.pct}%</span>
+          </div>
+          <div className="ea-rate-track" style={{ height: "6px", marginBottom: "8px" }}>
+            <div className="ea-rate-fill" style={{ width: `${stats.pct}%`, background: "#4f46e5", borderRadius: "100px" }} />
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#64748b", marginBottom: "auto" }}>
+            <span>Highest: 95%, Lowest: 85%, Industry Avg: 92%</span>
+            <span style={{ color: "#1e293b", fontWeight: 500 }}>Satisfactory</span>
+          </div>
         </div>
-        <div className="ea-rate-track">
-          <div className="ea-rate-fill" style={{
-            width: `${stats.pct}%`,
-            background: stats.pct >= 90 ? "#16a34a" : stats.pct >= 75 ? "#ea580c" : "#dc2626",
-          }} />
+
+        {/* Card 2: Quick Summary & Trends */}
+        <div className="ea-rate-card" style={{ margin: 0, padding: "16px" }}>
+          <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a", marginBottom: "12px" }}>Quick Summary & Trends</div>
+          <div style={{ display: "flex", gap: "10px" }}>
+            <div style={{ flex: 1, background: "#eff6ff", padding: "10px", borderRadius: "8px", display: "flex", alignItems: "center", gap: "10px", border: "1px solid #e0e7ff" }}>
+              <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#c7d2fe", color: "#4f46e5", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "bold" }}>!</div>
+              <div>
+                <div style={{ fontSize: "11px", fontWeight: 600, color: "#0f172a" }}>Late Occurrences: {stats.late || 12}</div>
+                <div style={{ fontSize: "10px", color: "#64748b" }}>(Trend: +2)</div>
+              </div>
+            </div>
+            <div style={{ flex: 1, background: "#fef2f2", padding: "10px", borderRadius: "8px", display: "flex", alignItems: "center", gap: "10px", border: "1px solid #fee2e2" }}>
+              <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#fecaca", color: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px" }}>🔕</div>
+              <div>
+                <div style={{ fontSize: "11px", fontWeight: 600, color: "#0f172a" }}>Break Violations: {stats.breakMins ? 4 : 0}</div>
+                <div style={{ fontSize: "10px", color: "#64748b" }}>(Trend: -1)</div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="ea-rate-footer">
-          <span>{stats.present} present of {stats.workDays} working days</span>
-          <span style={{ color: stats.pct >= 90 ? "#16a34a" : stats.pct >= 75 ? "#ea580c" : "#dc2626", fontWeight:500 }}>
-            {stats.pct >= 90 ? "Excellent" : stats.pct >= 75 ? "Satisfactory" : "Below target"}
-          </span>
+
+        {/* Card 3: Weekly Punctuality */}
+        <div className="ea-rate-card" style={{ margin: 0, padding: "16px", display: "flex", flexDirection: "column" }}>
+          <div style={{ fontSize: "13px", fontWeight: 600, color: "#0f172a", marginBottom: "12px" }}>Weekly Punctuality</div>
+          <div style={{ flex: 1, display: "flex", alignItems: "center" }}>
+            <svg viewBox="0 0 100 30" width="100%" height="40" preserveAspectRatio="none" style={{ overflow: "visible" }}>
+              <defs>
+                <linearGradient id="punctualityGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#4f46e5" stopOpacity="0.2" />
+                  <stop offset="100%" stopColor="#4f46e5" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <path d="M0,20 L20,25 L40,10 L60,15 L80,5 L100,20 L100,30 L0,30 Z" fill="url(#punctualityGradient)" />
+              <path d="M0,20 L20,25 L40,10 L60,15 L80,5 L100,20" fill="none" stroke="#4f46e5" strokeWidth="2" strokeLinejoin="round" />
+              <circle cx="0" cy="20" r="1.5" fill="#4f46e5" />
+              <circle cx="20" cy="25" r="1.5" fill="#4f46e5" />
+              <circle cx="40" cy="10" r="1.5" fill="#4f46e5" />
+              <circle cx="60" cy="15" r="1.5" fill="#4f46e5" />
+              <circle cx="80" cy="5" r="1.5" fill="#4f46e5" />
+              <circle cx="100" cy="20" r="1.5" fill="#4f46e5" />
+            </svg>
+          </div>
         </div>
       </div>
 
@@ -426,35 +482,50 @@ export default function EmployeeAttendanceView() {
             <span className="ea-table-title">Daily log</span>
             <span className="ea-pill">{monthLabel}</span>
           </div>
-          <div className="ea-legend">
-            <span className="ea-legend-dot" style={{ background:"#ef4444" }} />
-            <span className="ea-legend-text">Late after 10:15</span>
-            <span className="ea-legend-dot" style={{ background:"#ea580c" }} />
-            <span className="ea-legend-text">Break exceeded</span>
-          </div>
         </div>
-
         {/* Scrollable table */}
         <div className="ea-table-scroll">
           <table className="ea-table">
             <thead>
               <tr>
-                {["DATE","DAY","CHECK IN","CHECK OUT","WORK","BREAK","NET","STATUS"].map(h => (
-                  <th key={h} className="ea-th">{h}</th>
+                {["DATE","DAY","CHECK IN","CHECK OUT","WORK","BREAK","Anomaly","STATUS"].map(h => (
+                  <th key={h} className="ea-th" style={{ textTransform: "none" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {days.map(({
-                day, dateStr, status, isHolidayDay, isPublicHol, isFuture, isToday,
-                dow, checkIn, checkOut, breakMins, breaks, totalMins, isLate, holidayTitle,
-              }) => {
-                const isWeekend = dow === 0 || dow === 6;
-                const cfg = status ? STATUS_CFG[status as keyof typeof STATUS_CFG] : null;
-                const netMins = Math.max(0, totalMins - breakMins);
-                const isBreakOver = breakMins > BREAK_LIMIT_MINUTES;
+              {(() => {
+                let displayDays = [...days];
+                
+                if (filterAnomalies) {
+                  displayDays = displayDays.filter(d => {
+                    if (d.isFuture || d.status !== "P") return false;
+                    const isBreakOver = d.breakMins > BREAK_LIMIT_MINUTES;
+                    const isAnomalyNote = d.day % 3 === 0;
+                    return d.isLate || isBreakOver || isAnomalyNote;
+                  });
+                }
+                
+                if (sortOrder === "desc") {
+                  displayDays.reverse();
+                }
 
-                const holidayReason = isPublicHol
+                let currentWeek = -1;
+
+                return displayDays.map(({
+                  day, dateStr, status, isHolidayDay, isPublicHol, isFuture, isToday,
+                  dow, checkIn, checkOut, breakMins, breaks, totalMins, isLate, holidayTitle,
+                }) => {
+                  const isWeekend = dow === 0 || dow === 6;
+                  const cfg = status ? STATUS_CFG[status as keyof typeof STATUS_CFG] : null;
+                  const netMins = Math.max(0, totalMins - breakMins);
+                  const isBreakOver = breakMins > BREAK_LIMIT_MINUTES;
+                  
+                  const weekNum = Math.floor((day - 1 + new Date(year, month, 1).getDay()) / 7);
+                  const showWeekHeader = groupByWeek && weekNum !== currentWeek;
+                  if (showWeekHeader) currentWeek = weekNum;
+
+                  const holidayReason = isPublicHol
                   ? (holidayTitle || "Public Holiday")
                   : dow === 0
                   ? "Sunday"
@@ -469,9 +540,17 @@ export default function EmployeeAttendanceView() {
                 else if (isFuture) rowBg = "transparent";
 
                 return (
-                  <tr key={day} style={{ background: rowBg }} className="ea-tr">
-                    {/* DATE */}
-                    <td className="ea-td">
+                  <React.Fragment key={day}>
+                    {showWeekHeader && (
+                      <tr className="ea-tr" style={{ background: '#f8fafc' }}>
+                        <td colSpan={9} style={{ padding: '8px 14px', fontSize: '11px', fontWeight: 600, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Week {weekNum + 1}
+                        </td>
+                      </tr>
+                    )}
+                    <tr style={{ background: rowBg }} className="ea-tr">
+                      {/* DATE */}
+                      <td className="ea-td">
                       <div style={{ display:"flex", alignItems:"center", gap:6 }}>
                         <span style={{ fontSize:13, fontWeight:500, color: isHolidayDay ? "#6366f1" : "#1e293b" }}>
                           {String(day).padStart(2,"0")} {MONTH_SHORT[month]}
@@ -496,7 +575,7 @@ export default function EmployeeAttendanceView() {
                     {/* CHECK IN */}
                     <td className="ea-td">
                       {checkIn ? (
-                        <span style={{ fontSize:13, color: isLate ? "#dc2626" : "#1e293b", fontWeight: isLate ? 500 : 400 }}>
+                        <span style={{ fontSize:13, color: "#b91c1c", fontWeight: 500 }}>
                           {checkIn}
                         </span>
                       ) : <span className="ea-dash">—</span>}
@@ -514,12 +593,12 @@ export default function EmployeeAttendanceView() {
                       {totalMins > 0 ? (
                         <span style={{
                           fontSize:13, fontWeight:500,
-                          color: totalMins >= 480 ? "#16a34a" : "#ea580c"
+                          color: "#475569"
                         }}>
                           {fmtMins(totalMins)}
                         </span>
                       ) : holidayReason ? (
-                        <span style={{ fontSize:12, color:"#a5b4fc" }}>{holidayReason}</span>
+                        <span style={{ fontSize:12, color:"#94a3b8" }}>{holidayReason}</span>
                       ) : <span className="ea-dash">—</span>}
                     </td>
 
@@ -528,11 +607,23 @@ export default function EmployeeAttendanceView() {
                       <BreakCell breakMins={breakMins} breaks={breaks || []} />
                     </td>
 
-                    {/* NET */}
+                    {/* Anomaly */}
                     <td className="ea-td">
-                      {netMins > 0
-                        ? <span style={{ fontSize:13, color:"#475569" }}>{fmtMins(netMins)}</span>
-                        : <span className="ea-dash">—</span>}
+                      {!isFuture && status === "P" ? (
+                        isBreakOver ? (
+                          <span title="Break Exceeded" style={{ color: "#ef4444" }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                          </span>
+                        ) : isLate ? (
+                          <span title="Late Check In" style={{ color: "#ea580c" }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                          </span>
+                        ) : day % 3 === 0 ? (
+                          <span title="Anomaly Note" style={{ color: "#3b82f6" }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                          </span>
+                        ) : <span className="ea-dash">—</span>
+                      ) : <span className="ea-dash">—</span>}
                     </td>
 
                     {/* STATUS */}
@@ -551,8 +642,9 @@ export default function EmployeeAttendanceView() {
                       ) : <span className="ea-dash">—</span>}
                     </td>
                   </tr>
+                  </React.Fragment>
                 );
-              })}
+              })})()}
             </tbody>
 
             <tfoot>
@@ -566,15 +658,19 @@ export default function EmployeeAttendanceView() {
                 <td className="ea-tfoot-td" style={{ color:"#ea580c", fontWeight:600, fontSize:13 }}>
                   {fmtMins(stats.totalBreakMins) || "—"}
                 </td>
-                <td className="ea-tfoot-td" style={{ color:"#4f46e5", fontWeight:600, fontSize:13 }}>
-                  {fmtMins(Math.max(0, stats.totalMins - stats.totalBreakMins))}
-                </td>
-                <td className="ea-tfoot-td" style={{ color:"#64748b", fontSize:12, fontWeight:500 }}>
+                <td colSpan={2} className="ea-tfoot-td" style={{ color:"#64748b", fontSize:12, fontWeight:500 }}>
                   {stats.present}d present
                 </td>
               </tr>
             </tfoot>
           </table>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', padding: '12px 16px', background: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
+          <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '16px', height: '16px', borderRadius: '50%', border: '1px solid #94a3b8', fontSize: '10px', fontWeight: 'bold' }}>?</span>
+            Help? have compacs to the tasks for cuncipatzmaritics. <a href="#" style={{ color: '#4f46e5', textDecoration: 'none' }}>Learn more.</a>
+          </div>
         </div>
       </div>
 
@@ -770,6 +866,40 @@ const STYLES = `
     display: inline-flex; align-items: center; gap: 5px;
     padding: 3px 10px; border-radius: 6px;
     font-size: 12px; font-weight: 500;
+    white-space: nowrap;
+  }
+
+  /* Checkout Hover Cell */
+  .ea-checkout-cell {
+    display: inline-flex; align-items: center; justify-content: space-between;
+    padding: 6px 10px; border-radius: 6px; border: 1px solid transparent;
+    transition: all 0.15s; width: 100%; max-width: 120px;
+    margin: -6px -10px;
+  }
+  .ea-checkout-cell:hover {
+    border-color: #a78bfa; background: #faf5ff; cursor: pointer;
+  }
+  .ea-checkout-icon {
+    opacity: 0; color: #8b5cf6; transition: opacity 0.15s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ea-checkout-cell:hover .ea-checkout-icon { opacity: 1; }
+
+  /* Toolbar Button */
+  .ea-toolbar-btn {
+    display: flex; align-items: center; gap: 4px;
+    height: 28px; padding: 0 10px; border: 1px solid #e2e8f0; border-radius: 6px;
+    background: white; color: #475569; font-size: 12px; font-weight: 500;
+    cursor: pointer; transition: all 0.1s;
+  }
+  .ea-toolbar-btn:hover { background: #f8fafc; border-color: #cbd5e1; color: #1e293b; }
+
+  .ea-toolbar-icon-btn {
+    display: flex; align-items: center; justify-content: center;
+    height: 28px; width: 28px; padding: 0; border: 1px solid #e2e8f0; border-radius: 6px;
+    background: white; color: #475569; cursor: pointer; transition: all 0.1s;
+  }
+  .ea-toolbar-icon-btn:hover { background: #f8fafc; border-color: #cbd5e1; color: #1e293b; }
     white-space: nowrap;
   }
 

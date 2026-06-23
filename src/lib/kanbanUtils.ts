@@ -75,10 +75,10 @@ export function getLabelStyle(colorValue: string) {
 }
 
 export const TICKET_TYPES: Record<string, { label: string; icon: string; color: string; bg: string; border: string; description: string }> = {
-  story: { label: "Story", icon: "📘", color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", description: "A user story" },
-  task: { label: "Task", icon: "✅", color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", description: "A unit of work" },
-  bug: { label: "Bug", icon: "🐞", color: "#dc2626", bg: "#fef2f2", border: "#fecaca", description: "Something broken" },
-  defect: { label: "Defect", icon: "⚠️", color: "#d97706", bg: "#fffbeb", border: "#fde68a", description: "A quality issue" },
+  story: { label: "Story", icon: "📘", color: "#4B5563", bg: "#FAFAFA", border: "#E5E7EB", description: "A user story" },
+  task: { label: "Task", icon: "✅", color: "#4B5563", bg: "#FAFAFA", border: "#E5E7EB", description: "A unit of work" },
+  bug: { label: "Bug", icon: "🐞", color: "#4B5563", bg: "#FAFAFA", border: "#E5E7EB", description: "Something broken" },
+  defect: { label: "Defect", icon: "⚠️", color: "#4B5563", bg: "#FAFAFA", border: "#E5E7EB", description: "A quality issue" },
 };
 
 export const PRI_CONFIG: Record<string, { dot: string; bg: string; text: string; label: string }> = {
@@ -116,9 +116,9 @@ export function isOverdue(dueDate?: string, status?: string) {
 export function canDragTask(user: any, task: any, project: any) {
   if (!user) return false;
   const isAdmin = user?.accountType === "ADMIN" || user?.accountType === "SUPERADMIN" || user?.accountType === "BUSINESSOWNER" || user?.accountType === "BUSINESS_OWNER";
-  const isPM = project?.projectManager === user.uid || 
-               (Array.isArray(project?.projectManagers) && project.projectManagers.includes(user.uid)) ||
-               project?.createdBy === user.uid;
+  const isPM = project?.projectManager === user.uid ||
+    (Array.isArray(project?.projectManagers) && project.projectManagers.includes(user.uid)) ||
+    project?.createdBy === user.uid;
   return isAdmin || isPM || task.assignedTo === user.uid;
 }
 
@@ -150,24 +150,24 @@ export const statusColors: Record<string, string> = {
 };
 
 export const STATIC_COL_CONFIG: Record<string, { color: string; bg: string; border: string; headerBg: string; dot: string }> = {
-  new: { color: "#64748b", bg: "#f8fafc", border: "#e2e8f0", headerBg: "#f1f5f9", dot: "#94a3b8" },
-  dev_in_progress: { color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", headerBg: "#dbeafe", dot: "#3b82f6" },
-  unit_testing: { color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", headerBg: "#ede9fe", dot: "#8b5cf6" },
-  ready_for_qa: { color: "#0891b2", bg: "#ecfeff", border: "#a5f3fc", headerBg: "#cffafe", dot: "#06b6d4" },
-  testing_in_progress: { color: "#0d9488", bg: "#f0fdfa", border: "#99f6e4", headerBg: "#ccfbf1", dot: "#14b8a6" },
-  reopened: { color: "#dc2626", bg: "#fef2f2", border: "#fecaca", headerBg: "#fee2e2", dot: "#ef4444" },
-  done: { color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0", headerBg: "#dcfce7", dot: "#22c55e" },
+  new: { color: "#4B5563", bg: "#FAFAFA", border: "#E5E7EB", headerBg: "#FFFFFF", dot: "#9CA3AF" },
+  dev_in_progress: { color: "#4B5563", bg: "#FAFAFA", border: "#E5E7EB", headerBg: "#FFFFFF", dot: "#3B82F6" },
+  unit_testing: { color: "#4B5563", bg: "#FAFAFA", border: "#E5E7EB", headerBg: "#FFFFFF", dot: "#8B5CF6" },
+  ready_for_qa: { color: "#4B5563", bg: "#FAFAFA", border: "#E5E7EB", headerBg: "#FFFFFF", dot: "#06B6D4" },
+  testing_in_progress: { color: "#4B5563", bg: "#FAFAFA", border: "#E5E7EB", headerBg: "#FFFFFF", dot: "#10B981" },
+  reopened: { color: "#4B5563", bg: "#FAFAFA", border: "#E5E7EB", headerBg: "#FFFFFF", dot: "#EF4444" },
+  done: { color: "#4B5563", bg: "#FAFAFA", border: "#E5E7EB", headerBg: "#FFFFFF", dot: "#10B981" },
 };
 
 export const DYNAMIC_PALETTE = [
-  { color: "#64748b", bg: "#f8fafc", border: "#e2e8f0", headerBg: "#f1f5f9", dot: "#94a3b8" },
-  { color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", headerBg: "#dbeafe", dot: "#3b82f6" },
-  { color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe", headerBg: "#ede9fe", dot: "#8b5cf6" },
-  { color: "#16a34a", bg: "#f0fdf4", border: "#bbf7d0", headerBg: "#dcfce7", dot: "#22c55e" },
-  { color: "#dc2626", bg: "#fef2f2", border: "#fecaca", headerBg: "#fee2e2", dot: "#ef4444" },
-  { color: "#0891b2", bg: "#ecfeff", border: "#a5f3fc", headerBg: "#cffafe", dot: "#06b6d4" },
-  { color: "#d97706", bg: "#fffbeb", border: "#fde68a", headerBg: "#fef3c7", dot: "#f59e0b" },
-  { color: "#be185d", bg: "#fdf2f8", border: "#fbcfe8", headerBg: "#fce7f3", dot: "#ec4899" },
+  { color: "#4B5563", bg: "#FAFAFA", border: "#E5E7EB", headerBg: "#FFFFFF", dot: "#9CA3AF" },
+  { color: "#4B5563", bg: "#FAFAFA", border: "#E5E7EB", headerBg: "#FFFFFF", dot: "#3B82F6" },
+  { color: "#4B5563", bg: "#FAFAFA", border: "#E5E7EB", headerBg: "#FFFFFF", dot: "#8B5CF6" },
+  { color: "#4B5563", bg: "#FAFAFA", border: "#E5E7EB", headerBg: "#FFFFFF", dot: "#10B981" },
+  { color: "#4B5563", bg: "#FAFAFA", border: "#E5E7EB", headerBg: "#FFFFFF", dot: "#EF4444" },
+  { color: "#4B5563", bg: "#FAFAFA", border: "#E5E7EB", headerBg: "#FFFFFF", dot: "#06B6D4" },
+  { color: "#4B5563", bg: "#FAFAFA", border: "#E5E7EB", headerBg: "#FFFFFF", dot: "#F59E0B" },
+  { color: "#4B5563", bg: "#FAFAFA", border: "#E5E7EB", headerBg: "#FFFFFF", dot: "#EC4899" },
 ];
 
 export function getColStyle(colId: string, index: number) {

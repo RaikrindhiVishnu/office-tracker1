@@ -40,6 +40,8 @@ import { Task, KanbanColumn, TicketType, TICKET_TYPES, LABEL_COLORS, TaskLabel, 
 import { TaskActivityTimeline } from "../../admin/ActivityTimeline";
 import ProjectForums from "./ProjectForums";
 import CodePRIntegration from "./CodePRIntegration";
+import DailySheetView from "./DailySheetView";
+import { Folder, Clock, BarChart2, AlertTriangle, LayoutGrid, Calendar, Bell } from "lucide-react";
 
 /* ─── LOCAL TYPES (not needed in kanban file) ─── */
 type ViewMode = "kanban" | "list" | "timeline" | "logs" | "reports" | "forums" | "code";
@@ -1109,7 +1111,7 @@ function TaskModal({
               </div>
               <div className="flex gap-4 items-stretch">
                 {(() => {
-                  const displayImages = form.images?.length ? form.images : form.imageUrl ? [{url: form.imageUrl, name: "Screenshot"}] : [];
+                  const displayImages = form.images?.length ? form.images : form.imageUrl ? [{ url: form.imageUrl, name: "Screenshot" }] : [];
                   if (displayImages.length === 0) return null;
                   return (
                     <div className="w-1/3 min-w-[180px] border border-gray-100 rounded-2xl p-3 bg-white shadow-sm flex flex-col max-h-[160px] overflow-y-auto custom-scrollbar">
@@ -1117,16 +1119,16 @@ function TaskModal({
                       <div className="flex flex-col gap-2">
                         {displayImages.map((img, idx) => (
                           <div key={idx} className="relative group shrink-0 h-20">
-                            <img 
-                              src={img.url} 
-                              alt={`Screenshot ${idx + 1}`} 
+                            <img
+                              src={img.url}
+                              alt={`Screenshot ${idx + 1}`}
                               className="w-full h-full object-cover rounded-xl border border-gray-100"
                             />
                             <button
                               onClick={() => setForm(f => {
-                                 const curr = f.images?.length ? f.images : f.imageUrl ? [{url: f.imageUrl, name: "Screenshot", uploadedAt: new Date().toISOString()}] : [];
-                                 const newImages = curr.filter((_, i) => i !== idx);
-                                 return { ...f, images: newImages, imageUrl: newImages[0]?.url || "" };
+                                const curr = f.images?.length ? f.images : f.imageUrl ? [{ url: f.imageUrl, name: "Screenshot", uploadedAt: new Date().toISOString() }] : [];
+                                const newImages = curr.filter((_, i) => i !== idx);
+                                return { ...f, images: newImages, imageUrl: newImages[0]?.url || "" };
                               })}
                               className="absolute -top-2 -right-2 bg-red-400 text-white w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow-sm text-xs z-10 hover:bg-red-500 hover:scale-110"
                             >
@@ -1138,7 +1140,7 @@ function TaskModal({
                     </div>
                   );
                 })()}
-                <div 
+                <div
                   className="flex-1 min-h-[160px] border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center bg-white hover:bg-indigo-50/30 hover:border-indigo-300 transition-all relative overflow-hidden group shadow-sm"
                   onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = "#818cf8"; e.currentTarget.style.background = "#eef2ff"; }}
                   onDragLeave={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = "#e5e7eb"; e.currentTarget.style.background = "rgb(249 250 251 / 0.5)"; }}
@@ -1277,14 +1279,14 @@ function TaskModal({
             </div>
             <div className="col-span-3">
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Blocked By (Task IDs, comma separated)</label>
-              <input 
-                value={form.blockedBy?.join(", ") || ""} 
+              <input
+                value={form.blockedBy?.join(", ") || ""}
                 onChange={e => {
                   const ids = e.target.value.split(",").map(s => s.trim()).filter(Boolean);
                   setForm(f => ({ ...f, blockedBy: ids }));
-                }} 
-                placeholder="TSK-001, STR-002" 
-                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" 
+                }}
+                placeholder="TSK-001, STR-002"
+                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300"
               />
             </div>
           </div>
@@ -1481,9 +1483,9 @@ function TaskDetailModal({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/") && file.size > 700 * 1024) { 
-      alert("Non-image files must be under 700KB to store in the database. Please use smaller files."); 
-      return; 
+    if (!file.type.startsWith("image/") && file.size > 700 * 1024) {
+      alert("Non-image files must be under 700KB to store in the database. Please use smaller files.");
+      return;
     }
 
     setUploading(true);
@@ -1508,7 +1510,7 @@ function TaskDetailModal({
             canvas.height = height;
             const ctx = canvas.getContext("2d");
             ctx?.drawImage(img, 0, 0, width, height);
-            
+
             const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
             await addDoc(collection(firestoreDb, "taskFiles"), {
               taskId: task.id,
@@ -1602,13 +1604,13 @@ function TaskDetailModal({
                     <p className="text-[10px] font-bold text-white/50 tracking-wider">
                       {tc.label} {task.taskCode && `· ${task.taskCode}`}
                     </p>
-                    <button 
+                    <button
                       onClick={() => {
                         const url = `${window.location.origin}/public/task/${task.id}`;
                         navigator.clipboard.writeText(url);
                         alert("Public Shareable Link copied to clipboard!");
-                      }} 
-                      className="text-white/50 hover:text-white transition-colors" 
+                      }}
+                      className="text-white/50 hover:text-white transition-colors"
                       title="Copy Link"
                     >
                       🔗
@@ -1870,10 +1872,10 @@ function TaskDetailModal({
           {taskTab === "images" && (
             <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
               <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider mb-4">Task Images</h3>
-              <TaskImages 
-                taskId={task.id} 
-                projectId={task.projectId} 
-                projectColor={projectColor} 
+              <TaskImages
+                taskId={task.id}
+                projectId={task.projectId}
+                projectColor={projectColor}
                 images={task.images || []}
                 canManage={canEdit || isProjectManager}
               />
@@ -2364,10 +2366,9 @@ function EmployeeDailySheet({ user, projects }: { user: any; projects: any[] }) 
     </div>
   );
 }
-
 /* ─── PROJECTS PAGE ─── */
-function ProjectsPage({ user, myProjects, onOpenProject, onCreateProject, onEditProject, onDeleteProject }: {
-  user: any; myProjects: any[];
+function ProjectsPage({ user, projects, users, allProjectTasks, onOpenProject, onCreateProject, onEditProject, onDeleteProject }: {
+  user: any; projects: any[]; users: any[]; allProjectTasks: any[];
   onOpenProject: (project: any) => void;
   onCreateProject: () => void;
   onEditProject: (project: any) => void;
@@ -2376,63 +2377,82 @@ function ProjectsPage({ user, myProjects, onOpenProject, onCreateProject, onEdit
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <div><h2 className="text-2xl font-black text-gray-900">My Projects</h2><p className="text-sm text-gray-400">{myProjects.length} project{myProjects.length !== 1 ? "s" : ""}</p></div>
-        <button onClick={onCreateProject} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white shadow-sm transition hover:opacity-90" style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)" }}>
+        <div><h2 className="text-2xl font-black text-gray-900">My Projects</h2><p className="text-sm text-gray-400">{projects.length} project{projects.length !== 1 ? "s" : ""}</p></div>
+        <button onClick={onCreateProject} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white shadow-sm transition hover:opacity-90" style={{ background: "#4A5578" }}>
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><path d="M7 1v12M1 7h12" /></svg>
           New Project
         </button>
       </div>
-      {myProjects.length === 0 ? (
+      {projects.length === 0 ? (
         <div className="text-center py-24 bg-white rounded-2xl border border-gray-100 text-gray-300">
           <div className="text-6xl mb-4">📭</div>
           <p className="text-xl font-bold text-gray-400">No projects yet</p>
-          <button onClick={onCreateProject} className="mt-4 px-5 py-2 text-sm font-bold text-white rounded-xl" style={{ background: "#6366f1" }}>Create your first project</button>
+          <button onClick={onCreateProject} className="mt-4 px-5 py-2 text-sm font-bold text-white rounded-xl" style={{ background: "#4A5578" }}>Create your first project</button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {myProjects.map((project: any) => {
+        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-4">
+          {projects.map((project: any) => {
             const projPerms = getPermissions(user, project);
+            const status = project.status || "Planning";
+            const sc = {
+              "Planning": { bg: "#f3f4f6", color: "#6b7280" },
+              "In Progress": { bg: "#eff6ff", color: "#3b82f6" },
+              "Completed": { bg: "#dcfce7", color: "#22c55e" },
+              "On Hold": { bg: "#fee2e2", color: "#ef4444" },
+              "Archived": { bg: "#f3f4f6", color: "#6b7280" }
+            }[status] || { bg: "#f3f4f6", color: "#6b7280" };
+
+            const pc = { bg: "#F3F4F6", color: "#4B5563" }; // Neutral priority
+            const memberList = project.members?.slice(0, 5).map((uid: string) => users.find((u: any) => u.uid === uid)).filter(Boolean);
+            const pmsUids = project.managers || [];
+            if (project.createdBy && !pmsUids.includes(project.createdBy)) pmsUids.unshift(project.createdBy);
+            const isExplicitPM = projPerms.isPM;
+
             return (
-              <div key={project.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all cursor-pointer group overflow-hidden relative" onClick={() => onOpenProject(project)}>
-                <div className="h-1.5" style={{ background: project.color || "#6366f1" }} />
-                <div className="p-5">
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0" style={{ background: project.color || "#6366f1" }}>{project.name[0]}</div>
-                      <div><h3 className="font-bold text-sm text-gray-900 group-hover:text-indigo-700">{project.name}</h3>{project.clientName && <p className="text-xs text-gray-400">{project.clientName}</p>}</div>
+              <div key={project.id} className="proj-card bg-white rounded-xl overflow-hidden cursor-pointer group" style={{ border: "1px solid #e5e7eb", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }} onClick={() => onOpenProject(project)}>
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-2 mb-3"><div className="flex items-center gap-2.5 min-w-0"><div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0" style={{ background: sc.bg, color: sc.color }}>{project.name[0]?.toUpperCase()}</div><div className="min-w-0"><h3 className="text-sm font-semibold text-gray-900 truncate leading-tight group-hover:text-indigo-600 transition">{project.name}</h3>{project.clientName && <p className="text-[11px] text-gray-400 truncate mt-0.5">{project.clientName}</p>}</div></div><div className="flex items-center gap-1.5 shrink-0">{isExplicitPM ? <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">👑 PM</span> : projPerms.isAdmin ? <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">⚙️ Admin</span> : null}<span className="text-[10px] font-medium px-2 py-0.5 rounded" style={{ background: sc.bg, color: sc.color }}>{status}</span></div></div>
+                  <p className="text-xs text-gray-400 line-clamp-1 mb-3">{project.description || "No description."}</p>
+                  <div className="flex flex-wrap gap-1 mb-3">{project.projectType === "Billing" && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">Billing</span>}{project.billingType && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">{project.billingType}</span>}<span className="text-[10px] px-1.5 py-0.5 rounded border" style={{ background: pc.bg, color: pc.color, borderColor: "#E5E7EB" }}>{project.priority || "Medium"}</span>{pmsUids.length > 1 && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 border border-gray-200">👑 {pmsUids.length} PMs</span>}{project.endDate && <span className="text-[10px] text-gray-400 ml-auto">Due {project.endDate}</span>}</div>
+                  <>
+                    {(() => {
+                      const pt = allProjectTasks.filter(t => t.projectId === project.id);
+                      const stats = [
+                        { type: "story", icon: "📘", bg: "#F3F4F6", color: "#4B5563", border: "#E5E7EB" },
+                        { type: "task", icon: "🧩", bg: "#F3F4F6", color: "#4B5563", border: "#E5E7EB" },
+                        { type: "bug", icon: "🐞", bg: "#F3F4F6", color: "#4B5563", border: "#E5E7EB" },
+                        { type: "defect", icon: "🎯", bg: "#F3F4F6", color: "#4B5563", border: "#E5E7EB" },
+                      ].map(s => ({
+                        ...s,
+                        total: pt.filter(t => (t.ticketType || "task").toLowerCase() === s.type).length,
+                        done: pt.filter(t => (t.ticketType || "task").toLowerCase() === s.type && t.status === "done").length,
+                      })).filter(s => s.total > 0);
+
+                      return stats.length > 0 ? (
+                        <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                          {stats.map(s => (
+                            <span key={s.type}
+                              className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md border"
+                              style={{ background: s.bg, color: s.color, borderColor: s.border }}>
+                              {s.icon} {s.done}/{s.total}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()}
+
+                    <div className="mb-2">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-[10px] text-gray-400">Progress</span>
+                        <span className="text-[10px] font-semibold" style={{ color: sc.color }}>{project.progress || 0}%</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${project.progress || 0}%`, background: sc.color }} />
+                      </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${project.status === "Completed" ? "bg-green-100 text-green-700" : project.status === "In Progress" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>{project.status}</span>
-                      {projPerms.isPM ? (
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${user?.accountType === "ADMIN" ? "bg-indigo-100 text-indigo-700" : "text-white"}`}
-                          style={user?.accountType !== "ADMIN" ? { background: project.color || "#6366f1" } : {}}
-                        >
-                          👑 {user?.accountType === "ADMIN" ? "Admin" : "Team Lead"}
-                        </span>
-                      ) : projPerms.isAdmin ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">⚙️ Admin</span>
-                      ) : null}
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-400 line-clamp-2 mb-4 leading-relaxed">{project.description || "No description"}</p>
-                  <div>
-                    <div className="flex justify-between mb-1.5">
-                      <span className="text-xs text-gray-400">Progress</span>
-                      <span className="text-xs font-bold" style={{ color: project.color || "#6366f1" }}>{project.progress || 0}%</span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-1.5"><div className="h-1.5 rounded-full" style={{ width: `${project.progress || 0}%`, background: project.color || "#6366f1" }} /></div>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between">
-                    {project.endDate && <span className="text-xs text-gray-400">📅 {project.endDate}</span>}
-                    <div className="flex items-center gap-2 ml-auto">
-                      <button onClick={e => { e.stopPropagation(); onEditProject(project); }} className="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-semibold text-gray-400 hover:text-indigo-600 px-2 py-1 rounded-lg hover:bg-indigo-50 border border-transparent hover:border-indigo-100" title="Edit project">✏️ Edit</button>
-                      {projPerms.fullControl && (
-                        <button onClick={e => { e.stopPropagation(); onDeleteProject(project.id); }} className="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-semibold text-gray-400 hover:text-red-600 px-2 py-1 rounded-lg hover:bg-red-50 border border-transparent hover:border-red-100" title="Delete project">🗑️ Delete</button>
-                      )}
-                      <span className="text-xs font-semibold text-indigo-600 group-hover:underline">Open →</span>
-                    </div>
-                  </div>
+                  </>
+
+                  <div className="flex items-center justify-between"><div className="flex -space-x-1.5">{memberList?.map((u: any, i: number) => <div key={i} title={u?.email?.split("@")[0]} className="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-white text-[9px] font-semibold" style={{ background: "#4A5578" }}>{u?.email?.[0]?.toUpperCase()}</div>)}{project.members?.length > 5 && <span className="text-[10px] text-gray-400 pl-2">+{project.members.length - 5}</span>}</div><div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all"><button onClick={e => { e.stopPropagation(); onEditProject(project); }} className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-[#282B3E] hover:bg-gray-100 transition text-xs">✏️</button>{projPerms.fullControl && <button onClick={e => { e.stopPropagation(); onDeleteProject(project.id); }} className="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition text-xs">🗑️</button>}</div></div>
                 </div>
               </div>
             );
@@ -2467,6 +2487,8 @@ export default function ProjectManagement({ user, projects, users, setSidebarCol
   const [search, setSearch] = useState("");
   const [showMyTasksOnly, setShowMyTasksOnly] = useState(false);
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
+
+  const [allProjectTasks, setAllProjectTasks] = useState<any[]>([]);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [quickAddStory, setQuickAddStory] = useState<{ story: Task; ticketType: TicketType } | null>(null);
@@ -2516,7 +2538,35 @@ export default function ProjectManagement({ user, projects, users, setSidebarCol
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const showToast = (msg: string) => setToastMsg(msg);
 
+  const [todayDailySheetTasks, setTodayDailySheetTasks] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const todayStr = new Date().toISOString().split("T")[0];
+    const q = query(collection(db, "dailySheets"), where("uid", "==", user.uid), where("dateStr", "==", todayStr));
+    return onSnapshot(q, s => {
+      if (!s.empty) {
+        const data = s.docs[0].data();
+        let tasksArr = data.tasks || [];
+        if (!data.tasks && data.taskTitle) {
+          tasksArr = [{ project: data.project, taskTitle: data.taskTitle, description: data.description, hours: data.hours }];
+        }
+        setTodayDailySheetTasks(tasksArr);
+      } else {
+        setTodayDailySheetTasks([]);
+      }
+    });
+  }, [user?.uid]);
+
   const myProjects = projects?.filter((p: any) => user?.accountType === "ADMIN" || p.members?.includes(user?.uid)) || [];
+
+  useEffect(() => {
+    if (myProjects.length === 0) return;
+    const q = query(collection(db, "projectTasks"));
+    return onSnapshot(q, snap => {
+      setAllProjectTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+  }, [myProjects.length]);
   const userName = user?.displayName || user?.email?.split("@")[0] || "";
   const projectColor = activeProject?.color || "#6366f1";
   const permissions = getPermissions(user, activeProject);
@@ -2767,8 +2817,7 @@ export default function ProjectManagement({ user, projects, users, setSidebarCol
   const myProgress = myTasks.length > 0 ? Math.round((myDone / myTasks.length) * 100) : 0;
   const overdueTasks = myTasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "done");
   const todayStr = new Date().toISOString().split("T")[0];
-  const todayLogs = myWorkLogs.filter(l => l.date === todayStr);
-  const todayHours = todayLogs.reduce((s, l) => s + l.hoursWorked, 0);
+  const todayHours = todayDailySheetTasks.reduce((s, l) => s + (Number(l.hours) || 0), 0);
   const totalHoursAll = myWorkLogs.reduce((s, l) => s + l.hoursWorked, 0);
 
   const sprintFilteredTasks = activeSprint ? tasks.filter(t => t.sprintId === activeSprint.id) : tasks;
@@ -2783,9 +2832,9 @@ export default function ProjectManagement({ user, projects, users, setSidebarCol
 
   /* ── PROJECT VIEW ── */
   if (activeProject) {
-    const projectMembers = users.filter((u: any) => 
-      activeProject.members?.includes(u.uid) || 
-      activeProject.managers?.includes(u.uid) || 
+    const projectMembers = users.filter((u: any) =>
+      activeProject.members?.includes(u.uid) ||
+      activeProject.managers?.includes(u.uid) ||
       activeProject.createdBy === u.uid
     );
     return (
@@ -2803,10 +2852,7 @@ export default function ProjectManagement({ user, projects, users, setSidebarCol
               <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: projectColor }} />
               <h1 className="font-bold text-gray-900 text-sm truncate">{activeProject.name}</h1>
               {isProjectManager && (
-                <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${user?.accountType === "ADMIN" ? "bg-indigo-100 text-indigo-700" : "text-white"}`}
-                  style={user?.accountType !== "ADMIN" ? { background: projectColor } : {}}
-                >
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 bg-gray-100 text-gray-700 border border-gray-200">
                   👑 Lead
                 </span>
               )}
@@ -2818,9 +2864,9 @@ export default function ProjectManagement({ user, projects, users, setSidebarCol
                 <div className="hidden sm:block"><p className="text-xs font-bold text-gray-700">{myProgress}%</p><p className="text-[10px] text-gray-400">My tasks</p></div>
               </div>
               <TeamButton users={users} activeProject={activeProject} user={user} projectColor={projectColor} />
-              
+
               {/* Collapse/Expand Toggle */}
-              <button 
+              <button
                 onClick={() => setHeaderCollapsed(!headerCollapsed)}
                 className="ml-2 w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 transition"
                 title={headerCollapsed ? "Expand Header" : "Collapse Header"}
@@ -2833,57 +2879,56 @@ export default function ProjectManagement({ user, projects, users, setSidebarCol
           {!headerCollapsed && (
             <>
 
-          {/* Toolbar */}
-          <div className="px-3 sm:px-6 py-2.5 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2 shrink-0 overflow-x-auto whitespace-nowrap scrollbar-none">
-            <div className="flex bg-white border border-gray-200 rounded-lg overflow-hidden shrink-0">
-              {([
-                ["kanban", "⊞ Board"],
-                ["list", "☰ List"],
-                ["timeline", "📅 Activity"],
-                ["forums", "💬 Forums"],
-                ["code", "💻 Code / PRs"],
-                ["logs", "⏱ Logs"],
-                ["reports", "📊 Reports"],
-              ] as [ViewMode, string][]).map(([mode, label]) => (
-                <button key={mode} onClick={() => setViewMode(mode)}
-                  className={`px-3 py-1.5 text-xs font-semibold transition ${viewMode === mode ? "text-white" : "text-gray-500 hover:bg-gray-50"}`}
-                  style={viewMode === mode ? { background: projectColor } : {}}>
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div className="w-px h-5 bg-gray-200 shrink-0" />
-            {viewMode !== "reports" && (
-              <>
-                <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none shrink-0">
-                  <option value="all">Priority</option>{["Low", "Medium", "High", "Critical"].map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
-                <select value={filterTicketType} onChange={e => setFilterTicketType(e.target.value as any)} className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none shrink-0">
-                  <option value="all">Type</option>
-                  {(Object.keys(TICKET_TYPES) as TicketType[]).map(t => <option key={t} value={t}>{TICKET_TYPES[t].icon} {TICKET_TYPES[t].label}</option>)}
-                </select>
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search..." className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none w-24 shrink-0" />
-              </>
-            )}
-            <div className="hidden sm:block sm:flex-1" />
-            {viewMode !== "reports" && (
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg text-white shadow-sm transition" style={{ background: projectColor }}>+ New Ticket</button>
-                <button onClick={() => setShowWorkLogForm(!showWorkLogForm)} className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg text-white shadow-sm" style={{ background: "#64748b" }}>⏱ Log Work</button>
+              {/* Toolbar */}
+              <div className="px-3 sm:px-6 py-2.5 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2 shrink-0 overflow-x-auto whitespace-nowrap scrollbar-none">
+                <div className="flex bg-white border border-gray-200 rounded-lg overflow-hidden shrink-0">
+                  {([
+                    ["kanban", "⊞ Board"],
+                    ["list", "☰ List"],
+                    ["timeline", "📅 Activity"],
+                    ["forums", "💬 Forums"],
+                    ["code", "💻 Code / PRs"],
+                    ["logs", "⏱ Logs"],
+                    ["reports", "📊 Reports"],
+                  ] as [ViewMode, string][]).map(([mode, label]) => (
+                    <button key={mode} onClick={() => setViewMode(mode)}
+                      className={`px-3 py-1.5 text-xs font-semibold transition rounded-md ${viewMode === mode ? "bg-gray-100 text-gray-800 border border-gray-200 shadow-sm" : "text-gray-500 hover:bg-gray-50"}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className="w-px h-5 bg-gray-200 shrink-0" />
+                {viewMode !== "reports" && (
+                  <>
+                    <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none shrink-0">
+                      <option value="all">Priority</option>{["Low", "Medium", "High", "Critical"].map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                    <select value={filterTicketType} onChange={e => setFilterTicketType(e.target.value as any)} className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none shrink-0">
+                      <option value="all">Type</option>
+                      {(Object.keys(TICKET_TYPES) as TicketType[]).map(t => <option key={t} value={t}>{TICKET_TYPES[t].icon} {TICKET_TYPES[t].label}</option>)}
+                    </select>
+                    <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Search..." className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white focus:outline-none w-24 shrink-0" />
+                  </>
+                )}
+                <div className="hidden sm:block sm:flex-1" />
+                {viewMode !== "reports" && (
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button onClick={() => setShowCreateModal(true)} className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg text-sky-700 bg-sky-50 border border-sky-200 shadow-sm transition hover:bg-sky-100">+ New Ticket</button>
+                    <button onClick={() => setShowWorkLogForm(!showWorkLogForm)} className="flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-lg text-gray-700 bg-gray-50 border border-gray-200 shadow-sm transition hover:bg-gray-100">⏱ Log Work</button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {milestones.length > 0 && (
-            <div className="px-6 py-2 border-t border-gray-100 flex items-center gap-2 overflow-x-auto bg-white">
-              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider shrink-0">Milestones</span>
-              {milestones.map(m => (
-                <span key={m.id} className={`text-xs font-semibold px-2.5 py-1 rounded-full border shrink-0 ${m.status === "completed" ? "border-green-200 bg-green-50 text-green-700" : "border-gray-200 bg-gray-50 text-gray-600"}`}>
-                  {m.status === "completed" ? "✅" : "🎯"} {m.title}
-                </span>
-              ))}
-            </div>
-          )}
+              {milestones.length > 0 && (
+                <div className="px-6 py-2 border-t border-gray-100 flex items-center gap-2 overflow-x-auto bg-white">
+                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider shrink-0">Milestones</span>
+                  {milestones.map(m => (
+                    <span key={m.id} className={`text-xs font-semibold px-2.5 py-1 rounded-full border shrink-0 ${m.status === "completed" ? "border-green-200 bg-green-50 text-green-700" : "border-gray-200 bg-gray-50 text-gray-600"}`}>
+                      {m.status === "completed" ? "✅" : "🎯"} {m.title}
+                    </span>
+                  ))}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -2913,9 +2958,8 @@ export default function ProjectManagement({ user, projects, users, setSidebarCol
               { label: "Stories", val: tasks.filter(t => t.ticketType === "story").length, color: "#7c3aed" },
               { label: "Bugs", val: tasks.filter(t => t.ticketType === "bug").length, color: "#dc2626" },
             ].map(s => (
-              <div key={s.label} className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full" style={{ background: s.color }} />
-                <span className="text-sm font-black" style={{ color: s.color }}>{s.val}</span>
+              <div key={s.label} className="flex items-center gap-1.5">
+                <span className="text-sm font-black text-gray-800">{s.val}</span>
                 <span className="text-xs text-gray-400 hidden sm:inline">{s.label}</span>
               </div>
             ))}
@@ -3146,23 +3190,17 @@ export default function ProjectManagement({ user, projects, users, setSidebarCol
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap');`}</style>
       <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Avatar name={userName} size="md" highlight />
-            <div>
-              <p className="font-bold text-sm text-gray-900">Hey, {userName} 👋</p>
-              <p className="text-xs text-gray-400">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
-            </div>
-            {user?.designation && <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 ml-1">{user.designation}</span>}
-          </div>
+
           <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl w-full sm:w-auto overflow-x-auto scrollbar-none">
             {([
-              ["dashboard", "🏠 Dashboard"],
-              ["projects", "📁 Projects"],
-              ["dailysheet", "📋 Daily Sheet"],
-              ["notifications", "🔔 Inbox"],
-            ] as [AppTab, string][]).map(([t, label]) => (
+              ["dashboard", "Dashboard", <LayoutGrid key="dashboard" className="w-3.5 h-3.5" />],
+              ["projects", "Projects", <Folder key="projects" className="w-3.5 h-3.5" />],
+              ["dailysheet", "Daily Sheet", <Calendar key="dailysheet" className="w-3.5 h-3.5" />],
+              ["notifications", "Inbox", <Bell key="notifications" className="w-3.5 h-3.5" />],
+            ] as [AppTab, string, React.ReactNode][]).map(([t, label, icon]) => (
               <button key={t} onClick={() => setActiveTab(t)}
-                className={`flex-1 sm:flex-initial whitespace-nowrap px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1 active:scale-95 ${activeTab === t ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+                className={`flex-1 sm:flex-initial whitespace-nowrap px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 active:scale-95 ${activeTab === t ? "bg-white text-[#282B3E] shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+                {icon}
                 {label}
                 {t === "notifications" && unreadCount > 0 && <span className="ml-1 bg-red-500 text-white text-[9px] font-black rounded-full px-1.5 py-0.5">{unreadCount}</span>}
               </button>
@@ -3171,22 +3209,26 @@ export default function ProjectManagement({ user, projects, users, setSidebarCol
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-6 space-y-6">
-        {activeTab === "dailysheet" && <EmployeeDailySheet user={user} projects={myProjects} />}
+      <div className="w-full px-4 py-6 space-y-6">
+        {activeTab === "dailysheet" && (
+          <div className="h-[calc(100vh-140px)] rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-white">
+            <DailySheetView />
+          </div>
+        )}
 
         {activeTab === "dashboard" && (
           <div className="space-y-5">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { icon: "📁", label: "My Projects", val: myProjects.length, bg: "#e8f1ff" },
-                { icon: "⏱", label: "Today's Hours", val: `${todayHours}h`, bg: "#e7f8ee" },
-                { icon: "📊", label: "Total Hours", val: `${totalHoursAll}h`, bg: "#eef2ff" },
-                { icon: "⚠️", label: "Overdue Tasks", val: overdueTasks.length, bg: "#fff4e5" },
+                { icon: <Folder className="w-6 h-6 text-slate-700" />, label: "My Projects", val: myProjects.length, bg: "#eff6ff" },
+                { icon: <Clock className="w-6 h-6 text-slate-700" />, label: "Today's Hours", val: `${todayHours}h`, bg: "#f3f4f6" },
+                { icon: <BarChart2 className="w-6 h-6 text-slate-700" />, label: "Total Hours", val: `${totalHoursAll}h`, bg: "#eff6ff" },
+                { icon: <AlertTriangle className="w-6 h-6 text-slate-700" />, label: "Overdue Tasks", val: overdueTasks.length, bg: "#f3f4f6" },
               ].map(s => (
-                <div key={s.label} className="rounded-2xl p-5 shadow-sm" style={{ background: s.bg }}>
-                  <div className="flex justify-between items-start">
-                    <div><p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{s.label}</p><p className="text-4xl font-black text-gray-800">{s.val}</p></div>
-                    <span className="text-3xl">{s.icon}</span>
+                <div key={s.label} className="rounded-xl p-3.5 shadow-sm" style={{ background: s.bg }}>
+                  <div className="flex justify-between items-center">
+                    <div><p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">{s.label}</p><p className="text-2xl font-black text-gray-800">{s.val}</p></div>
+                    <span className="opacity-90">{s.icon}</span>
                   </div>
                 </div>
               ))}
@@ -3197,15 +3239,16 @@ export default function ProjectManagement({ user, projects, users, setSidebarCol
                   <div><h3 className="font-bold text-gray-800">Today's Work</h3><p className="text-xs text-gray-400 mt-0.5">{todayStr}</p></div>
                   <span className="text-2xl font-black text-indigo-600">{todayHours}h</span>
                 </div>
-                {todayLogs.length === 0
-                  ? <div className="text-center py-10 text-gray-300"><div className="text-4xl mb-2">📝</div><p className="text-sm font-medium">No work logged today</p></div>
-                  : <div className="divide-y divide-gray-50">{todayLogs.map(log => (
-                    <div key={log.id} className="flex items-start gap-3 p-4">
-                      <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-indigo-400" />
-                      <div className="flex-1"><p className="text-xs font-bold text-indigo-600 mb-0.5">{log.projectName}</p>{log.taskName && <p className="text-xs text-gray-400">{log.taskName}</p>}<p className="text-sm text-gray-700 mt-0.5">{log.description}</p></div>
-                      <p className="font-black text-lg text-indigo-600">{log.hoursWorked}h</p>
-                    </div>
-                  ))}</div>
+                {todayDailySheetTasks.length === 0
+                  ? <div className="text-center py-10 text-gray-300"><div className="text-4xl mb-2">📝</div><p className="text-sm font-medium">No work logged today in Daily Sheet</p></div>
+                  : <div className="divide-y divide-gray-50 max-h-[320px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
+                    {todayDailySheetTasks.map((t, idx) => (
+                      <div key={idx} className="flex items-start gap-3 p-4">
+                        <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-indigo-400" />
+                        <div className="flex-1"><p className="text-xs font-bold text-indigo-600 mb-0.5">{t.project}</p>{t.taskTitle && <p className="text-xs text-gray-400">{t.taskTitle}</p>}<p className="text-sm text-gray-700 mt-0.5">{t.description}</p></div>
+                        <p className="font-black text-lg text-indigo-600">{t.hours || 0}h</p>
+                      </div>
+                    ))}</div>
                 }
               </div>
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -3213,20 +3256,33 @@ export default function ProjectManagement({ user, projects, users, setSidebarCol
                   <h3 className="font-bold text-gray-800">My Projects</h3>
                   <button onClick={() => setActiveTab("projects")} className="text-xs font-semibold text-indigo-600">View all →</button>
                 </div>
-                <div className="divide-y divide-gray-50">
-                  {myProjects.slice(0, 4).map((p: any) => (
-                    <div key={p.id} onClick={() => { setActiveProject(p); setViewMode("kanban"); }} className="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 transition group">
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0" style={{ background: p.color || "#6366f1" }}>{p.name[0]}</div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm text-gray-800 truncate group-hover:text-indigo-700">{p.name}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <div className="flex-1 bg-gray-100 rounded-full h-1"><div className="h-1 rounded-full" style={{ width: `${p.progress || 0}%`, background: p.color || "#6366f1" }} /></div>
-                          <span className="text-[10px] font-bold" style={{ color: p.color || "#6366f1" }}>{p.progress || 0}%</span>
+                <div className="divide-y divide-gray-50 max-h-[320px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
+                  {myProjects.map((p: any) => {
+                    const status = p.status || "Planning";
+                    const sc = {
+                      "Planning": { bg: "#f3f4f6", color: "#6b7280" }, // Same as main dashboard T.text2
+                      "In Progress": { bg: "#eff6ff", color: "#3b82f6" },
+                      "Completed": { bg: "#dcfce7", color: "#22c55e" },
+                      "On Hold": { bg: "#fee2e2", color: "#ef4444" },
+                      "Archived": { bg: "#f3f4f6", color: "#6b7280" }
+                    }[status] || { bg: "#f3f4f6", color: "#6b7280" };
+
+                    return (
+                      <div key={p.id} onClick={() => { setActiveProject(p); setViewMode("kanban"); }} className="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50 transition group">
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm shrink-0" style={{ background: sc.bg, color: sc.color }}>{p.name[0]?.toUpperCase()}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <p className="font-semibold text-sm text-gray-800 truncate group-hover:text-indigo-700">{p.name}</p>
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: sc.bg, color: sc.color }}>{status}</span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <div className="flex-1 bg-gray-100 rounded-full h-[3px] overflow-hidden"><div className="h-full rounded-full transition-all duration-500" style={{ width: `${p.progress || 0}%`, background: sc.color }} /></div>
+                            <span className="text-[10px] font-bold" style={{ color: sc.color }}>{p.progress || 0}%</span>
+                          </div>
                         </div>
                       </div>
-                      <span className="text-gray-300 group-hover:text-indigo-400">→</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {myProjects.length === 0 && <div className="text-center py-10 text-gray-300"><div className="text-4xl mb-2">📭</div><p className="text-sm">No projects yet</p></div>}
                 </div>
               </div>
@@ -3235,7 +3291,7 @@ export default function ProjectManagement({ user, projects, users, setSidebarCol
         )}
 
         {activeTab === "projects" && (
-          <ProjectsPage user={user} myProjects={myProjects}
+          <ProjectsPage user={user} projects={myProjects} users={users} allProjectTasks={allProjectTasks}
             onOpenProject={(project) => { setActiveProject(project); setViewMode("kanban"); }}
             onCreateProject={() => setShowProjectModal(true)}
             onEditProject={(project) => setEditingProject(project)}

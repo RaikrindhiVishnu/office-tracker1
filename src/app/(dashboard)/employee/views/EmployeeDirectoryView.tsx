@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { collection, query, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import SectionLoader from "@/components/common/SectionLoader";
 
 export default function EmployeeDirectoryView() {
   const [employees, setEmployees] = useState<any[]>([]);
@@ -42,11 +43,7 @@ export default function EmployeeDirectoryView() {
   }, [employees, search, departmentFilter]);
 
   if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center bg-slate-50">
-        <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-      </div>
-    );
+    return <SectionLoader />;
   }
 
   return (

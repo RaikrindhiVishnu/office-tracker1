@@ -171,7 +171,7 @@ const TaskCard = memo(({
         borderTop: `1px solid ${isSelected ? "#6366f1" : ovd ? "#fca5a5" : "#e5e7eb"}`,
         borderRight: `1px solid ${isSelected ? "#6366f1" : ovd ? "#fca5a5" : "#e5e7eb"}`,
         borderBottom: `1px solid ${isSelected ? "#6366f1" : ovd ? "#fca5a5" : "#e5e7eb"}`,
-        borderLeft: `3px solid ${tm.color}`,
+        borderLeft: `1px solid ${isSelected ? "#6366f1" : ovd ? "#fca5a5" : "#e5e7eb"}`,
         borderRadius: "10px",
         padding: "10px 10px 8px",
         cursor: draggable ? "grab" : "default",
@@ -242,7 +242,7 @@ const TaskCard = memo(({
           </span>
           <span style={{ fontSize: "12px", flexShrink: 0 }}>{tm.icon}</span>
           {mine && (
-            <span style={{ fontSize: "9px", fontWeight: 800, padding: "1px 5px", borderRadius: "100px", background: projectColor + "20", color: projectColor, flexShrink: 0 }}>You</span>
+            <span style={{ fontSize: "9px", fontWeight: 800, padding: "1px 5px", borderRadius: "100px", background: "#f3f4f6", color: "#6b7280", flexShrink: 0 }}>You</span>
           )}
 
           {task.ticketType === "bug" && (
@@ -383,8 +383,8 @@ const StoryCard = memo(({
     <div style={{
       borderRadius: "10px",
       overflow: "hidden",
-      border: `${isSelected ? "2px" : "1px"} solid ${isSelected ? "#6366f1" : "#ddd6fe"}`,
-      background: isSelected ? "#eef2ff" : "#faf8ff",
+      border: `${isSelected ? "2px" : "1px"} solid ${isSelected ? "#6366f1" : "#bae6fd"}`,
+      background: isSelected ? "#eef2ff" : "#f0f9ff",
       opacity: isDragging ? 0.35 : 1,
       transition: "all 0.2s",
       display: "block",
@@ -397,21 +397,21 @@ const StoryCard = memo(({
         onDragStart={e => { if (!draggable) { e.preventDefault(); return; } handleDragStart(e, story); }}
         onDragEnd={handleDragEnd}
         onClick={e => { if (e.shiftKey) { toggleSelect(story.id, e); return; } onTaskClick(story); }}
-        style={{ padding: "10px 10px 8px", cursor: draggable ? "grab" : "default", borderLeft: "3px solid #7c3aed" }}
+        style={{ padding: "10px 10px 8px", cursor: draggable ? "grab" : "default" }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "5px", marginBottom: "7px", minWidth: 0 }}>
           <div
             onClick={e => toggleSelect(story.id, e)}
-            style={{ width: "14px", height: "14px", borderRadius: "3px", border: `1.5px solid ${isSelected ? "#6366f1" : "#c4b5fd"}`, background: isSelected ? "#6366f1" : "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+            style={{ width: "14px", height: "14px", borderRadius: "3px", border: `1.5px solid ${isSelected ? "#6366f1" : "#d1d5db"}`, background: isSelected ? "#6366f1" : "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
           >
             {isSelected && <span style={{ color: "white", fontSize: "8px", fontWeight: 700 }}>✓</span>}
           </div>
-          <span style={{ fontSize: "10px", fontFamily: "monospace", fontWeight: 700, padding: "1px 5px", borderRadius: "4px", background: "#ede9fe", color: "#5b21b6", flexShrink: 0 }}>
+          <span style={{ fontSize: "10px", fontFamily: "monospace", fontWeight: 700, padding: "1px 5px", borderRadius: "4px", background: "#f3f4f6", color: "#4b5563", flexShrink: 0 }}>
             {story.taskCode || "STR"}
           </span>
           <span style={{ fontSize: "12px" }}>📘</span>
-          <span style={{ fontSize: "10px", fontWeight: 700, color: "#6d28d9", background: "#ede9fe", padding: "1px 6px", borderRadius: "100px" }}>Story</span>
-          {mine && <span style={{ fontSize: "9px", fontWeight: 800, padding: "1px 5px", borderRadius: "100px", background: projectColor + "20", color: projectColor }}>You</span>}
+          <span style={{ fontSize: "10px", fontWeight: 700, color: "#4b5563", background: "#f3f4f6", padding: "1px 6px", borderRadius: "100px" }}>Story</span>
+          {mine && <span style={{ fontSize: "9px", fontWeight: 800, padding: "1px 5px", borderRadius: "100px", background: "#f3f4f6", color: "#6b7280" }}>You</span>}
           <div style={{ flex: 1, minWidth: 0 }} />
           {pri && (
             <div style={{ display: "flex", alignItems: "center", gap: "3px", flexShrink: 0 }}>
@@ -420,7 +420,7 @@ const StoryCard = memo(({
             </div>
           )}
         </div>
-        <h3 style={{ fontSize: "14px", fontWeight: 800, color: "#312e81", lineHeight: 1.3, marginBottom: story.labels?.length ? "4px" : "8px" }}>{story.title}</h3>
+        <h3 style={{ fontSize: "14px", fontWeight: 800, color: "#1f2937", lineHeight: 1.3, marginBottom: story.labels?.length ? "4px" : "8px" }}>{story.title}</h3>
 
         {/* Labels for Story Card - Interactive */}
         {story.labels && story.labels.length > 0 && (
@@ -461,17 +461,17 @@ const StoryCard = memo(({
         {story.tags && story.tags.length > 0 && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: "3px", marginBottom: "6px" }}>
             {story.tags.slice(0, 3).map(tag => (
-              <span key={tag} style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "100px", background: "#ede9fe", color: "#6d28d9", fontWeight: 500 }}>#{tag}</span>
+              <span key={tag} style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "100px", background: "#f3f4f6", color: "#6b7280", fontWeight: 500 }}>#{tag}</span>
             ))}
           </div>
         )}
         <div style={{ marginBottom: "7px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "#8b5cf6", marginBottom: "3px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "#6b7280", marginBottom: "3px" }}>
             <span>{doneCount}/{allChildren.length} tasks</span>
             <span style={{ fontWeight: 700 }}>{pct}%</span>
           </div>
-          <div style={{ height: "4px", background: "#ede9fe", borderRadius: "4px", overflow: "hidden" }}>
-            <div style={{ height: "4px", borderRadius: "4px", width: `${pct}%`, background: pct === 100 ? "#22c55e" : "#6366f1", transition: "width 0.4s" }} />
+          <div style={{ height: "4px", background: "#f3f4f6", borderRadius: "4px", overflow: "hidden" }}>
+            <div style={{ height: "4px", borderRadius: "4px", width: `${pct}%`, background: pct === 100 ? "#22c55e" : "#6b7280", transition: "width 0.4s" }} />
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
@@ -480,22 +480,22 @@ const StoryCard = memo(({
               <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: avatarColor(name), display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "9px", fontWeight: 700, flexShrink: 0 }}>
                 {avatarInitial(name)}
               </div>
-              <span style={{ fontSize: "10px", fontWeight: 600, color: "#5b21b6", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{name}</span>
+              <span style={{ fontSize: "10px", fontWeight: 600, color: "#4b5563", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{name}</span>
             </div>
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: "5px", flex: 1, minWidth: 0 }}>
-              <div style={{ width: "20px", height: "20px", borderRadius: "50%", border: "1.5px dashed #c4b5fd", display: "flex", alignItems: "center", justifyContent: "center", color: "#c4b5fd", fontSize: "9px" }}>?</div>
-              <span style={{ fontSize: "10px", color: "#c4b5fd" }}>Unassigned</span>
+              <div style={{ width: "20px", height: "20px", borderRadius: "50%", border: "1.5px dashed #d1d5db", display: "flex", alignItems: "center", justifyContent: "center", color: "#d1d5db", fontSize: "9px" }}>?</div>
+              <span style={{ fontSize: "10px", color: "#9ca3af" }}>Unassigned</span>
             </div>
           )}
           {story.dueDate && (
-            <span style={{ fontSize: "10px", color: ovd ? "#ef4444" : "#8b5cf6", fontWeight: ovd ? 700 : 500, marginRight: "6px", flexShrink: 0 }}>
+            <span style={{ fontSize: "10px", color: ovd ? "#ef4444" : "#6b7280", fontWeight: ovd ? 700 : 500, marginRight: "6px", flexShrink: 0 }}>
               {ovd ? "⚡ " : ""}{formatDate(story.dueDate)}
             </span>
           )}
           <button
             onClick={e => { e.stopPropagation(); toggleStory(story.id, colId); }}
-            style={{ width: "22px", height: "22px", borderRadius: "6px", border: "1px solid #ddd6fe", background: "#ede9fe", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", color: "#6d28d9", marginRight: "4px", flexShrink: 0 }}
+            style={{ width: "22px", height: "22px", borderRadius: "6px", border: "1px solid #e5e7eb", background: "#f3f4f6", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", color: "#4b5563", marginRight: "4px", flexShrink: 0 }}
           >
             {isCollapsed ? "▶" : "▼"}
           </button>
@@ -515,7 +515,7 @@ const StoryCard = memo(({
 
       {/* Children */}
       {!isCollapsed && (
-        <div style={{ borderTop: "1px solid #ddd6fe", background: "#faf5ff", padding: "4px 0" }}>
+        <div style={{ borderTop: "1px solid #e5e7eb", background: "#fafafa", padding: "4px 0" }}>
           {colChildren.map(child => (
             <div key={child.id} style={{ margin: "3px 6px 3px 12px" }}>
               <TaskCard

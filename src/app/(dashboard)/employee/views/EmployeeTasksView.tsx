@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { DailyTask } from "@/types/dailyTask";
+import SectionLoader from "@/components/common/SectionLoader";
 
 export default function EmployeeTasksView({ user }: { user: any }) {
   const [tasks, setTasks] = useState<DailyTask[]>([]);
@@ -130,9 +131,8 @@ export default function EmployeeTasksView({ user }: { user: any }) {
               <th className="px-3 py-3 font-medium">Priority</th>
               <th className="px-3 py-3 font-medium whitespace-nowrap text-center">Assigned At</th>
               <th className="px-3 py-3 font-medium whitespace-nowrap text-center">Deadline</th>
-              <th className="px-3 py-3 font-medium whitespace-nowrap text-center">Completed At</th>
-              <th className="px-3 py-3 font-medium">Status</th>
-              <th className="px-3 py-3 font-medium text-right">Actions</th>
+              <th className="px-3 py-3 font-medium text-center">Completed At</th>
+              <th className="px-3 py-3 font-medium text-center">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -209,7 +209,7 @@ export default function EmployeeTasksView({ user }: { user: any }) {
                   })()}
                 </td>
 
-                <td className="px-3 py-3">
+                <td className="px-3 py-3 text-center">
                   <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[12px] font-medium bg-white shadow-sm
                     ${isCompleted ? "border-green-200 text-green-700" :
                       isWorking ? "border-orange-200 text-orange-700" :
@@ -230,18 +230,6 @@ export default function EmployeeTasksView({ user }: { user: any }) {
                               } as Record<string, string> )[t.status as string] || (t.status as string) || 'New'}
                   </div>
                 </td>
-
-                <td className="px-3 py-3 text-right">
-                  {!isCompleted && !isWorking && (
-                    <button onClick={() => updateStatus(t.id, "in progress")} className="px-4 py-1.5 text-[12px] font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 shadow-sm transition-colors">Start</button>
-                  )}
-                  {isWorking && (
-                    <button onClick={() => updateStatus(t.id, "done")} className="px-4 py-1.5 text-[12px] font-medium text-gray-700 bg-white border border-gray-200 rounded-md hover:bg-gray-50 shadow-sm transition-colors">Complete</button>
-                  )}
-                  {isCompleted && (
-                    <span className="text-[12px] text-gray-400 italic">Done</span>
-                  )}
-                </td>
               </tr>
             )})}
           </tbody>
@@ -250,7 +238,7 @@ export default function EmployeeTasksView({ user }: { user: any }) {
     </div>
   );
 
-  if (loading) return <div className="p-10 flex justify-center items-center h-[50vh]"><div className="animate-spin w-8 h-8 border-4 border-slate-300 border-t-slate-800 rounded-full"></div></div>;
+  if (loading) return <SectionLoader />;
 
   return (
     <div className="bg-slate-50 min-h-screen p-4 sm:p-6 lg:p-8 animate-fade-in font-sans">
