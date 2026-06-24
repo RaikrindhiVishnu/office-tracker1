@@ -10,8 +10,9 @@ export default function EmployeeTasksView({ user }: { user: any }) {
   const [tasks, setTasks] = useState<DailyTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterStatus, setFilterStatus] = useState<"All" | "Assigned" | "In Progress" | "Completed">("All");
+  const [filterStatus, setFilterStatus] = useState<"All" | "New" | "Dev In Progress" | "Unit Testing" | "Ready For QA" | "Done">("All");
   const [users, setUsers] = useState<any[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
 
   useEffect(() => {
     // Fetch users for resolving "Created By" names
@@ -48,7 +49,38 @@ export default function EmployeeTasksView({ user }: { user: any }) {
       unsub();
     };
   }, [user?.uid]);
+  useEffect(() => {
+    if (!user?.uid) return;
+    const qProjects = query(collection(db, "projects"), where("members", "array-contains", user.uid));
+    const unsubProjects = onSnapshot(qProjects, (snap) => {
+      setProjects(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsubProjects();
+  }, [user?.uid]);
 
+  const getStatusLabel = (task: any) => {
+    const defaultMap: Record<string, string> = {
+      new: "New",
+      dev_in_progress: "Dev In Progress",
+      unit_testing: "Unit Testing",
+      ready_for_qa: "Ready For QA",
+      testing_in_progress: "Testing In Progress",
+      reopened: "Reopened",
+      done: "Done",
+      r_and_d: "R & D",
+      Completed: "Done"
+    };
+
+    if (defaultMap[task.status]) return defaultMap[task.status];
+
+    const proj = projects.find(p => p.id === task.projectId);
+    if (proj && proj.kanbanColumns) {
+      const col = proj.kanbanColumns.find((c: any) => c.id === task.status);
+      if (col) return col.label;
+    }
+
+    return task.status || "New";
+  };
   const updateStatus = async (taskId: string, status: "todo" | "in progress" | "done") => {
     try {
       const payload: any = { status, updatedAt: serverTimestamp() };
@@ -67,28 +99,37 @@ export default function EmployeeTasksView({ user }: { user: any }) {
   const filteredTasks = useMemo(() => {
     return tasks.filter((t: any) => {
       const title = t.title || t.taskName || "";
+      const label = getStatusLabel(t);
       const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             t.description?.toLowerCase().includes(searchQuery.toLowerCase());
       
-      const isCompleted = t.status === "done" || t.status === "Completed";
-      const isWorking = t.status === "in progress" || t.status === "In Progress";
+      const isCompleted = t.status === "done" || t.status === "Completed" || label.toLowerCase() === "done" || label.toLowerCase() === "completed";
+      const isWorking = t.status === "in progress" || t.status === "In Progress" || t.status === "dev_in_progress" || label.toLowerCase().includes("progress");
       
       let matchesFilter = true;
-      if (filterStatus === "Completed") matchesFilter = isCompleted;
-      if (filterStatus === "In Progress") matchesFilter = isWorking;
-      if (filterStatus === "Assigned") matchesFilter = !isCompleted && !isWorking;
+      const labelStr = label.toLowerCase();
+      if (filterStatus === "New") matchesFilter = labelStr === "new";
+      if (filterStatus === "Dev In Progress") matchesFilter = labelStr === "dev in progress";
+      if (filterStatus === "Unit Testing") matchesFilter = labelStr === "unit testing";
+      if (filterStatus === "Ready For QA") matchesFilter = labelStr === "ready for qa";
+      if (filterStatus === "Done") matchesFilter = labelStr === "done" || labelStr === "completed";
       
       return matchesSearch && matchesFilter;
     });
-  }, [tasks, searchQuery, filterStatus]);
+  }, [tasks, searchQuery, filterStatus, projects]);
 
   const stats = useMemo(() => {
-    const total = tasks.length;
-    const completed = tasks.filter((t: any) => t.status === "done" || t.status === "Completed").length;
-    const inProgress = tasks.filter((t: any) => t.status === "in progress" || t.status === "In Progress").length;
-    const assigned = total - completed - inProgress;
-    return { total, completed, inProgress, assigned };
-  }, [tasks]);
+    const counts = { total: tasks.length, newTasks: 0, devInProgress: 0, unitTesting: 0, readyForQa: 0, done: 0 };
+    tasks.forEach((t: any) => {
+      const labelStr = getStatusLabel(t).toLowerCase();
+      if (labelStr === "new") counts.newTasks++;
+      else if (labelStr === "dev in progress") counts.devInProgress++;
+      else if (labelStr === "unit testing") counts.unitTesting++;
+      else if (labelStr === "ready for qa") counts.readyForQa++;
+      else if (labelStr === "done" || labelStr === "completed") counts.done++;
+    });
+    return counts;
+  }, [tasks, projects]);
 
   const formatDate = (dateInput: any) => {
     if (!dateInput) return "--";
@@ -113,17 +154,19 @@ export default function EmployeeTasksView({ user }: { user: any }) {
             />
           </div>
           
-          <div className="flex gap-2 text-xs font-medium">
-            <button onClick={() => setFilterStatus("All")} className={`px-3 py-1.5 rounded-full transition-colors ${filterStatus === "All" ? "bg-slate-900 text-white" : "text-gray-500 hover:bg-gray-100"}`}>All ({stats.total})</button>
-            <button onClick={() => setFilterStatus("Assigned")} className={`px-3 py-1.5 rounded-full transition-colors ${filterStatus === "Assigned" ? "bg-slate-900 text-white" : "text-gray-500 hover:bg-gray-100"}`}>Assigned ({stats.assigned})</button>
-            <button onClick={() => setFilterStatus("In Progress")} className={`px-3 py-1.5 rounded-full transition-colors ${filterStatus === "In Progress" ? "bg-slate-900 text-white" : "text-gray-500 hover:bg-gray-100"}`}>Working ({stats.inProgress})</button>
-            <button onClick={() => setFilterStatus("Completed")} className={`px-3 py-1.5 rounded-full transition-colors ${filterStatus === "Completed" ? "bg-slate-900 text-white" : "text-gray-500 hover:bg-gray-100"}`}>Completed ({stats.completed})</button>
+          <div className="flex gap-2 text-xs font-medium overflow-x-auto pb-2 sm:pb-0 hide-scrollbar">
+            <button onClick={() => setFilterStatus("All")} className={`px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${filterStatus === "All" ? "bg-slate-900 text-white" : "text-gray-500 hover:bg-gray-100"}`}>All ({stats.total})</button>
+            <button onClick={() => setFilterStatus("New")} className={`px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${filterStatus === "New" ? "bg-slate-900 text-white" : "text-gray-500 hover:bg-gray-100"}`}>New ({stats.newTasks})</button>
+            <button onClick={() => setFilterStatus("Dev In Progress")} className={`px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${filterStatus === "Dev In Progress" ? "bg-slate-900 text-white" : "text-gray-500 hover:bg-gray-100"}`}>Dev In Progress ({stats.devInProgress})</button>
+            <button onClick={() => setFilterStatus("Unit Testing")} className={`px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${filterStatus === "Unit Testing" ? "bg-slate-900 text-white" : "text-gray-500 hover:bg-gray-100"}`}>Unit Testing ({stats.unitTesting})</button>
+            <button onClick={() => setFilterStatus("Ready For QA")} className={`px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${filterStatus === "Ready For QA" ? "bg-slate-900 text-white" : "text-gray-500 hover:bg-gray-100"}`}>Ready For QA ({stats.readyForQa})</button>
+            <button onClick={() => setFilterStatus("Done")} className={`px-3 py-1.5 rounded-full whitespace-nowrap transition-colors ${filterStatus === "Done" ? "bg-slate-900 text-white" : "text-gray-500 hover:bg-gray-100"}`}>Done ({stats.done})</button>
           </div>
         </div>
       </div>
 
       <div className="overflow-x-auto pb-4">
-        <table className="w-full text-left border-collapse">
+        <table className="w-full text-left border-collapse min-w-[800px]">
           <thead>
             <tr className="border-b border-gray-200 text-[11px] text-gray-500 font-medium bg-white">
               <th className="px-3 py-3 font-medium">Task</th>
@@ -139,8 +182,9 @@ export default function EmployeeTasksView({ user }: { user: any }) {
             {filteredTasks.length === 0 ? (
               <tr><td colSpan={7} className="p-8 text-center text-sm text-gray-500">No tasks found matching your criteria.</td></tr>
             ) : filteredTasks.map((t: any) => {
-              const isCompleted = t.status === "done" || t.status === "Completed";
-              const isWorking = t.status === "in progress" || t.status === "In Progress";
+              const label = getStatusLabel(t);
+              const isCompleted = t.status === "done" || t.status === "Completed" || label.toLowerCase() === "done" || label.toLowerCase() === "completed";
+              const isWorking = t.status === "in progress" || t.status === "In Progress" || t.status === "dev_in_progress" || label.toLowerCase().includes("progress");
               const assignedByUser = users.find(u => u.uid === t.createdBy);
               const assignedByName = t.createdByName || assignedByUser?.name || assignedByUser?.displayName || assignedByUser?.email?.split('@')[0] || "Unassigned";
               return (
@@ -217,17 +261,7 @@ export default function EmployeeTasksView({ user }: { user: any }) {
                     }`}
                   >
                     <div className={`w-1.5 h-1.5 rounded-full ${isCompleted ? "bg-green-500" : isWorking ? "bg-orange-500" : "bg-blue-500"}`}></div>
-                    {( {
-                                new: "New",
-                                dev_in_progress: "Dev In Progress",
-                                unit_testing: "Unit Testing",
-                                ready_for_qa: "Ready For QA",
-                                testing_in_progress: "Testing In Progress",
-                                reopened: "Reopened",
-                                done: "Done",
-                                r_and_d: "R & D",
-                                Completed: "Done"
-                              } as Record<string, string> )[t.status as string] || (t.status as string) || 'New'}
+                    {getStatusLabel(t)}
                   </div>
                 </td>
               </tr>
