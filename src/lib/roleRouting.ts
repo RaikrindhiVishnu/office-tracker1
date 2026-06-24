@@ -22,11 +22,11 @@ export function getRoleRedirect(
 
   // ✅ ADMIN ROUTES
   if (r === "superadmin") return "/admin";
-  if (r === "admin") return "/admin";
+  if (r === "admin" || r === "businessowner" || r === "business_owner") return "/admin";
   if (r === "hr") return "/hr";
 
   // ✅ EMPLOYEE & LEAD → DEPARTMENT BASED 
-  if (r === "employee" || r === "lead") {
+  if (r === "employee" || r === "lead" || r === "finance" || r === "sales" || r === "it" || r === "operations" || r === "marketing" || r === "executive" || r === "customersupport" || r === "customer_support") {
     switch (d) {
       case "sales":
         return "/analytics/sales";
