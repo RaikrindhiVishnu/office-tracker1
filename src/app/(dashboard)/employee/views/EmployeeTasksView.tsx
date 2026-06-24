@@ -120,6 +120,9 @@ export default function EmployeeTasksView({ user }: { user: any }) {
 
   const stats = useMemo(() => {
     const counts = { total: tasks.length, newTasks: 0, devInProgress: 0, unitTesting: 0, readyForQa: 0, done: 0 };
+    let completed = 0;
+    let inProgress = 0;
+    
     tasks.forEach((t: any) => {
       const labelStr = getStatusLabel(t).toLowerCase();
       if (labelStr === "new") counts.newTasks++;
@@ -127,8 +130,17 @@ export default function EmployeeTasksView({ user }: { user: any }) {
       else if (labelStr === "unit testing") counts.unitTesting++;
       else if (labelStr === "ready for qa") counts.readyForQa++;
       else if (labelStr === "done" || labelStr === "completed") counts.done++;
+      
+      if (t.status === "done" || t.status === "Completed" || labelStr === "done" || labelStr === "completed") {
+        completed++;
+      } else if (t.status === "in progress" || t.status === "In Progress" || t.status === "dev_in_progress" || labelStr.includes("progress")) {
+        inProgress++;
+      }
     });
-    return counts;
+    
+    const assigned = counts.total - completed - inProgress;
+    
+    return { ...counts, completed, inProgress, assigned };
   }, [tasks, projects]);
 
   const formatDate = (dateInput: any) => {
