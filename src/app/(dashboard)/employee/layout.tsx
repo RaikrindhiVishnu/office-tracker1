@@ -21,9 +21,12 @@ export default function EmployeeLayout({
         return;
       }
 
-      const role = userData.accountType?.toUpperCase().trim();
+      const role = (userData.accountType ?? userData.role ?? "").toString().trim().toUpperCase();
 
-      if (role !== "EMPLOYEE") {
+      // Allow EMPLOYEE, LEAD, and department-based roles that use the employee dashboard
+      const allowedEmployeeRoles = ["EMPLOYEE", "LEAD", "FINANCE", "SALES", "IT", "OPERATIONS", "MARKETING", "EXECUTIVE", "CUSTOMERSUPPORT", "CUSTOMER_SUPPORT"];
+      
+      if (!allowedEmployeeRoles.includes(role)) {
         router.replace("/login");
       }
     }
