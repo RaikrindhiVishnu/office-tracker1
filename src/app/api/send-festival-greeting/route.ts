@@ -67,8 +67,8 @@ export async function POST(req: NextRequest) {
 
         sent++;
 
-        // Delay to prevent rate limiting
-        await new Promise(res => setTimeout(res, 400));
+        // Delay of 4000ms to prevent Gmail rate limiting and spam flagging
+        await new Promise(res => setTimeout(res, 4000));
 
       } catch (err: any) {
         errors.push(`${r.email}: ${err.message}`);

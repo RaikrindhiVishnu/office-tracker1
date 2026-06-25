@@ -948,7 +948,7 @@ export function KanbanBoard({
     if (isCollapsed) {
       return (
         <div
-          style={{ width: "44px", minWidth: "44px", borderRight: "1px solid #e8ecf0", background: "#fff", display: "flex", flexDirection: "column", alignItems: "center", padding: "12px 0", gap: "8px", transition: "all 0.2s", flexShrink: 0 }}
+          className="w-[44px] min-w-[44px] shrink-0 border-r border-[#e8ecf0] bg-white flex flex-col items-center py-3 gap-2 transition-all"
           onDragOver={e => handleDragOver(e, col.id)}
           onDrop={e => handleDrop(e, col.id)}
           onDragLeave={handleDragLeave}
@@ -963,13 +963,10 @@ export function KanbanBoard({
 
     return (
       <div
+        className="w-[85vw] min-w-[85vw] sm:w-[272px] sm:min-w-[272px] shrink-0 border-r border-[#e8ecf0] flex flex-col h-full overflow-hidden snap-center"
         style={{
-          width: "272px", minWidth: "272px", borderRight: "1px solid #e8ecf0",
           background: isOver ? `${cfg.dot}08` : "#fff",
-          display: "flex", flexDirection: "column",
-          height: "100%",
-          transition: "background 0.15s", flexShrink: 0,
-          overflow: "hidden",
+          transition: "background 0.15s"
         }}
         onDragOver={e => handleDragOver(e, col.id)}
         onDrop={e => handleDrop(e, col.id)}
@@ -1761,7 +1758,7 @@ export function KanbanBoard({
       {/* ── Board / Swimlane ── */}
       {viewMode === "board" ? (
         <div style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden" }}>
-          <div style={{ display: "flex", flex: 1, overflowX: "auto", overflowY: "hidden", height: "100%" }}>
+          <div className="flex flex-1 overflow-x-auto overflow-y-hidden h-full snap-x snap-mandatory scroll-p-2 hide-scrollbar">
             {columns.map((col, i) => <Fragment key={col.id}>{renderKanbanColumn(col, i)}</Fragment>)}
 
             {/* Add KanbanColumn */}

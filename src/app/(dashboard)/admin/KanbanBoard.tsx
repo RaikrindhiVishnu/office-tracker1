@@ -1709,8 +1709,8 @@ export function KanbanBoard({
               else handleTaskDrop(e, col.id);
             }}
             /* KEY FIX: explicit height:100% + min-h-0 so column fills the board row */
-            className={`flex flex-col min-h-0 shrink-0 transition-all duration-200 border-r border-gray-100 ${canManage && !isCollapsed ? "cursor-grab active:cursor-grabbing" : ""}`}
-            style={{ width: isCollapsed ? "48px" : "280px", height: "100%", background: isCollapsed ? "#f8fafc" : "#fff" }}
+            className={`flex flex-col min-h-0 shrink-0 transition-all duration-200 border-r border-gray-100 snap-center ${canManage && !isCollapsed ? "cursor-grab active:cursor-grabbing" : ""} ${isCollapsed ? "w-[48px] min-w-[48px]" : "w-[85vw] min-w-[85vw] sm:w-[280px] sm:min-w-[280px]"}`}
+            style={{ height: "100%", background: isCollapsed ? "#f8fafc" : "#fff" }}
           >
             {/* Column Header */}
             <div
@@ -1942,11 +1942,11 @@ export function KanbanBoard({
            * overflow-x-auto here, overflow-y hidden (columns own their vertical scroll).
            */
           <div
-            className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden kb-scroll border-t border-gray-100"
+            className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden kb-scroll border-t border-gray-100 snap-x snap-mandatory scroll-p-2"
             style={{ display: "flex", alignItems: "stretch" }}
           >
-            {/* min-w-max ensures columns don't compress; height:100% lets columns fill vertically */}
-            <div style={{ display: "flex", minWidth: "max-content", height: "100%" }}>
+            {/* height:100% lets columns fill vertically */}
+            <div style={{ display: "flex", height: "100%" }}>
               {renderBoardView()}
             </div>
           </div>

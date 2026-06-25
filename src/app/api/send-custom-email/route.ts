@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
         // Replace {name} placeholder for personalisation
         const personalBody = body.replace(/\{name\}/gi, r.name || r.email);
 
-        const logoPath = path.join(process.cwd(), "public", "logo.svg");
+        const logoPath = path.join(process.cwd(), "public", "logo-black.svg");
         const logoAttachment = {
           filename: "logo.svg",
           path: logoPath,
@@ -69,8 +69,8 @@ export async function POST(req: NextRequest) {
 
         sent++;
 
-        // 500ms delay between emails — same as other routes
-        await new Promise(res => setTimeout(res, 500));
+        // 4000ms delay between emails to prevent Gmail bulk spam flagging
+        await new Promise(res => setTimeout(res, 4000));
 
       } catch (err: any) {
         errors.push(`${r.email}: ${err.message}`);

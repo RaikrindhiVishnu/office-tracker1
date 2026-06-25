@@ -223,7 +223,7 @@ export default function EmployeeTasksView({ user }: { user: any }) {
               placeholder="Search task, description..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-4 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 w-[240px] transition-all"
+              className="pl-9 pr-4 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 w-full sm:w-[240px] transition-all"
             />
           </div>
 
@@ -231,7 +231,7 @@ export default function EmployeeTasksView({ user }: { user: any }) {
             <select
               value={filterProject}
               onChange={(e) => setFilterProject(e.target.value)}
-              className="pl-3 pr-8 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm cursor-pointer appearance-none w-[180px] bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2224%22%20height%3D%2224%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20stroke%3D%22%236b7280%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:calc(100%-8px)_center] bg-[length:14px]"
+              className="pl-3 pr-8 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-lg text-xs font-medium focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm cursor-pointer appearance-none w-full sm:w-[180px] bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2224%22%20height%3D%2224%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20stroke%3D%22%236b7280%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:calc(100%-8px)_center] bg-[length:14px]"
             >
               <option value="All">All Projects</option>
               {uniqueProjects.map(p => (
