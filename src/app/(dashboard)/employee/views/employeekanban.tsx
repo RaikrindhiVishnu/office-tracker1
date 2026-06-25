@@ -631,7 +631,17 @@ export function KanbanBoard({
   const dragGhostRef = useRef<HTMLElement | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setLocalTasks(tasks); }, [tasks]);
+  useEffect(() => {
+    const validColIds = new Set(columns.map(c => c.id));
+    const fallbackId = columns.length > 0 ? columns[0].id : "new";
+    const mappedTasks = tasks.map(t => {
+      if (!validColIds.has(t.status)) {
+        return { ...t, status: fallbackId };
+      }
+      return t;
+    });
+    setLocalTasks(mappedTasks);
+  }, [tasks, columns]);
 
   /* ── Keyboard shortcuts ── */
   useEffect(() => {

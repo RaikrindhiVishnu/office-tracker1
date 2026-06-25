@@ -57,6 +57,7 @@ export const BottomSheetNotification: React.FC<BottomSheetNotificationProps> = (
     return () => { document.body.style.overflow = "unset"; };
   }, [isOpen]);
 
+
   // Combine system notifications (like task assignments) with chat notifications
   const allNotifications = [
     ...systemNotifications.map(n => ({ ...n, isChat: false, read: n.isRead })),
@@ -77,6 +78,12 @@ export const BottomSheetNotification: React.FC<BottomSheetNotificationProps> = (
   const unreadItems = allNotifications.filter(n => !n.read);
   const readItems = allNotifications.filter(n => n.read);
   const totalUnreadCount = unreadItems.length;
+
+  useEffect(() => {
+    if (isOpen && totalUnreadCount > 0) {
+      handleMarkAllRead();
+    }
+  }, [isOpen, totalUnreadCount]);
 
   const handleMarkRead = async (n: any) => {
     if (n.read) return;

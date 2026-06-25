@@ -459,6 +459,19 @@ export const MobileDashboard: React.FC = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [scrollDirection, setScrollDirection] = useState<"up" | "down">("up");
 
+  const [isOffline, setIsOffline] = useState(false);
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    if (typeof navigator !== 'undefined' && !navigator.onLine) setIsOffline(true);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
   // ── Native Mobile: Pull-to-Refresh & Swipe Gestures ──
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pullProgress, setPullProgress] = useState(0);
@@ -900,9 +913,16 @@ export const MobileDashboard: React.FC = () => {
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
+      {/* Offline Banner */}
+      {isOffline && (
+        <div className="bg-red-500 text-white text-xs font-bold py-1.5 text-center shadow-md w-full sticky top-0 z-[100]">
+          You are currently offline. Please check your connection.
+        </div>
+      )}
+
       {/* Global Branded Header — for all tabs except chat */}
       {activeTab !== "chat" && (
-        <div className={`px-4 pt-3 pb-1 flex items-center justify-between sticky top-0 z-40 transition-transform duration-500 ease-in-out ${isScrolled ? "bg-white shadow-sm border-b border-gray-200" : "bg-[#e0e7ff]"} ${scrollDirection === "down" ? "-translate-y-[150%]" : "translate-y-0"}`}>
+        <div className={`px-4 pt-[max(12px,env(safe-area-inset-top))] pb-1 flex items-center justify-between sticky top-0 z-40 transition-transform duration-500 ease-in-out ${isScrolled ? "bg-white shadow-sm border-b border-gray-200" : "bg-[#e0e7ff]"} ${scrollDirection === "down" ? "-translate-y-[150%]" : "translate-y-0"}`}>
           <div className="flex items-center gap-2">
             <Image src="/logo-black.svg" alt="TGY CRM Logo" width={85} height={50} className="object-contain" priority />
           </div>
@@ -2148,8 +2168,8 @@ export const MobileDashboard: React.FC = () => {
 
 
 
-      {/* Floating Glass Bottom Navigation Bar */}
-      <nav className={`fixed bottom-5 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-[480px] bg-white/70 backdrop-blur-2xl border border-white/60 rounded-[28px] shadow-[0_8px_30px_rgb(0,0,0,0.08)] py-2 px-6 flex items-center justify-between z-50 transition-transform duration-500 ease-in-out ${(scrollDirection === "down" || activeTab === "chat") ? "translate-y-[200px]" : "translate-y-0"}`}>
+      {/* Flat Bottom Navigation Bar */}
+      <nav className={`fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-2xl border-t border-gray-200 shadow-[0_-4px_20px_rgb(0,0,0,0.05)] pt-2 pb-[max(8px,env(safe-area-inset-bottom))] px-6 flex items-center justify-between z-50 transition-transform duration-500 ease-in-out ${(scrollDirection === "down" || activeTab === "chat") ? "translate-y-[200px]" : "translate-y-0"}`}>
         {/* Home */}
         <button
           onClick={() => { setActiveTab("home"); triggerHaptic('light'); }}
