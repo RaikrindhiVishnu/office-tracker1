@@ -10,6 +10,7 @@ export default function TeamTasksView({ user }: { user: any }) {
   const [tasks, setTasks] = useState<any[]>([]);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [allProjects, setAllProjects] = useState<any[]>([]);
+  const [projectColumns, setProjectColumns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -40,6 +41,45 @@ export default function TeamTasksView({ user }: { user: any }) {
     };
     return map[norm] || "New";
   };
+
+  const getDisplayStatus = (task: any) => {
+    const defaultMap: Record<string, string> = {
+      new: "New",
+      dev_in_progress: "Dev In Progress",
+      unit_testing: "Unit Testing",
+      ready_for_qa: "Ready For QA",
+      testing_in_progress: "Testing In Progress",
+      reopened: "Reopened",
+      done: "Done",
+      r_and_d: "R & D",
+      Completed: "Done"
+    };
+
+    if (defaultMap[task.status]) return defaultMap[task.status];
+
+    const proj = allProjects.find(p => p.id === task.projectId || p.name === task.projectName || p.name === task.project);
+    if (proj && proj.kanbanColumns) {
+      const col = proj.kanbanColumns.find((c: any) => c.id === task.status);
+      if (col) return col.label;
+    }
+    
+    if (proj) {
+      const pCols = projectColumns.find(pc => pc.projectId === proj.id);
+      if (pCols && pCols.columns) {
+        const col = pCols.columns.find((c: any) => c.id === task.status);
+        if (col) return col.label;
+      }
+    } else if (task.projectId) {
+      const pCols = projectColumns.find(pc => pc.projectId === task.projectId);
+      if (pCols && pCols.columns) {
+        const col = pCols.columns.find((c: any) => c.id === task.status);
+        if (col) return col.label;
+      }
+    }
+
+    return task.status || "New";
+  };
+
 
   const [filterTime, setFilterTime] = useState<"All Time" | "This Month" | "Today" | "Custom">("All Time");
   const [customStart, setCustomStart] = useState("");
@@ -82,6 +122,11 @@ export default function TeamTasksView({ user }: { user: any }) {
         setAllProjects(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       });
       unsubscribeFunctions.push(unsubProjects);
+      
+      const unsubProjectCols = onSnapshot(collection(db, "projectColumns"), (snap) => {
+        setProjectColumns(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+      unsubscribeFunctions.push(unsubProjectCols);
 
       // Firestore 'in' queries are limited to 10 elements
       const chunks = [];
@@ -664,7 +709,7 @@ export default function TeamTasksView({ user }: { user: any }) {
                                 getMappedStatus(t.status) === 'Testing' ? 'bg-purple-100 text-purple-700' : 
                                 getMappedStatus(t.status) === 'Dev In Progress' ? 'bg-amber-100 text-amber-700' : 
                                 'bg-slate-100 text-slate-700'}`}>
-                              {getMappedStatus(t.status)}
+                              {getDisplayStatus(t)}
                             </span>
                           </div>
                         </td>
