@@ -274,7 +274,7 @@ export const MobileDashboard: React.FC = () => {
 
   // Navigation tab state
   const [activeTab, setActiveTab] = useState<
-    "home" | "attendance" | "standup" | "assistant" | "approvals" | "emergency" | "projects" | "payslips" | "profile" | "leave" | "help" | "directory" | "chat" | "calendar" | "more"
+    "home" | "attendance" | "standup" | "assistant" | "approvals" | "emergency" | "projects" | "payslips" | "profile" | "leave" | "help" | "directory" | "chat" | "calendar" | "more" | "daily-sheet"
   >("home");
 
   // Firestore state for Project Management
