@@ -251,7 +251,72 @@ export default function EmployeeTasksView({ user }: { user: any }) {
         </div>
       </div>
 
-      <div className="overflow-x-auto pb-4">
+      {/* ── MOBILE VIEW (CARD LAYOUT) ── */}
+      <div className="lg:hidden mx-2 sm:mx-4 mb-6 space-y-4 pt-4">
+        {filteredTasks.length === 0 ? (
+          <div className="p-8 text-center text-sm text-gray-500 bg-white rounded-xl shadow-sm border border-gray-100">No tasks found matching your criteria.</div>
+        ) : filteredTasks.map((t: any) => {
+          const label = getStatusLabel(t);
+          const isCompleted = t.status === "done" || t.status === "Completed" || label.toLowerCase() === "done" || label.toLowerCase() === "completed";
+          const isWorking = t.status === "in progress" || t.status === "In Progress" || t.status === "dev_in_progress" || label.toLowerCase().includes("progress");
+          const assignedByUser = users.find(u => u.uid === t.createdBy);
+          const assignedByName = t.createdByName || assignedByUser?.name || assignedByUser?.displayName || assignedByUser?.email?.split('@')[0] || "Unassigned";
+
+          const deadlineStr = t.dueDate || t.expectedCompletionDate;
+          const isLate = deadlineStr && new Date(deadlineStr) < new Date() && t.status !== 'Completed' && t.status !== 'done';
+          const deadlineText = deadlineStr ? new Date(deadlineStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : "No deadline";
+
+          return (
+            <div key={t.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-3">
+              {/* Header: Title & Status */}
+              <div className="flex justify-between items-start gap-2">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900 leading-tight">{t.title || t.taskName}</h3>
+                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">{t.description}</p>
+                </div>
+                <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold ${isCompleted ? 'bg-green-100 text-green-700' : isWorking ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'}`}>
+                  {label}
+                </span>
+              </div>
+
+              {/* Details Grid */}
+              <div className="grid grid-cols-2 gap-y-2 mt-1">
+                <div>
+                  <span className="block text-[10px] text-gray-400 font-medium uppercase tracking-wider">Priority</span>
+                  <div className={`mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold ${t.priority === 'High' || t.priority === 'Critical' ? 'text-red-600' : t.priority === 'Medium' ? 'text-yellow-600' : 'text-blue-600'}`}>
+                    <div className={`w-1.5 h-1.5 rounded-full ${t.priority === 'High' || t.priority === 'Critical' ? 'bg-red-500' : t.priority === 'Medium' ? 'bg-yellow-500' : 'bg-blue-500'}`}></div>
+                    {t.priority || 'Medium'}
+                  </div>
+                </div>
+                <div>
+                  <span className="block text-[10px] text-gray-400 font-medium uppercase tracking-wider">Created By</span>
+                  <div className="mt-0.5 flex items-center gap-1.5">
+                    <div className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[8px] font-bold shrink-0">
+                      {(assignedByName)[0].toUpperCase()}
+                    </div>
+                    <span className="text-[11px] font-semibold text-gray-700 truncate">{assignedByName}</span>
+                  </div>
+                </div>
+                <div>
+                  <span className="block text-[10px] text-gray-400 font-medium uppercase tracking-wider">Assigned</span>
+                  <span className="block mt-0.5 text-[11px] font-medium text-gray-700">
+                    {t.createdAt?.seconds ? new Date(t.createdAt.seconds * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'Unknown'}
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-[10px] text-gray-400 font-medium uppercase tracking-wider">Deadline</span>
+                  <span className={`block mt-0.5 text-[11px] font-medium ${isLate ? 'text-red-600 font-bold' : 'text-gray-700'}`}>
+                    {deadlineText}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── DESKTOP VIEW (TABLE) ── */}
+      <div className="hidden lg:block overflow-x-auto pb-4">
         <table className="w-full text-left border-collapse min-w-[800px]">
           <thead>
             <tr className="border-b border-gray-200 text-[11px] text-gray-500 font-medium bg-white">

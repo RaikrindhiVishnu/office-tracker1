@@ -2466,9 +2466,9 @@ function ProjectsPage({ user, projects, users, allProjectTasks, onOpenProject, o
 /* ═══════════════════════════════════════════
    MAIN COMPONENT
 ═══════════════════════════════════════════ */
-export default function ProjectManagement({ user, projects, users, setSidebarCollapsed }: any) {
+export default function ProjectManagement({ user, projects, users, setSidebarCollapsed, isMobilePwa = false }: any) {
   const [viewStack, setViewStack] = useState<Task[]>([]);
-  const [activeTab, setActiveTab] = useState<AppTab>("dashboard");
+  const [activeTab, setActiveTab] = useState<AppTab>(isMobilePwa ? "projects" : "dashboard");
   const [activeProject, setActiveProject] = useState<any>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
 
@@ -3188,28 +3188,31 @@ export default function ProjectManagement({ user, projects, users, setSidebarCol
   return (
     <div className="min-h-screen bg-gray-50" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap');`}</style>
-      <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      
+      {!isMobilePwa && (
+        <div className="bg-white border-b border-gray-200 shadow-sm">
+          <div className="px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
 
-          <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl w-full sm:w-auto overflow-x-auto scrollbar-none">
-            {([
-              ["dashboard", "Dashboard", <LayoutGrid key="dashboard" className="w-3.5 h-3.5" />],
-              ["projects", "Projects", <Folder key="projects" className="w-3.5 h-3.5" />],
-              ["dailysheet", "Daily Sheet", <Calendar key="dailysheet" className="w-3.5 h-3.5" />],
-              ["notifications", "Inbox", <Bell key="notifications" className="w-3.5 h-3.5" />],
-            ] as [AppTab, string, React.ReactNode][]).map(([t, label, icon]) => (
-              <button key={t} onClick={() => setActiveTab(t)}
-                className={`flex-1 sm:flex-initial whitespace-nowrap px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 active:scale-95 ${activeTab === t ? "bg-white text-[#282B3E] shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
-                {icon}
-                {label}
-                {t === "notifications" && unreadCount > 0 && <span className="ml-1 bg-red-500 text-white text-[9px] font-black rounded-full px-1.5 py-0.5">{unreadCount}</span>}
-              </button>
-            ))}
+            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl w-full sm:w-auto overflow-x-auto scrollbar-none">
+              {([
+                ["dashboard", "Dashboard", <LayoutGrid key="dashboard" className="w-3.5 h-3.5" />],
+                ["projects", "Projects", <Folder key="projects" className="w-3.5 h-3.5" />],
+                ["dailysheet", "Daily Sheet", <Calendar key="dailysheet" className="w-3.5 h-3.5" />],
+                ["notifications", "Inbox", <Bell key="notifications" className="w-3.5 h-3.5" />],
+              ] as [AppTab, string, React.ReactNode][]).map(([t, label, icon]) => (
+                <button key={t} onClick={() => setActiveTab(t)}
+                  className={`flex-1 sm:flex-initial whitespace-nowrap px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 active:scale-95 ${activeTab === t ? "bg-white text-[#282B3E] shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+                  {icon}
+                  {label}
+                  {t === "notifications" && unreadCount > 0 && <span className="ml-1 bg-red-500 text-white text-[9px] font-black rounded-full px-1.5 py-0.5">{unreadCount}</span>}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="w-full px-4 py-6 space-y-6">
+      <div className={`w-full px-4 space-y-6 ${isMobilePwa ? 'py-2' : 'py-6'}`}>
         {activeTab === "dailysheet" && (
           <div className="h-[calc(100vh-140px)] rounded-2xl overflow-hidden border border-gray-200 shadow-sm bg-white">
             <DailySheetView />

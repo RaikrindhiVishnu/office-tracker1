@@ -25,6 +25,7 @@ import { NotificationCenter } from "../notifications/NotificationCenter";
 import OrgChart from "../../components/OrgChart";
 import { BottomSheetNotification } from "./BottomSheetNotification";
 import DailySheetView from "../../app/(dashboard)/employee/views/DailySheetView";
+import EmployeeTasksView from "../../app/(dashboard)/employee/views/EmployeeTasksView";
 import {
   Home,
   UserCheck,
@@ -103,13 +104,18 @@ const ActiveProjectsSlider = ({ projects, users, setActiveTab }: any) => {
 
   const touchStartX = React.useRef(0);
   const touchEndX = React.useRef(0);
+  const isDragging = React.useRef(false);
 
   const handleTouchStart = (e: any) => {
     touchStartX.current = e.targetTouches[0].clientX;
+    isDragging.current = false;
     setIsPaused(true);
   };
   const handleTouchMove = (e: any) => {
     touchEndX.current = e.targetTouches[0].clientX;
+    if (Math.abs(touchStartX.current - touchEndX.current) > 10) {
+      isDragging.current = true;
+    }
   };
   const handleTouchEnd = () => {
     setIsPaused(false);
@@ -173,7 +179,13 @@ const ActiveProjectsSlider = ({ projects, users, setActiveTab }: any) => {
             return (
               <div key={p.id} className="w-full shrink-0 px-4">
                 <div
-                  onClick={() => setActiveTab("projects")}
+                  onClick={(e) => {
+                    if (isDragging.current) {
+                      e.preventDefault();
+                      return;
+                    }
+                    setActiveTab("projects");
+                  }}
                   className="rounded-[16px] p-5 w-full shadow-[0_4px_20px_rgba(0,0,0,0.08)] flex flex-col hover:shadow-[0_8px_30px_rgba(0,0,0,0.15)] active:scale-[0.98] transition-all duration-300 cursor-pointer relative overflow-hidden group h-[220px]"
                 >
                   <div className="absolute inset-0 z-0">
@@ -273,9 +285,28 @@ export const MobileDashboard: React.FC = () => {
   const searchParams = useSearchParams();
 
   // Navigation tab state
-  const [activeTab, setActiveTab] = useState<
-    "home" | "attendance" | "standup" | "assistant" | "approvals" | "emergency" | "projects" | "payslips" | "profile" | "leave" | "help" | "directory" | "chat" | "calendar" | "more" | "daily-sheet"
+  const [activeTab, setActiveTabState] = useState<
+    "home" | "attendance" | "standup" | "assistant" | "approvals" | "emergency" | "projects" | "payslips" | "profile" | "leave" | "help" | "directory" | "chat" | "calendar" | "more" | "daily-sheet" | "tasks"
   >("home");
+
+  const setActiveTab = React.useCallback((tab: any) => {
+    setActiveTabState(tab);
+    window.history.pushState({ tab }, "", `?tab=${tab}`);
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      if (e.state && e.state.tab) {
+        setActiveTabState(e.state.tab);
+      } else {
+        const params = new URLSearchParams(window.location.search);
+        const t = params.get("tab");
+        setActiveTabState((t as any) || "home");
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   // Firestore state for Project Management
   const [users, setUsers] = useState<any[]>([]);
@@ -334,8 +365,7 @@ export const MobileDashboard: React.FC = () => {
 
   const prevUnreadCount = useRef(totalUnread);
   useEffect(() => {
-    if (totalUnread > prevUnreadCount.current) {
-      setShowNotifications(true);
+    if (totalUnread > prevUnreadCount.current && prevUnreadCount.current !== 0) {
       playSound('pop');
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
         navigator.vibrate([25, 40, 25]);
@@ -1724,6 +1754,7 @@ export const MobileDashboard: React.FC = () => {
                   { icon: UserCheck, label: "Check In", tab: "attendance", bg: "bg-sky-50 text-sky-600 hover:bg-sky-100" },
                   { icon: Mic, label: "Standup", tab: "standup", bg: "bg-emerald-50 text-emerald-600 hover:bg-emerald-100" },
                   { icon: FileText, label: "Timesheet", tab: "daily-sheet", bg: "bg-indigo-50 text-indigo-600 hover:bg-indigo-100" },
+                  { icon: FileText, label: "Tasks", tab: "tasks", bg: "bg-cyan-50 text-cyan-600 hover:bg-cyan-100" },
                   { icon: Folder, label: "Projects", tab: "projects", bg: "bg-blue-50 text-blue-600 hover:bg-blue-100" },
                   { icon: Calendar, label: "Leave", tab: "leave", bg: "bg-rose-50 text-rose-600 hover:bg-rose-100" },
                   { icon: MessageSquare, label: "Chat", tab: "chat", bg: "bg-cyan-50 text-cyan-600 hover:bg-cyan-100" },
@@ -2073,6 +2104,13 @@ export const MobileDashboard: React.FC = () => {
         {activeTab === "daily-sheet" && (
           <div className="min-h-screen bg-gray-50 pb-32">
             <DailySheetView />
+          </div>
+        )}
+
+        {/* Tab: TASKS */}
+        {activeTab === "tasks" && (
+          <div className="min-h-screen bg-gray-50 pb-32">
+            <EmployeeTasksView user={user} />
           </div>
         )}
 
