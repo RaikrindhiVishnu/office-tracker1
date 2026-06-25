@@ -24,6 +24,7 @@ import { MobileCalendar } from "./MobileCalendar";
 import { NotificationCenter } from "../notifications/NotificationCenter";
 import OrgChart from "../../components/OrgChart";
 import { BottomSheetNotification } from "./BottomSheetNotification";
+import DailySheetView from "../../app/(dashboard)/employee/views/DailySheetView";
 import {
   Home,
   UserCheck,
@@ -1722,9 +1723,10 @@ export const MobileDashboard: React.FC = () => {
                 {[
                   { icon: UserCheck, label: "Check In", tab: "attendance", bg: "bg-sky-50 text-sky-600 hover:bg-sky-100" },
                   { icon: Mic, label: "Standup", tab: "standup", bg: "bg-emerald-50 text-emerald-600 hover:bg-emerald-100" },
-                  { icon: Folder, label: "Projects", tab: "projects", bg: "bg-indigo-50 text-indigo-600 hover:bg-indigo-100" },
+                  { icon: FileText, label: "Timesheet", tab: "daily-sheet", bg: "bg-indigo-50 text-indigo-600 hover:bg-indigo-100" },
+                  { icon: Folder, label: "Projects", tab: "projects", bg: "bg-blue-50 text-blue-600 hover:bg-blue-100" },
                   { icon: Calendar, label: "Leave", tab: "leave", bg: "bg-rose-50 text-rose-600 hover:bg-rose-100" },
-                  { icon: MessageSquare, label: "Chat", tab: "chat", bg: "bg-blue-50 text-blue-600 hover:bg-blue-100" },
+                  { icon: MessageSquare, label: "Chat", tab: "chat", bg: "bg-cyan-50 text-cyan-600 hover:bg-cyan-100" },
                   { icon: Calendar, label: "Calendar", tab: "calendar", bg: "bg-purple-50 text-purple-600 hover:bg-purple-100" },
                   { icon: FileText, label: "Payslips", tab: "payslips", bg: "bg-orange-50 text-orange-600 hover:bg-orange-100" },
                   { icon: Users, label: "Directory", tab: "directory", bg: "bg-teal-50 text-teal-600 hover:bg-teal-100" },
@@ -2065,6 +2067,13 @@ export const MobileDashboard: React.FC = () => {
         {/* Tab 14: CALENDAR */}
         {activeTab === "calendar" && (
           <MobileCalendar />
+        )}
+
+        {/* Tab: DAILY SHEET */}
+        {activeTab === "daily-sheet" && (
+          <div className="min-h-screen bg-gray-50 pb-32">
+            <DailySheetView />
+          </div>
         )}
 
         {/* Tab 15: MORE */}

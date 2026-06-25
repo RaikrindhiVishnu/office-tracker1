@@ -1074,8 +1074,107 @@ export default function AdminDailySheetsView() {
         </div>
       </div>
 
-      {/* ══ TABLE ═══════════════════════════════════════════════════════════ */}
-      <div className="mx-6 mb-8 bg-white rounded-b-xl border border-slate-200 overflow-hidden shadow-sm">
+      {/* ── MOBILE VIEW (CARD LAYOUT) ── */}
+      <div className="lg:hidden mx-2 sm:mx-6 mb-8 space-y-4">
+        {paginated.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center text-slate-400">
+             <p className="text-sm font-medium">No entries found</p>
+             <p className="text-xs">Try adjusting the filters above.</p>
+          </div>
+        ) : (
+          paginated.map((e: any, idx) => {
+            const name = empName(e.uid);
+            const att = attendanceMap[`${e.uid}_${e.dateStr}`];
+            const docId = e.id!;
+            
+            const isWeekend = e.isMissing && e.stateType === "Weekend";
+            const isAbsent = e.isMissing && e.stateType === "Absent";
+            const isNotFilled = e.isMissing && e.stateType === "Not Filled";
+            const isPending = e.isMissing && !isWeekend && !isAbsent && !isNotFilled;
+
+            const dayTasks: any[] = [];
+            if (!e.isMissing) {
+              if (e.tasks && e.tasks.length > 0) {
+                e.tasks.forEach((t: any) => dayTasks.push({ ...t, entryId: docId, taskId: t.id }));
+              } else if (e.taskTitle) {
+                dayTasks.push({ ...e, entryId: docId, taskId: "legacy_" + docId });
+              }
+            }
+
+            return (
+              <div key={docId} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 relative">
+                 <div className="flex justify-between items-start mb-3 border-b border-slate-100 pb-3">
+                   <div className="flex items-center gap-2">
+                     <div className={`w-8 h-8 rounded-full ${avatarColor(name)} text-white flex items-center justify-center text-xs font-bold shrink-0 ${isWeekend || isPending ? 'opacity-50' : ''}`}>
+                       {initials(name)}
+                     </div>
+                     <div>
+                       <p className="text-sm font-bold text-slate-800 leading-tight">{name}</p>
+                       <p className="text-xs text-slate-500">{e.dateStr} <span className="text-[10px] ml-1">{new Date(e.dateStr + "T00:00:00").toLocaleDateString("en-US", { weekday: "short" })}</span></p>
+                     </div>
+                   </div>
+                   
+                   {/* Status Badge */}
+                   <div>
+                     {isWeekend ? <span className="text-[10px] font-bold uppercase text-slate-500 bg-slate-100 px-2 py-1 rounded">Weekend</span> :
+                      isAbsent ? <span className="text-[10px] font-bold uppercase text-red-700 bg-red-100 px-2 py-1 rounded">Absent</span> :
+                      isNotFilled ? <span className="text-[10px] font-bold uppercase text-amber-700 bg-amber-100 px-2 py-1 rounded">Not Filled</span> :
+                      isPending ? <span className="text-[10px] font-bold uppercase text-red-700 bg-red-100 px-2 py-1 rounded">Not Checked</span> :
+                      e.isHoliday ? <span className="text-[10px] font-bold uppercase text-amber-700 bg-amber-100 px-2 py-1 rounded">Holiday</span> :
+                      e.isDraft ? <span className="text-[10px] font-bold uppercase text-slate-500 bg-slate-100 px-2 py-1 rounded">Draft</span> :
+                      e.status === "Approved" ? <span className="text-[10px] font-bold uppercase text-emerald-700 bg-emerald-100 px-2 py-1 rounded">Approved</span> :
+                      e.status === "Rejected" ? <span className="text-[10px] font-bold uppercase text-rose-700 bg-rose-100 px-2 py-1 rounded">Rejected</span> :
+                      e.status === "Pending Approval" ? <span className="text-[10px] font-bold uppercase text-indigo-700 bg-indigo-100 px-2 py-1 rounded">Approval</span> :
+                      <span className="text-[10px] font-bold uppercase text-emerald-700 bg-emerald-100 px-2 py-1 rounded">Submitted</span>}
+                   </div>
+                 </div>
+
+                 {!isWeekend && !isAbsent && (
+                   <div className="grid grid-cols-3 gap-2 mb-3 bg-slate-50 p-2 rounded-lg border border-slate-100 text-center">
+                     <div>
+                       <div className="text-[9px] font-bold text-slate-400 uppercase">In</div>
+                       <div className="text-xs font-semibold text-indigo-600">{att?.in || "—"}</div>
+                     </div>
+                     <div className="border-x border-slate-200">
+                       <div className="text-[9px] font-bold text-slate-400 uppercase">Out</div>
+                       <div className="text-xs font-semibold text-slate-500">{att?.out || "—"}</div>
+                     </div>
+                     <div>
+                       <div className="text-[9px] font-bold text-slate-400 uppercase">Sys Hrs</div>
+                       <div className="text-xs font-semibold text-slate-700">{att?.sys || "—"}</div>
+                     </div>
+                   </div>
+                 )}
+
+                 {!e.isMissing && (
+                   <div className="mb-3 space-y-2">
+                     {dayTasks.length > 0 ? dayTasks.map((t, i) => (
+                       <div key={t.taskId || i} className="text-xs text-slate-600 border border-slate-100 rounded-lg p-2.5 bg-white shadow-sm relative">
+                         <span className="font-bold text-slate-700">Task {i + 1}: </span>
+                         <span className="font-medium text-slate-700">{t.project} - {t.taskTitle}</span> {t.description && `- ${t.description}`}
+                         <span className="text-[10px] ml-1 text-slate-400 font-bold">({t.hours}h)</span>
+                         {t.status && <span className="ml-2 inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">{t.status}</span>}
+                       </div>
+                     )) : (
+                       <div className="text-xs text-slate-400 italic">No tasks logged</div>
+                     )}
+                   </div>
+                 )}
+
+                 {e.status === "Pending Approval" && (
+                   <div className="flex gap-2 mt-2 pt-2 border-t border-slate-100">
+                     <button onClick={(ev) => handleApprove(docId, ev)} className="flex-1 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded text-xs font-bold hover:bg-emerald-100 transition">Approve</button>
+                     <button onClick={(ev) => handleReject(docId, ev)} className="flex-1 py-1.5 bg-rose-50 text-rose-600 border border-rose-200 rounded text-xs font-bold hover:bg-rose-100 transition">Reject</button>
+                   </div>
+                 )}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* ══ TABLE (DESKTOP ONLY) ═══════════════════════════════════════════════════════════ */}
+      <div className="hidden lg:block mx-6 mb-8 bg-white rounded-b-xl border border-slate-200 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
