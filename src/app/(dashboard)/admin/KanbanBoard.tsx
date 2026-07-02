@@ -1520,7 +1520,7 @@ export function KanbanBoard({
 
   /* ══ TOOLBAR ══ */
   const renderToolbar = () => (
-    <div className="sticky top-0 z-30 flex items-center gap-2 p-2 bg-white border-b border-gray-200 shrink-0 w-full overflow-x-auto">
+    <div className="sticky top-0 z-30 flex flex-wrap items-center gap-2 p-2 bg-white border-b border-gray-200 shrink-0 w-full">
       <div className="flex items-center gap-1.5 shrink-0 bg-gray-50 p-1 rounded-xl border border-gray-100">
         <button onClick={() => setFilters(f => ({ ...f, mine: !f.mine }))}
           className={`h-8 px-2.5 rounded-lg text-[10px] font-bold transition-all border ${filters.mine ? "bg-indigo-600 border-indigo-600 text-white" : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"}`}>

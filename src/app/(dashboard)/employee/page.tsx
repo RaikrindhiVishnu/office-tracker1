@@ -606,8 +606,8 @@ export default function ZohoStyleEmployeeDashboard() {
   }).length;
 
   // ── ✅ NEW: open MeetChat overlay (called from dashboard card + navbar button)
-  const openMeetChat = () => { setChatTargetUid(null); setShowMeetChat(true); };
-  const closeMeetChat = () => { setShowMeetChat(false); setChatTargetUid(null); };
+  const openMeetChat = () => { setChatTargetUid(null); setActiveView("meet"); };
+  const closeMeetChat = () => { setActiveView("dashboard"); setChatTargetUid(null); };
 
   const openChatWith = (uid: string) => {
     setChatTargetUid(uid);
@@ -966,7 +966,14 @@ export default function ZohoStyleEmployeeDashboard() {
             {activeView === "documents" && <DocumentVaultView />}
             {activeView === "profile" && <EnhancedProfileView />}
             {activeView === "help" && <HelpView />}
-            {activeView === "meet" && <MeetView users={users.filter((u: any) => u.uid !== user.uid)} />}
+            {activeView === "meet" && (
+              <MeetChatAppUpdated
+                users={users}
+                isOpen={true}
+                onClose={() => { setActiveView("dashboard"); setChatTargetUid(null); }}
+                targetUid={chatTargetUid}
+              />
+            )}
             {activeView === "tasks" && <EmployeeTasksView user={{ ...user, ...userData }} />}
             {activeView === "team" && <TeamTasksView user={{ ...user, ...userData }} />}
             {activeView === "reports" && <ReportsView user={user} attendance={attendance} />}
@@ -1018,13 +1025,7 @@ export default function ZohoStyleEmployeeDashboard() {
         </div>
       )}
 
-      {/* ✅ MeetChat OVERLAY — rendered at root level so it covers everything */}
-      <MeetChatAppUpdated
-        users={users}
-        isOpen={showMeetChat}
-        onClose={closeMeetChat}
-        targetUid={chatTargetUid}
-      />
+
 
 
 

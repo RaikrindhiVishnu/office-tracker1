@@ -99,6 +99,60 @@ interface DailyTask {
   category: string;
 }
 
+/* ─── MODAL MULTI-SELECT ─── */
+function ModalMultiSelect({
+  label, options, selected, onChange
+}: {
+  label: string;
+  options: { value: string; label: React.ReactNode }[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const toggle = (val: string) => {
+    if (selected.includes(val)) onChange(selected.filter(v => v !== val));
+    else onChange([...selected, val]);
+  };
+
+  return (
+    <div className="relative w-full" ref={ref}>
+      <button type="button" onClick={() => setOpen(!open)}
+        className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white text-left flex items-center justify-between">
+        <div className="flex-1 truncate pr-2 text-gray-700">
+          {selected.length === 0 ? <span className="text-gray-400">Select assignees...</span> : 
+            options.filter(o => selected.includes(o.value)).map(o => o.label).join(", ")}
+        </div>
+        <span className="text-[10px] text-gray-400">▼</span>
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg z-[9999] py-1 max-h-48 overflow-y-auto custom-scrollbar">
+          {options.length === 0 && <div className="px-3 py-2 text-sm text-gray-400">No options available</div>}
+          {options.map(opt => {
+            const isSel = selected.includes(opt.value);
+            return (
+              <div key={opt.value} onClick={() => toggle(opt.value)}
+                className="px-3 py-2 text-sm font-medium text-gray-700 hover:bg-indigo-50 flex items-center justify-between cursor-pointer transition-colors">
+                <div className="flex-1 truncate">{opt.label}</div>
+                <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${isSel ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'}`}>
+                  {isSel && <span className="text-white text-[10px] font-bold">✓</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── CONSTANTS ─── */
 const DEFAULT_COLUMNS: KanbanColumn[] = [
   { id: "new", label: "NEW" },
@@ -1246,29 +1300,24 @@ function TaskModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Assignees</label>
-              <select 
-                multiple
-                value={form.assignees || (form.assignedTo ? [form.assignedTo] : [])}
-                onChange={e => {
-                  const options = Array.from(e.target.selectedOptions).map(o => o.value).filter(Boolean);
+              <ModalMultiSelect
+                label="Assignees"
+                options={[
+                  ...(!isProjectManager && currentUserId ? [{ value: currentUserId, label: (users?.find((u: any) => u.uid === currentUserId)?.displayName?.trim() || users?.find((u: any) => u.uid === currentUserId)?.name?.trim() || "Assign to me") }] : []),
+                  ...(users?.filter((u: any) => isProjectManager || u.uid !== currentUserId).map((u: any) => ({
+                    value: u.uid,
+                    label: u.displayName?.trim() || u.name?.trim() || "Unknown"
+                  })) || [])
+                ]}
+                selected={form.assignees || (form.assignedTo ? [form.assignedTo] : [])}
+                onChange={(options) => {
                   const names = options.map(uid => {
                     const u = users?.find((user: any) => user.uid === uid);
                     return u ? (u.displayName?.trim() || u.name?.trim() || "Unknown") : "Unknown";
                   });
                   setForm(f => ({ ...f, assignees: options, assigneeNames: names, assignedTo: options[0] || "", assignedToName: names[0] || "" }));
                 }}
-                title="Hold Ctrl/Cmd to select multiple"
-                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white custom-scrollbar"
-                style={{ height: "auto", overflowY: "auto", maxHeight: "150px" }}>
-                {!isProjectManager && currentUserId && (
-                  <option value={currentUserId}>
-                    {users?.find((u: any) => u.uid === currentUserId)?.displayName?.trim() || users?.find((u: any) => u.uid === currentUserId)?.name?.trim() || "Assign to me"}
-                  </option>
-                )}
-                {users?.filter((u: any) => isProjectManager || u.uid !== currentUserId).map((u: any) => (
-                  <option key={u.uid} value={u.uid}>{u.displayName?.trim() || u.name?.trim() || "Unknown"}</option>
-                ))}
-              </select>
+              />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">

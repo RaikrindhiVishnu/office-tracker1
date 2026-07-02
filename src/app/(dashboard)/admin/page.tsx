@@ -1211,11 +1211,15 @@ export default function AdminPage() {
 
           {view === "daily-sheet" && <AdminDailySheetsView />}
 
-          {view === "Meet" && <MeetView users={users.filter((u) => u.uid !== user.uid)} />}
+          {view === "Meet" && (
+            <MeetChatApp
+              users={users}
+              isOpen={true}
+              onClose={() => setView("Dashboard")}
+            />
+          )}
 
           <IncomingCallListener />
-          <MeetChatApp users={users} isOpen={showMeet} onClose={() => setShowMeet(false)} />
-
           {view === "accounts" && <AccountsDashboard />}
           {view === "leads" && <LeadsView />}
           {view === "invoices" && <InvoicesView />}
