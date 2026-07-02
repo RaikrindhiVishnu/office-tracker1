@@ -1215,7 +1215,7 @@ export default function AdminPage() {
             <MeetChatApp
               users={users}
               isOpen={true}
-              onClose={() => setView("Dashboard")}
+              onClose={() => setView("dashboard")}
             />
           )}
 
