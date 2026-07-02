@@ -25,6 +25,8 @@ export interface Task {
   sprintId?: string | null;
   assignedTo?: string | null;
   assignedToName?: string | null;
+  assignees?: string[]; // Array of assigned user IDs
+  assigneeNames?: string[]; // Array of assigned user display names
   assignedDate?: string;
   startDate?: string;
   dueDate?: string;

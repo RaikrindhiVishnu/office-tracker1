@@ -23,7 +23,7 @@ export default function AdminLayout({
       return;
     }
 
-    const role = (userData.accountType ?? userData.role ?? "").toString().trim().toUpperCase();
+    const role = (userData.accountType || userData.role || "").toString().trim().toUpperCase();
 
     // ✅ Also allow SUPERADMIN to access admin panel if needed
     if (role !== "ADMIN" && role !== "SUPERADMIN" && role !== "BUSINESSOWNER" && role !== "BUSINESS_OWNER" && role !== "HR") {
@@ -45,7 +45,7 @@ export default function AdminLayout({
   }
 
   // ✅ Don't render children at all if role is wrong
-  const currentRole = (userData?.accountType ?? userData?.role ?? "").toString().trim().toUpperCase();
+  const currentRole = (userData?.accountType || userData?.role || "").toString().trim().toUpperCase();
   if (!userData || (currentRole !== "ADMIN" && currentRole !== "SUPERADMIN" && currentRole !== "BUSINESSOWNER" && currentRole !== "BUSINESS_OWNER" && currentRole !== "HR")) {
     return null;
   }

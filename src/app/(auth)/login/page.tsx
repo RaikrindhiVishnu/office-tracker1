@@ -1,4 +1,5 @@
 "use client";
+// Triggering re-compile to resolve Turbopack error (2)
 
 import { useState } from "react";
 import {
@@ -76,8 +77,8 @@ export default function LoginPage() {
       if (!userSnap.exists()) throw new Error(`PROFILE_NOT_FOUND_FOR_UID: ${cred.user.uid} (${cred.user.email})`);
 
       const userData = userSnap.data();
-      const role = (userData?.accountType ?? userData?.role ?? "").toString().trim().toUpperCase();
-      const department = (userData?.department ?? "").toString().trim().toUpperCase();
+      const role = (userData?.accountType || userData?.role || "").toString().trim().toUpperCase();
+      const department = (userData?.department || "").toString().trim().toUpperCase();
 
       if (userData?.mustChangePassword === true) { router.replace("/change-password"); return; }
 

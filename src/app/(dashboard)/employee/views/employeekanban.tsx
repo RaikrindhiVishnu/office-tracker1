@@ -697,7 +697,7 @@ export function KanbanBoard({
       if (e.key === "s" || e.key === "S") { e.preventDefault(); searchRef.current?.focus(); }
       if (e.key === "Escape") {
         if (isFullscreen) { setIsFullscreen(false); return; }
-        setFilters({ search: "", mine: false, overdue: false, priority: "", type: "", assignee: "", createdBy: "" });
+        setFilters({ search: "", mine: false, overdue: false, priority: "", type: "", assignees: [], labels: [], createdBy: "" });
         setSelectedTasks(new Set());
         setBulkMoveOpen(false);
         setStoryPopup(null);
@@ -738,6 +738,7 @@ export function KanbanBoard({
       if (filters.search) {
         const s = filters.search.toLowerCase();
         if (!(t.title.toLowerCase().includes(s) || (t.taskCode || "").toLowerCase().includes(s) || (t.description || "").toLowerCase().includes(s) || (t.tags || []).some(tag => tag.toLowerCase().includes(s)))) return false;
+      }
       if (filters.mine && t.assignedTo !== currentUserId) return false;
       if (filters.overdue && !isOverdue(t.dueDate, t.status)) return false;
       if (filters.priority && t.priority !== filters.priority) return false;

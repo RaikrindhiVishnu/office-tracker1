@@ -21,7 +21,7 @@ export default function EmployeeLayout({
         return;
       }
 
-      const role = (userData.accountType ?? userData.role ?? "").toString().trim().toUpperCase();
+      const role = (userData.accountType || userData.role || "").toString().trim().toUpperCase();
 
       // Allow EMPLOYEE, LEAD, and department-based roles that use the employee dashboard
       const allowedEmployeeRoles = ["EMPLOYEE", "LEAD", "FINANCE", "SALES", "IT", "OPERATIONS", "MARKETING", "EXECUTIVE", "CUSTOMERSUPPORT", "CUSTOMER_SUPPORT"];
