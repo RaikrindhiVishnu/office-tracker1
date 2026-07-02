@@ -595,6 +595,62 @@ const SWIMLANE_COL_WIDTH = 240;  // px — card column width
 const SWIMLANE_LABEL_WIDTH = 160; // px — left group label column
 
 /* ══════════════════════════════════════════════
+   MultiSelectDropdown
+   ══════════════════════════════════════════════ */
+function MultiSelectDropdown({
+  label, options, selected, onChange
+}: {
+  label: string;
+  options: { value: string; label: React.ReactNode }[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const toggle = (val: string) => {
+    if (selected.includes(val)) onChange(selected.filter(v => v !== val));
+    else onChange([...selected, val]);
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => setOpen(!open)}
+        style={{ height: "32px", padding: "0 10px", fontSize: "10px", fontWeight: 700, borderRadius: "6px", border: "1px solid #e5e7eb", background: "transparent", color: "#374151", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", minWidth: "120px", justifyContent: "space-between" }}>
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+        {selected.length > 0 && <span style={{ background: "#e0e7ff", color: "#4338ca", padding: "0 4px", borderRadius: "4px", fontSize: "9px" }}>{selected.length}</span>}
+        <span style={{ fontSize: "8px", opacity: 0.5, marginLeft: "4px" }}>▼</span>
+      </button>
+      {open && (
+        <div style={{ position: "absolute", top: "100%", left: 0, marginTop: "4px", width: "192px", background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)", zIndex: 100, padding: "4px 0", maxHeight: "240px", overflowY: "auto" }}>
+          {options.length === 0 ? <div style={{ padding: "8px 12px", fontSize: "10px", color: "#9ca3af", textAlign: "center" }}>No options</div> : null}
+          {options.map(opt => {
+            const isSel = selected.includes(opt.value);
+            return (
+              <div key={opt.value} onClick={() => toggle(opt.value)}
+                style={{ padding: "8px 12px", fontSize: "10px", fontWeight: 700, color: "#374151", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}
+                onMouseEnter={e => e.currentTarget.style.background = "#f9fafb"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                <div style={{ flex: 1, minWidth: 0, paddingRight: "8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{opt.label}</div>
+                <div style={{ width: "14px", height: "14px", borderRadius: "4px", border: isSel ? "1px solid #4f46e5" : "1px solid #d1d5db", background: isSel ? "#4f46e5" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {isSel && <span style={{ fontSize: "8px", color: "white" }}>✓</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
    KANBAN BOARD COMPONENT
    ══════════════════════════════════════════════ */
 export function KanbanBoard({
@@ -1687,41 +1743,29 @@ export function KanbanBoard({
 
         {/* Filters */}
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          <select 
-            multiple
-            value={filters.assignees} 
-            onChange={e => {
-              const options = Array.from(e.target.selectedOptions).map(o => o.value);
-              setFilters(f => ({ ...f, assignees: options }));
-            }}
-            style={{ height: "32px", overflowY: "auto", padding: "4px 8px", fontSize: "11px", fontWeight: 700, borderRadius: "6px", border: "1px solid #e5e7eb", width: "120px" }}
-            title="Hold Ctrl/Cmd to select multiple"
-            className="custom-scrollbar"
-          >
-            {users.map((u: any) => <option key={u.uid} value={u.uid}>{u.displayName || u.name}</option>)}
-          </select>
-          {filters.assignees.length > 0 && (
-            <button onClick={() => setFilters(f => ({ ...f, assignees: [] }))} style={{ border: "none", background: "none", color: "#ef4444", fontSize: "12px", cursor: "pointer", marginLeft: "-6px" }}>✕</button>
-          )}
+          <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+            <MultiSelectDropdown
+              label="Assignees"
+              options={users.map((u: any) => ({ value: u.uid, label: u.displayName || u.name }))}
+              selected={filters.assignees}
+              onChange={assignees => setFilters(f => ({ ...f, assignees }))}
+            />
+            {filters.assignees.length > 0 && (
+              <button onClick={() => setFilters(f => ({ ...f, assignees: [] }))} style={{ position: "absolute", top: "-4px", right: "-4px", width: "16px", height: "16px", background: "#ef4444", color: "white", borderRadius: "50%", fontSize: "8px", fontWeight: "bold", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10 }}>✕</button>
+            )}
+          </div>
 
-          <select 
-            multiple
-            value={filters.labels} 
-            onChange={e => {
-              const options = Array.from(e.target.selectedOptions).map(o => o.value);
-              setFilters(f => ({ ...f, labels: options }));
-            }}
-            style={{ height: "32px", overflowY: "auto", padding: "4px 8px", fontSize: "11px", fontWeight: 700, borderRadius: "6px", border: "1px solid #e5e7eb", width: "100px" }}
-            title="Hold Ctrl/Cmd to select multiple"
-            className="custom-scrollbar"
-          >
-            {Array.from(new Map(tasks.flatMap(t => t.labels || []).map(l => [l.id, l])).values()).map(l => (
-               <option key={l.id} value={l.id}>{l.title}</option>
-            ))}
-          </select>
-          {filters.labels.length > 0 && (
-            <button onClick={() => setFilters(f => ({ ...f, labels: [] }))} style={{ border: "none", background: "none", color: "#ef4444", fontSize: "12px", cursor: "pointer", marginLeft: "-6px" }}>✕</button>
-          )}
+          <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+            <MultiSelectDropdown
+              label="Labels"
+              options={Array.from(new Map(tasks.flatMap(t => t.labels || []).map(l => [l.id, l])).values()).map(l => ({ value: l.id, label: l.title }))}
+              selected={filters.labels}
+              onChange={labels => setFilters(f => ({ ...f, labels }))}
+            />
+            {filters.labels.length > 0 && (
+              <button onClick={() => setFilters(f => ({ ...f, labels: [] }))} style={{ position: "absolute", top: "-4px", right: "-4px", width: "16px", height: "16px", background: "#ef4444", color: "white", borderRadius: "50%", fontSize: "8px", fontWeight: "bold", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10 }}>✕</button>
+            )}
+          </div>
 
           <button
             onClick={() => setFilters({ search: "", mine: false, overdue: false, priority: "", type: "", assignees: [], labels: [], createdBy: "" })}

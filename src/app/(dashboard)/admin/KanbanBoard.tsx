@@ -303,6 +303,57 @@ function BulkActionBar({ count, columns, projectColor, onDelete, onMove, onClear
   );
 }
 
+function MultiSelectDropdown({
+  label, options, selected, onChange
+}: {
+  label: string;
+  options: { value: string; label: React.ReactNode }[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const toggle = (val: string) => {
+    if (selected.includes(val)) onChange(selected.filter(v => v !== val));
+    else onChange([...selected, val]);
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => setOpen(!open)}
+        className="h-8 px-2.5 text-[10px] font-bold border border-gray-200 rounded-lg text-gray-700 bg-transparent hover:bg-gray-50 flex items-center gap-1.5 transition-colors cursor-pointer w-auto min-w-[120px] justify-between">
+        <span className="truncate">{label}</span>
+        {selected.length > 0 && <span className="bg-indigo-100 text-indigo-700 px-1 rounded text-[9px]">{selected.length}</span>}
+        <span className="text-[8px] opacity-50 ml-1">▼</span>
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-[100] py-1 max-h-60 overflow-y-auto custom-scrollbar">
+          {options.length === 0 ? <div className="px-3 py-2 text-[10px] text-gray-400 text-center">No options</div> : null}
+          {options.map(opt => {
+            const isSel = selected.includes(opt.value);
+            return (
+              <div key={opt.value} onClick={() => toggle(opt.value)}
+                className="px-3 py-2 text-[10px] font-bold text-gray-700 hover:bg-gray-50 flex items-center justify-between cursor-pointer transition-colors">
+                <div className="flex-1 min-w-0 pr-2 truncate">{opt.label}</div>
+                <div className={`w-3.5 h-3.5 rounded flex items-center justify-center shrink-0 ${isSel ? 'bg-indigo-600' : 'border border-gray-300'}`}>
+                  {isSel && <span className="text-[8px] text-white">✓</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function LabelPicker({
   selectedLabels = [],
   onChange,
@@ -1481,39 +1532,23 @@ export function KanbanBoard({
         </button>
       </div>
       <div className="flex items-center gap-1.5 shrink-0 bg-white p-1 rounded-xl border border-gray-100 relative group">
-        <select 
-          multiple
-          value={filters.assignees}
-          onChange={(e) => {
-            const options = Array.from(e.target.selectedOptions).map(o => o.value);
-            setFilters(f => ({ ...f, assignees: options }));
-          }}
-          className="h-8 px-2 text-[10px] font-bold border border-gray-200 rounded-lg text-gray-700 outline-none bg-transparent hover:bg-gray-50 cursor-pointer w-32 custom-scrollbar"
-          style={{ height: '32px', overflowY: 'auto' }}
-          title="Hold Ctrl/Cmd to select multiple"
-        >
-          {users.map(u => <option key={u.uid} value={u.uid}>{u.displayName || u.name}</option>)}
-        </select>
+        <MultiSelectDropdown
+          label="Assignees"
+          options={users.map(u => ({ value: u.uid, label: u.displayName || u.name }))}
+          selected={filters.assignees}
+          onChange={(assignees) => setFilters(f => ({ ...f, assignees }))}
+        />
         {filters.assignees.length > 0 && (
           <button onClick={() => setFilters(f => ({ ...f, assignees: [] }))} className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[8px] flex items-center justify-center font-bold shadow-sm z-10 hover:bg-red-600">✕</button>
         )}
       </div>
       <div className="flex items-center gap-1.5 shrink-0 bg-white p-1 rounded-xl border border-gray-100 relative group">
-        <select 
-          multiple
-          value={filters.labels}
-          onChange={(e) => {
-            const options = Array.from(e.target.selectedOptions).map(o => o.value);
-            setFilters(f => ({ ...f, labels: options }));
-          }}
-          className="h-8 px-2 text-[10px] font-bold border border-gray-200 rounded-lg text-gray-700 outline-none bg-transparent hover:bg-gray-50 cursor-pointer w-28 custom-scrollbar"
-          style={{ height: '32px', overflowY: 'auto' }}
-          title="Hold Ctrl/Cmd to select multiple"
-        >
-          {Array.from(new Map(tasks.flatMap(t => t.labels || []).map(l => [l.id, l])).values()).map(l => (
-             <option key={l.id} value={l.id}>{l.title}</option>
-          ))}
-        </select>
+        <MultiSelectDropdown
+          label="Labels"
+          options={Array.from(new Map(tasks.flatMap(t => t.labels || []).map(l => [l.id, l])).values()).map(l => ({ value: l.id, label: l.title }))}
+          selected={filters.labels}
+          onChange={(labels) => setFilters(f => ({ ...f, labels }))}
+        />
         {filters.labels.length > 0 && (
           <button onClick={() => setFilters(f => ({ ...f, labels: [] }))} className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[8px] flex items-center justify-center font-bold shadow-sm z-10 hover:bg-red-600">✕</button>
         )}
