@@ -1738,7 +1738,7 @@ export function KanbanBoard({
     }}>
 
       {/* ── Toolbar ── */}
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 14px", borderBottom: "1px solid #e5e7eb", flexShrink: 0, flexWrap: "nowrap", overflowX: "auto", whiteSpace: "nowrap", background: "#fff", zIndex: 20 }}>
+      <div style={{ position: "relative", display: "flex", alignItems: "center", gap: "8px", padding: "10px 14px", borderBottom: "1px solid #e5e7eb", flexShrink: 0, flexWrap: "wrap", background: "#fff", zIndex: 100 }}>
         {toolbarPrefix}
 
         {/* Filters */}
