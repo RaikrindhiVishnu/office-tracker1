@@ -49,7 +49,7 @@ const DOW_SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - 2 + i);
-const DEFAULT_LATE_THRESHOLD: LateThreshold = { hour: 10, minute: 15 };
+const DEFAULT_LATE_THRESHOLD: LateThreshold = { hour: 9, minute: 0 };
 
 const BREAK_ICONS: Record<string, string> = { MORNING: "☕", LUNCH: "🍽️", EVENING: "🌇" };
 
@@ -577,10 +577,24 @@ export default function AttendanceDashboard({
   // NEW: track whether all-emp PDF print is in progress
   const [printingAllEmp, setPrintingAllEmp] = useState(false);
 
-  const [lateThreshold, setLateThreshold] = useState<LateThreshold>(lateThresholdProp ?? DEFAULT_LATE_THRESHOLD);
+  const [lateThreshold, setLateThreshold] = useState<LateThreshold>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("lateThreshold");
+      if (stored) {
+        try { return JSON.parse(stored); } catch (e) {}
+      }
+    }
+    return lateThresholdProp ?? DEFAULT_LATE_THRESHOLD;
+  });
   useEffect(() => { if (lateThresholdProp) setLateThreshold(lateThresholdProp); }, [lateThresholdProp]);
 
-  function handleSaveThreshold(t: LateThreshold) { setLateThreshold(t); onSaveLateThreshold?.(t); }
+  function handleSaveThreshold(t: LateThreshold) { 
+    setLateThreshold(t); 
+    if (typeof window !== "undefined") {
+      localStorage.setItem("lateThreshold", JSON.stringify(t));
+    }
+    onSaveLateThreshold?.(t); 
+  }
 
   // ── Session data ────────────────────────────────────────────────────────────
   const [monthlySessionData, setMonthlySessionData] = useState<Record<string, Record<string, DaySessionNode>>>({});

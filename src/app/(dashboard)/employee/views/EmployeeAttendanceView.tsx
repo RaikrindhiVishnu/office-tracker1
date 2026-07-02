@@ -88,7 +88,7 @@ function fmtMins(m: number): string {
   return `${min}m`;
 }
 
-function isLateCheckIn(checkIn: string | null, threshold = { hour: 10, minute: 15 }): boolean {
+function isLateCheckIn(checkIn: string | null, threshold = { hour: 9, minute: 0 }): boolean {
   if (!checkIn) return false;
   const [h, m] = checkIn.split(":").map(Number);
   return h > threshold.hour || (h === threshold.hour && m > threshold.minute);

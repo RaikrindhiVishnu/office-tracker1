@@ -82,14 +82,14 @@ export async function GET(req: NextRequest) {
           if (userData.email) {
             await sendEmail({
               to: userData.email,
-              subject: "Daily Check-in Reminder – Please Check In Before 10:15 AM",
+              subject: "Daily Check-in Reminder – Please Check In Before 9:00 AM",
               html: `
                 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
-                  <h2 style="color: #0f172a; font-size: 20px; margin-bottom: 20px;">Daily Check-in Reminder – Please Check In Before 10:15 AM</h2>
+                  <h2 style="color: #0f172a; font-size: 20px; margin-bottom: 20px;">Daily Check-in Reminder – Please Check In Before 9:00 AM</h2>
                   <p style="color: #475569; font-size: 16px;">Dear Team,</p>
-                  <p style="color: #475569; font-size: 16px;">This is a friendly reminder to complete your <strong>daily check-in every working day before 10:15 AM</strong>.</p>
+                  <p style="color: #475569; font-size: 16px;">This is a friendly reminder to complete your <strong>daily check-in every working day before 9:00 AM</strong>.</p>
                   <div style="background-color: #fef2f2; padding: 15px; border-left: 4px solid #ef4444; margin: 20px 0;">
-                    <strong style="color: #991b1b;">⚠️ Warning:</strong> <span style="color: #7f1d1d;">Check-ins submitted after <strong>10:15 AM may be flagged as a late mark</strong> as per the attendance policy.</span>
+                    <strong style="color: #991b1b;">⚠️ Warning:</strong> <span style="color: #7f1d1d;">Check-ins submitted after <strong>9:00 AM may be flagged as a late mark</strong> as per the attendance policy.</span>
                   </div>
                   <p style="color: #475569; font-size: 16px;">Please make it a habit to check in daily and ensure your attendance is recorded on time.</p>
                   <p style="color: #475569; font-size: 16px;">Thank you for your cooperation.</p>
@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
           await adminDb.collection("notifications").add({
             uid: userDoc.id,
             title: "Check-in Reminder",
-            message: "You haven't checked in today. Please check in immediately. Note: It is past 10:15 AM.",
+            message: "You haven't checked in today. Please check in immediately. Note: It is past 9:00 AM.",
             read: false,
             createdAt: admin.firestore.FieldValue.serverTimestamp()
           });

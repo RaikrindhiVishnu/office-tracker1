@@ -24,6 +24,9 @@ import EmployeeLifecycle from "./EmployeeLifecycle";
 import RecruitmentATS from "./RecruitmentATS";
 import AdminDailySheetsView from "@/app/(dashboard)/admin/AdminDailySheetsView";
 import AdminRegularizationRequestsView from "@/app/(dashboard)/admin/AdminRegularizationRequestsView";
+import EmployeeAttendanceView from "@/app/(dashboard)/employee/views/EmployeeAttendanceView";
+import { checkIn, checkOut, getTodayAttendance } from "@/lib/attendance";
+import NavbarBreakStatus from "@/components/NavbarBreakStatus";
 
 import type { AttendanceType } from "@/types/attendance";
 import type { Employee }       from "@/types/Employee";
@@ -31,7 +34,7 @@ import type { Session }        from "@/types/Employee";
 import type { EmployeeRow }    from "@/types/EmployeeRow";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type HRView = "dashboard"|"leave"|"employees"|"employee-overview"|"attendance"|"payslips"|"announcements"|"queries"|"lifecycle"|"recruitment"|"daily-sheet"|"regularization";
+type HRView = "dashboard"|"leave"|"employees"|"employee-overview"|"attendance"|"my-attendance"|"payslips"|"announcements"|"queries"|"lifecycle"|"recruitment"|"daily-sheet"|"regularization";
 
 interface Notification { id:string; toUid:string; title:string; message:string; read:boolean; createdAt:Timestamp; }
 interface LeaveRequest  { id:string; uid:string; userName:string; userEmail:string; leaveType:string; fromDate:string; toDate:string; reason:string; status:"Pending"|"Approved"|"Rejected"; createdAt:any; }
@@ -278,6 +281,12 @@ function HRDashboard() {
   const [busy,setBusy]               = useState(true);
   const [queryUnread,setQueryUnread] = useState(0);
 
+  // NEW: HR Attendance state
+  const [hrAttendance, setHrAttendance] = useState<any>(null);
+  const [busyAttendance, setBusyAttendance] = useState(false);
+  const [totalSeconds, setTotalSeconds] = useState<number>(0);
+  const [todayBreaks, setTodayBreaks] = useState<Break[]>([]);
+
   const [breakData,setBreakData]     = useState<Record<string,Break[]>>({});
   const [wuMap,setWuMap]             = useState<Record<string,WorkUpdate>>({});
   const [search,setSearch]           = useState("");
@@ -339,6 +348,59 @@ function HRDashboard() {
 
   useEffect(()=>{ if(loading||!user) return; const u1=onSnapshot(query(collection(db,"employeeQueries"),where("adminUnread","==",true)),s=>setQueryUnread(s.size)); const u2=onSnapshot(query(collection(db,"employeeQueries"),orderBy("createdAt","desc")),s=>setQueries(s.docs.map(d=>({id:d.id,...(d.data() as any)})))); const u3=onSnapshot(query(collection(db,"notifications"),where("toUid","==",user.uid),orderBy("createdAt","desc")),s=>setNotifs(s.docs.map(d=>({id:d.id,...(d.data() as any)})))); loadRows(); loadUsers(); loadLeaves(); loadMsgs(); loadMonthly(); return ()=>{u1();u2();u3();}; },[loading,user]);
   useEffect(()=>{ loadMonthly(); },[monthKey]);
+
+  // HR Personal Attendance Logic
+  const loadHrAttendance = useCallback(async () => {
+    if (!user) return;
+    const data = await getTodayAttendance(user.uid);
+    setHrAttendance(data);
+  }, [user]);
+
+  useEffect(() => {
+    if (!loading && user) loadHrAttendance();
+  }, [loading, user, loadHrAttendance]);
+
+  useEffect(() => {
+    if (!user) return;
+    const dateStr = getTodayStr();
+    const attRef = doc(db, "attendance", `${user.uid}_${dateStr}`);
+    return onSnapshot(attRef, (snap) => {
+      if (snap.exists()) setTodayBreaks(snap.data().breaks || []);
+    });
+  }, [user]);
+
+  useEffect(() => {
+    if (!hrAttendance?.sessions?.length) return;
+    const calc = () => {
+      let s = 0;
+      hrAttendance.sessions.forEach((sess: any) => {
+        const ci = sess.checkIn?.toDate()?.getTime();
+        if (!ci) return;
+        const co = sess.checkOut?.toDate()?.getTime() || Date.now();
+        s += Math.floor((co - ci) / 1000);
+      });
+      s -= calcBreakSec(todayBreaks);
+      setTotalSeconds(Math.max(0, s));
+    };
+    calc();
+    const last = hrAttendance.sessions.at(-1);
+    if (last && !last.checkOut) {
+      const iv = setInterval(calc, 1000);
+      return () => clearInterval(iv);
+    }
+  }, [hrAttendance, todayBreaks]);
+
+  const doCheckIn = async () => { if (!user) return; setBusyAttendance(true); await checkIn(user.uid); await loadHrAttendance(); setBusyAttendance(false); };
+  const doCheckOut = async () => { if (!user) return; setBusyAttendance(true); await checkOut(user.uid); await loadHrAttendance(); setBusyAttendance(false); };
+
+  const formatTimer = (seconds: number) => {
+    const h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60), s = seconds % 60;
+    return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  };
+
+  const hrSessions = hrAttendance?.sessions || [];
+  const lastHrSession = hrSessions.at(-1);
+  const hrIsCheckedIn = !!(lastHrSession && !lastHrSession.checkOut);
 
   // ── Actions ───────────────────────────────────────────────────────────────
   const logout = async()=>{ await signOut(auth); router.push("/login"); };
@@ -480,8 +542,9 @@ function HRDashboard() {
     {key:"recruitment" as HRView,label:"Recruitment",icon:"🎯"},
     {key:"leave"     as HRView,label:"Leave Management",icon:"📋",badge:pendL},
     {key:"employees" as HRView,label:"Employees",icon:"👥"},
-    {key:"employee-overview" as HRView,label:"Employee Overview",icon:"👁️"},
-    {key:"attendance"as HRView,label:"Attendance",icon:"📅"},
+    {key:"employee-overview" as HRView,label:"Employee Overview",icon:"📊"},
+    {key:"my-attendance" as HRView,label:"My Attendance",icon:"🕒"},
+    {key:"attendance"as HRView,label:"Team Attendance",icon:"🏢"},
     {key:"payslips"  as HRView,label:"Payroll",icon:"₹"},
     {key:"daily-sheet" as HRView,label:"Time Sheets",icon:"📅"},
     {key:"regularization" as HRView,label:"Regularization",icon:"⏱️"},
@@ -564,6 +627,23 @@ function HRDashboard() {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            {/* HR Attendance Controls */}
+            {user && (
+              <div className="flex items-center gap-2 mr-2">
+                <div className="h-8 flex items-center gap-2 bg-teal-50 rounded-lg px-2 sm:px-3 border border-teal-200 shadow-sm transition-all shrink-0">
+                  <div className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
+                  <span className="text-[10px] sm:text-xs font-bold text-teal-700 font-mono tracking-wider">
+                    {formatTimer(totalSeconds)}
+                  </span>
+                </div>
+                <NavbarBreakStatus uid={user.uid} isCheckedIn={hrIsCheckedIn} />
+                {hrIsCheckedIn ? (
+                  <button disabled={busyAttendance} onClick={doCheckOut} className="h-8 px-2 sm:px-4 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg hover:bg-rose-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-bold text-[10px] sm:text-xs hover:scale-[1.02] active:scale-95 shadow-sm shrink-0">Check Out</button>
+                ) : (
+                  <button disabled={busyAttendance} onClick={doCheckIn} className="h-8 px-2 sm:px-4 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-bold text-[10px] sm:text-xs hover:scale-[1.02] active:scale-95 shadow-sm shrink-0">Check In</button>
+                )}
+              </div>
+            )}
             <span className="hidden sm:flex items-center gap-1.5 text-xs text-emerald-600 font-semibold bg-emerald-50 px-3 py-1.5 rounded-full">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"/>Live
             </span>
@@ -927,6 +1007,12 @@ function HRDashboard() {
           {view==="regularization" && (
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden min-h-screen p-6">
               <AdminRegularizationRequestsView />
+            </div>
+          )}
+
+          {view==="my-attendance" && (
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden min-h-screen">
+              <EmployeeAttendanceView />
             </div>
           )}
 
