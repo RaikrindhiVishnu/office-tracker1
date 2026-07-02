@@ -606,12 +606,11 @@ export default function ZohoStyleEmployeeDashboard() {
   }).length;
 
   // ── ✅ NEW: open MeetChat overlay (called from dashboard card + navbar button)
-  const openMeetChat = () => { setChatTargetUid(null); setActiveView("meet"); };
+  const openMeetChat = () => { window.open("/meet", "_blank"); };
   const closeMeetChat = () => { setActiveView("dashboard"); setChatTargetUid(null); };
 
   const openChatWith = (uid: string) => {
-    setChatTargetUid(uid);
-    setShowMeetChat(true);
+    window.open(`/meet?uid=${uid}`, "_blank");
   };
 
   return (
@@ -966,14 +965,7 @@ export default function ZohoStyleEmployeeDashboard() {
             {activeView === "documents" && <DocumentVaultView />}
             {activeView === "profile" && <EnhancedProfileView />}
             {activeView === "help" && <HelpView />}
-            {activeView === "meet" && (
-              <MeetChatAppUpdated
-                users={users}
-                isOpen={true}
-                onClose={() => { setActiveView("dashboard"); setChatTargetUid(null); }}
-                targetUid={chatTargetUid}
-              />
-            )}
+
             {activeView === "tasks" && <EmployeeTasksView user={{ ...user, ...userData }} />}
             {activeView === "team" && <TeamTasksView user={{ ...user, ...userData }} />}
             {activeView === "reports" && <ReportsView user={user} attendance={attendance} />}

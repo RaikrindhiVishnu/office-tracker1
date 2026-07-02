@@ -1211,13 +1211,7 @@ export default function AdminPage() {
 
           {view === "daily-sheet" && <AdminDailySheetsView />}
 
-          {view === "Meet" && (
-            <MeetChatApp
-              users={users}
-              isOpen={true}
-              onClose={() => setView("dashboard")}
-            />
-          )}
+
 
           <IncomingCallListener />
           {view === "accounts" && <AccountsDashboard />}
