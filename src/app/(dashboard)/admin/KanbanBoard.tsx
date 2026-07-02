@@ -110,11 +110,12 @@ interface KanbanBoardProps {
   onCreateTask?: (storyId: string, ticketType: string) => void;
   currentUser?: any;
   activeProject?: any;
+  users?: any[];
 }
 
 interface FilterState {
   search: string; mine: boolean; overdue: boolean;
-  priority: string; type: string; assignee: string;
+  priority: string; type: string; assignees: string[]; labels: string[];
 }
 
 /* ─── COLOR PICKER PORTAL ─── */
@@ -471,7 +472,7 @@ export function TaskModal({
 }) {
   const getAutoCode = (ticketType: string) => generateTaskCode(ticketType, existingTasks);
   const [f, setF] = useState({
-    title: "", description: "", assignedTo: "", dueDate: "", priority: "Medium",
+    title: "", description: "", assignedTo: "", assignees: [] as string[], assigneeNames: [] as string[], dueDate: "", priority: "Medium",
     status: columns[0]?.id || "todo", estimatedHours: "", storyPoints: "3", tags: "",
     ticketType: defaultTicketType || "task",
     parentStoryId: defaultStoryId || "",
@@ -486,7 +487,10 @@ export function TaskModal({
     if (editingTask) {
       setF({
         title: editingTask.title || "", description: editingTask.description || "",
-        assignedTo: editingTask.assignedTo || "", dueDate: editingTask.dueDate || "",
+        assignedTo: editingTask.assignedTo || "", 
+        assignees: editingTask.assignees || (editingTask.assignedTo ? [editingTask.assignedTo] : []),
+        assigneeNames: editingTask.assigneeNames || (editingTask.assignedToName ? [editingTask.assignedToName] : []),
+        dueDate: editingTask.dueDate || "",
         priority: editingTask.priority || "Medium", status: editingTask.status || columns[0]?.id,
         estimatedHours: editingTask.estimatedHours?.toString() || "",
         storyPoints: editingTask.storyPoints?.toString() || "3",
@@ -529,11 +533,12 @@ export function TaskModal({
 
   const submit = () => {
     if (!f.title.trim()) return;
-    const assignedUser = f.assignedTo ? users.find((u: any) => u.uid === f.assignedTo) : null;
     const data = {
       ...f,
-      assignedTo: f.assignedTo || null,
-      assignedToName: assignedUser ? resolveDisplayName(assignedUser) : null,
+      assignedTo: f.assignees.length > 0 ? f.assignees[0] : null,
+      assignedToName: f.assignees.length > 0 ? resolveDisplayName(users.find((u: any) => u.uid === f.assignees[0])) : null,
+      assignees: f.assignees,
+      assigneeNames: f.assignees.map(id => resolveDisplayName(users.find((u: any) => u.uid === id))),
       estimatedHours: f.estimatedHours ? Number(f.estimatedHours) : undefined,
       storyPoints: f.storyPoints ? Number(f.storyPoints) : undefined,
       tags: f.tags.split(",").map((t: string) => t.trim()).filter(Boolean),
@@ -655,11 +660,26 @@ export function TaskModal({
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none resize-vertical" />
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-gray-500 block mb-1">Assignee</label>
-              <select value={f.assignedTo} onChange={e => setF({ ...f, assignedTo: e.target.value })}
+              <label className="text-xs font-medium text-gray-500 block mb-1">Assignees</label>
+              <div className="flex flex-wrap gap-1 mb-1">
+                 {f.assignees.map(id => {
+                   const u = users.find((u:any) => u.uid === id);
+                   return (
+                     <div key={id} className="bg-indigo-100 text-indigo-700 text-[10px] font-semibold px-2 py-1 rounded flex items-center gap-1">
+                       {u?.displayName || u?.name || "Unknown"}
+                       <button onClick={(e) => { e.preventDefault(); setF({...f, assignees: f.assignees.filter(a => a !== id)}); }} className="text-indigo-400 hover:text-indigo-600">✕</button>
+                     </div>
+                   );
+                 })}
+              </div>
+              <select value="" onChange={e => {
+                  if (e.target.value && !f.assignees.includes(e.target.value)) {
+                    setF({ ...f, assignees: [...f.assignees, e.target.value] });
+                  }
+                }}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none">
-                <option value="">Unassigned</option>
-                {users.map((u: any) => <option key={u.uid} value={u.uid}>{u.displayName || u.name || "Unknown"}</option>)}
+                <option value="" disabled>Add Assignee...</option>
+                {users.filter((u:any) => !f.assignees.includes(u.uid)).map((u: any) => <option key={u.uid} value={u.uid}>{u.displayName || u.name || "Unknown"}</option>)}
               </select>
             </div>
             <div>
@@ -1017,20 +1037,40 @@ const TaskCard = memo(({
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            {task.assignedToName ? (
-              <div className="flex items-center gap-1.5 min-w-0">
-                <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0"
-                  style={{ background: avatarColor(cleanDisplayName(task.assignedToName)) }}>
-                  {avatarInitial(cleanDisplayName(task.assignedToName))}
+            {(() => {
+              const assignees = task.assignees?.length ? task.assigneeNames || task.assignees : (task.assignedToName ? [task.assignedToName] : []);
+              if (assignees.length === 0) {
+                return (
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-5 h-5 rounded-full border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-300 text-[9px]">?</div>
+                    <span className="text-[10px] text-gray-400">Unassigned</span>
+                  </div>
+                );
+              }
+              return (
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <div className="flex -space-x-1 shrink-0">
+                    {assignees.slice(0, 3).map((n, idx) => {
+                      const cName = cleanDisplayName(n);
+                      return (
+                        <div key={idx} className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold border-2 border-white"
+                          style={{ background: avatarColor(cName), zIndex: 3 - idx }} title={cName}>
+                          {avatarInitial(cName)}
+                        </div>
+                      );
+                    })}
+                    {assignees.length > 3 && (
+                      <div className="w-5 h-5 rounded-full flex items-center justify-center text-gray-500 bg-gray-100 text-[8px] font-bold border-2 border-white" style={{ zIndex: 0 }} title={`${assignees.length - 3} more`}>
+                        +{assignees.length - 3}
+                      </div>
+                    )}
+                  </div>
+                  {assignees.length === 1 && (
+                    <span className="text-[10px] font-semibold text-gray-600 truncate" style={{ maxWidth: "80px" }}>{cleanDisplayName(assignees[0])}</span>
+                  )}
                 </div>
-                <span className="text-[10px] font-semibold text-gray-600 truncate" style={{ maxWidth: "80px" }}>{cleanDisplayName(task.assignedToName)}</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5">
-                <div className="w-5 h-5 rounded-full border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-300 text-[9px]">?</div>
-                <span className="text-[10px] text-gray-400">Unassigned</span>
-              </div>
-            )}
+              );
+            })()}
             {formatDate(task.dueDate) && (
               <span className={`text-[10px] font-medium shrink-0 ${overdue ? "text-red-500 font-bold" : "text-gray-400"}`}>
                 {overdue ? "⚡ " : ""}{formatDate(task.dueDate)}
@@ -1158,20 +1198,40 @@ const StoryCard = memo(({
         </div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            {story.assignedToName ? (
-              <div className="flex items-center gap-1.5 min-w-0">
-                <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0"
-                  style={{ background: avatarColor(cleanDisplayName(story.assignedToName)) }}>
-                  {avatarInitial(cleanDisplayName(story.assignedToName))}
+            {(() => {
+              const assignees = story.assignees?.length ? story.assigneeNames || story.assignees : (story.assignedToName ? [story.assignedToName] : []);
+              if (assignees.length === 0) {
+                return (
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-5 h-5 rounded-full border-2 border-dashed border-indigo-200 flex items-center justify-center text-indigo-300 text-[9px]">?</div>
+                    <span className="text-[10px] text-indigo-300">Unassigned</span>
+                  </div>
+                );
+              }
+              return (
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <div className="flex -space-x-1 shrink-0">
+                    {assignees.slice(0, 3).map((n, idx) => {
+                      const cName = cleanDisplayName(n);
+                      return (
+                        <div key={idx} className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold border-2 border-white"
+                          style={{ background: avatarColor(cName), zIndex: 3 - idx }} title={cName}>
+                          {avatarInitial(cName)}
+                        </div>
+                      );
+                    })}
+                    {assignees.length > 3 && (
+                      <div className="w-5 h-5 rounded-full flex items-center justify-center text-indigo-500 bg-indigo-100 text-[8px] font-bold border-2 border-white" style={{ zIndex: 0 }} title={`${assignees.length - 3} more`}>
+                        +{assignees.length - 3}
+                      </div>
+                    )}
+                  </div>
+                  {assignees.length === 1 && (
+                    <span className="text-[10px] font-semibold text-indigo-700 truncate" style={{ maxWidth: "90px" }}>{cleanDisplayName(assignees[0])}</span>
+                  )}
                 </div>
-                <span className="text-[10px] font-semibold text-indigo-700 truncate" style={{ maxWidth: "90px" }}>{cleanDisplayName(story.assignedToName)}</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5">
-                <div className="w-5 h-5 rounded-full border-2 border-dashed border-indigo-200 flex items-center justify-center text-indigo-300 text-[9px]">?</div>
-                <span className="text-[10px] text-indigo-300">Unassigned</span>
-              </div>
-            )}
+              );
+            })()}
             {story.dueDate && <span className={`text-[10px] font-medium shrink-0 ${overdue ? "text-red-500" : "text-indigo-400"}`}>{overdue ? "⚠️ " : ""}{formatDate(story.dueDate)}</span>}
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -1220,7 +1280,7 @@ StoryCard.displayName = "StoryCard";
 export function KanbanBoard({
   tasks, columns, setColumns, projectColor = "#6366f1",
   onTaskClick, onStatusChange, canManage, onSaveColumns, onCreateTask,
-  currentUser, activeProject,
+  currentUser, activeProject, users = [],
 }: KanbanBoardProps) {
 
   /* ── state ── */
@@ -1264,7 +1324,7 @@ export function KanbanBoard({
   const [activeColorKey, setActiveColorKey] = useState<string | null>(null);
 
   const [filters, setFilters] = useState<FilterState>({
-    search: "", mine: false, overdue: false, priority: "", type: "", assignee: "",
+    search: "", mine: false, overdue: false, priority: "", type: "", assignees: [], labels: [],
   });
 
   const [isMounted, setIsMounted] = useState(false);
@@ -1278,7 +1338,7 @@ export function KanbanBoard({
       if (e.key === "Escape") {
         if (activeColorKey) { setActiveColorKey(null); return; }
         if (isFullscreen) { setIsFullscreen(false); return; }
-        setFilters({ search: "", mine: false, overdue: false, priority: "", type: "", assignee: "" });
+        setFilters({ search: "", mine: false, overdue: false, priority: "", type: "", assignees: [], labels: [] });
       }
       if (e.key.toLowerCase() === "f") { e.preventDefault(); setIsFullscreen(p => !p); }
       if (e.key.toLowerCase() === "s") { e.preventDefault(); searchRef.current?.focus(); }
@@ -1301,7 +1361,12 @@ export function KanbanBoard({
     if (filters.overdue && !isOverdue(t.dueDate, t.status)) return false;
     if (filters.priority && t.priority !== filters.priority) return false;
     if (filters.type && t.ticketType !== filters.type) return false;
-    if (filters.assignee && t.assignedTo !== filters.assignee) return false;
+    if (filters.assignees && filters.assignees.length > 0) {
+      if (!t.assignees?.some(a => filters.assignees.includes(a)) && !filters.assignees.includes(t.assignedTo || "")) return false;
+    }
+    if (filters.labels && filters.labels.length > 0) {
+      if (!t.labels || !t.labels.some(l => filters.labels.includes(l.id))) return false;
+    }
     if (filters.search) {
       const s = filters.search.toLowerCase();
       return t.title.toLowerCase().includes(s) || (t.description || "").toLowerCase().includes(s) || (t.taskCode || "").toLowerCase().includes(s);
@@ -1414,6 +1479,44 @@ export function KanbanBoard({
           className={`h-8 px-2.5 rounded-lg text-[10px] font-bold transition-all border ${filters.overdue ? "bg-red-500 border-red-500 text-white" : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
           Overdue
         </button>
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0 bg-white p-1 rounded-xl border border-gray-100 relative group">
+        <select 
+          multiple
+          value={filters.assignees}
+          onChange={(e) => {
+            const options = Array.from(e.target.selectedOptions).map(o => o.value);
+            setFilters(f => ({ ...f, assignees: options }));
+          }}
+          className="h-8 px-2 text-[10px] font-bold border border-gray-200 rounded-lg text-gray-700 outline-none bg-transparent hover:bg-gray-50 cursor-pointer w-32 custom-scrollbar"
+          style={{ height: '32px', overflowY: 'auto' }}
+          title="Hold Ctrl/Cmd to select multiple"
+        >
+          {users.map(u => <option key={u.uid} value={u.uid}>{u.displayName || u.name}</option>)}
+        </select>
+        {filters.assignees.length > 0 && (
+          <button onClick={() => setFilters(f => ({ ...f, assignees: [] }))} className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[8px] flex items-center justify-center font-bold shadow-sm z-10 hover:bg-red-600">✕</button>
+        )}
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0 bg-white p-1 rounded-xl border border-gray-100 relative group">
+        <select 
+          multiple
+          value={filters.labels}
+          onChange={(e) => {
+            const options = Array.from(e.target.selectedOptions).map(o => o.value);
+            setFilters(f => ({ ...f, labels: options }));
+          }}
+          className="h-8 px-2 text-[10px] font-bold border border-gray-200 rounded-lg text-gray-700 outline-none bg-transparent hover:bg-gray-50 cursor-pointer w-28 custom-scrollbar"
+          style={{ height: '32px', overflowY: 'auto' }}
+          title="Hold Ctrl/Cmd to select multiple"
+        >
+          {Array.from(new Map(tasks.flatMap(t => t.labels || []).map(l => [l.id, l])).values()).map(l => (
+             <option key={l.id} value={l.id}>{l.title}</option>
+          ))}
+        </select>
+        {filters.labels.length > 0 && (
+          <button onClick={() => setFilters(f => ({ ...f, labels: [] }))} className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[8px] flex items-center justify-center font-bold shadow-sm z-10 hover:bg-red-600">✕</button>
+        )}
       </div>
       <div className="h-6 w-px bg-gray-200 mx-1 shrink-0" />
       <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl shrink-0">
@@ -1633,14 +1736,28 @@ export function KanbanBoard({
                                   </div>
                                   <p className="text-[11px] font-semibold text-gray-800 line-clamp-2 leading-snug group-hover/card:text-indigo-600 transition-colors">{t.title}</p>
                                   <div className="mt-2 flex items-center justify-between">
-                                    {t.assignedToName && (
-                                      <div
-                                        className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[7px] font-bold shrink-0"
-                                        style={{ background: avatarColor(cleanDisplayName(t.assignedToName)) }}
-                                      >
-                                        {avatarInitial(cleanDisplayName(t.assignedToName))}
-                                      </div>
-                                    )}
+                                    {(() => {
+                                      const assignees = t.assignees?.length ? t.assigneeNames || t.assignees : (t.assignedToName ? [t.assignedToName] : []);
+                                      if (assignees.length === 0) return null;
+                                      return (
+                                        <div className="flex -space-x-1 shrink-0">
+                                          {assignees.slice(0, 3).map((n, idx) => {
+                                            const cName = cleanDisplayName(n);
+                                            return (
+                                              <div key={idx} className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[7px] font-bold border border-white"
+                                                style={{ background: avatarColor(cName), zIndex: 3 - idx }} title={cName}>
+                                                {avatarInitial(cName)}
+                                              </div>
+                                            );
+                                          })}
+                                          {assignees.length > 3 && (
+                                            <div className="w-4 h-4 rounded-full flex items-center justify-center text-gray-500 bg-gray-100 text-[6px] font-bold border border-white" style={{ zIndex: 0 }} title={`${assignees.length - 3} more`}>
+                                              +{assignees.length - 3}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })()}
                                     {t.dueDate && (
                                       <span className={`text-[9px] font-bold ${isOverdue(t.dueDate, t.status) ? "text-red-500" : "text-gray-400"}`}>
                                         {formatDate(t.dueDate)}

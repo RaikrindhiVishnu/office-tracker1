@@ -67,7 +67,8 @@ interface FilterState {
   overdue: boolean;
   priority: string;
   type: string;
-  assignee: string;
+  assignees: string[];
+  labels: string[];
   createdBy: string;
 }
 
@@ -288,19 +289,40 @@ const TaskCard = memo(({
         )}
 
         <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, overflow: "hidden" }}>
-          {task.assignedToName ? (
-            <>
-              <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: avatarColor(name), display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "9px", fontWeight: 700, flexShrink: 0 }} title={name}>
-                {avatarInitial(name)}
-              </div>
-              <span style={{ fontSize: "11px", color: "#4b5563", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{name}</span>
-            </>
-          ) : (
-            <>
-              <div style={{ width: "20px", height: "20px", borderRadius: "50%", border: "1.5px dashed #d1d5db", display: "flex", alignItems: "center", justifyContent: "center", color: "#d1d5db", fontSize: "9px", flexShrink: 0 }}>?</div>
-              <span style={{ fontSize: "11px", color: "#d1d5db", flex: 1, minWidth: 0 }}>Unassigned</span>
-            </>
-          )}
+          {(() => {
+            const assignees = task.assignees?.length ? task.assigneeNames || task.assignees : (task.assignedToName ? [task.assignedToName] : []);
+            if (assignees.length === 0) {
+              return (
+                <>
+                  <div style={{ width: "20px", height: "20px", borderRadius: "50%", border: "1.5px dashed #d1d5db", display: "flex", alignItems: "center", justifyContent: "center", color: "#d1d5db", fontSize: "9px", flexShrink: 0 }}>?</div>
+                  <span style={{ fontSize: "11px", color: "#d1d5db", flex: 1, minWidth: 0 }}>Unassigned</span>
+                </>
+              );
+            }
+            return (
+              <>
+                <div style={{ display: "flex", marginLeft: assignees.length > 1 ? "4px" : "0", flexShrink: 0 }}>
+                  {assignees.slice(0, 3).map((n, idx) => {
+                    const cName = cleanName(n);
+                    return (
+                      <div key={idx} style={{ width: "20px", height: "20px", borderRadius: "50%", background: avatarColor(cName), display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "9px", fontWeight: 700, flexShrink: 0, marginLeft: idx > 0 ? "-4px" : "0", border: "1px solid white", zIndex: 3 - idx }} title={cName}>
+                        {avatarInitial(cName)}
+                      </div>
+                    );
+                  })}
+                  {assignees.length > 3 && (
+                    <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", color: "#6b7280", fontSize: "8px", fontWeight: 700, flexShrink: 0, marginLeft: "-4px", border: "1px solid white", zIndex: 0 }} title={`${assignees.length - 3} more`}>
+                      +{assignees.length - 3}
+                    </div>
+                  )}
+                </div>
+                {assignees.length === 1 && (
+                  <span style={{ fontSize: "11px", color: "#4b5563", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{cleanName(assignees[0])}</span>
+                )}
+                {assignees.length > 1 && <span style={{ flex: 1 }} />}
+              </>
+            );
+          })()}
           {dueFmt && (
             <span style={{ fontSize: "10px", fontWeight: ovd ? 700 : 500, color: ovd ? "#ef4444" : "#9ca3af", flexShrink: 0 }}>
               {ovd ? "⚡ " : ""}{dueFmt}
@@ -475,19 +497,41 @@ const StoryCard = memo(({
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
-          {story.assignedToName ? (
-            <div style={{ display: "flex", alignItems: "center", gap: "5px", flex: 1, minWidth: 0 }}>
-              <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: avatarColor(name), display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "9px", fontWeight: 700, flexShrink: 0 }}>
-                {avatarInitial(name)}
-              </div>
-              <span style={{ fontSize: "10px", fontWeight: 600, color: "#4b5563", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{name}</span>
-            </div>
-          ) : (
-            <div style={{ display: "flex", alignItems: "center", gap: "5px", flex: 1, minWidth: 0 }}>
-              <div style={{ width: "20px", height: "20px", borderRadius: "50%", border: "1.5px dashed #d1d5db", display: "flex", alignItems: "center", justifyContent: "center", color: "#d1d5db", fontSize: "9px" }}>?</div>
-              <span style={{ fontSize: "10px", color: "#9ca3af" }}>Unassigned</span>
-            </div>
-          )}
+          {(() => {
+            const assignees = story.assignees?.length ? story.assigneeNames || story.assignees : (story.assignedToName ? [story.assignedToName] : []);
+            if (assignees.length === 0) {
+              return (
+                <div style={{ display: "flex", alignItems: "center", gap: "5px", flex: 1, minWidth: 0 }}>
+                  <div style={{ width: "20px", height: "20px", borderRadius: "50%", border: "1.5px dashed #d1d5db", display: "flex", alignItems: "center", justifyContent: "center", color: "#d1d5db", fontSize: "9px", flexShrink: 0 }}>?</div>
+                  <span style={{ fontSize: "10px", color: "#9ca3af" }}>Unassigned</span>
+                </div>
+              );
+            }
+            return (
+              <>
+                <div style={{ display: "flex", marginLeft: assignees.length > 1 ? "4px" : "0", flexShrink: 0, flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", flexShrink: 0 }}>
+                    {assignees.slice(0, 3).map((n, idx) => {
+                      const cName = cleanName(n);
+                      return (
+                        <div key={idx} style={{ width: "20px", height: "20px", borderRadius: "50%", background: avatarColor(cName), display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "9px", fontWeight: 700, flexShrink: 0, marginLeft: idx > 0 ? "-4px" : "0", border: "1px solid white", zIndex: 3 - idx }} title={cName}>
+                          {avatarInitial(cName)}
+                        </div>
+                      );
+                    })}
+                    {assignees.length > 3 && (
+                      <div style={{ width: "20px", height: "20px", borderRadius: "50%", background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center", color: "#6b7280", fontSize: "8px", fontWeight: 700, flexShrink: 0, marginLeft: "-4px", border: "1px solid white", zIndex: 0 }} title={`${assignees.length - 3} more`}>
+                        +{assignees.length - 3}
+                      </div>
+                    )}
+                  </div>
+                  {assignees.length === 1 && (
+                    <span style={{ fontSize: "10px", fontWeight: 600, color: "#4b5563", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0, marginLeft: "5px" }}>{cleanName(assignees[0])}</span>
+                  )}
+                </div>
+              </>
+            );
+          })()}
           {story.dueDate && (
             <span style={{ fontSize: "10px", color: ovd ? "#ef4444" : "#6b7280", fontWeight: ovd ? 700 : 500, marginRight: "6px", flexShrink: 0 }}>
               {ovd ? "⚡ " : ""}{formatDate(story.dueDate)}
@@ -567,6 +611,7 @@ export function KanbanBoard({
   user,
   activeProject,
   toolbarPrefix,
+  users = [],
 }: {
   tasks: Task[];
   columns: KanbanColumn[];
@@ -581,6 +626,7 @@ export function KanbanBoard({
   user: any;
   activeProject: any;
   toolbarPrefix?: React.ReactNode;
+  users?: any[];
 }) {
   const permissions = getPermissions(user, activeProject);
 
@@ -621,7 +667,7 @@ export function KanbanBoard({
 
   /* ── Filter state ── */
   const [filters, setFilters] = useState<FilterState>({
-    search: "", mine: false, overdue: false, priority: "", type: "", assignee: "", createdBy: ""
+    search: "", mine: false, overdue: false, priority: "", type: "", assignees: [], labels: [], createdBy: ""
   });
 
   /* ── Drag state ── */
@@ -692,12 +738,16 @@ export function KanbanBoard({
       if (filters.search) {
         const s = filters.search.toLowerCase();
         if (!(t.title.toLowerCase().includes(s) || (t.taskCode || "").toLowerCase().includes(s) || (t.description || "").toLowerCase().includes(s) || (t.tags || []).some(tag => tag.toLowerCase().includes(s)))) return false;
-      }
       if (filters.mine && t.assignedTo !== currentUserId) return false;
       if (filters.overdue && !isOverdue(t.dueDate, t.status)) return false;
       if (filters.priority && t.priority !== filters.priority) return false;
       if (filters.type && t.ticketType !== filters.type) return false;
-      if (filters.assignee && t.assignedTo !== filters.assignee) return false;
+      if (filters.assignees && filters.assignees.length > 0) {
+        if (!t.assignees?.some(a => filters.assignees.includes(a)) && !filters.assignees.includes(t.assignedTo || "")) return false;
+      }
+      if (filters.labels && filters.labels.length > 0) {
+        if (!t.labels || !t.labels.some(l => filters.labels.includes(l.id))) return false;
+      }
       if (filters.createdBy && t.createdBy !== filters.createdBy) return false;
       return true;
     });
@@ -705,7 +755,7 @@ export function KanbanBoard({
 
   const colTasks = (colId: string) => filteredTasks.filter(t => t.status === colId);
   const allColTasks = (colId: string) => localTasks.filter(t => t.status === colId);
-  const activeFiltersCount = [filters.mine, filters.overdue, !!filters.priority, !!filters.type, !!filters.assignee].filter(Boolean).length;
+  const activeFiltersCount = [filters.mine, filters.overdue, !!filters.priority, !!filters.type, filters.assignees.length > 0, filters.labels.length > 0, !!filters.createdBy].filter(Boolean).length;
 
   /* ── Story toggle ── */
   const toggleStory = useCallback((storyId: string, colId: string) => {
@@ -1634,65 +1684,54 @@ export function KanbanBoard({
       <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 14px", borderBottom: "1px solid #e5e7eb", flexShrink: 0, flexWrap: "nowrap", overflowX: "auto", whiteSpace: "nowrap", background: "#fff", zIndex: 20 }}>
         {toolbarPrefix}
 
-        {/* Search */}
-        {/* <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "6px 10px", minWidth: "180px" }}>
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#9ca3af" strokeWidth="2"><circle cx="7" cy="7" r="5" /><path d="m11 11 3 3" /></svg>
-          <input
-            ref={searchRef}
-            value={filters.search}
-            onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
-            placeholder="Search… (S)"
-            style={{ border: "none", background: "transparent", fontSize: "13px", color: "#111827", outline: "none", width: "100%" }}
-          />
-          {filters.search && (
-            <button onClick={() => setFilters(f => ({ ...f, search: "" }))} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: "12px", padding: 0 }}>✕</button>
-          )}
-        </div> */}
-
         {/* Filters */}
-        {[
-          { key: "overdue", label: "⚡ Overdue" },
-        ].map(f => (
-          <button key={f.key} onClick={() => setFilters(prev => ({ ...prev, [f.key]: !prev[f.key as keyof FilterState] }))}
-            style={{
-              fontSize: "12px", padding: "6px 12px", borderRadius: "8px", cursor: "pointer", fontWeight: 600, transition: "all 0.15s",
-              border: `1px solid ${filters[f.key as keyof FilterState] ? projectColor : "#e5e7eb"}`,
-              background: filters[f.key as keyof FilterState] ? projectColor + "15" : "#f9fafb",
-              color: filters[f.key as keyof FilterState] ? projectColor : "#4b5563",
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <select 
+            multiple
+            value={filters.assignees} 
+            onChange={e => {
+              const options = Array.from(e.target.selectedOptions).map(o => o.value);
+              setFilters(f => ({ ...f, assignees: options }));
             }}
-          >{f.label}</button>
-        ))}
-
-        {/* <select value={filters.priority} onChange={e => setFilters(f => ({ ...f, priority: e.target.value }))}
-          style={{ fontSize: "12px", padding: "6px 10px", borderRadius: "8px", border: `1px solid ${filters.priority ? projectColor : "#e5e7eb"}`, background: filters.priority ? projectColor + "10" : "#f9fafb", color: filters.priority ? projectColor : "#4b5563", cursor: "pointer", fontWeight: 600, outline: "none" }}>
-          <option value="">All priorities</option>
-          {["Critical", "High", "Medium", "Low"].map(p => <option key={p} value={p}>{p}</option>)}
-        </select> */}
-
-        {/* <select value={filters.type} onChange={e => setFilters(f => ({ ...f, type: e.target.value }))}
-          style={{ fontSize: "12px", padding: "6px 10px", borderRadius: "8px", border: `1px solid ${filters.type ? projectColor : "#e5e7eb"}`, background: filters.type ? projectColor + "10" : "#f9fafb", color: filters.type ? projectColor : "#4b5563", cursor: "pointer", fontWeight: 600, outline: "none" }}>
-          <option value="">All types</option>
-          {(["story", "task", "bug", "defect"] as TicketType[]).map(tp => <option key={tp} value={tp}>{TICKET_TYPES[tp].label}</option>)}
-        </select> */}
-
-        {allAssignees.length > 0 && (
-          <select value={filters.assignee} onChange={e => setFilters(f => ({ ...f, assignee: e.target.value }))}
-            style={{ fontSize: "12px", padding: "6px 10px", borderRadius: "8px", border: `1px solid ${filters.assignee ? projectColor : "#e5e7eb"}`, background: filters.assignee ? projectColor + "10" : "#f9fafb", color: filters.assignee ? projectColor : "#4b5563", cursor: "pointer", fontWeight: 600, outline: "none" }}>
-            <option value="">All assignees</option>
-            {allAssignees.map(([uid, name]) => <option key={`assignee-${uid}`} value={uid}>{cleanName(name)}</option>)}
+            style={{ height: "32px", overflowY: "auto", padding: "4px 8px", fontSize: "11px", fontWeight: 700, borderRadius: "6px", border: "1px solid #e5e7eb", width: "120px" }}
+            title="Hold Ctrl/Cmd to select multiple"
+            className="custom-scrollbar"
+          >
+            {users.map((u: any) => <option key={u.uid} value={u.uid}>{u.displayName || u.name}</option>)}
           </select>
-        )}
-        
-        {allAssignees.length > 0 && (
-          <select value={filters.createdBy} onChange={e => setFilters(f => ({ ...f, createdBy: e.target.value }))}
-            style={{ fontSize: "12px", padding: "6px 10px", borderRadius: "8px", border: `1px solid ${filters.createdBy ? projectColor : "#e5e7eb"}`, background: filters.createdBy ? projectColor + "10" : "#f9fafb", color: filters.createdBy ? projectColor : "#4b5563", cursor: "pointer", fontWeight: 600, outline: "none" }}>
-            <option value="">All creators</option>
-            {allAssignees.map(([uid, name]) => <option key={`creator-${uid}`} value={uid}>{cleanName(name)}</option>)}
+          {filters.assignees.length > 0 && (
+            <button onClick={() => setFilters(f => ({ ...f, assignees: [] }))} style={{ border: "none", background: "none", color: "#ef4444", fontSize: "12px", cursor: "pointer", marginLeft: "-6px" }}>✕</button>
+          )}
+
+          <select 
+            multiple
+            value={filters.labels} 
+            onChange={e => {
+              const options = Array.from(e.target.selectedOptions).map(o => o.value);
+              setFilters(f => ({ ...f, labels: options }));
+            }}
+            style={{ height: "32px", overflowY: "auto", padding: "4px 8px", fontSize: "11px", fontWeight: 700, borderRadius: "6px", border: "1px solid #e5e7eb", width: "100px" }}
+            title="Hold Ctrl/Cmd to select multiple"
+            className="custom-scrollbar"
+          >
+            {Array.from(new Map(tasks.flatMap(t => t.labels || []).map(l => [l.id, l])).values()).map(l => (
+               <option key={l.id} value={l.id}>{l.title}</option>
+            ))}
           </select>
-        )}
+          {filters.labels.length > 0 && (
+            <button onClick={() => setFilters(f => ({ ...f, labels: [] }))} style={{ border: "none", background: "none", color: "#ef4444", fontSize: "12px", cursor: "pointer", marginLeft: "-6px" }}>✕</button>
+          )}
+
+          <button
+            onClick={() => setFilters({ search: "", mine: false, overdue: false, priority: "", type: "", assignees: [], labels: [], createdBy: "" })}
+            style={{ padding: "6px 12px", fontSize: "11px", fontWeight: 600, color: "#6b7280", background: "#f3f4f6", border: "none", borderRadius: "6px", cursor: "pointer" }}
+          >
+            Clear Filters
+          </button>
+        </div>
 
         {activeFiltersCount > 0 && (
-          <button onClick={() => setFilters({ search: "", mine: false, overdue: false, priority: "", type: "", assignee: "", createdBy: "" })}
+          <button onClick={() => setFilters({ search: "", mine: false, overdue: false, priority: "", type: "", assignees: [], labels: [], createdBy: "" })}
             style={{ fontSize: "12px", padding: "6px 10px", borderRadius: "8px", border: "1px solid #fca5a5", background: "#fef2f2", color: "#dc2626", cursor: "pointer", fontWeight: 600 }}>
             Clear {activeFiltersCount} filter{activeFiltersCount > 1 ? "s" : ""}
           </button>

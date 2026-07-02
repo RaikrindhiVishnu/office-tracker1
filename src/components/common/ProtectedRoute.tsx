@@ -27,7 +27,9 @@ export default function ProtectedRoute({
 
       // ❌ Role not allowed
       if (allowedRoles && userData?.role) {
-        if (!allowedRoles.includes(userData.role)) {
+        const userRoleLower = userData.role.toLowerCase();
+        const allowedLower = allowedRoles.map(r => r.toLowerCase());
+        if (!allowedLower.includes(userRoleLower)) {
           router.push("/unauthorized"); // or dashboard
         }
       }

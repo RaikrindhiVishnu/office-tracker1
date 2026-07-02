@@ -1245,14 +1245,21 @@ function TaskModal({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Assignee</label>
-              <select value={form.assignedTo || ""}
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1.5">Assignees</label>
+              <select 
+                multiple
+                value={form.assignees || (form.assignedTo ? [form.assignedTo] : [])}
                 onChange={e => {
-                  const u = users?.find((u: any) => u.uid === e.target.value);
-                  setForm(f => ({ ...f, assignedTo: e.target.value, assignedToName: u ? (u.displayName?.trim() || u.name?.trim() || null) : null }));
+                  const options = Array.from(e.target.selectedOptions).map(o => o.value).filter(Boolean);
+                  const names = options.map(uid => {
+                    const u = users?.find((user: any) => user.uid === uid);
+                    return u ? (u.displayName?.trim() || u.name?.trim() || "Unknown") : "Unknown";
+                  });
+                  setForm(f => ({ ...f, assignees: options, assigneeNames: names, assignedTo: options[0] || "", assignedToName: names[0] || "" }));
                 }}
-                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
-                <option value="">Unassigned</option>
+                title="Hold Ctrl/Cmd to select multiple"
+                className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white custom-scrollbar"
+                style={{ height: "auto", overflowY: "auto", maxHeight: "150px" }}>
                 {!isProjectManager && currentUserId && (
                   <option value={currentUserId}>
                     {users?.find((u: any) => u.uid === currentUserId)?.displayName?.trim() || users?.find((u: any) => u.uid === currentUserId)?.name?.trim() || "Assign to me"}
@@ -2984,6 +2991,7 @@ export default function ProjectManagement({ user, projects, users, setSidebarCol
                 onToast={showToast}
                 user={user}
                 activeProject={activeProject}
+                users={users}
                 toolbarPrefix={
                   <>
                     <SprintDropdown

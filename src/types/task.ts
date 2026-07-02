@@ -11,6 +11,8 @@ export interface Task {
   status?: string;
   priority?: string;
   assignedTo?: string;
+  assignees?: string[]; // Array of assigned user IDs
+  assigneeNames?: string[]; // Array of assigned user display names
 
   ticketType?: string;
   tags?: string[];
