@@ -34,7 +34,7 @@ import type { Session }        from "@/types/Employee";
 import type { EmployeeRow }    from "@/types/EmployeeRow";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type HRView = "dashboard"|"leave"|"employees"|"employee-overview"|"attendance"|"my-attendance"|"payslips"|"announcements"|"queries"|"lifecycle"|"recruitment"|"daily-sheet"|"regularization";
+type HRView = "dashboard"|"leave"|"employees"|"employee-overview"|"attendance"|"my-attendance"|"payslips"|"announcements"|"queries"|"lifecycle"|"recruitment"|"daily-sheet"|"regularization"|"daily-report";
 
 interface Notification { id:string; toUid:string; title:string; message:string; read:boolean; createdAt:Timestamp; }
 interface LeaveRequest  { id:string; uid:string; userName:string; userEmail:string; leaveType:string; fromDate:string; toDate:string; reason:string; status:"Pending"|"Approved"|"Rejected"; createdAt:any; }
@@ -759,7 +759,7 @@ function HRDashboard() {
         </div>
 
         {/* ── PAGE CONTENT ── */}
-        <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
+        <main className="flex-1 px-4 sm:px-6 py-6 space-y-6 overflow-y-auto">
 
           {view==="daily-report"&&(
             <div className="space-y-6">
