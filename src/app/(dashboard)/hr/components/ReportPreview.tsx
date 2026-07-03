@@ -68,7 +68,7 @@ export default function ReportPreview({ data, onBack }: ReportPreviewProps) {
   });
 
   const absent = totalEmployees - present;
-  const updatesSubmitted = attendanceRows.filter(r => r.hasUpdates).length;
+  const updatesSubmitted = attendanceRows.filter((r: any) => r.hasUpdates).length;
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -267,10 +267,10 @@ export default function ReportPreview({ data, onBack }: ReportPreviewProps) {
               <span>⚠️</span> Needs Attention
             </h2>
             <ul className="list-disc pl-5 space-y-2 text-sm text-gray-700">
-              {attendanceRows.filter(r => !r.hasUpdates && r.isPresent).map((r, i) => (
+              {attendanceRows.filter((r: any) => !r.hasUpdates && r.isPresent).map((r: any, i: number) => (
                 <li key={i}><strong>{r.name}</strong> ({r.department}) was present but submitted no work updates.</li>
               ))}
-              {attendanceRows.filter(r => !r.isPresent).map((r, i) => (
+              {attendanceRows.filter((r: any) => !r.isPresent).map((r: any, i: number) => (
                 <li key={i}><strong>{r.name}</strong> ({r.department}) did not check in.</li>
               ))}
             </ul>
