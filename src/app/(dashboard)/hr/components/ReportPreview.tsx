@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import React, { useState, useEffect, useRef } from "react";
 
 interface ReportPreviewProps {
   data: any;
@@ -11,35 +10,38 @@ interface ReportPreviewProps {
 export default function ReportPreview({ data, onBack }: ReportPreviewProps) {
   const [aiSummary, setAiSummary] = useState<string>("");
   const [loadingAi, setLoadingAi] = useState(false);
+  const [aiError, setAiError] = useState(false);
+  const fetchingRef = useRef(false);
 
   useEffect(() => {
-    if (data.config.includeAI && !aiSummary) {
+    if (data.config.includeAI && !aiSummary && !fetchingRef.current) {
       generateAISummary();
     }
-  }, []);
+  }, [data.date]); // Regenerate when date changes
 
   const generateAISummary = async () => {
     try {
+      fetchingRef.current = true;
       setLoadingAi(true);
-      const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || "");
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      setAiError(false);
       
-      const prompt = `
-        You are an HR Assistant. Generate a short, professional executive summary (max 4 sentences) for this daily report.
-        Date: ${data.date}
-        Total Employees in Scope: ${data.users.length}
-        Total Work Updates: ${data.workUpdates.length}
-        Total Daily Sheet Tasks: ${data.dailySheets.reduce((acc: number, ds: any) => acc + (ds.tasks?.length || 0), 0)}
-        Focus on attendance, task completion, and any blocked items. Be factual and objective.
-      `;
+      const res = await fetch("/api/ai/summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reportData: data })
+      });
       
-      const result = await model.generateContent(prompt);
-      setAiSummary(result.response.text());
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error || "Failed to generate AI summary");
+      
+      setAiSummary(resData.summary);
     } catch (err) {
       console.error("AI Error:", err);
-      setAiSummary("AI Summary could not be generated at this time.");
+      setAiError(true);
+      setAiSummary("");
     } finally {
       setLoadingAi(false);
+      fetchingRef.current = false;
     }
   };
 
@@ -298,13 +300,22 @@ export default function ReportPreview({ data, onBack }: ReportPreviewProps) {
         {/* Section 9: AI Summary */}
         {data.config.includeAI && (
           <div className="mb-10 bg-indigo-50 border border-indigo-100 p-6 rounded-xl page-break-avoid">
-            <h2 className="text-lg font-bold text-indigo-900 mb-3 flex items-center gap-2">
-              <span>✨</span> AI-Generated Daily Summary
-            </h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-indigo-900 flex items-center gap-2">
+                <span>✨</span> AI-Generated Daily Summary
+              </h2>
+              {aiError && !loadingAi && (
+                <button onClick={generateAISummary} className="px-3 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-xs font-bold rounded-md transition-colors print:hidden">
+                  Retry
+                </button>
+              )}
+            </div>
             {loadingAi ? (
-              <p className="text-sm text-indigo-600 animate-pulse">Generating insights...</p>
+              <p className="text-sm text-indigo-600 animate-pulse font-medium">Generating AI daily summary...</p>
+            ) : aiError ? (
+              <p className="text-sm text-rose-600">Failed to generate AI summary. Please try again.</p>
             ) : (
-              <p className="text-sm text-indigo-800 leading-relaxed">{aiSummary}</p>
+              <p className="text-sm text-indigo-800 leading-relaxed whitespace-pre-wrap">{aiSummary}</p>
             )}
           </div>
         )}
