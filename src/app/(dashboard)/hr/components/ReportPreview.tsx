@@ -25,10 +25,20 @@ export default function ReportPreview({ data, onBack }: ReportPreviewProps) {
       setLoadingAi(true);
       setAiError(false);
       
+      const payloadData = {
+        date: data.date,
+        department: data.department,
+        users: data.users.map((u: any) => ({ id: u.id, name: u.name, department: u.department })),
+        attendance: data.attendance.map((a: any) => ({ userId: a.userId, totalMinutes: a.totalMinutes })),
+        workUpdates: data.workUpdates.map((wu: any) => ({ uid: wu.uid, task: wu.task, status: wu.status, notes: wu.notes })),
+        dailySheets: data.dailySheets.map((ds: any) => ({ uid: ds.uid, tasks: ds.tasks?.map((t: any) => ({ project: t.project, taskTitle: t.taskTitle, hours: t.hours, status: t.status })) })),
+        leaves: data.leaves.map((l: any) => ({ userName: l.userName, leaveType: l.leaveType, status: l.status }))
+      };
+
       const res = await fetch("/api/ai/summary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reportData: data })
+        body: JSON.stringify({ reportData: payloadData })
       });
       
       const resData = await res.json();

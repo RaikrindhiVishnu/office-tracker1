@@ -29,6 +29,7 @@ import { checkIn, checkOut, getTodayAttendance } from "@/lib/attendance";
 import NavbarBreakStatus from "@/components/NavbarBreakStatus";
 import EnhancedProfileView from "@/app/(dashboard)/employee/views/EnhancedProfileView";
 import ReportBuilder from "./components/ReportBuilder";
+import AIChatBot from "@/app/(dashboard)/employee/views/AIChatBot";
 
 import type { AttendanceType } from "@/types/attendance";
 import type { Employee }       from "@/types/Employee";
@@ -1426,6 +1427,7 @@ function HRDashboard() {
 
       {todayPanel&&<EmployeeTodayPanel employee={todayPanel} adminUid="admin" onClose={()=>setTodayPanel(null)}/>}
       <IncomingCallListener/>
+      <AIChatBot />
 
       <style jsx>{`
         @media print {
