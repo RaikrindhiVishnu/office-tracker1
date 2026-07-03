@@ -1429,7 +1429,7 @@ function HRDashboard() {
       <IncomingCallListener/>
       <AIChatBot />
 
-      <style jsx>{`
+      <style jsx global>{`
         @media print {
           body { background: white !important; }
           /* Hide sidebar and top header */
