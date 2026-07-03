@@ -27,6 +27,7 @@ import AdminRegularizationRequestsView from "@/app/(dashboard)/admin/AdminRegula
 import EmployeeAttendanceView from "@/app/(dashboard)/employee/views/EmployeeAttendanceView";
 import { checkIn, checkOut, getTodayAttendance } from "@/lib/attendance";
 import NavbarBreakStatus from "@/components/NavbarBreakStatus";
+import EnhancedProfileView from "@/app/(dashboard)/employee/views/EnhancedProfileView";
 
 import type { AttendanceType } from "@/types/attendance";
 import type { Employee }       from "@/types/Employee";
@@ -34,7 +35,7 @@ import type { Session }        from "@/types/Employee";
 import type { EmployeeRow }    from "@/types/EmployeeRow";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type HRView = "dashboard"|"leave"|"employees"|"employee-overview"|"attendance"|"my-attendance"|"payslips"|"announcements"|"queries"|"lifecycle"|"recruitment"|"daily-sheet"|"regularization"|"daily-report";
+type HRView = "dashboard"|"leave"|"employees"|"employee-overview"|"attendance"|"my-attendance"|"payslips"|"announcements"|"queries"|"lifecycle"|"recruitment"|"daily-sheet"|"regularization"|"daily-report"|"profile";
 
 interface Notification { id:string; toUid:string; title:string; message:string; read:boolean; createdAt:Timestamp; }
 interface LeaveRequest  { id:string; uid:string; userName:string; userEmail:string; leaveType:string; fromDate:string; toDate:string; reason:string; status:"Pending"|"Approved"|"Rejected"; createdAt:any; }
@@ -315,8 +316,6 @@ function HRDashboard() {
   const [leaveFilter,setLeaveFilter]= useState<"All"|"Pending"|"Approved"|"Rejected">("All");
 
   const [profileOpen, setProfileOpen] = useState(false);
-  const [editProfileOpen, setEditProfileOpen] = useState(false);
-  const [profileData, setProfileData] = useState({ name: "", phone: "", profilePhoto: "" });
 
   const monthKey = `${monthlyDate.getFullYear()}-${String(monthlyDate.getMonth()+1).padStart(2,"0")}`;
 
@@ -514,26 +513,6 @@ function HRDashboard() {
 
   const saveAtt = async(uid:string,dateStr:string,s:AttendanceType)=>{ await setDoc(doc(db,"monthlyAttendance",monthKey),{[uid]:{[dateStr]:s},updatedAt:serverTimestamp()},{merge:true}); };
 
-  const handleProfilePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => { setProfileData((prev) => ({ ...prev, profilePhoto: reader.result as string })); };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const saveMyProfile = async () => {
-    if (!user) return;
-    await updateDoc(doc(db, "users", user.uid), {
-      name: profileData.name,
-      phone: profileData.phone,
-      profilePhoto: profileData.profilePhoto,
-      updatedAt: serverTimestamp()
-    });
-    setEditProfileOpen(false);
-  };
-
   // ── Derived ───────────────────────────────────────────────────────────────
   const sbd:Record<string,string[]>={};
   rows.forEach(r=>{ r.sessions.forEach(s=>{ if(!s.checkIn) return; const d=(s.checkIn as any).toDate(); const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; const k=`${r.uid}_${ds}`; if(!sbd[k]) sbd[k]=[]; sbd[k].push("S"); }); });
@@ -677,13 +656,6 @@ function HRDashboard() {
             <div className="relative">
               <button onClick={()=>{
                 setProfileOpen(o=>!o);
-                if (!profileOpen) {
-                  setProfileData({
-                    name: (userData as any)?.name || "",
-                    phone: (userData as any)?.phone || "",
-                    profilePhoto: (userData as any)?.profilePhoto || ""
-                  });
-                }
               }} className="focus:outline-none ml-2">
                 <Avatar name={userName} photo={(userData as any)?.profilePhoto} size="sm"/>
               </button>
@@ -691,7 +663,7 @@ function HRDashboard() {
                 <>
                   <div className="fixed inset-0 z-30" onClick={() => setProfileOpen(false)} />
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl z-40 border border-gray-100 py-1">
-                    <button onClick={() => { setProfileOpen(false); setEditProfileOpen(true); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2">
+                    <button onClick={() => { setProfileOpen(false); setView("profile"); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2">
                       <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                       Profile
                     </button>
@@ -705,41 +677,6 @@ function HRDashboard() {
             </div>
           </div>
         </header>
-
-        {/* Edit Profile Modal */}
-        {editProfileOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-                <h3 className="font-bold text-gray-900 text-lg">Edit Profile</h3>
-                <button onClick={() => setEditProfileOpen(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-              </div>
-              <div className="p-6 space-y-4">
-                <div className="flex flex-col items-center gap-3 mb-4">
-                  <Avatar name={profileData.name || userName} photo={profileData.profilePhoto} size="xl" />
-                  <label className="cursor-pointer text-sm font-semibold text-teal-600 hover:text-teal-700 bg-teal-50 px-3 py-1.5 rounded-lg transition-colors">
-                    Upload Photo
-                    <input type="file" accept="image/*" className="hidden" onChange={handleProfilePhotoChange} />
-                  </label>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Full Name</label>
-                  <input type="text" value={profileData.name} onChange={e => setProfileData(p => ({...p, name: e.target.value}))} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-teal-400 focus:bg-white transition-colors" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Phone Number</label>
-                  <input type="text" value={profileData.phone} onChange={e => setProfileData(p => ({...p, phone: e.target.value}))} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-teal-400 focus:bg-white transition-colors" />
-                </div>
-              </div>
-              <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
-                <button onClick={() => setEditProfileOpen(false)} className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-200 rounded-xl transition-colors">Cancel</button>
-                <button onClick={saveMyProfile} className="px-4 py-2 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl transition-colors shadow-sm">Save Changes</button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Mobile App Promo Banner */}
         <div className="lg:hidden p-3.5 bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-950 border-b border-indigo-900 flex items-center justify-between shadow-md shrink-0">
@@ -761,16 +698,29 @@ function HRDashboard() {
         {/* ── PAGE CONTENT ── */}
         <main className="flex-1 px-4 sm:px-6 py-6 space-y-6 overflow-y-auto">
 
+          {view==="profile" && <EnhancedProfileView />}
+
           {view==="daily-report"&&(
-            <div className="space-y-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-6 print:m-0 print:p-0">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900">Daily Report</h2>
                   <p className="text-sm text-gray-500 mt-1">Summary of today's activities, attendance, and tasks</p>
                 </div>
-                <div className="px-4 py-2 bg-white rounded-xl border border-gray-200 shadow-sm font-medium text-gray-700 text-sm">
-                  {new Date().toLocaleDateString("en-US", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                <div className="flex items-center gap-3">
+                  <div className="px-4 py-2 bg-white rounded-xl border border-gray-200 shadow-sm font-medium text-gray-700 text-sm">
+                    {new Date().toLocaleDateString("en-US", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                  </div>
+                  <button onClick={() => window.print()} className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl shadow-sm transition-colors flex items-center gap-2 text-sm">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    Export PDF
+                  </button>
                 </div>
+              </div>
+              
+              <div className="hidden print:block mb-6 border-b border-gray-200 pb-4">
+                <h1 className="text-2xl font-black text-gray-900">Daily Operations Report</h1>
+                <p className="text-gray-500 mt-1 text-sm">Date: {new Date().toLocaleDateString("en-US", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
               </div>
 
               {/* Top Level Summary */}
@@ -1643,8 +1593,15 @@ function HRDashboard() {
 
       <style jsx>{`
         @media print {
-          body > * { display: none !important; }
-          #payslip-print { display: block !important; position: fixed; inset: 0; background: white; }
+          body { background: white !important; }
+          /* Hide sidebar and top header */
+          aside, header, .lg\\:hidden { display: none !important; }
+          /* Reset main container layout for printing */
+          .lg\\:ml-60 { margin-left: 0 !important; }
+          main { overflow: visible !important; padding: 0 !important; margin: 0 !important; }
+          /* Avoid page breaks inside cards and rows */
+          .bg-white { box-shadow: none !important; border: 1px solid #e5e7eb !important; page-break-inside: avoid; }
+          tr { page-break-inside: avoid; }
         }
       `}</style>
     </div>
