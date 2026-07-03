@@ -49,14 +49,14 @@ export default function ReportPreview({ data, onBack }: ReportPreviewProps) {
   let present = 0;
   let totalHours = 0;
   const attendanceRows = data.users.map((u: any) => {
-    // Look for attendance records for this user
-    const userAtt = data.attendance.filter((a: any) => a.uid === u.id);
+    // Look for attendance records for this user (attendance docs use userId)
+    const userAtt = data.attendance.filter((a: any) => a.uid === u.id || a.userId === u.id);
     // Rough calculation: if there's an attendance doc, count as present
     const isPresent = userAtt.length > 0;
     if (isPresent) present++;
     
-    // Check if they submitted work updates
-    const hasUpdates = data.workUpdates.some((wu: any) => wu.uid === u.id);
+    // Check if they submitted live work updates OR a daily sheet
+    const hasUpdates = data.workUpdates.some((wu: any) => wu.uid === u.id) || data.dailySheets.some((ds: any) => ds.uid === u.id);
     
     return {
       name: u.name || u.email,
@@ -158,7 +158,7 @@ export default function ReportPreview({ data, onBack }: ReportPreviewProps) {
         {data.config.includeWorkUpdates && (
           <div className="mb-10">
             <h2 className="text-xl font-bold text-gray-900 mb-4 border-b border-gray-200 pb-2 flex items-center gap-2">
-              <span className="text-teal-600">📋</span> Employee Work Updates
+              <span className="text-teal-600">📋</span> Employee Work Updates & Daily Sheets
             </h2>
             {data.workUpdates.length === 0 && data.dailySheets.length === 0 ? (
               <p className="text-gray-500 italic">No work updates logged for this date.</p>
