@@ -314,8 +314,9 @@ function HRDashboard() {
   const [empSearch,setEmpSearch]    = useState("");
   const [leaveFilter,setLeaveFilter]= useState<"All"|"Pending"|"Approved"|"Rejected">("All");
 
-  const [notifOpen,setNotifOpen] = useState(false);
-  const unreadN = notifs.filter(n=>!n.read).length;
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [profileData, setProfileData] = useState({ name: "", phone: "", profilePhoto: "" });
 
   const monthKey = `${monthlyDate.getFullYear()}-${String(monthlyDate.getMonth()+1).padStart(2,"0")}`;
 
@@ -513,6 +514,26 @@ function HRDashboard() {
 
   const saveAtt = async(uid:string,dateStr:string,s:AttendanceType)=>{ await setDoc(doc(db,"monthlyAttendance",monthKey),{[uid]:{[dateStr]:s},updatedAt:serverTimestamp()},{merge:true}); };
 
+  const handleProfilePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => { setProfileData((prev) => ({ ...prev, profilePhoto: reader.result as string })); };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const saveMyProfile = async () => {
+    if (!user) return;
+    await updateDoc(doc(db, "users", user.uid), {
+      name: profileData.name,
+      phone: profileData.phone,
+      profilePhoto: profileData.profilePhoto,
+      updatedAt: serverTimestamp()
+    });
+    setEditProfileOpen(false);
+  };
+
   // ── Derived ───────────────────────────────────────────────────────────────
   const sbd:Record<string,string[]>={};
   rows.forEach(r=>{ r.sessions.forEach(s=>{ if(!s.checkIn) return; const d=(s.checkIn as any).toDate(); const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; const k=`${r.uid}_${ds}`; if(!sbd[k]) sbd[k]=[]; sbd[k].push("S"); }); });
@@ -538,6 +559,7 @@ function HRDashboard() {
 
   const navItems = [
     {key:"dashboard" as HRView,label:"Dashboard",icon:"⊞"},
+    {key:"daily-report" as HRView,label:"Daily Report",icon:"📝"},
     {key:"lifecycle" as HRView,label:"Lifecycle",icon:"🚀"},
     {key:"recruitment" as HRView,label:"Recruitment",icon:"🎯"},
     {key:"leave"     as HRView,label:"Leave Management",icon:"📋",badge:pendL},
@@ -648,39 +670,76 @@ function HRDashboard() {
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"/>Live
             </span>
             <NotificationBell
-  role="hr"
-  uid={user.uid}
-  accentColor="#0d9488"
-/>
+              role="hr"
+              uid={user.uid}
+              accentColor="#0d9488"
+            />
             <div className="relative">
-              <button onClick={()=>setNotifOpen(o=>!o)} className="relative p-2 hover:bg-gray-50 rounded-xl transition">
-                <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-                {unreadN>0&&<span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{unreadN}</span>}
+              <button onClick={()=>{
+                setProfileOpen(o=>!o);
+                if (!profileOpen) {
+                  setProfileData({
+                    name: (userData as any)?.name || "",
+                    phone: (userData as any)?.phone || "",
+                    profilePhoto: (userData as any)?.profilePhoto || ""
+                  });
+                }
+              }} className="focus:outline-none ml-2">
+                <Avatar name={userName} photo={(userData as any)?.profilePhoto} size="sm"/>
               </button>
-              {notifOpen&&(<>
-                <div className="fixed inset-0 z-40" onClick={()=>setNotifOpen(false)}/>
-                <div className="absolute right-0 top-12 w-80 max-h-96 overflow-y-auto bg-white border border-gray-100 rounded-2xl shadow-xl z-50">
-                  <div className="sticky top-0 bg-white flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                    <span className="font-semibold text-gray-900 text-sm">Notifications</span>
-                    {unreadN>0&&<button onClick={markRead} className="text-xs text-teal-600 hover:text-teal-800 font-semibold">Mark all read</button>}
+              {profileOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setProfileOpen(false)} />
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl z-40 border border-gray-100 py-1">
+                    <button onClick={() => { setProfileOpen(false); setEditProfileOpen(true); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2">
+                      <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                      Profile
+                    </button>
+                    <button onClick={logout} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                      Logout
+                    </button>
                   </div>
-                  {notifs.length===0
-                    ?<p className="text-center text-gray-400 text-sm py-8">No notifications</p>
-                    :notifs.map(n=>(
-                      <div key={n.id} className={`px-4 py-3 border-b border-gray-50 ${n.read?"":"bg-teal-50/40"}`}>
-                        <p className="font-semibold text-gray-900 text-sm">{n.title}</p>
-                        <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">{n.message}</p>
-                        <p className="text-gray-400 text-xs mt-1">{n.createdAt?.toDate?.()?.toLocaleString("en-IN",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})??""}</p>
-                      </div>
-                    ))
-                  }
-                </div>
-              </>)}
+                </>
+              )}
             </div>
-
-            <Avatar name={userName} photo={(userData as any)?.profilePhoto} size="sm"/>
           </div>
         </header>
+
+        {/* Edit Profile Modal */}
+        {editProfileOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                <h3 className="font-bold text-gray-900 text-lg">Edit Profile</h3>
+                <button onClick={() => setEditProfileOpen(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="flex flex-col items-center gap-3 mb-4">
+                  <Avatar name={profileData.name || userName} photo={profileData.profilePhoto} size="xl" />
+                  <label className="cursor-pointer text-sm font-semibold text-teal-600 hover:text-teal-700 bg-teal-50 px-3 py-1.5 rounded-lg transition-colors">
+                    Upload Photo
+                    <input type="file" accept="image/*" className="hidden" onChange={handleProfilePhotoChange} />
+                  </label>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Full Name</label>
+                  <input type="text" value={profileData.name} onChange={e => setProfileData(p => ({...p, name: e.target.value}))} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-teal-400 focus:bg-white transition-colors" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Phone Number</label>
+                  <input type="text" value={profileData.phone} onChange={e => setProfileData(p => ({...p, phone: e.target.value}))} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-teal-400 focus:bg-white transition-colors" />
+                </div>
+              </div>
+              <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t border-gray-100">
+                <button onClick={() => setEditProfileOpen(false)} className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-200 rounded-xl transition-colors">Cancel</button>
+                <button onClick={saveMyProfile} className="px-4 py-2 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl transition-colors shadow-sm">Save Changes</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Mobile App Promo Banner */}
         <div className="lg:hidden p-3.5 bg-gradient-to-r from-indigo-900 via-indigo-950 to-slate-950 border-b border-indigo-900 flex items-center justify-between shadow-md shrink-0">
@@ -700,9 +759,164 @@ function HRDashboard() {
         </div>
 
         {/* ── PAGE CONTENT ── */}
-        <main className="flex-1 px-4 sm:px-6 py-6 space-y-6 overflow-y-auto">
+        <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
 
-          {/* ════ DASHBOARD ════ */}
+          {view==="daily-report"&&(
+            <div className="space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Daily Report</h2>
+                  <p className="text-sm text-gray-500 mt-1">Summary of today's activities, attendance, and tasks</p>
+                </div>
+                <div className="px-4 py-2 bg-white rounded-xl border border-gray-200 shadow-sm font-medium text-gray-700 text-sm">
+                  {new Date().toLocaleDateString("en-US", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                </div>
+              </div>
+
+              {/* Top Level Summary */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard label="Total Present" value={online + offline} sub={`${total - (online+offline)} absent`} icon="👥" accent />
+                <StatCard label="Currently Online" value={online} icon="🟢" />
+                <StatCard label="Work Updates Today" value={Object.keys(wuMap).length} icon="🔄" />
+                <StatCard label="Total Work Hours" value={Math.floor(rows.reduce((sum, r) => sum + r.totalMinutes, 0) / 60) + "h " + (rows.reduce((sum, r) => sum + r.totalMinutes, 0) % 60) + "m"} icon="⏱️" />
+              </div>
+
+              {/* Department Summary & Daily Tasks */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+                  <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="text-teal-600">📊</span> Team Activity Summary
+                  </h3>
+                  <div className="space-y-4">
+                    {(() => {
+                      const deptStats = users.reduce((acc, u) => {
+                        const dept = (u as any).department || "Unassigned";
+                        if (!acc[dept]) acc[dept] = { total: 0, present: 0, updates: 0 };
+                        acc[dept].total++;
+                        const r = rows.find(x => x.uid === u.id);
+                        if (r && r.totalMinutes > 0) acc[dept].present++;
+                        if (wuMap[u.id]) acc[dept].updates++;
+                        return acc;
+                      }, {} as Record<string, { total: number, present: number, updates: number }>);
+                      
+                      const depts = Object.entries(deptStats).sort((a,b) => b[1].present - a[1].present);
+                      if (depts.length === 0) return <p className="text-sm text-gray-500">No team data available</p>;
+                      
+                      return depts.map(([dept, stats]) => (
+                        <div key={dept} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 border border-gray-100">
+                          <div>
+                            <p className="font-semibold text-gray-900 text-sm">{dept}</p>
+                            <p className="text-xs text-gray-500">{stats.present} / {stats.total} present</p>
+                          </div>
+                          <div className="text-right">
+                            <span className="inline-block px-2.5 py-1 bg-white rounded-lg border border-gray-200 text-xs font-bold text-teal-700 shadow-sm">
+                              {stats.updates} tasks
+                            </span>
+                          </div>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col h-full max-h-[400px]">
+                  <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
+                    <span className="text-teal-600">📋</span> Recent Tasks Today
+                  </h3>
+                  <div className="overflow-y-auto pr-2 space-y-3 flex-1 hide-scrollbar">
+                    {Object.values(wuMap).length === 0 ? (
+                      <p className="text-sm text-gray-500 text-center py-8">No tasks logged today</p>
+                    ) : (
+                      Object.values(wuMap).map((wu, i) => (
+                        <div key={i} className="p-3 bg-gray-50 border border-gray-100 rounded-xl">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <Avatar name={wu.userName} size="sm" />
+                              <span className="font-semibold text-sm text-gray-900">{wu.userName}</span>
+                            </div>
+                            <span className="text-[10px] text-gray-400 font-medium">{fmtTime(wu.createdAt)}</span>
+                          </div>
+                          <p className="text-sm text-gray-700 mb-2">{wu.task}</p>
+                          <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-md ${WU_STATUS[wu.status]?.bg || "bg-gray-100"} ${WU_STATUS[wu.status]?.color || "text-gray-700"}`}>
+                            {wu.status}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Comprehensive Timesheet */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                    <span className="text-teal-600">🕒</span> Today's Timesheet & Check-ins
+                  </h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gray-50/50">
+                        <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider rounded-tl-xl">Employee</th>
+                        <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">First In</th>
+                        <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Last Out</th>
+                        <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Total Work</th>
+                        <th className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider rounded-tr-xl">Current Task</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {rows.length === 0 ? (
+                        <tr><td colSpan={6} className="text-center py-8 text-sm text-gray-400">No attendance data found</td></tr>
+                      ) : (
+                        rows.map(r => {
+                          const firstSession = r.sessions[0];
+                          const lastSession = r.sessions[r.sessions.length - 1];
+                          const firstIn = firstSession?.checkIn ? fmtTime(firstSession.checkIn) : "—";
+                          const lastOut = lastSession?.checkOut ? fmtTime(lastSession.checkOut) : "—";
+                          const wu = wuMap[r.uid];
+
+                          return (
+                            <tr key={r.uid} className="hover:bg-gray-50/50 transition-colors">
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-3">
+                                  <Avatar name={r.name} photo={r.profilePhoto} size="sm" />
+                                  <div>
+                                    <p className="font-semibold text-gray-900 text-sm">{r.name}</p>
+                                    <p className="text-[10px] text-gray-500">{users.find(u => u.id === r.uid)?.department || "—"}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`w-2 h-2 rounded-full ${r.status === "ONLINE" ? "bg-emerald-500 animate-pulse" : "bg-gray-300"}`} />
+                                  <span className="text-xs font-semibold text-gray-700">{r.status}</span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4 text-sm text-gray-600 font-medium">{firstIn}</td>
+                              <td className="py-3 px-4 text-sm text-gray-600 font-medium">{r.status === "ONLINE" ? "Working" : lastOut}</td>
+                              <td className="py-3 px-4 text-sm font-bold text-gray-900">{fmtTotal(r.totalMinutes)}</td>
+                              <td className="py-3 px-4">
+                                {wu ? (
+                                  <div className="max-w-xs truncate text-xs font-medium text-gray-700" title={wu.task}>
+                                    {wu.task}
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-gray-400 italic">No task logged</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
           {view==="dashboard"&&(
             <div className="space-y-6">
 

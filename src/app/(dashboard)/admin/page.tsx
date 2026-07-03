@@ -63,7 +63,6 @@ import { checkIn, checkOut, getTodayAttendance } from "@/lib/attendance";
 import { getActiveBreak, getTodayDateStr, type Break } from "@/lib/breakTracking";
 import NavbarBreakStatus from "@/components/NavbarBreakStatus";
 import UnifiedApprovalCenter from "./UnifiedApprovalCenter";
-import AdminPayrollView from "./AdminPayrollView";
 import ProductivityReportsView from "./ProductivityReportsView";
 import AdminBudgetTracking from "./AdminBudgetTracking";
 import ProjectGanttChart from "./ProjectGanttChart";
@@ -725,12 +724,6 @@ export default function AdminPage() {
           />
 
           <NavItem
-            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-            label="Payroll" active={view === "payroll"}
-            onClick={() => { setView("payroll"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
-          />
-
-          <NavItem
             icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
             label="Shift Management" active={view === "shift-management"}
             onClick={() => { setView("shift-management"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
@@ -1156,8 +1149,6 @@ export default function AdminPage() {
           {view === "regularization" && <AdminRegularizationRequestsView />}
 
           {view === "approval-center" && <UnifiedApprovalCenter />}
-
-          {view === "payroll" && <AdminPayrollView />}
 
           {view === "productivity" && <ProductivityReportsView />}
 
