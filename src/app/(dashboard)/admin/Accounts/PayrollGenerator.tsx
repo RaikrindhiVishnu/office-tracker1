@@ -48,7 +48,7 @@ export default function PayrollGenerator() {
 
   // Edit Modal State
   const [editingEmp, setEditingEmp]         = useState<EmployeeData | null>(null);
-  const [editForm, setEditForm]             = useState<Partial<EmployeeData>>({});
+  const [editForm, setEditForm]             = useState<any>({});
   const [savingEdit, setSavingEdit]         = useState(false);
 
   const monthKey    = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
@@ -96,9 +96,17 @@ export default function PayrollGenerator() {
 
   const pendingCount = filteredEmployees.filter((e) => !e.generated).length;
 
-  const handleEditClick = (emp: EmployeeData) => {
+  const handleEditClick = async (emp: EmployeeData) => {
     setEditingEmp(emp);
     setEditForm({ ...emp });
+    try {
+      const snap = await getDoc(doc(db, "salaryStructures", emp.uid));
+      if (snap.exists()) {
+        setEditForm((prev: any) => ({ ...prev, ...snap.data() }));
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleSaveEdit = async () => {
@@ -114,6 +122,21 @@ export default function PayrollGenerator() {
         ifscCode: editForm.ifscCode || "",
         accountNo: editForm.accountNo || "",
       });
+
+      const gross = Number(editForm.basic || 0) + Number(editForm.hra || 0) + Number(editForm.specialAllowance || 0);
+      await setDoc(doc(db, "salaryStructures", editingEmp.uid), {
+        basic: editForm.basic || "",
+        hra: editForm.hra || "",
+        specialAllowance: editForm.specialAllowance || "",
+        pf: editForm.pf || "",
+        pt: editForm.pt || "",
+        tds: editForm.tds || "",
+        bankAccount: editForm.accountNo || editForm.bankAccount || "",
+        pan: editForm.pan || "",
+        gross,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+
       alert("Details updated successfully!");
       setEditingEmp(null);
       await loadEmployees();
@@ -570,7 +593,9 @@ export default function PayrollGenerator() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Edit Payroll Details for {editingEmp.name}</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Employee Details</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Employee ID</label>
                 <input type="text" value={editForm.empId || ""} onChange={(e) => setEditForm({ ...editForm, empId: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" />
@@ -604,7 +629,40 @@ export default function PayrollGenerator() {
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Account Number</label>
                 <input type="text" value={editForm.accountNo || ""} onChange={(e) => setEditForm({ ...editForm, accountNo: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" />
               </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">PAN Number</label>
+                <input type="text" value={editForm.pan || ""} onChange={(e) => setEditForm({ ...editForm, pan: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm uppercase" />
+              </div>
             </div>
+
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Salary Components</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Basic</label>
+                <input type="number" value={editForm.basic || ""} onChange={(e) => setEditForm({ ...editForm, basic: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">HRA</label>
+                <input type="number" value={editForm.hra || ""} onChange={(e) => setEditForm({ ...editForm, hra: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Special Allowance</label>
+                <input type="number" value={editForm.specialAllowance || ""} onChange={(e) => setEditForm({ ...editForm, specialAllowance: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">PF</label>
+                <input type="number" value={editForm.pf || ""} onChange={(e) => setEditForm({ ...editForm, pf: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">PT</label>
+                <input type="number" value={editForm.pt || ""} onChange={(e) => setEditForm({ ...editForm, pt: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">TDS</label>
+                <input type="number" value={editForm.tds || ""} onChange={(e) => setEditForm({ ...editForm, tds: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" />
+              </div>
+            </div>
+
             <div className="flex justify-end gap-3 mt-6">
               <button onClick={() => setEditingEmp(null)} className="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition text-sm">Cancel</button>
               <button onClick={handleSaveEdit} disabled={savingEdit} className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 text-sm">

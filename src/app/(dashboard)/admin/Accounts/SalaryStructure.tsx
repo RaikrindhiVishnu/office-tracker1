@@ -9,6 +9,7 @@ import {
   serverTimestamp,
   collection,
   getDocs,
+  updateDoc,
 } from "firebase/firestore";
 
 /* ================= TYPES ================= */
@@ -17,6 +18,13 @@ interface Employee {
   uid: string;
   name?: string;
   email?: string;
+  empId?: string;
+  designation?: string;
+  dateOfJoining?: string;
+  paymentMode?: string;
+  bankName?: string;
+  ifscCode?: string;
+  accountNo?: string;
 }
 
 interface Salary {
@@ -51,6 +59,7 @@ export default function SalaryStructure() {
     useState<Employee | null>(null);
 
   const [salary, setSalary] = useState<Salary>(emptySalary);
+  const [empDetails, setEmpDetails] = useState<Partial<Employee>>({});
   const [loading, setLoading] = useState(false);
 
   /* ================= LOAD EMPLOYEES ================= */
@@ -81,7 +90,12 @@ export default function SalaryStructure() {
   /* ================= LOAD SALARY ================= */
 
   useEffect(() => {
-    if (!selectedEmployee) return;
+    if (!selectedEmployee) {
+      setEmpDetails({});
+      return;
+    }
+
+    setEmpDetails(selectedEmployee);
 
     const loadSalary = async () => {
       try {
@@ -115,6 +129,13 @@ export default function SalaryStructure() {
     }));
   };
 
+  const handleEmpChange = (field: keyof Employee, value: string) => {
+    setEmpDetails((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
   /* ================= SAVE ================= */
 
   const saveSalary = async () => {
@@ -136,10 +157,26 @@ export default function SalaryStructure() {
         { merge: true }
       );
 
-      alert("✅ Salary structure saved!");
+      await updateDoc(doc(db, "users", selectedEmployee.uid), {
+        empId: empDetails.empId || "",
+        designation: empDetails.designation || "",
+        dateOfJoining: empDetails.dateOfJoining || "",
+        paymentMode: empDetails.paymentMode || "",
+        bankName: empDetails.bankName || "",
+        ifscCode: empDetails.ifscCode || "",
+        accountNo: empDetails.accountNo || "",
+      });
+
+      setEmployees((prev) =>
+        prev.map((emp) =>
+          emp.uid === selectedEmployee.uid ? { ...emp, ...empDetails } : emp
+        )
+      );
+
+      alert("✅ Salary structure and details saved!");
     } catch (err) {
       console.error(err);
-      alert("❌ Error saving salary");
+      alert("❌ Error saving salary and details");
     }
 
     setLoading(false);
@@ -178,17 +215,41 @@ export default function SalaryStructure() {
         ))}
       </select>
 
+      {/* Employee Details Form */}
+      {selectedEmployee && (
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Employee Details</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <input placeholder="Employee ID" value={empDetails.empId || ""} onChange={(e) => handleEmpChange("empId", e.target.value)} className="border border-gray-200 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+            <input placeholder="Designation" value={empDetails.designation || ""} onChange={(e) => handleEmpChange("designation", e.target.value)} className="border border-gray-200 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+            <input type="date" placeholder="Date of Joining" value={empDetails.dateOfJoining || ""} onChange={(e) => handleEmpChange("dateOfJoining", e.target.value)} className="border border-gray-200 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200 text-gray-500" />
+            <select value={empDetails.paymentMode || ""} onChange={(e) => handleEmpChange("paymentMode", e.target.value)} className="border border-gray-200 p-3 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200 text-gray-500">
+              <option value="">Select Payment Mode</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+              <option value="Cheque">Cheque</option>
+              <option value="Cash">Cash</option>
+            </select>
+            <input placeholder="Bank Name" value={empDetails.bankName || ""} onChange={(e) => handleEmpChange("bankName", e.target.value)} className="border border-gray-200 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+            <input placeholder="IFSC Code" value={empDetails.ifscCode || ""} onChange={(e) => handleEmpChange("ifscCode", e.target.value)} className="border border-gray-200 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+            <input placeholder="Account No" value={empDetails.accountNo || ""} onChange={(e) => handleEmpChange("accountNo", e.target.value)} className="border border-gray-200 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+          </div>
+        </div>
+      )}
+
       {/* Salary Form (ALWAYS VISIBLE) */}
-      <div className="grid grid-cols-2 gap-4">
-        {(Object.keys(emptySalary) as (keyof Salary)[]).map((field) => (
-          <input
-            key={field}
-            placeholder={field}
-            value={salary[field]}
-            onChange={(e) => handleChange(field, e.target.value)}
-            className="border border-gray-200 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
-          />
-        ))}
+      <div className="mb-6">
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Salary Components</h3>
+        <div className="grid grid-cols-2 gap-4">
+          {(Object.keys(emptySalary) as (keyof Salary)[]).map((field) => (
+            <input
+              key={field}
+              placeholder={field}
+              value={salary[field]}
+              onChange={(e) => handleChange(field, e.target.value)}
+              className="border border-gray-200 p-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            />
+          ))}
+        </div>
       </div>
 
       {/* Gross Salary */}
