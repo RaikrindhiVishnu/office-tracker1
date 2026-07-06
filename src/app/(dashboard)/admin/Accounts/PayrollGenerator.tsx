@@ -3,13 +3,21 @@
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import {
-  collection, getDocs, doc, getDoc, setDoc, serverTimestamp,
+  collection, getDocs, doc, getDoc, setDoc, serverTimestamp, updateDoc
 } from "firebase/firestore";
 import SalaryStructure from "./SalaryStructure";
 import PayslipHistory  from "./PayslipHistory";
+import type { AttendanceType } from "@/types/attendance";
 
-type Employee = {
+type EmployeeData = {
   uid: string; name: string; email: string; generated?: boolean;
+  designation?: string;
+  empId?: string;
+  dateOfJoining?: string;
+  paymentMode?: string;
+  bankName?: string;
+  ifscCode?: string;
+  accountNo?: string;
 };
 
 type View = "payroll" | "salary" | "history";
@@ -27,7 +35,7 @@ export default function PayrollGenerator() {
   const today = new Date();
 
   const [currentView, setCurrentView]       = useState<View>("payroll");
-  const [employees, setEmployees]           = useState<Employee[]>([]);
+  const [employees, setEmployees]           = useState<EmployeeData[]>([]);
   const [selectedYear, setSelectedYear]     = useState(today.getFullYear());
   const [selectedMonth, setSelectedMonth]   = useState(today.getMonth() + 1);
   const [selectedEmp, setSelectedEmp]       = useState<string>("all");
@@ -36,21 +44,45 @@ export default function PayrollGenerator() {
   const [downloadingUid, setDownloadingUid] = useState<string | null>(null);
   const [bulkProgress, setBulkProgress]     = useState<{ done: number; total: number } | null>(null);
   const [loadingAll, setLoadingAll]         = useState(false);
+  const [monthlyAtt, setMonthlyAtt]         = useState<Record<string, Record<string, AttendanceType>>>({});
+
+  // Edit Modal State
+  const [editingEmp, setEditingEmp]         = useState<EmployeeData | null>(null);
+  const [editForm, setEditForm]             = useState<Partial<EmployeeData>>({});
+  const [savingEdit, setSavingEdit]         = useState(false);
 
   const monthKey    = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
   const yearOptions = [today.getFullYear(), today.getFullYear() - 1, today.getFullYear() - 2];
 
-  useEffect(() => { loadEmployees(); }, [monthKey]);
+  useEffect(() => { loadEmployees(); loadMonthlyAttendance(); }, [monthKey]);
+
+  const loadMonthlyAttendance = async () => {
+    const snap = await getDoc(doc(db, "monthlyAttendance", monthKey));
+    if (snap.exists()) setMonthlyAtt(snap.data() as any);
+    else setMonthlyAtt({});
+  };
 
   const loadEmployees = async () => {
     const snap = await getDocs(collection(db, "users"));
-    const list: Employee[] = [];
+    const list: EmployeeData[] = [];
     for (const docSnap of snap.docs) {
       const uid  = docSnap.id;
       const data = docSnap.data();
-      if (data.accountType !== "EMPLOYEE") continue;
+      if (data.accountType === "BUSINESSOWNER") continue;
       const payslipSnap = await getDoc(doc(db, "payslips", `${uid}_${monthKey}`));
-      list.push({ uid, name: data.name, email: data.email, generated: payslipSnap.exists() });
+      list.push({ 
+        uid, 
+        name: data.name || "", 
+        email: data.email || "", 
+        generated: payslipSnap.exists(),
+        designation: data.designation || "",
+        empId: data.empId || "",
+        dateOfJoining: data.dateOfJoining || "",
+        paymentMode: data.paymentMode || "",
+        bankName: data.bankName || "",
+        ifscCode: data.ifscCode || "",
+        accountNo: data.accountNo || data.bankAccount || "",
+      });
     }
     setEmployees(list);
   };
@@ -63,6 +95,34 @@ export default function PayrollGenerator() {
   });
 
   const pendingCount = filteredEmployees.filter((e) => !e.generated).length;
+
+  const handleEditClick = (emp: EmployeeData) => {
+    setEditingEmp(emp);
+    setEditForm({ ...emp });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingEmp) return;
+    setSavingEdit(true);
+    try {
+      await updateDoc(doc(db, "users", editingEmp.uid), {
+        empId: editForm.empId || "",
+        designation: editForm.designation || "",
+        dateOfJoining: editForm.dateOfJoining || "",
+        paymentMode: editForm.paymentMode || "",
+        bankName: editForm.bankName || "",
+        ifscCode: editForm.ifscCode || "",
+        accountNo: editForm.accountNo || "",
+      });
+      alert("Details updated successfully!");
+      setEditingEmp(null);
+      await loadEmployees();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to update details.");
+    }
+    setSavingEdit(false);
+  };
 
   /* ── generatePayslip ─────────────────────────────────────────────────────*/
   const generatePayslip = async (uid: string, silent = false): Promise<boolean> => {
@@ -78,16 +138,35 @@ export default function PayrollGenerator() {
       }
       const s = salarySnap.data();
 
-      const basic            = Number(s.basic            ?? s.Basic            ?? 0);
-      const hra              = Number(s.hra              ?? s.HRA              ?? 0);
-      const specialAllowance = Number(s.specialAllowance ?? s.SpecialAllowance ?? 0);
+      const totalDays        = daysInMonth(selectedMonth, selectedYear);
+      let paidDays           = totalDays;
+      let lop                = 0;
+
+      if (monthlyAtt[uid]) {
+        const attRecord = monthlyAtt[uid];
+        let pCount = 0; let aCount = 0; let lCount = 0;
+        for (let d = 1; d <= totalDays; d++) {
+          const ds = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+          const st = attRecord[ds];
+          if (st === "P" || st === "H" || st === "SL") pCount++;
+          else if (st === "A") aCount++;
+          else if (st === "LOP") lCount++;
+        }
+        if (pCount > 0 || aCount > 0 || lCount > 0) {
+           lop = aCount + lCount;
+           paidDays = Math.max(0, totalDays - lop);
+        }
+      }
+
+      const basic            = Math.round((Number(s.basic ?? s.Basic ?? 0) / totalDays) * paidDays);
+      const hra              = Math.round((Number(s.hra ?? s.HRA ?? 0) / totalDays) * paidDays);
+      const specialAllowance = Math.round((Number(s.specialAllowance ?? s.SpecialAllowance ?? 0) / totalDays) * paidDays);
       const pf               = Number(s.pf               ?? s.PF               ?? 0);
       const pt               = Number(s.pt               ?? s.PT               ?? 0);
       const tds              = Number(s.tds              ?? s.TDS              ?? 0);
       const totalEarnings    = basic + hra + specialAllowance;
       const totalDeductions  = pf + pt + tds;
-      const netSalary        = totalEarnings - totalDeductions;
-      const totalDays        = daysInMonth(selectedMonth, selectedYear);
+      const netSalary        = Math.max(0, totalEarnings - totalDeductions);
 
       await setDoc(doc(db, "payslips", `${uid}_${monthKey}`), {
         uid,
@@ -96,14 +175,17 @@ export default function PayrollGenerator() {
         designation:    u.designation   || "N/A",
         empId:          u.empId         || u.employeeId || "N/A",
         dateOfJoining:  u.dateOfJoining || u.joiningDate || "N/A",
-        bankAccount:    s.bankAccount   ?? s.BankAccount ?? "N/A",
+        bankAccount:    u.accountNo     || s.bankAccount || s.BankAccount || "N/A",
+        bankName:       u.bankName      || "N/A",
+        ifscCode:       u.ifscCode      || "N/A",
+        paymentMode:    u.paymentMode   || "N/A",
         pan:            s.pan           ?? s.Pan         ?? "N/A",
         month:          selectedMonth,
         year:           selectedYear,
         monthKey,
         totalDays,
-        lop:            0,
-        paidDays:       totalDays,
+        lop,
+        paidDays,
         basic, hra, specialAllowance,
         totalEarnings,
         pf, pt, tds,
@@ -460,7 +542,10 @@ export default function PayrollGenerator() {
                       : <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">⏳ Pending</span>
                     }
                   </td>
-                  <td className="px-4 py-3 text-center">
+                  <td className="px-4 py-3 text-center flex items-center justify-center gap-2">
+                    <button onClick={() => handleEditClick(emp)} className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50">
+                      ✏ Edit Details
+                    </button>
                     {emp.generated ? (
                       <button onClick={() => handleDownload(emp.uid)} disabled={downloadingUid === emp.uid}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-indigo-500 text-indigo-600 rounded-lg text-xs font-medium hover:bg-indigo-50 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -479,6 +564,56 @@ export default function PayrollGenerator() {
           </table>
         )}
       </div>
+
+      {/* Edit Modal */}
+      {editingEmp && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-4">Edit Payroll Details for {editingEmp.name}</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Employee ID</label>
+                <input type="text" value={editForm.empId || ""} onChange={(e) => setEditForm({ ...editForm, empId: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Designation</label>
+                <input type="text" value={editForm.designation || ""} onChange={(e) => setEditForm({ ...editForm, designation: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Date of Joining</label>
+                <input type="date" value={editForm.dateOfJoining || ""} onChange={(e) => setEditForm({ ...editForm, dateOfJoining: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Payment Mode</label>
+                <select value={editForm.paymentMode || ""} onChange={(e) => setEditForm({ ...editForm, paymentMode: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm bg-white">
+                  <option value="">Select Mode</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="Cash">Cash</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Bank Name</label>
+                <input type="text" value={editForm.bankName || ""} onChange={(e) => setEditForm({ ...editForm, bankName: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">IFSC Code</label>
+                <input type="text" value={editForm.ifscCode || ""} onChange={(e) => setEditForm({ ...editForm, ifscCode: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Account Number</label>
+                <input type="text" value={editForm.accountNo || ""} onChange={(e) => setEditForm({ ...editForm, accountNo: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setEditingEmp(null)} className="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition text-sm">Cancel</button>
+              <button onClick={handleSaveEdit} disabled={savingEdit} className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 text-sm">
+                {savingEdit ? "Saving..." : "Save Details"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

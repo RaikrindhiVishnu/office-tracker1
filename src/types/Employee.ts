@@ -19,4 +19,10 @@ export interface Employee {
   sessions?: Session[];
   profilePhoto?: string;
   resumeUrl?: string;
+  empId?: string;
+  dateOfJoining?: string;
+  paymentMode?: string;
+  bankName?: string;
+  ifscCode?: string;
+  accountNo?: string;
 }

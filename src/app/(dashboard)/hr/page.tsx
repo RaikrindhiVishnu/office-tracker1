@@ -30,6 +30,7 @@ import NavbarBreakStatus from "@/components/NavbarBreakStatus";
 import EnhancedProfileView from "@/app/(dashboard)/employee/views/EnhancedProfileView";
 import ReportBuilder from "./components/ReportBuilder";
 import AIChatBot from "@/app/(dashboard)/employee/views/AIChatBot";
+import PayrollGenerator from "@/app/(dashboard)/admin/Accounts/PayrollGenerator";
 
 import type { AttendanceType } from "@/types/attendance";
 import type { Employee }       from "@/types/Employee";
@@ -1278,56 +1279,8 @@ function HRDashboard() {
 
           {/* ════ PAYSLIPS ════ */}
           {view==="payslips"&&(
-            <div className="space-y-5">
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">Payroll</h1>
-                <p className="text-sm text-gray-400 mt-0.5">Generate and manage employee payslips</p>
-              </div>
-
-              <div className="bg-white rounded-2xl border border-gray-100 p-6">
-                <h2 className="font-semibold text-gray-900 mb-5">Generate Payslip</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Employee</label>
-                    <select value={payEmpId} onChange={e=>{setPayEmpId(e.target.value);setPayData(null);}} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-teal-400 bg-gray-50">
-                      <option value="">Select employee</option>
-                      {users.map(u=><option key={u.id} value={u.id}>{u.name} — {(u as any).designation||"Employee"}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Month</label>
-                    <input type="month" value={payMonth} onChange={e=>{setPayMonth(e.target.value);setPayData(null);}} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-teal-400 bg-gray-50"/>
-                  </div>
-                  <button onClick={genPayslip} disabled={genPay||!payEmpId} className="px-6 py-2.5 bg-teal-600 text-white font-semibold rounded-xl hover:bg-teal-700 transition text-sm shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
-                    {genPay?"Calculating...":"Generate →"}
-                  </button>
-                </div>
-              </div>
-
-              {payData&&(
-                <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden" id="payslip-print">
-                  <div className="bg-teal-600 text-white px-8 py-6 flex items-start justify-between">
-                    <div><p className="text-2xl font-bold">PAYSLIP</p><p className="text-teal-100 text-sm mt-1">{new Date(payData.payMonth+"-01").toLocaleDateString("en-IN",{month:"long",year:"numeric"})}</p></div>
-                    <div className="text-right"><p className="font-semibold text-white">{payData.emp.name}</p><p className="text-sm text-teal-100">{payData.emp.email}</p><p className="text-sm text-teal-100">{payData.emp.designation||"Employee"}</p></div>
-                  </div>
-                  <div className="p-8 space-y-6">
-                    <div className="grid grid-cols-3 gap-3">
-                      {[{label:"Working Days",value:payData.daysInMonth,cls:"text-gray-900"},{label:"Present Days",value:payData.presentDays,cls:"text-teal-600"},{label:"LOP Days",value:payData.lopDays,cls:"text-red-500"}].map(item=>(
-                        <div key={item.label} className="bg-gray-50 border border-gray-100 rounded-xl p-4 text-center"><p className={`text-2xl font-bold ${item.cls}`}>{item.value}</p><p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mt-1">{item.label}</p></div>
-                      ))}
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between py-3 border-b border-gray-100 text-sm"><span className="text-gray-500">Gross Salary</span><span className="font-semibold text-gray-900">₹{payData.salary.toLocaleString("en-IN")}</span></div>
-                      <div className="flex justify-between py-3 border-b border-gray-100 text-sm"><span className="text-red-500">LOP Deduction ({payData.lopDays} days)</span><span className="font-semibold text-red-500">− ₹{payData.lopDeduct.toLocaleString("en-IN")}</span></div>
-                      <div className="flex justify-between py-4 bg-teal-600 text-white rounded-xl px-5 mt-3"><span className="font-bold">Net Salary</span><span className="font-bold text-xl">₹{payData.netSalary.toLocaleString("en-IN")}</span></div>
-                    </div>
-                    <div className="flex gap-3">
-                      <button onClick={()=>window.print()} className="flex-1 py-2.5 bg-teal-600 text-white font-semibold rounded-xl hover:bg-teal-700 transition text-sm">🖨️ Print</button>
-                      <button onClick={()=>setPayData(null)} className="px-5 py-2.5 bg-gray-100 text-gray-600 font-semibold rounded-xl hover:bg-gray-200 transition text-sm">Clear</button>
-                    </div>
-                  </div>
-                </div>
-              )}
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden min-h-screen p-6">
+              <PayrollGenerator />
             </div>
           )}
 
