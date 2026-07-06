@@ -51,6 +51,10 @@ export default function PayrollGenerator() {
   const [editForm, setEditForm]             = useState<any>({});
   const [savingEdit, setSavingEdit]         = useState(false);
 
+  // Preview Modal State
+  const [previewData, setPreviewData]       = useState<any | null>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+
   const monthKey    = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
   const yearOptions = [today.getFullYear(), today.getFullYear() - 1, today.getFullYear() - 2];
 
@@ -429,9 +433,123 @@ export default function PayrollGenerator() {
   /* ─── Handlers ──────────────────────────────────────────────────────────── */
   const handleGenerateSingle = async (uid: string) => {
     setGeneratingUid(uid);
-    const ok = await generatePayslip(uid, false);
-    if (ok) await loadEmployees();
+    try {
+      const userSnap = await getDoc(doc(db, "users", uid));
+      if (!userSnap.exists()) { alert("Employee not found."); setGeneratingUid(null); return; }
+      const u = userSnap.data();
+
+      const salarySnap = await getDoc(doc(db, "salaryStructures", uid));
+      if (!salarySnap.exists()) {
+        alert(`No salary structure found for ${u.name}. Please set it up first.`);
+        setGeneratingUid(null); return;
+      }
+      const s = salarySnap.data();
+
+      const totalDays        = daysInMonth(selectedMonth, selectedYear);
+      let paidDays           = totalDays;
+      let lop                = 0;
+
+      if (monthlyAtt[uid]) {
+        const attRecord = monthlyAtt[uid];
+        let pCount = 0; let aCount = 0; let lCount = 0;
+        for (let d = 1; d <= totalDays; d++) {
+          const ds = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+          const st = attRecord[ds];
+          if (st === "P" || st === "H" || st === "SL") pCount++;
+          else if (st === "A") aCount++;
+          else if (st === "LOP") lCount++;
+        }
+        if (pCount > 0 || aCount > 0 || lCount > 0) {
+           lop = aCount + lCount;
+           paidDays = Math.max(0, totalDays - lop);
+        }
+      }
+
+      const rawBasic            = Number(s.basic ?? s.Basic ?? 0);
+      const rawHra              = Number(s.hra ?? s.HRA ?? 0);
+      const rawSpecialAllowance = Number(s.specialAllowance ?? s.SpecialAllowance ?? 0);
+      const pf               = Number(s.pf               ?? s.PF               ?? 0);
+      const pt               = Number(s.pt               ?? s.PT               ?? 0);
+      const tds              = Number(s.tds              ?? s.TDS              ?? 0);
+
+      const basic = Math.round((rawBasic / totalDays) * paidDays);
+      const hra = Math.round((rawHra / totalDays) * paidDays);
+      const specialAllowance = Math.round((rawSpecialAllowance / totalDays) * paidDays);
+      const totalEarnings    = basic + hra + specialAllowance;
+      const totalDeductions  = pf + pt + tds;
+      const netSalary        = Math.max(0, totalEarnings - totalDeductions);
+
+      setPreviewData({
+        uid, u, s, rawBasic, rawHra, rawSpecialAllowance, pf, pt, tds, totalDays, paidDays, lop, basic, hra, specialAllowance, totalEarnings, totalDeductions, netSalary
+      });
+      setShowPreviewModal(true);
+    } catch (err) {
+      console.error(err);
+      alert("Error preparing preview.");
+    }
     setGeneratingUid(null);
+  };
+
+  const handlePreviewPaidDaysChange = (newPaidDaysStr: string) => {
+    if (!previewData) return;
+    const newPaidDays = Number(newPaidDaysStr);
+    const lop = previewData.totalDays - newPaidDays;
+    
+    const basic = Math.round((previewData.rawBasic / previewData.totalDays) * newPaidDays);
+    const hra = Math.round((previewData.rawHra / previewData.totalDays) * newPaidDays);
+    const specialAllowance = Math.round((previewData.rawSpecialAllowance / previewData.totalDays) * newPaidDays);
+    const totalEarnings = basic + hra + specialAllowance;
+    const netSalary = Math.max(0, totalEarnings - previewData.totalDeductions);
+
+    setPreviewData({
+      ...previewData,
+      paidDays: newPaidDays,
+      lop: lop < 0 ? 0 : lop,
+      basic, hra, specialAllowance, totalEarnings, netSalary
+    });
+  };
+
+  const confirmAndGeneratePayslip = async () => {
+    if (!previewData) return;
+    try {
+      setGeneratingUid(previewData.uid);
+      setShowPreviewModal(false);
+
+      const { uid, u, s, totalDays, paidDays, lop, basic, hra, specialAllowance, pf, pt, tds, totalEarnings, totalDeductions, netSalary } = previewData;
+
+      await setDoc(doc(db, "payslips", `${uid}_${monthKey}`), {
+        uid,
+        name:           u.name          || "",
+        email:          u.email         || "",
+        designation:    u.designation   || "N/A",
+        empId:          u.empId         || u.employeeId || "N/A",
+        dateOfJoining:  u.dateOfJoining || u.joiningDate || "N/A",
+        bankAccount:    u.accountNo     || s.bankAccount || s.BankAccount || "N/A",
+        bankName:       u.bankName      || "N/A",
+        ifscCode:       u.ifscCode      || "N/A",
+        paymentMode:    u.paymentMode   || "N/A",
+        pan:            s.pan           ?? s.Pan         ?? "N/A",
+        month:          selectedMonth,
+        year:           selectedYear,
+        monthKey,
+        totalDays,
+        lop,
+        paidDays,
+        basic, hra, specialAllowance,
+        totalEarnings,
+        pf, pt, tds,
+        totalDeductions,
+        netSalary,
+        generatedAt: serverTimestamp(),
+      });
+      await loadEmployees();
+      setGeneratingUid(null);
+      await handleDownload(uid);
+    } catch(e) {
+      console.error(e);
+      alert("Failed to confirm and generate.");
+      setGeneratingUid(null);
+    }
   };
 
   const handleDownload = async (uid: string) => {
@@ -667,6 +785,49 @@ export default function PayrollGenerator() {
               <button onClick={() => setEditingEmp(null)} className="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition text-sm">Cancel</button>
               <button onClick={handleSaveEdit} disabled={savingEdit} className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 text-sm">
                 {savingEdit ? "Saving..." : "Save Details"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Preview Modal */}
+      {showPreviewModal && previewData && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-4">Preview Payslip: {previewData.u.name}</h2>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Total Days</label>
+                  <input type="number" value={previewData.totalDays} disabled className="w-full px-3 py-2 border rounded-lg text-sm bg-gray-50" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Paid Days</label>
+                  <input type="number" value={previewData.paidDays} onChange={(e) => handlePreviewPaidDaysChange(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm font-semibold text-indigo-700 focus:ring-2 focus:ring-indigo-200 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">LOP Days</label>
+                  <input type="number" value={previewData.lop} disabled className="w-full px-3 py-2 border rounded-lg text-sm bg-gray-50 text-red-500" />
+                </div>
+              </div>
+
+              <div className="border-t border-gray-100 pt-4">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Calculated Salary</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between"><span className="text-gray-500">Basic</span><span className="font-medium text-gray-900">₹{previewData.basic.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">HRA</span><span className="font-medium text-gray-900">₹{previewData.hra.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">Special Allowance</span><span className="font-medium text-gray-900">₹{previewData.specialAllowance.toLocaleString()}</span></div>
+                  <div className="flex justify-between border-t border-gray-100 pt-2"><span className="text-gray-500">Total Deductions (PF, PT, TDS)</span><span className="font-medium text-red-500">− ₹{previewData.totalDeductions.toLocaleString()}</span></div>
+                  <div className="flex justify-between border-t border-gray-100 pt-2"><span className="font-bold text-gray-900">Net Salary</span><span className="font-bold text-indigo-600 text-lg">₹{previewData.netSalary.toLocaleString()}</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setShowPreviewModal(false)} className="px-4 py-2 text-gray-600 font-medium hover:bg-gray-100 rounded-lg transition text-sm">Cancel</button>
+              <button onClick={confirmAndGeneratePayslip} className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition text-sm">
+                OK & Generate
               </button>
             </div>
           </div>
