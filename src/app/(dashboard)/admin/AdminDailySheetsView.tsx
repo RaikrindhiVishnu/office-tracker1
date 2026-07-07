@@ -194,12 +194,9 @@ export default function AdminDailySheetsView() {
                 const start = s.checkIn.toDate();
                 const ds = key.split("_").slice(1).join("_");
                 const end = s.checkOut ? s.checkOut.toDate() : (ds === todayStr ? new Date() : null);
-                const bStart = new Date(start); bStart.setHours(10, 0, 0, 0);
-                const bEnd = new Date(start); bEnd.setHours(19, 0, 0, 0);
-                const effStart = new Date(Math.max(start.getTime(), bStart.getTime()));
-                const effEnd = end ? new Date(Math.min(end.getTime(), bEnd.getTime())) : bEnd;
-                if (effEnd > effStart) {
-                  effectiveMins += Math.floor((effEnd.getTime() - effStart.getTime()) / 60000);
+                const effEnd = end || new Date();
+                if (effEnd > start) {
+                  effectiveMins += Math.floor((effEnd.getTime() - start.getTime()) / 60000);
                 }
               });
               map[key] = { in: fmt(first.checkIn), out: last.checkOut ? fmt(last.checkOut) : "--:--", sys: `${(effectiveMins / 60).toFixed(1)}h` };

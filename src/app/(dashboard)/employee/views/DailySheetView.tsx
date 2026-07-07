@@ -130,12 +130,9 @@ export default function DailySheetView() {
           sessions.forEach((s: any) => {
             const start = s.checkIn.toDate();
             const end = s.checkOut ? s.checkOut.toDate() : (data.date === getTodayDateStr() ? new Date() : null);
-            const bStart = new Date(start); bStart.setHours(10, 0, 0, 0);
-            const bEnd = new Date(start); bEnd.setHours(19, 0, 0, 0);
-            const effStart = new Date(Math.max(start.getTime(), bStart.getTime()));
-            const effEnd = end ? new Date(Math.min(end.getTime(), bEnd.getTime())) : bEnd;
-            if (effEnd > effStart) {
-              effectiveMins += Math.floor((effEnd.getTime() - effStart.getTime()) / 60000);
+            const effEnd = end || new Date();
+            if (effEnd > start) {
+              effectiveMins += Math.floor((effEnd.getTime() - start.getTime()) / 60000);
             }
           });
           attMap[data.date] = {
@@ -460,12 +457,9 @@ export default function DailySheetView() {
             sessions.forEach((s: any) => {
               const start = s.checkIn.toDate();
               const end = s.checkOut ? s.checkOut.toDate() : (data.date === getTodayDateStr() ? new Date() : null);
-              const bStart = new Date(start); bStart.setHours(10, 0, 0, 0);
-              const bEnd = new Date(start); bEnd.setHours(19, 0, 0, 0);
-              const effStart = new Date(Math.max(start.getTime(), bStart.getTime()));
-              const effEnd = end ? new Date(Math.min(end.getTime(), bEnd.getTime())) : bEnd;
-              if (effEnd > effStart) {
-                effectiveMins += Math.floor((effEnd.getTime() - effStart.getTime()) / 60000);
+              const effEnd = end || new Date();
+              if (effEnd > start) {
+                effectiveMins += Math.floor((effEnd.getTime() - start.getTime()) / 60000);
               }
             });
             totalSysHours = Number((effectiveMins / 60).toFixed(2));

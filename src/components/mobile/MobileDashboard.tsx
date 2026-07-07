@@ -690,21 +690,14 @@ export const MobileDashboard: React.FC = () => {
 
       if (record && record.sessions && record.sessions.length > 0) {
         let totalMs = 0;
-        const d10am = new Date(d); d10am.setHours(10, 0, 0, 0);
-        const d7pm = new Date(d); d7pm.setHours(19, 0, 0, 0);
-        
         for (const s of record.sessions) {
           const start = s.checkIn?.toMillis ? s.checkIn.toMillis() : s.checkIn;
           if (!start) continue;
           
           const end = s.checkOut ? (s.checkOut?.toMillis ? s.checkOut.toMillis() : s.checkOut) : Date.now();
           
-          const clampedStart = Math.max(start, d10am.getTime());
-          const actualEnd = s.checkOut ? end : Math.min(Date.now(), d7pm.getTime());
-          const clampedEnd = Math.min(actualEnd, d7pm.getTime());
-          
-          if (clampedEnd > clampedStart) {
-            totalMs += (clampedEnd - clampedStart);
+          if (end > start) {
+            totalMs += (end - start);
           }
         }
         hours = totalMs / (1000 * 60 * 60);
@@ -749,21 +742,14 @@ export const MobileDashboard: React.FC = () => {
         interval = setInterval(() => {
           const sessions = attendance.sessions || [];
           let totalMs = 0;
-          const today = new Date();
-          const d10am = new Date(today); d10am.setHours(10, 0, 0, 0);
-          const d7pm = new Date(today); d7pm.setHours(19, 0, 0, 0);
-
           for (let i = 0; i < sessions.length; i++) {
             const s = sessions[i];
             const start = s.checkIn?.toMillis ? s.checkIn.toMillis() : s.checkIn;
             if (!start) continue;
             const end = s.checkOut ? (s.checkOut?.toMillis ? s.checkOut.toMillis() : s.checkOut) : Date.now();
             
-            const clampedStart = Math.max(start, d10am.getTime());
-            const clampedEnd = Math.min(end, d7pm.getTime());
-            
-            if (clampedEnd > clampedStart) {
-              totalMs += (clampedEnd - clampedStart);
+            if (end > start) {
+              totalMs += (end - start);
             }
           }
           setShiftSeconds(Math.floor(totalMs / 1000));
@@ -771,21 +757,14 @@ export const MobileDashboard: React.FC = () => {
       } else {
         const sessions = attendance.sessions || [];
         let totalMs = 0;
-        const today = new Date();
-        const d10am = new Date(today); d10am.setHours(10, 0, 0, 0);
-        const d7pm = new Date(today); d7pm.setHours(19, 0, 0, 0);
-
         for (let i = 0; i < sessions.length; i++) {
           const s = sessions[i];
           const start = s.checkIn?.toMillis ? s.checkIn.toMillis() : s.checkIn;
           const end = s.checkOut?.toMillis ? s.checkOut.toMillis() : s.checkOut;
           if (!start || !end) continue;
 
-          const clampedStart = Math.max(start, d10am.getTime());
-          const clampedEnd = Math.min(end, d7pm.getTime());
-          
-          if (clampedEnd > clampedStart) {
-            totalMs += (clampedEnd - clampedStart);
+          if (end > start) {
+            totalMs += (end - start);
           }
         }
         setShiftSeconds(Math.floor(totalMs / 1000));

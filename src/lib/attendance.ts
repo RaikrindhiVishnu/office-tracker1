@@ -26,18 +26,9 @@ async function isPayrollLocked(dateStr: string): Promise<boolean> {
 export function getBoundedMinutes(startTs: Timestamp, endTs: Timestamp): number {
   const start = startTs.toDate();
   const end = endTs.toDate();
-  
-  const boundaryStart = new Date(start);
-  boundaryStart.setHours(10, 0, 0, 0);
 
-  const boundaryEnd = new Date(start);
-  boundaryEnd.setHours(19, 0, 0, 0);
-
-  const effectiveStart = new Date(Math.max(start.getTime(), boundaryStart.getTime()));
-  const effectiveEnd = new Date(Math.min(end.getTime(), boundaryEnd.getTime()));
-
-  if (effectiveEnd <= effectiveStart) return 0;
-  return Math.floor((effectiveEnd.getTime() - effectiveStart.getTime()) / 60000);
+  if (end <= start) return 0;
+  return Math.floor((end.getTime() - start.getTime()) / 60000);
 }
 
 /** Get today's attendance */

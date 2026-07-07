@@ -194,9 +194,9 @@ export default function PayrollGenerator() {
 
       const pf               = Number(s.pf               ?? s.PF               ?? 0);
       const pt               = Number(s.pt               ?? s.PT               ?? 0);
-      const tds              = Number(s.tds              ?? s.TDS              ?? 0);
+      
       const totalEarnings    = basic + hra + specialAllowance;
-      const totalDeductions  = pf + pt + tds + lopDeduction;
+      const totalDeductions  = pf + pt + lopDeduction;
       const netSalary        = Math.max(0, totalEarnings - totalDeductions);
 
       await setDoc(doc(db, "payslips", `${uid}_${monthKey}`), {
@@ -373,9 +373,9 @@ export default function PayrollGenerator() {
         ["Special Allowances", fmt(p.specialAllowance)],
       ];
       const deductionRows = [
-        ["TDS",   fmt(p.tds)],
         ["PT",    fmt(p.pt)],
         ["LOP Deduction", fmt(p.lopDeduction || 0)],
+        ["", ""],
       ];
 
       earningRows.forEach((er, i) => {
@@ -475,19 +475,18 @@ export default function PayrollGenerator() {
       const rawSpecialAllowance = Number(s.specialAllowance ?? s.SpecialAllowance ?? 0);
       const pf               = Number(s.pf               ?? s.PF               ?? 0);
       const pt               = Number(s.pt               ?? s.PT               ?? 0);
-      const tds              = Number(s.tds              ?? s.TDS              ?? 0);
-
+      
       const basic = rawBasic;
       const hra = rawHra;
       const specialAllowance = rawSpecialAllowance;
       const grossSalary = basic + hra + specialAllowance;
       const lopDeduction = Math.round((grossSalary / totalDays) * lop);
       const totalEarnings    = basic + hra + specialAllowance;
-      const totalDeductions  = pf + pt + tds + lopDeduction;
+      const totalDeductions  = pf + pt + lopDeduction;
       const netSalary        = Math.max(0, totalEarnings - totalDeductions);
 
       setPreviewData({
-        uid, u, s, rawBasic, rawHra, rawSpecialAllowance, pf, pt, tds, totalDays, paidDays, lop, lopDeduction, basic, hra, specialAllowance, totalEarnings, totalDeductions, netSalary
+        uid, u, s, rawBasic, rawHra, rawSpecialAllowance, pf, pt, totalDays, paidDays, lop, lopDeduction, basic, hra, specialAllowance, totalEarnings, totalDeductions, netSalary
       });
       setShowPreviewModal(true);
     } catch (err) {
@@ -510,7 +509,7 @@ export default function PayrollGenerator() {
     const lopDeduction = Math.round((grossSalary / previewData.totalDays) * finalLop);
     
     const totalEarnings = basic + hra + specialAllowance;
-    const totalDeductions = previewData.pf + previewData.pt + previewData.tds + lopDeduction;
+    const totalDeductions = previewData.pf + previewData.pt + lopDeduction;
     const netSalary = Math.max(0, totalEarnings - totalDeductions);
 
     setPreviewData({
@@ -528,7 +527,7 @@ export default function PayrollGenerator() {
       setGeneratingUid(previewData.uid);
       setShowPreviewModal(false);
 
-      const { uid, u, s, totalDays, paidDays, lop, lopDeduction, basic, hra, specialAllowance, pf, pt, tds, totalEarnings, totalDeductions, netSalary } = previewData;
+      const { uid, u, s, totalDays, paidDays, lop, lopDeduction, basic, hra, specialAllowance, pf, pt, totalEarnings, totalDeductions, netSalary } = previewData;
 
       await setDoc(doc(db, "payslips", `${uid}_${monthKey}`), {
         uid,
@@ -833,7 +832,7 @@ export default function PayrollGenerator() {
                   <div className="flex justify-between"><span className="text-gray-500">HRA</span><span className="font-medium text-gray-900">₹{previewData.hra.toLocaleString()}</span></div>
                   <div className="flex justify-between"><span className="text-gray-500">Special Allowance</span><span className="font-medium text-gray-900">₹{previewData.specialAllowance.toLocaleString()}</span></div>
                   <div className="flex justify-between"><span className="text-gray-500">LOP Deduction</span><span className="font-medium text-red-500">− ₹{previewData.lopDeduction.toLocaleString()}</span></div>
-                  <div className="flex justify-between border-t border-gray-100 pt-2"><span className="text-gray-500">Total Deductions (PF, PT, TDS, LOP)</span><span className="font-medium text-red-500">− ₹{previewData.totalDeductions.toLocaleString()}</span></div>
+                  <div className="flex justify-between border-t border-gray-100 pt-2"><span className="text-gray-500">Total Deductions (PF, PT, LOP)</span><span className="font-medium text-red-500">− ₹{previewData.totalDeductions.toLocaleString()}</span></div>
                   <div className="flex justify-between border-t border-gray-100 pt-2"><span className="font-bold text-gray-900">Net Salary</span><span className="font-bold text-indigo-600 text-lg">₹{previewData.netSalary.toLocaleString()}</span></div>
                 </div>
               </div>

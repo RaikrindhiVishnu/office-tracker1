@@ -78,7 +78,6 @@ export default function PayslipHistory() {
     const basic   = Number(p.basic || 0);
     const hra     = Number(p.hra || 0);
     const special = Number(p.specialAllowance || 0);
-    const tds     = Number(p.tds || 0);
     const pt      = Number(p.pt || 0);
     const lopDed  = Number(p.lopDeduction || 0);
 
@@ -145,9 +144,9 @@ export default function PayslipHistory() {
 
     const tableRows: [string,string,string,string,boolean,boolean][] = [
       ["Earnings",           "Amount",              "Deduction",        "Amount",                 true,  false],
-      ["Basic Salary",       String(basic),         "TDS",              String(tds),              false, false],
-      ["HRA",                String(hra),            "PT",               String(pt),               false, false],
-      ["Special Allowances", String(special),       "LOP Deduction",    String(lopDed),           false, false],
+      ["Basic Salary",       String(basic),         "PT",               String(pt),               false, false],
+      ["HRA",                String(hra),            "LOP Deduction",    String(lopDed),           false, false],
+      ["Special Allowances", String(special),       "",                 "",                       false, false],
       ["Total Earnings",     String(totalEarnings), "Total Deductions", String(totalDeductions),  false, true ],
     ];
 

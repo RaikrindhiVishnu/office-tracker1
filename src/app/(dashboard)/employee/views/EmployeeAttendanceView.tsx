@@ -297,16 +297,8 @@ export default function EmployeeAttendanceView() {
                 ? (s.checkOut?.toDate ? s.checkOut.toDate().getTime() : new Date(s.checkOut).getTime())
                 : Date.now();
                 
-              // Only calculate within 10:00 to 19:00 window
-              const dayDate = new Date(start);
-              const shiftStart = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 10, 0, 0).getTime();
-              const shiftEnd = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 19, 0, 0).getTime();
-              
-              const actualStart = Math.max(start, shiftStart);
-              const actualEnd = Math.min(end, shiftEnd);
-              
-              if (actualEnd > actualStart) {
-                totalMins += Math.floor((actualEnd - actualStart) / 60000);
+              if (end > start) {
+                totalMins += Math.floor((end - start) / 60000);
               }
             }
 

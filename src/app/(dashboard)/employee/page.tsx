@@ -320,16 +320,11 @@ export default function ZohoStyleEmployeeDashboard() {
       attendance.sessions.forEach((sess: any) => {
         if (!sess.checkIn) return;
         const checkInDate = sess.checkIn.toDate();
-        const shiftStart = new Date(checkInDate); shiftStart.setHours(10, 0, 0, 0);
-        const shiftEnd = new Date(checkInDate); shiftEnd.setHours(19, 0, 0, 0);
-
-        let ci = Math.max(checkInDate.getTime(), shiftStart.getTime());
+        let ci = checkInDate.getTime();
         const now = new Date();
 
-        let co = sess.checkOut ? sess.checkOut.toDate().getTime() : Math.min(now.getTime(), shiftEnd.getTime());
-        if (activeBreak?.startTime && !sess.checkOut) co = Math.min(activeBreak.startTime.toDate().getTime(), shiftEnd.getTime());
-
-        co = Math.min(co, shiftEnd.getTime());
+        let co = sess.checkOut ? sess.checkOut.toDate().getTime() : now.getTime();
+        if (activeBreak?.startTime && !sess.checkOut) co = activeBreak.startTime.toDate().getTime();
 
         if (co > ci) {
           let sessionSeconds = Math.floor((co - ci) / 1000);

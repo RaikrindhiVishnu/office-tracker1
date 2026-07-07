@@ -144,17 +144,8 @@ const calculateTotalMinutes = (sessions: Session[]) => {
         : new Date(s.checkOut))
       : new Date();
 
-    const boundaryStart = new Date(start);
-    boundaryStart.setHours(10, 0, 0, 0);
-
-    const boundaryEnd = new Date(start);
-    boundaryEnd.setHours(19, 0, 0, 0);
-
-    const effectiveStart = new Date(Math.max(start.getTime(), boundaryStart.getTime()));
-    const effectiveEnd = new Date(Math.min(end.getTime(), boundaryEnd.getTime()));
-
-    if (effectiveEnd > effectiveStart) {
-      total += Math.floor((effectiveEnd.getTime() - effectiveStart.getTime()) / 60000);
+    if (end > start) {
+      total += Math.floor((end.getTime() - start.getTime()) / 60000);
     }
   }
   return total;
