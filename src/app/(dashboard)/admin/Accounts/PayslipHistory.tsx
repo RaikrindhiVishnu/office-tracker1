@@ -68,31 +68,31 @@ export default function PayslipHistory() {
     });
 
     const userDoc    = await getDoc(doc(db, "users", uid));
-    const salarySnap = await getDoc(doc(db, "salaryStructures", uid));
+    const payslipSnap = await getDoc(doc(db, "payslips", `${uid}_${monthKey}`));
 
-    if (!salarySnap.exists()) { alert("Salary structure not found for this employee."); return false; }
+    if (!payslipSnap.exists()) { alert("Payslip data not found."); return false; }
 
     const user   = userDoc.data();
-    const salary = salarySnap.data();
+    const p      = payslipSnap.data();
 
-    const basic   = Number(salary.basic || 0);
-    const hra     = Number(salary.hra || 0);
-    const special = Number(salary.specialAllowance || 0);
-    const tds     = Number(salary.tds || 0);
-    const pt      = Number(salary.pt || 0);
-    const other   = Number(salary.other || 0);
+    const basic   = Number(p.basic || 0);
+    const hra     = Number(p.hra || 0);
+    const special = Number(p.specialAllowance || 0);
+    const tds     = Number(p.tds || 0);
+    const pt      = Number(p.pt || 0);
+    const lopDed  = Number(p.lopDeduction || 0);
 
-    const totalEarnings   = basic + hra + special;
-    const totalDeductions = tds + pt + other;
-    const netSalary       = totalEarnings - totalDeductions;
+    const totalEarnings   = Number(p.totalEarnings || 0);
+    const totalDeductions = Number(p.totalDeductions || 0);
+    const netSalary       = Number(p.netSalary || 0);
 
-    const totalDays   = salary.totalDays || 30;
-    const lop         = salary.lop || 0;
-    const paidDays    = totalDays - lop;
-    const bankAccount = salary.bankAccount || "N/A";
-    const designation = user?.designation || user?.role || "Employee";
-    const empId       = salary.empId || uid.substring(0, 6).toUpperCase();
-    const doj         = user?.dateOfJoining || "N/A";
+    const totalDays   = p.totalDays || 30;
+    const lop         = p.lop || 0;
+    const paidDays    = p.paidDays || 30;
+    const bankAccount = p.bankAccount || "N/A";
+    const designation = p.designation || user?.designation || user?.role || "Employee";
+    const empId       = p.empId || uid.substring(0, 6).toUpperCase();
+    const doj         = p.dateOfJoining || user?.dateOfJoining || "N/A";
 
     const [year, month] = monthKey.split("-");
     const monthName    = new Date(Number(year), Number(month) - 1).toLocaleString("default", { month: "long" });
@@ -147,7 +147,7 @@ export default function PayslipHistory() {
       ["Earnings",           "Amount",              "Deduction",        "Amount",                 true,  false],
       ["Basic Salary",       String(basic),         "TDS",              String(tds),              false, false],
       ["HRA",                String(hra),            "PT",               String(pt),               false, false],
-      ["Special Allowances", String(special),       "Other",            other ? String(other):"", false, false],
+      ["Special Allowances", String(special),       "LOP Deduction",    String(lopDed),           false, false],
       ["Total Earnings",     String(totalEarnings), "Total Deductions", String(totalDeductions),  false, true ],
     ];
 
