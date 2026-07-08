@@ -47,6 +47,7 @@ import LeadsView from "./LeadsView";
 import InvoicesView from "./InvoicesView";
 import ITAssetsView from "./it-assets/page";
 import AIInsightsView from "./AIInsightsView";
+import AdminOverviewDashboard from "./AdminOverviewDashboard";
 import DepartmentAnalytics from "./DepartmentAnalytics";
 import AdminAppraisalView from "./AdminAppraisalView";
 import AdminJobsView from "./AdminJobsView";
@@ -292,7 +293,7 @@ export default function AdminPage() {
     loadMonthlyAttendance();
   }, [monthKey]);
 
-  const [view, setView] = useState<View>("dashboard");
+  const [view, setView] = useState<View>("admin-dashboard");
   const [rows, setRows] = useState<EmployeeRow[]>([]);
   const [users, setUsers] = useState<Employee[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -675,8 +676,14 @@ export default function AdminPage() {
         <nav className="flex-1 overflow-y-auto py-2 space-y-0.5 custom-scrollbar">
 
           <NavItem
-            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>}
-            label="Dashboard" active={view === "dashboard"}
+            icon={<svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>}
+            label="Dashboard" active={view === "admin-dashboard"}
+            onClick={() => { setView("admin-dashboard"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
+          <NavItem
+            icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+            label="Daily View" active={view === "dashboard"}
             onClick={() => { setView("dashboard"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
           />
 
@@ -965,6 +972,20 @@ export default function AdminPage() {
         <main className={`flex-1 overflow-auto bg-slate-50 px-4 pb-4 pt-2 lg:px-8 lg:pb-8 lg:pt-4 space-y-4`}>
 
 
+
+          {view === "admin-dashboard" && (
+            <AdminOverviewDashboard
+              totalEmployees={totalEmployees}
+              onlineEmployees={onlineEmployees}
+              offlineEmployees={offlineEmployees}
+              pendingLeaves={pendingLeaves}
+              setView={setView}
+              chatNotifications={chatNotifications}
+              user={user}
+              isCheckedIn={isCheckedIn}
+              totalSeconds={totalSeconds}
+            />
+          )}
 
           {view === "dashboard" && (
             <Dashboard

@@ -39,8 +39,7 @@ export default function PurchaseRequestsView({ user }: { user: any }) {
   const [department, setDepartment] = useState("");
   const [quantity, setQuantity] = useState<number | "">("");
   const [productLink, setProductLink] = useState("");
-  const [files, setFiles] = useState<FileList | null>(null);
-  
+  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -61,16 +60,6 @@ export default function PurchaseRequestsView({ user }: { user: any }) {
     
     setSubmitting(true);
     try {
-      let uploadedImages: string[] = [];
-      if (files && files.length > 0) {
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i];
-          const storageRef = ref(storage, `purchase_requests/${user.uid}_${Date.now()}_${file.name}`);
-          await uploadBytes(storageRef, file);
-          const url = await getDownloadURL(storageRef);
-          uploadedImages.push(url);
-        }
-      }
 
       await addDoc(collection(db, "purchaseRequests"), {
         uid: user.uid,
@@ -91,7 +80,7 @@ export default function PurchaseRequestsView({ user }: { user: any }) {
       });
       setMsg({ type: "success", text: "Purchase request submitted successfully!" });
       setItemName(""); setVendorName(""); setEstimatedCost(""); setPriority("Medium"); setReason("");
-      setExpectedDate(""); setDepartment(""); setQuantity(""); setProductLink(""); setFiles(null);
+      setExpectedDate(""); setDepartment(""); setQuantity(""); setProductLink(""); setUploadedImages([]);
       setTimeout(() => setTab("history"), 1500);
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to submit." });
@@ -191,10 +180,52 @@ export default function PurchaseRequestsView({ user }: { user: any }) {
 
             <div style={{ marginBottom: 16 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", display: "block", marginBottom: 4 }}>Upload Images (Optional)</label>
-              <input type="file" multiple accept="image/*" onChange={e => setFiles(e.target.files)}
+              <input type="file" multiple accept="image/*" onChange={async e => {
+                const selected = e.target.files;
+                if (!selected) return;
+                
+                // Keep the existing files and append new ones
+                const newFiles = Array.from(selected);
+                
+                for (const file of newFiles) {
+                  const reader = new FileReader();
+                  reader.onload = (ev) => {
+                    const img = new window.Image();
+                    img.onload = () => {
+                      const canvas = document.createElement("canvas");
+                      let { width, height } = img;
+                      const MAX_DIM = 800;
+                      if (width > height && width > MAX_DIM) {
+                        height *= MAX_DIM / width;
+                        width = MAX_DIM;
+                      } else if (height > MAX_DIM) {
+                        width *= MAX_DIM / height;
+                        height = MAX_DIM;
+                      }
+                      canvas.width = width;
+                      canvas.height = height;
+                      const ctx = canvas.getContext("2d");
+                      ctx?.drawImage(img, 0, 0, width, height);
+                      
+                      const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+                      setUploadedImages(prev => [...prev, compressedBase64]);
+                    };
+                    img.src = ev.target?.result as string;
+                  };
+                  reader.readAsDataURL(file);
+                }
+              }}
                 style={{ width: "100%", padding: "9px 12px", border: "1px dashed #d1d5db", borderRadius: 8, fontSize: 13, background: "#f9fafb" }} />
-              {files && files.length > 0 && (
-                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{files.length} file(s) selected</div>
+              {uploadedImages.length > 0 && (
+                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                  {uploadedImages.map((img, i) => (
+                    <div key={i} style={{ position: "relative" }}>
+                      <img src={img} alt="preview" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 8, border: "1px solid #e2e8f0" }} />
+                      <button type="button" onClick={() => setUploadedImages(prev => prev.filter((_, idx) => idx !== i))}
+                        style={{ position: "absolute", top: -6, right: -6, background: "#ef4444", color: "#fff", border: "none", borderRadius: "50%", width: 20, height: 20, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 2px 4px rgba(0,0,0,0.2)" }}>×</button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
