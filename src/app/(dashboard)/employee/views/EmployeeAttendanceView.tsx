@@ -126,6 +126,7 @@ function buildDayStatuses(
     const holiday     = isHoliday(dateStr);
     const isHolidayDay =
       isSunday(year, month, day) ||
+      (dow === 6 && (year > 2026 || (year === 2026 && month >= 6))) ||
       isSecondSaturday(year, month, day) ||
       isFourthSaturday(year, month, day) ||
       isFifthSaturday(year, month, day) ||
