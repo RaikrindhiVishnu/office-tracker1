@@ -113,69 +113,71 @@ export default function MeetChatAppUpdated({ users, isOpen = false, onClose, tar
   const avatarBg = currentUser?.profilePhoto ? "transparent" : "#6366f1";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", fontFamily: "'DM Sans', sans-serif", overflow: "hidden" }}>
-
-      {/* ── HEADER ── */}
+    <div style={{ display: "flex", flexDirection: "row", height: "100%", fontFamily: "'DM Sans', sans-serif", overflow: "hidden" }}>
+      {/* ── LEFT SIDEBAR ── */}
       <div style={{
-        height: 52, background: "#1e2230", color: "#fff",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 10px", flexShrink: 0, borderBottom: "1px solid rgba(255,255,255,.08)",
-        gap: 6,
+        width: 64, background: "#f0f2f5", borderRight: "1px solid #d1d7db",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "space-between",
+        padding: "16px 0", flexShrink: 0, zIndex: 10
       }}>
-        {/* Left — Back button + Tabs */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-
-          {/* Back button */}
-          <button
-            title="Back"
-            onClick={handleClose}
-            style={{ ...hdrBtn, flexShrink: 0 }}
-          >
-            <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
+        {/* Top Icons */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 20, width: "100%", alignItems: "center" }}>
+          
+          {/* Back Button */}
+          <button title="Back" onClick={handleClose} style={{ ...sbBtn, color: "#54656f" }}>
+            <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" /></svg>
           </button>
 
-          {/* Chat / Calls tabs */}
-          <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.08)", borderRadius: 10, padding: "3px" }}>
-            <button
-              onClick={() => setActiveTab("chat")}
-              style={{
-                padding: "5px 14px",
-                borderRadius: 8, border: "none", cursor: "pointer",
-                background: activeTab === "chat" ? "#e8512a" : "transparent",
-                color: activeTab === "chat" ? "#fff" : "rgba(255,255,255,.7)",
-                fontWeight: 700, fontSize: 13, transition: "all .15s",
-              }}
-            >
-              Chats
-            </button>
-            <button
-              onClick={() => setActiveTab("calls")}
-              style={{
-                padding: "5px 14px",
-                borderRadius: 8, border: "none", cursor: "pointer",
-                background: activeTab === "calls" ? "#e8512a" : "transparent",
-                color: activeTab === "calls" ? "#fff" : "rgba(255,255,255,.7)",
-                fontWeight: 700, fontSize: 13, transition: "all .15s",
-              }}
-            >
-              Calls
-            </button>
-          </div>
+          {/* Chat Tab */}
+          <button
+            onClick={() => setActiveTab("chat")}
+            title="Chats"
+            style={{
+              ...sbBtn,
+              background: "transparent",
+              color: activeTab === "chat" ? "#111b21" : "#54656f"
+            }}
+          >
+            <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+          </button>
+          
+          {/* Calls Tab */}
+          <button
+            onClick={() => setActiveTab("calls")}
+            title="Calls"
+            style={{
+              ...sbBtn,
+              background: "transparent",
+              color: activeTab === "calls" ? "#111b21" : "#54656f"
+            }}
+          >
+            <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+          </button>
+          
         </div>
+        
+        {/* Profile Avatar 'N' Placeholder to match image exactly */}
+        <div style={{ width: 34, height: 34, borderRadius: "50%", background: "#8b5cf6", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 600, fontSize: 14 }}>
+          N
+        </div>
+      </div>
 
-        {/* Right — icons */}
-        <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
-
-          {/* NOTIFICATION BELL */}
-          <div ref={notifRef} style={{ position: "relative" }}>
-            <button
-              title="Notifications"
-              onClick={() => { setShowNotifs(p => !p); setShowSettings(false); setShowProfile(false); }}
-              style={hdrBtn}
-            >
-              <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+      {/* ── MAIN AREA ── */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
+        {/* We moved the top nav bar icons into rightHeaderIcons */}
+        
+        {/* Render rightHeaderIcons explicitly here for state management */}
+        {(() => {
+          const rightHeaderIcons = (
+            <>
+              {/* NOTIFICATION BELL */}
+              <div ref={notifRef} style={{ position: "relative" }}>
+                <button
+                  title="Notifications"
+                  onClick={() => { setShowNotifs(p => !p); setShowSettings(false); setShowProfile(false); }}
+                  style={{ ...hdrBtn, color: "#6b7280" }}
+                >
+              <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
                 <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
               {notifications.length > 0 && (
@@ -234,10 +236,10 @@ export default function MeetChatAppUpdated({ users, isOpen = false, onClose, tar
             )}
           </div>
 
-          {/* SETTINGS */}
-          <div ref={settRef} style={{ position: "relative" }}>
-            <button title="Settings" onClick={() => { setShowSettings(p => !p); setShowNotifs(false); setShowProfile(false); }} style={hdrBtn}>
-              <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              {/* SETTINGS */}
+              <div ref={settRef} style={{ position: "relative" }}>
+                <button title="Settings" onClick={() => { setShowSettings(p => !p); setShowNotifs(false); setShowProfile(false); }} style={{ ...hdrBtn, color: "#6b7280" }}>
+              <svg width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
                 <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <circle cx="12" cy="12" r="3" />
               </svg>
@@ -256,13 +258,13 @@ export default function MeetChatAppUpdated({ users, isOpen = false, onClose, tar
             )}
           </div>
 
-          {/* PROFILE */}
-          <div ref={profRef} style={{ position: "relative" }}>
-            <button
-              title="Profile"
-              onClick={() => { setShowProfile(p => !p); setShowNotifs(false); setShowSettings(false); }}
-              style={{ ...hdrBtn, width: "auto", padding: "0 6px" }}
-            >
+              {/* PROFILE */}
+              <div ref={profRef} style={{ position: "relative" }}>
+                <button
+                  title="Profile"
+                  onClick={() => { setShowProfile(p => !p); setShowNotifs(false); setShowSettings(false); }}
+                  style={{ ...hdrBtn, width: "auto", padding: "0 6px" }}
+                >
               <div style={{ position: "relative", width: 28, height: 28, flexShrink: 0 }}>
                 <div style={{
                   width: 28, height: 28, borderRadius: "50%", overflow: "hidden",
@@ -311,7 +313,7 @@ export default function MeetChatAppUpdated({ users, isOpen = false, onClose, tar
                       <div style={{ width: 10, height: 10, borderRadius: "50%", background: cfg.color, flexShrink: 0 }} />
                       <div style={{ flex: 1 }}>{cfg.label}</div>
                       {myStatus === key && (
-                        <svg width="14" height="14" fill="none" stroke="#e8512a" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" /></svg>
+                        <svg width="14" height="14" fill="none" stroke="#0f766e" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" /></svg>
                       )}
                     </div>
                   ))}
@@ -325,35 +327,42 @@ export default function MeetChatAppUpdated({ users, isOpen = false, onClose, tar
               </div>
             )}
           </div>
-        </div>
-      </div>
+            </>
+          );
 
-      {/* MAIN CONTENT — fills remaining height, no overflow */}
-      <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column", minHeight: 0 }}>
-        {activeTab === "chat" && <TeamsStyleChatUpdated users={users} targetUid={targetUid} />}
-        {activeTab === "calls" && (
-          <div style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
-            <TeamsStyleCalls users={users} />
-          </div>
-        )}
+          return (
+            <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column", minWidth: 0 }}>
+              {activeTab === "chat" && <TeamsStyleChatUpdated users={users} targetUid={targetUid} rightHeaderIcons={rightHeaderIcons} />}
+              {activeTab === "calls" && (
+                <div style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
+                  <TeamsStyleCalls users={users} />
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
 }
 
-/* ── shared inline style objects ── */
 const hdrBtn: React.CSSProperties = {
-  width: 34, height: 34, borderRadius: 8, border: "none",
-  background: "transparent", cursor: "pointer", color: "rgba(255,255,255,.75)",
+  width: 34, height: 34, borderRadius: 8, border: "1px solid rgba(255,255,255,0.8)",
+  background: "rgba(255,255,255,0.6)", cursor: "pointer", color: "#475569",
   display: "flex", alignItems: "center", justifyContent: "center",
   position: "relative", transition: "background .14s",
 };
 
+const sbBtn: React.CSSProperties = {
+  width: 44, height: 44, borderRadius: 12, border: "none",
+  background: "transparent", cursor: "pointer", display: "flex",
+  alignItems: "center", justifyContent: "center", transition: "all .15s",
+};
+
 const dropdown: React.CSSProperties = {
-  position: "absolute", background: "#fff",
-  border: "1px solid #e8eaf0", borderRadius: 13,
-  boxShadow: "0 8px 32px rgba(0,0,0,.14)", zIndex: 9000,
-  overflow: "hidden",
+  position: "absolute", background: "#fff", borderRadius: 14,
+  boxShadow: "0 8px 32px rgba(0,0,0,.15)", zIndex: 100, border: "1px solid #e8eaf0",
+  overflow: "hidden", animation: "zcpop .16s cubic-bezier(.34,1.4,.64,1)",
 };
 
 const menuItem: React.CSSProperties = {

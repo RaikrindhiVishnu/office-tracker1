@@ -89,20 +89,21 @@ const CSS = `
 .zc-sb-av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px;overflow:hidden;}
 .zc-sb-av img{width:100%;height:100%;object-fit:cover;}
 .zc-sb-status{width:11px;height:11px;border-radius:50%;border:2px solid #1e2230;position:absolute;bottom:-1px;right:-1px;}
-.zc-panel{width:292px;background:#fff;border-right:1px solid #e8eaf0;display:flex;flex-direction:column;flex-shrink:0;}
-.zc-panel-hd{padding:14px 14px 10px;}
+.zc-panel{width:320px;background:#ffffff;border-right:1px solid #d1d7db;display:flex;flex-direction:column;flex-shrink:0;color:#111b21;}
+.zc-panel-hd{padding:10px 14px;}
 .zc-panel-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
-.zc-panel-title{font-size:15px;font-weight:700;color:#1a1d23;}
+.zc-panel-title{font-size:22px;font-weight:700;color:#111b21;}
 .zc-icon-btn{width:30px;height:30px;border-radius:7px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#6b7280;transition:all .13s;}
 .zc-icon-btn:hover{background:#f5f6f8;color:#1a1d23;}
 .zc-search-wrap{position:relative;margin-bottom:10px;}
-.zc-search-ico{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#9aa0ad;pointer-events:none;}
-.zc-search{width:100%;padding:7px 10px 7px 30px;background:#f5f6f8;border:1.5px solid transparent;border-radius:8px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;color:#1a1d23;transition:all .15s;}
-.zc-search:focus{background:#fff;border-color:#e8512a;}
-.zc-tabs{display:flex;gap:3px;}
-.zc-tab{flex:1;padding:5px 6px;border-radius:7px;font-size:11.5px;font-weight:600;cursor:pointer;border:none;background:transparent;color:#9aa0ad;transition:all .14s;font-family:'DM Sans',sans-serif;}
-.zc-tab:hover{background:#f5f6f8;color:#1a1d23;}
-.zc-tab.on{background:#fff3ef;color:#e8512a;}
+.zc-search-ico{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#54656f;pointer-events:none;}
+.zc-search{width:100%;padding:7px 10px 7px 40px;background:#f0f2f5;border:none;border-radius:8px;font-size:14px;font-family:'DM Sans',sans-serif;outline:none;color:#111b21;transition:all .15s;}
+.zc-search:focus{background:#f0f2f5;}
+.zc-tabs{display:flex;gap:8px;padding-bottom:4px;overflow-x:auto;}
+.zc-tabs::-webkit-scrollbar{display:none;}
+.zc-tab{padding:6px 12px;border-radius:16px;font-size:14px;font-weight:500;cursor:pointer;border:none;background:#f0f2f5;color:#54656f;transition:none;font-family:'DM Sans',sans-serif;flex:none;}
+.zc-tab:hover{background:#f0f2f5;}
+.zc-tab.on{background:#e7fce3;color:#138955;box-shadow:none;}
 .zc-chat-list{flex:1;overflow-y:auto;}
 .zc-chat-list::-webkit-scrollbar{width:3px;}
 .zc-chat-list::-webkit-scrollbar-thumb{background:#e8eaf0;border-radius:3px;}
@@ -112,25 +113,27 @@ const CSS = `
 .zc-group-count{font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;}
 .zc-group-arrow{font-size:8px;color:#9aa0ad;transition:transform .18s;}
 .zc-group-arrow.open{transform:rotate(90deg);}
-.zc-chat-item{display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;transition:background .12s;position:relative;border-left:3px solid transparent;}
-.zc-chat-item:hover{background:#f8f9fb;}
-.zc-chat-item.on{background:#fff3ef;border-left-color:#e8512a;}
+.zc-chat-item{display:flex;align-items:center;gap:14px;padding:12px 14px;margin:0;border-radius:0;border-bottom:1px solid #f2f2f2;cursor:pointer;transition:none;position:relative;}
+.zc-chat-item:hover{background:#f5f6f6;}
+.zc-chat-item.on{background:#f0f2f5;}
 .zc-av{display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;flex-shrink:0;overflow:hidden;position:relative;}
 .zc-av img{width:100%;height:100%;object-fit:cover;}
 .zc-sdot{border-radius:50%;border:2px solid #fff;position:absolute;bottom:-2px;right:-2px;}
 .zc-chat-meta{flex:1;min-width:0;}
-.zc-chat-name{font-size:13px;font-weight:600;color:#1a1d23;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:4px;}
-.zc-chat-preview{font-size:11.5px;color:#9aa0ad;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px;}
-.zc-unread{min-width:18px;height:18px;border-radius:9px;background:#e8512a;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;flex-shrink:0;}
-.zc-main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden;background:#f0f2f5;}
-.zc-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#9aa0ad;gap:12px;}
-.zc-empty-ico{width:72px;height:72px;border-radius:20px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:32px;box-shadow:0 4px 16px rgba(0,0,0,.08);}
-.zc-conv-hd{height:56px;background:#fff;border-bottom:1px solid #e8eaf0;padding:0 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-.zc-conv-hd-left{display:flex;align-items:center;gap:9px;}
-.zc-conv-name{font-size:14px;font-weight:700;color:#1a1d23;}
-.zc-conv-sub{font-size:11.5px;color:#9aa0ad;margin-top:1px;}
-.zc-hd-btn{width:32px;height:32px;border-radius:8px;background:transparent;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#6b7280;transition:all .14s;position:relative;}
-.zc-hd-btn:hover{background:#f5f6f8;color:#1a1d23;}
+.zc-chat-name{font-family:'Segoe UI', 'Helvetica Neue', 'Inter', sans-serif;font-size:16px;font-weight:500;color:#111b21;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:4px;}
+.zc-chat-item.on .zc-chat-name{color:#111b21;}
+.zc-chat-preview{font-size:13px;color:#667781;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;}
+.zc-chat-item.on .zc-chat-preview{color:#667781;}
+.zc-unread{min-width:20px;height:20px;border-radius:10px;background:#25d366;color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;padding:0 6px;flex-shrink:0;}
+.zc-main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden;background:#efeae2;position:relative;}
+.zc-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#667781;gap:12px;background:#f0f2f5;}
+.zc-empty-ico{width:72px;height:72px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:32px;box-shadow:0 4px 16px rgba(0,0,0,.04);}
+.zc-conv-hd{height:60px;background:#f0f2f5;border-bottom:1px solid #d1d7db;padding:0 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.zc-conv-hd-left{display:flex;align-items:center;gap:14px;}
+.zc-conv-name{font-family:'Segoe UI', 'Helvetica Neue', 'Inter', sans-serif;font-size:16px;font-weight:500;color:#111b21;}
+.zc-conv-sub{font-size:13px;color:#667781;margin-top:1px;}
+.zc-hd-btn{width:40px;height:40px;border-radius:50%;background:transparent;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#54656f;transition:all .14s;position:relative;}
+.zc-hd-btn:hover{background:rgba(11,20,26,.05);color:#54656f;}
 .zc-msgs{flex:1;overflow-y:auto;padding:14px 20px;display:flex;flex-direction:column;gap:2px;}
 .zc-msgs::-webkit-scrollbar{width:4px;}
 .zc-msgs::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:4px;}
@@ -141,35 +144,39 @@ const CSS = `
 .zc-msg-av-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;}
 .zc-msg-content{max-width:68%;display:flex;flex-direction:column;}
 .zc-msg-sender{font-size:10.5px;font-weight:600;color:#6b7280;margin-bottom:2px;padding:0 4px;}
-.zc-bubble{padding:9px 13px;border-radius:12px;font-size:13.5px;line-height:1.55;word-break:break-word;position:relative;}
-.zc-bubble.them{background:#fff;color:#1a1d23;border-radius:4px 12px 12px 12px;box-shadow:0 1px 3px rgba(0,0,0,.07);}
-.zc-bubble.mine{background:#e8512a;color:#fff;border-radius:12px 4px 12px 12px;}
-.zc-bfile{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;text-decoration:none;}
-.zc-bfile.them{background:#f5f6f8;color:#1a1d23;}
-.zc-bfile.mine{background:rgba(0,0,0,.15);color:#fff;}
-.zc-msg-meta{display:flex;align-items:center;gap:4px;margin-top:3px;padding:0 4px;}
-.zc-msg-time{font-size:10.5px;color:#9aa0ad;}
+.zc-bubble{padding:6px 7px 8px 9px;font-size:14px;line-height:1.3;word-break:break-word;position:relative;display:inline-block;min-width:80px;box-shadow:0 1px 0.5px rgba(11,20,26,.13);}
+.zc-bubble::after{content:'';clear:both;display:table;}
+.zc-bubble.them{background:#fff;color:#111b21;border-radius:0 8px 8px 8px;border:none;}
+.zc-bubble.mine{background:#d9fdd3;color:#111b21;border-radius:8px 0 8px 8px;border:none;}
+.zc-date-sep{display:flex;justify-content:center;margin:12px 0;}
+.zc-date-sep span{background:#fff;color:#54656f;font-size:12.5px;font-weight:500;padding:5px 12px;border-radius:8px;box-shadow:0 1px 0.5px rgba(11,20,26,.13);}
+.zc-bfile{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;text-decoration:none;}
+.zc-bfile.them{background:#f0f2f5;color:#111b21;}
+.zc-bfile.mine{background:#c0edb8;color:#111b21;}
+.zc-msg-meta{float:right;margin-top:4px;margin-left:12px;margin-bottom:-4px;display:flex;align-items:center;gap:4px;}
+.zc-msg-time{font-size:11px;color:#667781;}
+.zc-bubble.mine .zc-msg-time{color:#667781;}
 .zc-msg-actions{opacity:0;position:absolute;top:-30px;right:0;display:flex;gap:3px;background:#fff;border:1px solid #e8eaf0;border-radius:7px;padding:3px 5px;box-shadow:0 2px 10px rgba(0,0,0,.12);z-index:10;}
 .zc-bubble:hover .zc-msg-actions{opacity:1;}
 .zc-act-btn{width:22px;height:22px;border-radius:5px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#6b7280;transition:all .13s;}
 .zc-act-btn:hover{background:#f5f6f8;color:#e8512a;}
 .zc-edit-wrap{background:#fff;border:1px solid #e8eaf0;border-radius:10px;padding:10px;box-shadow:0 2px 8px rgba(0,0,0,.07);}
-.zc-edit-ta{width:100%;padding:7px 10px;border:1.5px solid #e8eaf0;border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;resize:none;color:#1a1d23;min-height:60px;transition:border-color .14s;}
-.zc-edit-ta:focus{border-color:#e8512a;}
+.zc-edit-ta{width:100%;padding:7px 10px;border:1.5px solid #e5e7eb;border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;resize:none;color:#1a1d23;min-height:60px;transition:border-color .14s;}
+.zc-edit-ta:focus{border-color:#6d6ee4;}
 .zc-edit-btns{display:flex;gap:6px;margin-top:7px;justify-content:flex-end;}
-.zc-input-area{background:#fff;border-top:1px solid #e8eaf0;padding:10px 14px 12px;}
-.zc-file-prev{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#f5f6f8;border-radius:8px;margin-bottom:8px;font-size:12.5px;color:#1a1d23;}
-.zc-input-row{display:flex;align-items:flex-end;gap:8px;}
-.zc-input-box{flex:1;padding:9px 13px;background:#f5f6f8;border:1.5px solid transparent;border-radius:10px;font-size:13.5px;font-family:'DM Sans',sans-serif;outline:none;resize:none;min-height:40px;max-height:120px;color:#1a1d23;transition:all .15s;}
-.zc-input-box:focus{background:#fff;border-color:#e8512a;}
-.zc-input-box::placeholder{color:#b0b7c3;}
-.zc-inp-btn{width:36px;height:36px;border-radius:9px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;}
-.zc-inp-btn.attach{background:#f5f6f8;color:#6b7280;}
-.zc-inp-btn.attach:hover{background:#e8eaf0;color:#1a1d23;}
-.zc-inp-btn.send{background:#e8512a;color:#fff;}
-.zc-inp-btn.send:hover:not(:disabled){background:#d04420;}
-.zc-inp-btn.send:disabled{background:#e8eaf0;color:#b0b7c3;cursor:not-allowed;}
-.zc-dd{position:fixed;background:#fff;border:1px solid #e8eaf0;border-radius:13px;box-shadow:0 8px 32px rgba(0,0,0,.13);z-index:9000;overflow:hidden;animation:zcpop .16s cubic-bezier(.34,1.4,.64,1);}
+.zc-input-area{background:#f0f2f5;padding:10px 16px;}
+.zc-file-prev{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#e9edef;border-radius:8px;margin-bottom:8px;font-size:13px;color:#111b21;}
+.zc-input-row{display:flex;align-items:flex-end;gap:12px;background:transparent;border:none;border-radius:0;padding:0;box-shadow:none;}
+.zc-input-box{flex:1;padding:9px 12px;background:#fff;border:none;border-radius:8px;font-size:15px;font-family:'DM Sans',sans-serif;outline:none;resize:none;min-height:42px;max-height:120px;color:#111b21;}
+.zc-input-box:focus{background:#fff;}
+.zc-input-box::placeholder{color:#667781;}
+.zc-inp-btn{width:40px;height:40px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;}
+.zc-inp-btn.attach{background:transparent;color:#54656f;}
+.zc-inp-btn.attach:hover{background:rgba(11,20,26,.05);color:#54656f;}
+.zc-inp-btn.send{background:transparent;color:#54656f;}
+.zc-inp-btn.send:hover:not(:disabled){background:rgba(11,20,26,.05);}
+.zc-inp-btn.send:disabled{color:#cbd5e1;cursor:not-allowed;background:transparent;}
+.zc-dd{position:fixed;background:#fff;border:1px solid #d1d7db;border-radius:13px;box-shadow:0 8px 32px rgba(11,20,26,.1);z-index:9000;overflow:hidden;animation:zcpop .16s cubic-bezier(.34,1.4,.64,1);}
 @keyframes zcpop{from{opacity:0;transform:scale(.94) translateY(-4px)}to{opacity:1;transform:none}}
 .zc-prof-hd{padding:14px;border-bottom:1px solid #f0f2f5;display:flex;align-items:center;gap:10px;}
 .zc-prof-name{font-size:13.5px;font-weight:700;color:#1a1d23;}
@@ -232,13 +239,13 @@ const CSS = `
 .zc-mitm:hover{background:#f9fafb;}
 .zc-mitm.sel{background:#fff3ef;}
 .zc-chk{width:15px;height:15px;border-radius:4px;border:2px solid #d1d5db;display:flex;align-items:center;justify-content:center;transition:all .12px;flex-shrink:0;}
-.zc-chk.on{background:#e8512a;border-color:#e8512a;}
+.zc-chk.on{background:#6d6ee4;border-color:#6d6ee4;}
 .zc-mfooter{display:flex;gap:7px;margin-top:16px;justify-content:flex-end;}
 .zc-btn{padding:7px 18px;border-radius:8px;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;border:none;cursor:pointer;transition:all .14s;}
 .zc-btn.ghost{background:#f5f6f8;color:#6b7280;}
 .zc-btn.ghost:hover{background:#e8eaf0;}
-.zc-btn.primary{background:#e8512a;color:#fff;}
-.zc-btn.primary:hover{background:#d04420;}
+.zc-btn.primary{background:#6d6ee4;color:#fff;}
+.zc-btn.primary:hover{background:#5a5bd2;}
 .zc-btn.primary:disabled{background:#e8eaf0;color:#b0b7c3;cursor:not-allowed;}
 .zc-btn.danger{background:#fee2e2;color:#ef4444;}
 .zc-btn.danger:hover{background:#fecaca;}
@@ -271,7 +278,7 @@ const CSS = `
 }
 `;
 
-export default function TeamsStyleChat({ users, targetUid }: { users: User[]; targetUid?: string | null }) {
+export default function TeamsStyleChat({ users, targetUid, rightHeaderIcons }: { users: User[], targetUid?: string | null, rightHeaderIcons?: React.ReactNode }) {
   const { user } = useAuth();
   const [tab, setTab] = useState<"chats" | "calls">("chats");
   const [activeTab, setActiveTab] = useState<"all" | "direct" | "groups">("all");
@@ -1118,7 +1125,10 @@ export default function TeamsStyleChat({ users, targetUid }: { users: User[]; ta
 
             {/* ── CONVERSATION AREA ── */}
             {!selectedChat
-              ? <div className="zc-main">
+              ? <div className="zc-main" style={{ position: "relative" }}>
+                <div style={{ position: "absolute", top: 10, right: 10, display: "flex", gap: 2 }}>
+                  {rightHeaderIcons}
+                </div>
                 <div className="zc-empty">
                   <div className="zc-empty-ico">💬</div>
                   <div style={{ fontSize: 16, fontWeight: 700, color: "#374151" }}>Select a conversation</div>
@@ -1143,7 +1153,7 @@ export default function TeamsStyleChat({ users, targetUid }: { users: User[]; ta
                         </div>
                         <div>
                           <div className="zc-conv-name">{name}</div>
-                          <div className="zc-conv-sub" style={{ color: typing.length > 0 ? "#e8512a" : stCfg.color }}>
+                          <div className="zc-conv-sub" style={{ color: typing.length > 0 ? "#4ade80" : "#9ca3af" }}>
                             {typing.length > 0 ? `${typing.join(", ")} ${typing.length === 1 ? "is" : "are"} typing…` : selectedChat.isGroup ? `${selectedChat.participants.length} members` : stCfg.label}
                           </div>
                         </div>
@@ -1183,6 +1193,12 @@ export default function TeamsStyleChat({ users, targetUid }: { users: User[]; ta
                         </div>
                       )}
                     </div>
+                    {/* Render right header icons passed from parent after the 3 dots */}
+                    {rightHeaderIcons && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 2, borderLeft: "1px solid #e8eaf0", paddingLeft: 6, marginLeft: 6 }}>
+                        {rightHeaderIcons}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1194,37 +1210,56 @@ export default function TeamsStyleChat({ users, targetUid }: { users: User[]; ta
                     const showAv = i === 0 || messages[i - 1]?.senderUid !== m.senderUid;
                     const isRead = (m.readBy?.length || 0) > 1;
                     const su = users.find(u => u.uid === m.senderUid); const [sg1, sg2] = avGrad(m.senderName || "?");
+                    
+                    const mDate = m.createdAt?.toDate?.() || new Date();
+                    const dateStr = mDate.toLocaleDateString();
+                    let showDateStr = null;
+                    if (i === 0) showDateStr = dateStr;
+                    else if ((messages[i-1].createdAt?.toDate?.() || new Date()).toLocaleDateString() !== dateStr) showDateStr = dateStr;
+                    
+                    let formattedDate = showDateStr;
+                    if (showDateStr) {
+                      const today = new Date();
+                      const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+                      if (dateStr === today.toLocaleDateString()) formattedDate = "Today";
+                      else if (dateStr === yesterday.toLocaleDateString()) formattedDate = "Yesterday";
+                      else formattedDate = mDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                    }
+
                     if (isSystem) return <div key={m.id} className="zc-sys-msg"><span className="zc-sys-pill">{m.text}</span></div>;
                     return (
-                      <div key={m.id} className={`zc-msg-row${mine ? " mine" : ""}`} style={{ alignItems: "flex-end" }}>
-                        {!mine && selectedChat.isGroup && (showAv
-                          ? <div style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, overflow: "hidden" }}><div className="zc-msg-av-ph" style={{ background: `linear-gradient(135deg,${sg1},${sg2})` }}>{su?.profilePhoto ? <img src={su.profilePhoto} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="" /> : initials(m.senderName || "?")}</div></div>
-                          : <div style={{ width: 30, flexShrink: 0 }} />
-                        )}
-                        <div className="zc-msg-content" style={{ alignItems: mine ? "flex-end" : "flex-start" }}>
-                          {selectedChat.isGroup && !mine && showAv && <div className="zc-msg-sender">{su?.name || m.senderName}</div>}
-                          {editingMsgId === m.id && mine
-                            ? <div className="zc-edit-wrap">
-                              <textarea className="zc-edit-ta" value={editText} onChange={e => setEditText(e.target.value)} autoFocus rows={2} />
-                              <div className="zc-edit-btns">
-                                <button className="zc-btn ghost" style={{ padding: "4px 12px", fontSize: 12 }} onClick={() => { setEditingMsgId(null); setEditText(""); }}>Cancel</button>
-                                <button className="zc-btn primary" style={{ padding: "4px 12px", fontSize: 12 }} onClick={saveEdit}>Save</button>
+                      <div key={m.id}>
+                        {formattedDate && <div className="zc-date-sep"><span>{formattedDate}</span></div>}
+                        <div className={`zc-msg-row${mine ? " mine" : ""}`} style={{ alignItems: "flex-end" }}>
+                          {!mine && selectedChat.isGroup && (showAv
+                            ? <div style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, overflow: "hidden" }}><div className="zc-msg-av-ph" style={{ background: `linear-gradient(135deg,${sg1},${sg2})` }}>{su?.profilePhoto ? <img src={su.profilePhoto} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="" /> : initials(m.senderName || "?")}</div></div>
+                            : <div style={{ width: 30, flexShrink: 0 }} />
+                          )}
+                          <div className="zc-msg-content" style={{ alignItems: mine ? "flex-end" : "flex-start" }}>
+                            {selectedChat.isGroup && !mine && showAv && <div className="zc-msg-sender">{su?.name || m.senderName}</div>}
+                            {editingMsgId === m.id && mine
+                              ? <div className="zc-edit-wrap">
+                                <textarea className="zc-edit-ta" value={editText} onChange={e => setEditText(e.target.value)} autoFocus rows={2} />
+                                <div className="zc-edit-btns">
+                                  <button className="zc-btn ghost" style={{ padding: "4px 12px", fontSize: 12 }} onClick={() => { setEditingMsgId(null); setEditText(""); }}>Cancel</button>
+                                  <button className="zc-btn primary" style={{ padding: "4px 12px", fontSize: 12 }} onClick={saveEdit}>Save</button>
+                                </div>
                               </div>
-                            </div>
-                            : <div className={`zc-bubble ${mine ? "mine" : "them"}`}>
-                              {mine && <div className="zc-msg-actions">
-                                <button className="zc-act-btn" onClick={() => { setEditingMsgId(m.id); setEditText(m.text || ""); }}>✏️</button>
-                                <button className="zc-act-btn" style={{ color: "#ef4444" }} onClick={() => confirm("Delete?") && deleteMsg(m.id)}>🗑️</button>
-                              </div>}
-                              {m.text && <p style={{ margin: 0 }}>{m.text}</p>}
-                              {m.imageUrl && <img src={m.imageUrl} style={{ maxHeight: 180, borderRadius: 8, marginTop: m.text ? 6 : 0, cursor: "pointer" }} onClick={() => window.open(m.imageUrl, "_blank")} alt="" />}
-                              {m.fileUrl && !m.imageUrl && <a href={m.fileUrl} target="_blank" rel="noopener noreferrer" className={`zc-bfile ${mine ? "mine" : "them"}`}><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg><span style={{ fontSize: 12.5 }}>{m.fileName}</span></a>}
-                              {m.isEdited && <span style={{ fontSize: 10, opacity: .6, display: "block", marginTop: 2 }}>(edited)</span>}
-                            </div>
-                          }
-                          <div className="zc-msg-meta">
-                            <span className="zc-msg-time">{m.createdAt?.toDate?.()?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) || "Now"}</span>
-                            {mine && <span style={{ fontSize: 11, color: isRead ? "#22c55e" : "#9aa0ad" }}>{isRead ? "✓✓" : m.status === "delivered" ? "✓✓" : "✓"}</span>}
+                              : <div className={`zc-bubble ${mine ? "mine" : "them"}`}>
+                                {mine && <div className="zc-msg-actions">
+                                  <button className="zc-act-btn" onClick={() => { setEditingMsgId(m.id); setEditText(m.text || ""); }}>✏️</button>
+                                  <button className="zc-act-btn" style={{ color: "#ef4444" }} onClick={() => confirm("Delete?") && deleteMsg(m.id)}>🗑️</button>
+                                </div>}
+                                {m.text && <span style={{ margin: 0, display: "inline-block", whiteSpace: "pre-wrap" }}>{m.text}</span>}
+                                {m.imageUrl && <img src={m.imageUrl} style={{ maxHeight: 180, borderRadius: 8, marginTop: m.text ? 6 : 0, cursor: "pointer" }} onClick={() => window.open(m.imageUrl, "_blank")} alt="" />}
+                                {m.fileUrl && !m.imageUrl && <a href={m.fileUrl} target="_blank" rel="noopener noreferrer" className={`zc-bfile ${mine ? "mine" : "them"}`}><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg><span style={{ fontSize: 12.5 }}>{m.fileName}</span></a>}
+                                <div className="zc-msg-meta">
+                                  <span className="zc-msg-time">{m.createdAt?.toDate?.()?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) || "Now"}</span>
+                                  {mine && <span style={{ fontSize: 11, color: isRead ? "#bbf7d0" : "rgba(255,255,255,.6)" }}>{isRead ? "✓✓" : m.status === "delivered" ? "✓✓" : "✓"}</span>}
+                                </div>
+                                {m.isEdited && <span style={{ fontSize: 10, opacity: .6, display: "block", marginTop: 2, clear: "both" }}>(edited)</span>}
+                              </div>
+                            }
                           </div>
                         </div>
                       </div>
