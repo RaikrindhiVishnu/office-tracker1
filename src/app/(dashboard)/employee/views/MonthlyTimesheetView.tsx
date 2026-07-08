@@ -63,8 +63,11 @@ export default function MonthlyTimesheetView({ user }: { user: any }) {
     let isWeekend = false;
     if (day === 0) isWeekend = true;
     if (day === 6) {
-      const week = Math.ceil((i + 1) / 7);
-      if (week === 2 || week === 4) isWeekend = true;
+      if (d.getFullYear() > 2026 || (d.getFullYear() === 2026 && d.getMonth() >= 6)) isWeekend = true;
+      else {
+        const week = Math.ceil((i + 1) / 7);
+        if (week === 2 || week === 4) isWeekend = true;
+      }
     }
     return !isWeekend;
   }).length;
@@ -127,8 +130,11 @@ export default function MonthlyTimesheetView({ user }: { user: any }) {
                 let isWeekend = false;
                 if (day === 0) isWeekend = true;
                 if (day === 6) {
-                  const week = Math.ceil(dateNum / 7);
-                  if (week === 2 || week === 4) isWeekend = true;
+                  if (d.getFullYear() > 2026 || (d.getFullYear() === 2026 && d.getMonth() >= 6)) isWeekend = true;
+                  else {
+                    const week = Math.ceil(dateNum / 7);
+                    if (week === 2 || week === 4) isWeekend = true;
+                  }
                 }
 
                 const entry = entries.find(e => e.dateStr === dateStr);

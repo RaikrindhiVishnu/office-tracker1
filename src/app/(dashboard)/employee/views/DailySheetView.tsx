@@ -176,6 +176,7 @@ export default function DailySheetView() {
     const dateNum = d.getDate();
     if (day === 0) return true;
     if (day === 6) {
+      if (d.getFullYear() > 2026 || (d.getFullYear() === 2026 && d.getMonth() >= 6)) return true;
       const week = Math.ceil(dateNum / 7);
       return week === 2 || week === 4;
     }
