@@ -131,8 +131,10 @@ const formatTotal = (m?: number): string => {
   return h ? `${h}h ${min}m` : `${min}m`;
 };
 
-const calculateTotalMinutes = (sessions: Session[]) => {
+const calculateTotalMinutes = (sessions: Session[], dateStr?: string) => {
   let total = 0;
+  const todayStr = (() => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
+  const ds = dateStr || todayStr;
   for (const s of sessions) {
     if (!s?.checkIn) continue;
     const start = s.checkIn?.toDate
@@ -142,7 +144,7 @@ const calculateTotalMinutes = (sessions: Session[]) => {
       ? (s.checkOut?.toDate
         ? s.checkOut.toDate()
         : new Date(s.checkOut))
-      : new Date();
+      : (ds === todayStr ? new Date() : (() => { const d = new Date(ds); d.setHours(19, 0, 0, 0); return d; })());
 
     if (end > start) {
       total += Math.floor((end.getTime() - start.getTime()) / 60000);
@@ -370,7 +372,7 @@ export default function AdminPage() {
         sessions: sortedSessions,
         morningCheckIn,
         status: isOnline ? "ONLINE" : "OFFLINE",
-        totalMinutes: calculateTotalMinutes(sortedSessions),
+        totalMinutes: calculateTotalMinutes(sortedSessions, targetDate),
         task: updateSnap.exists() ? updateSnap.data().currentTask : "—",
       });
     }

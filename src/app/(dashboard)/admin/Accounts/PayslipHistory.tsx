@@ -144,8 +144,8 @@ export default function PayslipHistory() {
 
     const tableRows: [string,string,string,string,boolean,boolean][] = [
       ["Earnings",           "Amount",              "Deduction",        "Amount",                 true,  false],
-      ["Basic Salary",       String(basic),         "PT",               String(pt),               false, false],
-      ["HRA",                String(hra),            "LOP Deduction",    String(lopDed),           false, false],
+      ["Basic Salary",       String(basic),         "LOP Deduction",    String(lopDed),           false, false],
+      ["HRA",                String(hra),           "",                 "",                       false, false],
       ["Special Allowances", String(special),       "",                 "",                       false, false],
       ["Total Earnings",     String(totalEarnings), "Total Deductions", String(totalDeductions),  false, true ],
     ];

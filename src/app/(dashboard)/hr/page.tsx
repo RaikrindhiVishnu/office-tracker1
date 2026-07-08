@@ -57,7 +57,7 @@ const HOLIDAYS: Record<string,{title:string}> = {
 const getTodayStr = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
 const fmtTime     = (ts:any) => ts ? ts.toDate().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}) : "--";
 const fmtTotal    = (m?:number) => { const min=m??0; const h=Math.floor(min/60); const r=min%60; if(!h&&!r) return "0m"; return h ? `${h}h ${r}m` : `${r}m`; };
-const calcMins    = (sessions:Session[]) => { let t=0; for(const s of sessions){ if(!s?.checkIn) continue; const a=s.checkIn?.toDate?s.checkIn.toDate().getTime():new Date(s.checkIn as any).getTime(); const b=s.checkOut?(s.checkOut?.toDate?s.checkOut.toDate().getTime():new Date(s.checkOut as any).getTime()):Date.now(); if(b-a>0) t+=Math.floor((b-a)/60000); } return t; };
+const calcMins    = (sessions:Session[], dateStr?:string) => { let t=0; const today = getTodayStr(); const ds = dateStr || today; for(const s of sessions){ if(!s?.checkIn) continue; const a=s.checkIn?.toDate?s.checkIn.toDate().getTime():new Date(s.checkIn as any).getTime(); const b=s.checkOut?(s.checkOut?.toDate?s.checkOut.toDate().getTime():new Date(s.checkOut as any).getTime()):(ds === today ? Date.now() : (() => { const d = new Date(ds); d.setHours(19, 0, 0, 0); return d.getTime(); })()); if(b-a>0) t+=Math.floor((b-a)/60000); } return t; };
 const calcBreakSec= (breaks:Break[]) => breaks.reduce((a,b)=>{ if(!b.startTime) return a; const s=b.startTime.toDate().getTime(); const e=b.endTime?b.endTime.toDate().getTime():s; return a+Math.max(0,Math.floor((e-s)/1000)); },0);
 const fmtBreak    = (sec:number) => { if(!sec||sec<=0) return "—"; const h=Math.floor(sec/3600); const m=Math.floor((sec%3600)/60); if(h>0) return `${h}h ${m}m`; return m>0?`${m}m`:`${sec}s`; };
 const activeBreak = (breaks:Break[]) => { const a=breaks.find(b=>b.startTime&&!b.endTime); if(!a) return null; return a.type==="MORNING"?"☕ Morning":a.type==="LUNCH"?"🍱 Lunch":"🌆 Evening"; };
@@ -335,7 +335,7 @@ function HRDashboard() {
       const sorted=[...sess].sort((x,y)=>{ const xt=x.checkIn?.toDate?x.checkIn.toDate().getTime():new Date(x.checkIn as any).getTime(); const yt=y.checkIn?.toDate?y.checkIn.toDate().getTime():new Date(y.checkIn as any).getTime(); return xt-yt; });
       const last=sess[sess.length-1];
       const upd=await getDoc(doc(db,"dailyUpdates",`${uid}_${td}`));
-      data.push({id:uid,uid,name:ud.name,email:ud.email,profilePhoto:ud.profilePhoto||"",sessions:sorted,morningCheckIn:sorted[0]?.checkIn??null,status:last&&!last.checkOut?"ONLINE":"OFFLINE",totalMinutes:calcMins(sorted),task:upd.exists()?upd.data().currentTask:"—"});
+      data.push({id:uid,uid,name:ud.name,email:ud.email,profilePhoto:ud.profilePhoto||"",sessions:sorted,morningCheckIn:sorted[0]?.checkIn??null,status:last&&!last.checkOut?"ONLINE":"OFFLINE",totalMinutes:calcMins(sorted, td),task:upd.exists()?upd.data().currentTask:"—"});
     }
     setRows(data); setBusy(false);
   },[]);
