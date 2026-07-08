@@ -168,7 +168,7 @@ export function KanbanExportModal({
     if (activeProject?.description) {
       doc.setFontSize(10);
       doc.setTextColor(100, 100, 100);
-      const splitDesc = doc.splitTextToSize(activeProject.description, pageWidth - 80);
+      const splitDesc = doc.splitTextToSize(String(activeProject.description), pageWidth - 80);
       doc.text(splitDesc, 40, yPos);
       yPos += (splitDesc.length * 12) + 15;
     } else {
