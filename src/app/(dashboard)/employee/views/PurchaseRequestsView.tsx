@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage } from "@/lib/firebase";
 
 interface PurchaseRequest {
   id: string;
@@ -12,6 +13,11 @@ interface PurchaseRequest {
   estimatedCost: number;
   priority: "Low" | "Medium" | "High";
   reason: string;
+  expectedDate?: string;
+  department?: string;
+  quantity?: number;
+  productLink?: string;
+  images?: string[];
   status: "Pending" | "Approved" | "Ordered" | "Delivered" | "Rejected";
   createdAt: any;
 }
@@ -29,6 +35,11 @@ export default function PurchaseRequestsView({ user }: { user: any }) {
   const [estimatedCost, setEstimatedCost] = useState<number | "">("");
   const [priority, setPriority] = useState<"Low" | "Medium" | "High">("Medium");
   const [reason, setReason] = useState("");
+  const [expectedDate, setExpectedDate] = useState("");
+  const [department, setDepartment] = useState("");
+  const [quantity, setQuantity] = useState<number | "">("");
+  const [productLink, setProductLink] = useState("");
+  const [files, setFiles] = useState<FileList | null>(null);
   
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -46,10 +57,21 @@ export default function PurchaseRequestsView({ user }: { user: any }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg(null);
-    if (!itemName || !estimatedCost || !reason) { setMsg({ type: "error", text: "Please fill all required fields." }); return; }
+    if (!itemName || !estimatedCost || !reason || !expectedDate) { setMsg({ type: "error", text: "Please fill all required fields." }); return; }
     
     setSubmitting(true);
     try {
+      let uploadedImages: string[] = [];
+      if (files && files.length > 0) {
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const storageRef = ref(storage, `purchase_requests/${user.uid}_${Date.now()}_${file.name}`);
+          await uploadBytes(storageRef, file);
+          const url = await getDownloadURL(storageRef);
+          uploadedImages.push(url);
+        }
+      }
+
       await addDoc(collection(db, "purchaseRequests"), {
         uid: user.uid,
         employeeName: user.displayName || user.email?.split("@")[0],
@@ -59,11 +81,17 @@ export default function PurchaseRequestsView({ user }: { user: any }) {
         estimatedCost: Number(estimatedCost),
         priority,
         reason: reason.trim(),
+        expectedDate,
+        department: department.trim(),
+        quantity: quantity ? Number(quantity) : 1,
+        productLink: productLink.trim(),
+        images: uploadedImages,
         status: "Pending",
         createdAt: serverTimestamp(),
       });
       setMsg({ type: "success", text: "Purchase request submitted successfully!" });
       setItemName(""); setVendorName(""); setEstimatedCost(""); setPriority("Medium"); setReason("");
+      setExpectedDate(""); setDepartment(""); setQuantity(""); setProductLink(""); setFiles(null);
       setTimeout(() => setTab("history"), 1500);
     } catch (err: any) {
       setMsg({ type: "error", text: err.message || "Failed to submit." });
@@ -135,6 +163,41 @@ export default function PurchaseRequestsView({ user }: { user: any }) {
               </div>
             </div>
 
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", display: "block", marginBottom: 4 }}>Date Required By *</label>
+                <input type="date" value={expectedDate} onChange={e => setExpectedDate(e.target.value)} required
+                  style={{ width: "100%", padding: "9px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 13 }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", display: "block", marginBottom: 4 }}>Department</label>
+                <input value={department} onChange={e => setDepartment(e.target.value)} placeholder="e.g. IT, HR, Marketing"
+                  style={{ width: "100%", padding: "9px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 13 }} />
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", display: "block", marginBottom: 4 }}>Quantity</label>
+                <input type="number" value={quantity} onChange={e => setQuantity(e.target.value ? Number(e.target.value) : "")} placeholder="e.g. 1" min={1}
+                  style={{ width: "100%", padding: "9px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 13 }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", display: "block", marginBottom: 4 }}>Link to Product (Optional)</label>
+                <input type="url" value={productLink} onChange={e => setProductLink(e.target.value)} placeholder="https://..."
+                  style={{ width: "100%", padding: "9px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 13 }} />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", display: "block", marginBottom: 4 }}>Upload Images (Optional)</label>
+              <input type="file" multiple accept="image/*" onChange={e => setFiles(e.target.files)}
+                style={{ width: "100%", padding: "9px 12px", border: "1px dashed #d1d5db", borderRadius: 8, fontSize: 13, background: "#f9fafb" }} />
+              {files && files.length > 0 && (
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>{files.length} file(s) selected</div>
+              )}
+            </div>
+
             <div style={{ marginBottom: 16 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", display: "block", marginBottom: 4 }}>Business Justification *</label>
               <textarea value={reason} onChange={e => setReason(e.target.value)} placeholder="Why do you need this?" required rows={3}
@@ -174,7 +237,18 @@ export default function PurchaseRequestsView({ user }: { user: any }) {
                 </div>
               </div>
               <div style={{ marginTop: 10, fontSize: 13, color: "#475569", background: "#f8fafc", padding: "8px 12px", borderRadius: 8 }}>
-                <span className="font-semibold text-slate-700">Reason:</span> {req.reason}
+                <div style={{ marginBottom: 4 }}><span className="font-semibold text-slate-700">Reason:</span> {req.reason}</div>
+                {req.expectedDate && <div style={{ marginBottom: 4 }}><span className="font-semibold text-slate-700">Required By:</span> {req.expectedDate}</div>}
+                {req.department && <div style={{ marginBottom: 4 }}><span className="font-semibold text-slate-700">Department:</span> {req.department}</div>}
+                {req.quantity && <div style={{ marginBottom: 4 }}><span className="font-semibold text-slate-700">Quantity:</span> {req.quantity}</div>}
+                {req.productLink && <div style={{ marginBottom: 4 }}><span className="font-semibold text-slate-700">Link:</span> <a href={req.productLink} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb", textDecoration: "underline" }}>View Product</a></div>}
+                {req.images && req.images.length > 0 && (
+                  <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                    {req.images.map((img, i) => (
+                      <img key={i} src={img} alt="attachment" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 8, border: "1px solid #e2e8f0" }} />
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           );

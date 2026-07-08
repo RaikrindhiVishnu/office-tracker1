@@ -293,9 +293,18 @@ export default function EmployeeAttendanceView() {
             for (const s of sorted) {
               if (!s.checkIn) continue;
               const start = s.checkIn?.toDate ? s.checkIn.toDate().getTime() : new Date(s.checkIn).getTime();
-              const end   = s.checkOut
-                ? (s.checkOut?.toDate ? s.checkOut.toDate().getTime() : new Date(s.checkOut).getTime())
-                : Date.now();
+              let end;
+              if (s.checkOut) {
+                end = s.checkOut?.toDate ? s.checkOut.toDate().getTime() : new Date(s.checkOut).getTime();
+              } else {
+                if (dateStr === TODAY_KEY) {
+                  end = Date.now();
+                } else {
+                  // Standard checkout time is 7:00 PM (19:00) for past dates without a checkout
+                  end = new Date(`${dateStr}T19:00:00`).getTime();
+                  if (end < start) end = start;
+                }
+              }
                 
               if (end > start) {
                 totalMins += Math.floor((end - start) / 60000);
@@ -480,7 +489,7 @@ export default function EmployeeAttendanceView() {
           <table className="ea-table">
             <thead>
               <tr>
-                {["DATE","DAY","CHECK IN","CHECK OUT","WORK","BREAK","Anomaly","STATUS"].map(h => (
+                {["DATE","DAY","CHECK IN","CHECK OUT","WORK","BREAK","STATUS"].map(h => (
                   <th key={h} className="ea-th" style={{ textTransform: "none" }}>{h}</th>
                 ))}
               </tr>
@@ -493,8 +502,7 @@ export default function EmployeeAttendanceView() {
                   displayDays = displayDays.filter(d => {
                     if (d.isFuture || d.status !== "P") return false;
                     const isBreakOver = d.breakMins > BREAK_LIMIT_MINUTES;
-                    const isAnomalyNote = d.day % 3 === 0;
-                    return d.isLate || isBreakOver || isAnomalyNote;
+                    return d.isLate || isBreakOver;
                   });
                 }
                 
@@ -597,25 +605,6 @@ export default function EmployeeAttendanceView() {
                     {/* BREAK */}
                     <td className="ea-td">
                       <BreakCell breakMins={breakMins} breaks={breaks || []} />
-                    </td>
-
-                    {/* Anomaly */}
-                    <td className="ea-td">
-                      {!isFuture && status === "P" ? (
-                        isBreakOver ? (
-                          <span title="Break Exceeded" style={{ color: "#ef4444" }}>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                          </span>
-                        ) : isLate ? (
-                          <span title="Late Check In" style={{ color: "#ea580c" }}>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                          </span>
-                        ) : day % 3 === 0 ? (
-                          <span title="Anomaly Note" style={{ color: "#3b82f6" }}>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                          </span>
-                        ) : <span className="ea-dash">—</span>
-                      ) : <span className="ea-dash">—</span>}
                     </td>
 
                     {/* STATUS */}

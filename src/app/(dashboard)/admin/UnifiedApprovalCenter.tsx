@@ -80,7 +80,7 @@ export default function UnifiedApprovalCenter() {
     }));
 
     // 5. Purchase Requests
-    unsubs.push(onSnapshot(query(collection(db, "purchaseRequests"), where("status", "==", "Pending")), snap => {
+    unsubs.push(onSnapshot(query(collection(db, "purchaseRequests"), where("status", "in", ["Pending", "Rejected"])), snap => {
       const purs = snap.docs.map(d => {
         const data = d.data();
         return {
@@ -164,36 +164,67 @@ export default function UnifiedApprovalCenter() {
           {filteredItems.map(item => {
             const isMoney = item.type === "Expense" || item.type === "Advance Salary" || item.type === "Purchase Request";
             return (
-              <div key={item.id} style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-                  <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
-                    {item.type === "Leave" ? "🌴" : item.type === "Regularization" ? "⏳" : item.type === "Expense" ? "🧾" : item.type === "Purchase Request" ? "📦" : "💸"}
-                  </div>
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}>{item.employeeName}</div>
-                      <span style={{ fontSize: 10, fontWeight: 700, background: "#eff6ff", color: "#1d4ed8", padding: "2px 8px", borderRadius: 12 }}>{item.type}</span>
+              <div key={item.id} style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+                    <div style={{ width: 44, height: 44, borderRadius: "50%", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
+                      {item.type === "Leave" ? "🌴" : item.type === "Regularization" ? "⏳" : item.type === "Expense" ? "🧾" : item.type === "Purchase Request" ? "📦" : "💸"}
                     </div>
-                    <div style={{ fontSize: 13, color: "#475569", marginTop: 2, fontWeight: 500 }}>{item.title}</div>
-                    <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>{item.subtitle}</div>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}>{item.employeeName}</div>
+                        <span style={{ fontSize: 10, fontWeight: 700, background: item.status === "Rejected" ? "#fff1f2" : "#eff6ff", color: item.status === "Rejected" ? "#be123c" : "#1d4ed8", padding: "2px 8px", borderRadius: 12 }}>
+                          {item.type} {item.status === "Rejected" && "(Rejected)"}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 13, color: "#475569", marginTop: 2, fontWeight: 500 }}>{item.title}</div>
+                      <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>{item.subtitle}</div>
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+                    {isMoney && (
+                      <div style={{ fontSize: 18, fontWeight: 800, color: "#0f172a" }}>
+                        ₹{item.amount?.toLocaleString("en-IN")}
+                      </div>
+                    )}
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {item.status === "Rejected" ? (
+                        <button onClick={() => handleAction(item, "Approved")} style={{ padding: "6px 12px", borderRadius: 20, border: "none", background: "#f0fdf4", color: "#16a34a", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }} title="Undo Reject and Approve">
+                          Undo Reject & Approve
+                        </button>
+                      ) : (
+                        <>
+                          <button onClick={() => handleAction(item, "Rejected")} style={{ width: 36, height: 36, borderRadius: "50%", border: "none", background: "#fff1f2", color: "#e11d48", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }} title="Reject">
+                            ✕
+                          </button>
+                          <button onClick={() => handleAction(item, "Approved")} style={{ width: 36, height: 36, borderRadius: "50%", border: "none", background: "#f0fdf4", color: "#16a34a", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }} title="Approve">
+                            ✓
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
-                
-                <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-                  {isMoney && (
-                    <div style={{ fontSize: 18, fontWeight: 800, color: "#0f172a" }}>
-                      ₹{item.amount?.toLocaleString("en-IN")}
-                    </div>
-                  )}
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => handleAction(item, "Rejected")} style={{ width: 36, height: 36, borderRadius: "50%", border: "none", background: "#fff1f2", color: "#e11d48", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }} title="Reject">
-                      ✕
-                    </button>
-                    <button onClick={() => handleAction(item, "Approved")} style={{ width: 36, height: 36, borderRadius: "50%", border: "none", background: "#f0fdf4", color: "#16a34a", fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }} title="Approve">
-                      ✓
-                    </button>
+
+                {item.type === "Purchase Request" && (
+                  <div style={{ fontSize: 13, color: "#475569", background: "#f8fafc", padding: "10px 14px", borderRadius: 8 }}>
+                    <div style={{ marginBottom: 4 }}><span style={{ fontWeight: 600 }}>Reason:</span> {item.originalData.reason}</div>
+                    {item.originalData.expectedDate && <div style={{ marginBottom: 4 }}><span style={{ fontWeight: 600 }}>Required By:</span> {item.originalData.expectedDate}</div>}
+                    {item.originalData.department && <div style={{ marginBottom: 4 }}><span style={{ fontWeight: 600 }}>Department:</span> {item.originalData.department}</div>}
+                    {item.originalData.quantity && <div style={{ marginBottom: 4 }}><span style={{ fontWeight: 600 }}>Quantity:</span> {item.originalData.quantity}</div>}
+                    {item.originalData.productLink && <div style={{ marginBottom: 4 }}><span style={{ fontWeight: 600 }}>Link:</span> <a href={item.originalData.productLink} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb", textDecoration: "underline" }}>View Product</a></div>}
+                    {item.originalData.images && item.originalData.images.length > 0 && (
+                      <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                        {item.originalData.images.map((img: string, i: number) => (
+                          <a key={i} href={img} target="_blank" rel="noopener noreferrer">
+                            <img src={img} alt="attachment" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 8, border: "1px solid #e2e8f0" }} />
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
               </div>
             );
           })}

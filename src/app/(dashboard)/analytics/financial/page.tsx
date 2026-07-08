@@ -624,15 +624,26 @@ function OverviewTab({ data }: { data: ReturnType<typeof useFinance> }) {
 // ─────────────────────────────────────────────────────────────
 // 8. EXPENSES TAB
 // ─────────────────────────────────────────────────────────────
-function ExpensesTab({ expenses, onAdd, onDelete }: {
+function ExpensesTab({ expenses, month, onAdd, onDelete }: {
   expenses: Expense[];
+  month: string;
   onAdd: (data: Omit<Expense, "id" | "month" | "createdAt">) => void;
   onDelete: (id: string) => void;
 }) {
   const [category, setCategory] = useState("Rent");
   const [amount,   setAmount]   = useState("");
   const [note,     setNote]     = useState("");
-  const [date,     setDate]     = useState(new Date().toISOString().slice(0, 10));
+  const [date,     setDate]     = useState(() => {
+    const today = new Date();
+    const todayMonth = today.toISOString().slice(0, 7);
+    return month === todayMonth ? today.toISOString().slice(0, 10) : `${month}-01`;
+  });
+
+  useEffect(() => {
+    const today = new Date();
+    const todayMonth = today.toISOString().slice(0, 7);
+    setDate(month === todayMonth ? today.toISOString().slice(0, 10) : `${month}-01`);
+  }, [month]);
 
   const handleAdd = () => {
     if (!amount || !date) return;
@@ -1169,7 +1180,10 @@ const MONTH_LABELS: Record<string, string> = {
 type Tab = "overview" | "expenses" | "payroll" | "employees" | "assets" | "firestore";
 
 export default function FinancialDashboard() {
-  const [month, setMonth] = useState("2026-03");
+  const [month, setMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [tab,   setTab]   = useState<Tab>("overview");
 
   const data = useFinance(month);
@@ -1272,7 +1286,7 @@ export default function FinancialDashboard() {
       {/* CONTENT */}
       <main style={{ padding: "20px 24px", width: "100%" }}>
         {tab === "overview"  && <><OverviewTab  data={data} /><div style={{marginTop:20}}><CrossDeptFeed role="finance" accentColor="#2563eb" title="Sales & Business Activity" maxItems={8} /></div></>}
-        {tab === "expenses"  && <ExpensesTab  expenses={data.expenses}  onAdd={handleAddExpense} onDelete={handleDelExpense} />}
+        {tab === "expenses"  && <ExpensesTab  expenses={data.expenses} month={month} onAdd={handleAddExpense} onDelete={handleDelExpense} />}
         {tab === "payroll"   && <PayrollTab   payroll={data.payroll}    payrollTotals={data.payrollTotals} month={month} employees={data.employees} onAdd={handleAddPayroll} onDelete={handleDelPayroll} />}
         {tab === "employees" && <EmployeesTab employees={data.employees} />}
         {tab === "assets"    && <AssetsTab    assets={data.assets}      totalAssets={data.totalAssets} month={month} onAdd={handleAddAsset} onDelete={handleDelAsset} />}
