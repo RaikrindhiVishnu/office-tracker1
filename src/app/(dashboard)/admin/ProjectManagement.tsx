@@ -1823,6 +1823,7 @@ export default function AdminProjectManagement({ user, projects, users }: { user
                   onCreateTask={canManage ? handleKanbanCreateTask : undefined}
                   currentUser={user}
                   activeProject={activeProject}
+                  users={users}
                 />
               </div>
             </div>

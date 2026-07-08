@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { createPortal } from "react-dom";
 import { TaskLabel, LABEL_COLORS, TicketType, Task, KanbanColumn, getLabelStyle } from "@/lib/kanbanUtils";
 import { QuickImageUpload } from "./sprint";
+import { KanbanExportModal } from "./KanbanExportModal";
 
 /* ─── TYPES ─── */
 export type ViewMode = "board" | "swimlane";
@@ -1362,6 +1363,7 @@ export function KanbanBoard({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("board");
   const [groupBy, setGroupBy] = useState<GroupBy>("assignee");
+  const [showExportModal, setShowExportModal] = useState(false);
 
   const [editingColId, setEditingColId] = useState<string | null>(null);
   const [editingLabelVal, setEditingLabelVal] = useState("");
@@ -1570,6 +1572,10 @@ export function KanbanBoard({
         </select>
       )}
       <div className="flex-1" />
+      <button onClick={() => setShowExportModal(true)}
+        className="h-8 px-3 flex items-center gap-2 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors border border-green-100 text-[10px] font-bold">
+        Export
+      </button>
       <button onClick={() => setIsFullscreen(p => !p)}
         className="h-8 px-3 flex items-center gap-2 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors border border-indigo-100 text-[10px] font-bold">
         {isFullscreen ? "↙ Exit" : "↗ Fullscreen"} <span className="opacity-50 font-normal">(F)</span>
@@ -2082,6 +2088,15 @@ export function KanbanBoard({
           onCreate={ticketType => { if (onCreateTask) onCreateTask(floatingMenu.storyId, ticketType); setFloatingMenu(null); }}
         />
       )}
+
+      <KanbanExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        tasks={filteredTasks}
+        columns={columns}
+        activeProject={activeProject}
+        users={users}
+      />
 
       {/* Toolbar is shrink-0 — takes its natural height, remainder goes to board */}
       {renderToolbar()}
