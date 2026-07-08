@@ -99,6 +99,10 @@ export default function AdminExpenseView() {
 
   // Drawer states
   const [selectedExpense, setSelectedExpense] = useState<ExpenseClaim | null>(null);
+  const [isEditingExpense, setIsEditingExpense] = useState(false);
+  const [editExTitle, setEditExTitle] = useState("");
+  const [editExItems, setEditExItems] = useState<ExpenseItem[]>([]);
+
   const [selectedPR, setSelectedPR] = useState<PurchaseRequest | null>(null);
   
   // Action states
@@ -175,6 +179,38 @@ export default function AdminExpenseView() {
       setSelectedExpense(null); setAdminRemark(""); setPaymentDate("");
     } catch (err) {
       alert("Failed to update expense claim."); console.error(err);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const startEditExpense = () => {
+    if (!selectedExpense) return;
+    setEditExTitle(selectedExpense.title);
+    setEditExItems(JSON.parse(JSON.stringify(selectedExpense.items)));
+    setIsEditingExpense(true);
+  };
+
+  const handleUpdateExpense = async () => {
+    if (!selectedExpense) return;
+    if (!editExTitle.trim() || editExItems.some(i => !i.description || !i.amount || !i.date)) {
+      alert("Please fill all required fields correctly.");
+      return;
+    }
+    setProcessing(true);
+    try {
+      const totalAmount = editExItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+      await updateDoc(doc(db, "expenseClaims", selectedExpense.id), {
+        title: editExTitle.trim(),
+        items: editExItems,
+        totalAmount,
+      });
+      // Update local state to reflect changes immediately
+      setSelectedExpense({ ...selectedExpense, title: editExTitle.trim(), items: editExItems, totalAmount });
+      setIsEditingExpense(false);
+    } catch (err) {
+      alert("Failed to update expense claim.");
+      console.error(err);
     } finally {
       setProcessing(false);
     }
@@ -479,66 +515,138 @@ export default function AdminExpenseView() {
           </div>
 
           <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", marginBottom: 4 }}>Claim Title</div>
-              <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}>{selectedExpense.title}</div>
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", marginBottom: 8 }}>Expense Items</div>
-              {selectedExpense.items.map((item, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #f1f5f9" }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{CATEGORY_EMOJI[item.category]} {item.description}</div>
-                    <div style={{ fontSize: 11, color: "#94a3b8" }}>{item.date} · {item.category}</div>
-                  </div>
-                  <div style={{ fontWeight: 700, color: "#0f172a" }}>{fmtCur(item.amount)}</div>
+            {isEditingExpense ? (
+              <div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", display: "block", marginBottom: 4 }}>Claim Title *</label>
+                  <input value={editExTitle} onChange={e => setEditExTitle(e.target.value)} required
+                    style={{ width: "100%", padding: "9px 12px", border: "1px solid #cbd5e1", borderRadius: 8, fontSize: 13 }} />
                 </div>
-              ))}
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 0 0", fontWeight: 800 }}>
-                <span>Total</span>
-                <span style={{ color: "#2563eb", fontSize: 18 }}>{fmtCur(selectedExpense.totalAmount)}</span>
+                
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 8 }}>Expense Items *</div>
+                {editExItems.map((item, i) => (
+                  <div key={i} style={{ padding: 12, border: "1px solid #e2e8f0", borderRadius: 8, marginBottom: 12, background: "#f8fafc", position: "relative" }}>
+                    {editExItems.length > 1 && (
+                      <button type="button" onClick={() => setEditExItems(editExItems.filter((_, idx) => idx !== i))}
+                        style={{ position: "absolute", top: 8, right: 8, background: "none", border: "none", color: "#ef4444", fontSize: 18, cursor: "pointer", lineHeight: 1 }}>×</button>
+                    )}
+                    <div style={{ marginBottom: 8 }}>
+                      <label style={{ fontSize: 11, color: "#64748b", display: "block", marginBottom: 2 }}>Description</label>
+                      <input value={item.description} onChange={e => { const newItems = [...editExItems]; newItems[i].description = e.target.value; setEditExItems(newItems); }}
+                        style={{ width: "100%", padding: "6px 10px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 13 }} required />
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                      <div>
+                        <label style={{ fontSize: 11, color: "#64748b", display: "block", marginBottom: 2 }}>Amount (₹)</label>
+                        <input type="number" value={item.amount || ""} onChange={e => { const newItems = [...editExItems]; newItems[i].amount = Number(e.target.value); setEditExItems(newItems); }}
+                          style={{ width: "100%", padding: "6px 10px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 13 }} required />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, color: "#64748b", display: "block", marginBottom: 2 }}>Category</label>
+                        <select value={item.category} onChange={e => { const newItems = [...editExItems]; newItems[i].category = e.target.value; setEditExItems(newItems); }}
+                          style={{ width: "100%", padding: "6px 10px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 13 }}>
+                          {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, color: "#64748b", display: "block", marginBottom: 2 }}>Date</label>
+                        <input type="date" value={item.date} onChange={e => { const newItems = [...editExItems]; newItems[i].date = e.target.value; setEditExItems(newItems); }}
+                          style={{ width: "100%", padding: "6px 10px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 13 }} required />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <button type="button" onClick={() => setEditExItems([...editExItems, { description: "", amount: 0, category: "Travel", date: "" }])}
+                  style={{ fontSize: 13, color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontWeight: 600, padding: 0 }}>
+                  + Add Another Item
+                </button>
               </div>
-            </div>
+            ) : (
+              <>
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", marginBottom: 4 }}>Claim Title</div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}>{selectedExpense.title}</div>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", marginBottom: 8 }}>Expense Items</div>
+                  {selectedExpense.items.map((item, i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #f1f5f9" }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 500 }}>{CATEGORY_EMOJI[item.category] || "📦"} {item.description}</div>
+                        <div style={{ fontSize: 11, color: "#94a3b8" }}>{item.date} · {item.category}</div>
+                      </div>
+                      <div style={{ fontWeight: 700, color: "#0f172a" }}>{fmtCur(item.amount)}</div>
+                    </div>
+                  ))}
+                  <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 0 0", fontWeight: 800 }}>
+                    <span>Total</span>
+                    <span style={{ color: "#2563eb", fontSize: 18 }}>{fmtCur(selectedExpense.totalAmount)}</span>
+                  </div>
+                </div>
 
-            {selectedExpense.status === "Submitted" && (
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", display: "block", marginBottom: 4 }}>Admin Remark</label>
-                <textarea value={adminRemark} onChange={e => setAdminRemark(e.target.value)} placeholder="Add a note (optional)"
-                  style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, minHeight: 70, resize: "vertical" }} />
-              </div>
-            )}
-            {selectedExpense.status === "Approved" && (
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", display: "block", marginBottom: 4 }}>Payment Date</label>
-                <input type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)}
-                  style={{ width: "100%", padding: "9px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 13 }} />
-              </div>
+                {selectedExpense.status === "Submitted" && (
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", display: "block", marginBottom: 4 }}>Admin Remark</label>
+                    <textarea value={adminRemark} onChange={e => setAdminRemark(e.target.value)} placeholder="Add a note (optional)"
+                      style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, minHeight: 70, resize: "vertical" }} />
+                  </div>
+                )}
+                {selectedExpense.status === "Approved" && (
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", display: "block", marginBottom: 4 }}>Payment Date</label>
+                    <input type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)}
+                      style={{ width: "100%", padding: "9px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 13 }} />
+                  </div>
+                )}
+              </>
             )}
           </div>
 
           <div style={{ padding: "16px 20px", borderTop: "1px solid #f1f5f9", background: "#f8fafc" }}>
-            {selectedExpense.status === "Submitted" && (
-              <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
-                <button disabled={processing} onClick={() => handleExpenseAction("Approved")}
-                  style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#059669,#10b981)", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: processing ? 0.6 : 1 }}>
-                  ✓ Approve
+            {isEditingExpense ? (
+              <div style={{ display: "flex", gap: 10 }}>
+                <button disabled={processing} onClick={handleUpdateExpense}
+                  style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "none", background: "#2563eb", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: processing ? 0.6 : 1 }}>
+                  Save Changes
                 </button>
-                <button disabled={processing} onClick={() => handleExpenseAction("Rejected")}
-                  style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#dc2626,#ef4444)", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: processing ? 0.6 : 1 }}>
-                  ✕ Reject
+                <button disabled={processing} onClick={() => setIsEditingExpense(false)}
+                  style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", color: "#64748b", fontWeight: 700, cursor: "pointer", opacity: processing ? 0.6 : 1 }}>
+                  Cancel
                 </button>
               </div>
+            ) : (
+              <>
+                {selectedExpense.status === "Submitted" && (
+                  <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+                    <button disabled={processing} onClick={() => handleExpenseAction("Approved")}
+                      style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#059669,#10b981)", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: processing ? 0.6 : 1 }}>
+                      ✓ Approve
+                    </button>
+                    <button disabled={processing} onClick={() => handleExpenseAction("Rejected")}
+                      style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#dc2626,#ef4444)", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: processing ? 0.6 : 1 }}>
+                      ✕ Reject
+                    </button>
+                  </div>
+                )}
+                {selectedExpense.status === "Approved" && (
+                  <button disabled={processing || !paymentDate} onClick={() => handleExpenseAction("Reimbursed")}
+                    style={{ width: "100%", padding: "10px 0", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#7c3aed,#8b5cf6)", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: (processing || !paymentDate) ? 0.6 : 1, marginBottom: 12 }}>
+                    💰 Mark as Reimbursed
+                  </button>
+                )}
+                
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button onClick={startEditExpense}
+                    style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid #3b82f6", background: "transparent", color: "#3b82f6", fontWeight: 600, cursor: "pointer" }}>
+                    Edit Request
+                  </button>
+                  <button onClick={() => handleDelete("Expense", selectedExpense.id)}
+                    style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid #ef4444", background: "transparent", color: "#ef4444", fontWeight: 600, cursor: "pointer" }}>
+                    Delete Request
+                  </button>
+                </div>
+              </>
             )}
-            {selectedExpense.status === "Approved" && (
-              <button disabled={processing || !paymentDate} onClick={() => handleExpenseAction("Reimbursed")}
-                style={{ width: "100%", padding: "10px 0", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#7c3aed,#8b5cf6)", color: "#fff", fontWeight: 700, cursor: "pointer", opacity: (processing || !paymentDate) ? 0.6 : 1, marginBottom: 12 }}>
-                💰 Mark as Reimbursed
-              </button>
-            )}
-            <button onClick={() => handleDelete("Expense", selectedExpense.id)}
-              style={{ width: "100%", padding: "8px 0", borderRadius: 8, border: "1px solid #ef4444", background: "transparent", color: "#ef4444", fontWeight: 600, cursor: "pointer" }}>
-              Delete Request
-            </button>
           </div>
         </div>
       )}
