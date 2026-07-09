@@ -373,9 +373,10 @@ export default function PayrollGenerator() {
         ["Special Allowances", fmt(p.specialAllowance)],
       ];
       const deductionRows = [
-        ["LOP Deduction", fmt(p.lopDeduction || 0)],
-        ["", ""],
+        ["LOP Deduction", fmt(p.lopDeduction || 0)]
       ];
+      if (p.pt > 0) deductionRows.push(["Professional Tax (PT)", fmt(p.pt)]);
+      if (p.pf > 0) deductionRows.push(["Provident Fund (PF)", fmt(p.pf)]);
 
       earningRows.forEach((er, i) => {
         const dr = deductionRows[i] || ["", ""];
@@ -481,7 +482,7 @@ export default function PayrollGenerator() {
       const grossSalary = basic + hra + specialAllowance;
       const lopDeduction = Math.round((grossSalary / totalDays) * lop);
       const totalEarnings    = basic + hra + specialAllowance;
-      const totalDeductions  = lopDeduction;
+      const totalDeductions  = lopDeduction + pt + pf;
       const netSalary        = Math.max(0, totalEarnings - totalDeductions);
 
       setPreviewData({
@@ -507,8 +508,10 @@ export default function PayrollGenerator() {
     const grossSalary = basic + hra + specialAllowance;
     const lopDeduction = Math.round((grossSalary / previewData.totalDays) * finalLop);
     
+    const pt = previewData.pt || 0;
+    const pf = previewData.pf || 0;
     const totalEarnings = basic + hra + specialAllowance;
-    const totalDeductions = lopDeduction;
+    const totalDeductions = lopDeduction + pt + pf;
     const netSalary = Math.max(0, totalEarnings - totalDeductions);
 
     setPreviewData({
@@ -609,7 +612,7 @@ export default function PayrollGenerator() {
       const grossSalary = basic + hra + specialAllowance;
       const lopDeduction = Math.round((grossSalary / totalDays) * lop);
       const totalEarnings = basic + hra + specialAllowance;
-      const totalDeductions = lopDeduction;
+      const totalDeductions = lopDeduction + pt + pf;
       const netSalary = Math.max(0, totalEarnings - totalDeductions);
 
       await setDoc(doc(db, "payslips", `${uid}_${monthKey}`), {
@@ -912,7 +915,9 @@ export default function PayrollGenerator() {
                   <div className="flex justify-between"><span className="text-gray-500">HRA</span><span className="font-medium text-gray-900">₹{previewData.hra.toLocaleString()}</span></div>
                   <div className="flex justify-between"><span className="text-gray-500">Special Allowance</span><span className="font-medium text-gray-900">₹{previewData.specialAllowance.toLocaleString()}</span></div>
                   <div className="flex justify-between"><span className="text-gray-500">LOP Deduction</span><span className="font-medium text-red-500">− ₹{previewData.lopDeduction.toLocaleString()}</span></div>
-                  <div className="flex justify-between border-t border-gray-100 pt-2"><span className="text-gray-500">Total Deductions (LOP)</span><span className="font-medium text-red-500">− ₹{previewData.totalDeductions.toLocaleString()}</span></div>
+                  {previewData.pt > 0 && <div className="flex justify-between"><span className="text-gray-500">Professional Tax (PT)</span><span className="font-medium text-red-500">− ₹{previewData.pt.toLocaleString()}</span></div>}
+                  {previewData.pf > 0 && <div className="flex justify-between"><span className="text-gray-500">Provident Fund (PF)</span><span className="font-medium text-red-500">− ₹{previewData.pf.toLocaleString()}</span></div>}
+                  <div className="flex justify-between border-t border-gray-100 pt-2"><span className="text-gray-500">Total Deductions</span><span className="font-medium text-red-500">− ₹{previewData.totalDeductions.toLocaleString()}</span></div>
                   <div className="flex justify-between border-t border-gray-100 pt-2"><span className="font-bold text-gray-900">Net Salary</span><span className="font-bold text-indigo-600 text-lg">₹{previewData.netSalary.toLocaleString()}</span></div>
                 </div>
               </div>
