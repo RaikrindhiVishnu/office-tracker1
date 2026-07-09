@@ -570,6 +570,81 @@ export default function PayrollGenerator() {
     setDownloadingUid(null);
   };
 
+  const generatePayslipBulk = async (uid: string) => {
+    try {
+      const userSnap = await getDoc(doc(db, "users", uid));
+      if (!userSnap.exists()) return false;
+      const u = userSnap.data();
+
+      const salarySnap = await getDoc(doc(db, "salaryStructures", uid));
+      if (!salarySnap.exists()) return false;
+      const s = salarySnap.data();
+
+      const totalDays = daysInMonth(selectedMonth, selectedYear);
+      let paidDays = totalDays;
+      let lop = 0;
+
+      if (monthlyAtt[uid]) {
+        const attRecord = monthlyAtt[uid];
+        let pCount = 0; let aCount = 0; let lCount = 0;
+        for (let d = 1; d <= totalDays; d++) {
+          const ds = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+          const st = attRecord[ds];
+          if (st === "P" || st === "H" || st === "SL") pCount++;
+          else if (st === "A") aCount++;
+          else if (st === "LOP") lCount++;
+        }
+        if (pCount > 0 || aCount > 0 || lCount > 0) {
+           lop = aCount + lCount;
+           paidDays = Math.max(0, totalDays - lop);
+        }
+      }
+
+      const basic = Number(s.basic ?? s.Basic ?? 0);
+      const hra = Number(s.hra ?? s.HRA ?? 0);
+      const specialAllowance = Number(s.specialAllowance ?? s.SpecialAllowance ?? 0);
+      const pf = Number(s.pf ?? s.PF ?? 0);
+      const pt = Number(s.pt ?? s.PT ?? 0);
+      
+      const grossSalary = basic + hra + specialAllowance;
+      const lopDeduction = Math.round((grossSalary / totalDays) * lop);
+      const totalEarnings = basic + hra + specialAllowance;
+      const totalDeductions = lopDeduction;
+      const netSalary = Math.max(0, totalEarnings - totalDeductions);
+
+      await setDoc(doc(db, "payslips", `${uid}_${monthKey}`), {
+        uid,
+        name:           u.name          || "",
+        email:          u.email         || "",
+        designation:    u.designation   || "N/A",
+        empId:          u.empId         || u.employeeId || "N/A",
+        dateOfJoining:  u.dateOfJoining || u.joiningDate || "N/A",
+        bankAccount:    u.accountNo     || s.bankAccount || s.BankAccount || "N/A",
+        bankName:       u.bankName      || "N/A",
+        ifscCode:       u.ifscCode      || "N/A",
+        paymentMode:    u.paymentMode   || "N/A",
+        pan:            s.pan           ?? s.Pan         ?? "N/A",
+        month:          selectedMonth,
+        year:           selectedYear,
+        monthKey,
+        totalDays,
+        lop,
+        paidDays,
+        basic, hra, specialAllowance,
+        totalEarnings,
+        pf, pt,
+        totalDeductions,
+        lopDeduction,
+        netSalary,
+        generatedAt: serverTimestamp(),
+      });
+      return true;
+    } catch (err) {
+      console.error(err);
+      return false;
+    }
+  };
+
   const handleGenerateAll = async () => {
     const pending = filteredEmployees.filter((e) => !e.generated);
     if (!pending.length) { alert("All payslips already generated."); return; }
@@ -577,7 +652,7 @@ export default function PayrollGenerator() {
     setBulkProgress({ done: 0, total: pending.length });
     let success = 0; const fail: string[] = [];
     for (let i = 0; i < pending.length; i++) {
-      const ok = await generatePayslip(pending[i].uid, true);
+      const ok = await generatePayslipBulk(pending[i].uid);
       if (ok) success++; else fail.push(pending[i].name);
       setBulkProgress({ done: i + 1, total: pending.length });
     }
@@ -700,10 +775,16 @@ export default function PayrollGenerator() {
                       ✏ Edit Details
                     </button>
                     {emp.generated ? (
-                      <button onClick={() => handleDownload(emp.uid)} disabled={downloadingUid === emp.uid}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-indigo-500 text-indigo-600 rounded-lg text-xs font-medium hover:bg-indigo-50 disabled:opacity-50 disabled:cursor-not-allowed">
-                        {downloadingUid === emp.uid ? "Preparing…" : "⬇ Download"}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => handleDownload(emp.uid)} disabled={downloadingUid === emp.uid}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-indigo-500 text-indigo-600 rounded-lg text-xs font-medium hover:bg-indigo-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                          {downloadingUid === emp.uid ? "Preparing…" : "⬇ Download"}
+                        </button>
+                        <button onClick={() => handleGenerateSingle(emp.uid)} disabled={generatingUid === emp.uid}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-amber-500 text-amber-600 rounded-lg text-xs font-medium hover:bg-amber-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                          {generatingUid === emp.uid ? "Generating…" : "↺ Regenerate"}
+                        </button>
+                      </div>
                     ) : (
                       <button onClick={() => handleGenerateSingle(emp.uid)} disabled={generatingUid === emp.uid}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-emerald-500 text-emerald-600 rounded-lg text-xs font-medium hover:bg-emerald-50 disabled:opacity-50 disabled:cursor-not-allowed">

@@ -19,7 +19,7 @@ type Message = {
   id: string; text?: string; imageUrl?: string; fileUrl?: string;
   fileName?: string; fileType?: string; senderUid: string; senderName?: string;
   status?: "sent" | "delivered" | "seen"; createdAt: any; readBy?: string[];
-  editedAt?: any; isEdited?: boolean;
+  editedAt?: any; isEdited?: boolean; replyToId?: string; replyToText?: string; replyToName?: string;
 };
 type Chat = {
   id: string; participants: string[]; lastMessage?: string;
@@ -76,6 +76,7 @@ const ICE_SERVERS: RTCConfiguration = {
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+.zc-msg-row{transition:background 0.3s;}
 .zc{font-family:'DM Sans',sans-serif;display:flex;height:100%;background:#f0f2f5;color:#1a1d23;overflow:hidden;}
 .zc-sb{width:68px;background:#1e2230;display:flex;flex-direction:column;align-items:center;padding:14px 0 10px;gap:2px;flex-shrink:0;}
 .zc-sb-logo{width:38px;height:38px;background:linear-gradient(135deg,#e8512a,#f5853f);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;margin-bottom:12px;letter-spacing:-.3px;}
@@ -160,6 +161,13 @@ const CSS = `
 .zc-bubble:hover .zc-msg-actions{opacity:1;}
 .zc-act-btn{width:22px;height:22px;border-radius:5px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#6b7280;transition:all .13s;}
 .zc-act-btn:hover{background:#f5f6f8;color:#e8512a;}
+.zc-context-menu{position:fixed;background:#fff;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:9999;padding:6px 0;min-width:160px;font-family:'DM Sans',sans-serif;animation:zcpop .15s ease-out;}
+.zc-context-item{padding:10px 16px;font-size:14px;color:#374151;cursor:pointer;display:flex;align-items:center;gap:10px;transition:background .15s;}
+.zc-context-item:hover{background:#f3f4f6;}
+.zc-reply-box{background:rgba(0,0,0,.05);border-left:4px solid #0891b2;padding:6px 10px;border-radius:4px;margin-bottom:6px;font-size:13px;color:#374151;}
+.zc-reply-box .rep-name{font-weight:700;color:#0891b2;margin-bottom:2px;font-size:12px;}
+.zc-reply-preview{background:#e5e7eb;border-left:4px solid #0891b2;padding:8px 12px;border-radius:4px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;}
+.zc-reply-preview-text{font-size:13px;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;}
 .zc-edit-wrap{background:#fff;border:1px solid #e8eaf0;border-radius:10px;padding:10px;box-shadow:0 2px 8px rgba(0,0,0,.07);}
 .zc-edit-ta{width:100%;padding:7px 10px;border:1.5px solid #e5e7eb;border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;resize:none;color:#1a1d23;min-height:60px;transition:border-color .14s;}
 .zc-edit-ta:focus{border-color:#6d6ee4;}
@@ -305,6 +313,10 @@ export default function TeamsStyleChat({ users, targetUid, rightHeaderIcons }: {
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [callTimer, setCallTimer] = useState(0);
   const [userStatuses, setUserStatuses] = useState<Record<string, { status: UserStatus; online: boolean }>>({});
+  
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, msg: Message } | null>(null);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [forwardMsg, setForwardMsg] = useState<Message | null>(null);
 
   // ── NEW: Group Settings state ─────────────────────────────────────────────
   const [showGroupSettings, setShowGroupSettings] = useState(false);
@@ -416,6 +428,10 @@ export default function TeamsStyleChat({ users, targetUid, rightHeaderIcons }: {
   useEffect(() => {
     const h = (e: MouseEvent) => {
       if (dotsRef.current && !dotsRef.current.contains(e.target as Node)) setShowDots(false);
+      const target = e.target as HTMLElement;
+      if (target && typeof target.closest === 'function' && !target.closest('.zc-context-menu')) {
+        setContextMenu(null);
+      }
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
@@ -559,12 +575,17 @@ export default function TeamsStyleChat({ users, targetUid, rightHeaderIcons }: {
       const path = selectedChat.isGroup ? `groupChats/${chatId}/messages` : `chats/${chatId}/messages`;
       const msg: any = { senderUid: user.uid, senderName: getUserName(user), status: "sent", readBy: [user.uid], createdAt: serverTimestamp() };
       if (text.trim()) msg.text = text; if (fu) { msg.fileUrl = fu; msg.fileName = fn; msg.fileType = ft; }
+      if (replyTo) { 
+        msg.replyToId = replyTo.id; 
+        msg.replyToText = replyTo.text || replyTo.fileName || "File";
+        msg.replyToName = replyTo.senderName || users.find(u => u.uid === replyTo.senderUid)?.name || "User";
+      }
       await addDoc(collection(db, path), msg);
       const others = selectedChat.participants.filter(p => p !== user.uid);
       for (const pid of others) await addDoc(collection(db, "notifications"), { fromUid: user.uid, fromName: getUserName(user), toUid: pid, message: text || fn || "Sent a file", chatId, timestamp: serverTimestamp(), read: false });
       const tp = selectedChat.isGroup ? `groupChats/${chatId}/typing` : `chats/${chatId}/typing`;
       await deleteDoc(doc(db, tp, user.uid));
-      setText(""); setSelectedFile(null);
+      setText(""); setSelectedFile(null); setReplyTo(null);
     } catch (e) { console.error(e); } finally { setUploading(false); }
   };
 
@@ -1051,6 +1072,42 @@ export default function TeamsStyleChat({ users, targetUid, rightHeaderIcons }: {
         </div>
       )}
 
+      {/* ── FORWARD MODAL ── */}
+      {forwardMsg && (
+        <div className="zc-mbk" onClick={e => e.target === e.currentTarget && setForwardMsg(null)}>
+          <div className="zc-modal">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#1a1d23" }}>Forward Message to...</div>
+              <button style={{ background: "none", border: "none", cursor: "pointer", color: "#9aa0ad", fontSize: 20 }} onClick={() => setForwardMsg(null)}>×</button>
+            </div>
+            <div className="zc-mlist">
+              {chats.map(c => {
+                const name = getChatName(c);
+                const [g1, g2] = avGrad(name);
+                return (
+                  <div key={c.id} className="zc-mitm" onClick={async () => {
+                    if (!user) return;
+                    const path = c.isGroup ? `groupChats/${c.id}/messages` : `chats/${c.id}/messages`;
+                    const msg: any = { senderUid: user.uid, senderName: getUserName(user), status: "sent", readBy: [user.uid], createdAt: serverTimestamp() };
+                    if (forwardMsg.text) msg.text = forwardMsg.text;
+                    if (forwardMsg.fileUrl) { msg.fileUrl = forwardMsg.fileUrl; msg.fileName = forwardMsg.fileName; msg.fileType = forwardMsg.fileType; }
+                    if (forwardMsg.imageUrl) { msg.imageUrl = forwardMsg.imageUrl; }
+                    await addDoc(collection(db, path), msg);
+                    setForwardMsg(null);
+                  }}>
+                    <div className="zc-av" style={{ background: c.isGroup ? `linear-gradient(135deg,#0891b2,#22d3ee)` : `linear-gradient(135deg,${g1},${g2})`, width: 32, height: 32, borderRadius: 9, fontSize: 11, flexShrink: 0 }}>
+                      {c.groupAvatar ? <img src={c.groupAvatar} alt="" /> : getChatOU(c)?.profilePhoto ? <img src={getChatOU(c)!.profilePhoto} alt="" /> : initials(name)}
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1d23", flex: 1 }}>{name}</div>
+                    <div style={{ fontSize: 12, color: "#0891b2", fontWeight: 600 }}>Send</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── MAIN LAYOUT ── */}
       <div className={`zc ${selectedChat ? "has-chat" : ""}`}>
         {/* <div className="zc-sb">
@@ -1228,7 +1285,7 @@ export default function TeamsStyleChat({ users, targetUid, rightHeaderIcons }: {
 
                     if (isSystem) return <div key={m.id} className="zc-sys-msg"><span className="zc-sys-pill">{m.text}</span></div>;
                     return (
-                      <div key={m.id}>
+                      <div key={m.id} id={`msg-${m.id}`}>
                         {formattedDate && <div className="zc-date-sep"><span>{formattedDate}</span></div>}
                         <div className={`zc-msg-row${mine ? " mine" : ""}`} style={{ alignItems: "flex-end" }}>
                           {!mine && selectedChat.isGroup && (showAv
@@ -1245,17 +1302,30 @@ export default function TeamsStyleChat({ users, targetUid, rightHeaderIcons }: {
                                   <button className="zc-btn primary" style={{ padding: "4px 12px", fontSize: 12 }} onClick={saveEdit}>Save</button>
                                 </div>
                               </div>
-                              : <div className={`zc-bubble ${mine ? "mine" : "them"}`}>
-                                {mine && <div className="zc-msg-actions">
-                                  <button className="zc-act-btn" onClick={() => { setEditingMsgId(m.id); setEditText(m.text || ""); }}>✏️</button>
-                                  <button className="zc-act-btn" style={{ color: "#ef4444" }} onClick={() => confirm("Delete?") && deleteMsg(m.id)}>🗑️</button>
-                                </div>}
+                              : <div className={`zc-bubble ${mine ? "mine" : "them"}`} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.pageX, y: e.pageY, msg: m }); }}>
+                                {m.replyToText && (
+                                  <div className="zc-reply-box" style={{ cursor: "pointer" }} onClick={() => {
+                                    const el = document.getElementById(`msg-${m.replyToId}`);
+                                    if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.style.background = "#e5e7eb"; setTimeout(() => el.style.background = "", 1500); }
+                                  }}>
+                                    <div className="rep-name">{m.replyToName || "User"}</div>
+                                    {m.replyToText}
+                                  </div>
+                                )}
                                 {m.text && <span style={{ margin: 0, display: "inline-block", whiteSpace: "pre-wrap" }}>{m.text}</span>}
                                 {m.imageUrl && <img src={m.imageUrl} style={{ maxHeight: 180, borderRadius: 8, marginTop: m.text ? 6 : 0, cursor: "pointer" }} onClick={() => window.open(m.imageUrl, "_blank")} alt="" />}
                                 {m.fileUrl && !m.imageUrl && <a href={m.fileUrl} target="_blank" rel="noopener noreferrer" className={`zc-bfile ${mine ? "mine" : "them"}`}><svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg><span style={{ fontSize: 12.5 }}>{m.fileName}</span></a>}
                                 <div className="zc-msg-meta">
                                   <span className="zc-msg-time">{m.createdAt?.toDate?.()?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) || "Now"}</span>
-                                  {mine && <span style={{ fontSize: 11, color: isRead ? "#bbf7d0" : "rgba(255,255,255,.6)" }}>{isRead ? "✓✓" : m.status === "delivered" ? "✓✓" : "✓"}</span>}
+                                  {mine && <span style={{ marginLeft: 4, display: "inline-flex", alignItems: "center" }}>
+                                    {isRead ? (
+                                      <svg viewBox="0 0 16 15" width="16" height="15"><path fill="#53bdeb" d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.88a.32.32 0 0 1-.484.032l-.358-.325a.32.32 0 0 0-.484.032l-.378.48a.418.418 0 0 0 .036.54l1.32 1.267c.143.14.376.128.514-.027l6.07-8.549a.36.36 0 0 0-.064-.51zM11.66 3.316l-.478-.372a.365.365 0 0 0-.51.063L5.316 9.88a.32.32 0 0 1-.484.032L2.642 7.72a.366.366 0 0 0-.516.005l-.423.433a.364.364 0 0 0 .011.516l3.259 3.155c.143.14.376.128.514-.027l5.383-7.581a.36.36 0 0 0-.064-.51z"></path></svg>
+                                    ) : m.status === "delivered" ? (
+                                      <svg viewBox="0 0 16 15" width="16" height="15"><path fill="#9ca3af" d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.88a.32.32 0 0 1-.484.032l-.358-.325a.32.32 0 0 0-.484.032l-.378.48a.418.418 0 0 0 .036.54l1.32 1.267c.143.14.376.128.514-.027l6.07-8.549a.36.36 0 0 0-.064-.51zM11.66 3.316l-.478-.372a.365.365 0 0 0-.51.063L5.316 9.88a.32.32 0 0 1-.484.032L2.642 7.72a.366.366 0 0 0-.516.005l-.423.433a.364.364 0 0 0 .011.516l3.259 3.155c.143.14.376.128.514-.027l5.383-7.581a.36.36 0 0 0-.064-.51z"></path></svg>
+                                    ) : (
+                                      <svg viewBox="0 0 16 15" width="16" height="15"><path fill="#9ca3af" d="M10.91 3.316l-.478-.372a.365.365 0 0 0-.51.063L4.566 9.88a.32.32 0 0 1-.484.032L1.892 7.72a.366.366 0 0 0-.516.005l-.423.433a.364.364 0 0 0 .011.516l3.259 3.155c.143.14.376.128.514-.027l5.383-7.581a.36.36 0 0 0-.064-.51z"></path></svg>
+                                    )}
+                                  </span>}
                                 </div>
                                 {m.isEdited && <span style={{ fontSize: 10, opacity: .6, display: "block", marginTop: 2, clear: "both" }}>(edited)</span>}
                               </div>
@@ -1268,8 +1338,31 @@ export default function TeamsStyleChat({ users, targetUid, rightHeaderIcons }: {
                   <div ref={msgsEnd} />
                 </div>
 
+                {/* ── CONTEXT MENU ── */}
+                {contextMenu && (
+                  <div className="zc-context-menu" style={{ left: Math.min(contextMenu.x, window.innerWidth - 180), top: Math.min(contextMenu.y, window.innerHeight - 200) }} onClick={(e) => e.stopPropagation()}>
+                    <div className="zc-context-item" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setReplyTo(contextMenu.msg); setContextMenu(null); }}>↩️ Reply</div>
+                    <div className="zc-context-item" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setForwardMsg(contextMenu.msg); setContextMenu(null); }}>↗️ Forward</div>
+                    <div className="zc-context-item" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); navigator.clipboard.writeText(contextMenu.msg.text || ""); setContextMenu(null); }}>📋 Copy</div>
+                    {contextMenu.msg.senderUid === user?.uid && (
+                      <div className="zc-context-item" onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setEditingMsgId(contextMenu.msg.id); setEditText(contextMenu.msg.text || ""); setContextMenu(null); }}>✏️ Edit</div>
+                    )}
+                    {contextMenu.msg.senderUid === user?.uid && (
+                      <div className="zc-context-item" style={{ color: "#ef4444" }} onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); if(confirm("Delete message?")) deleteMsg(contextMenu.msg.id); setContextMenu(null); }}>🗑️ Delete</div>
+                    )}
+                  </div>
+                )}
+
                 {/* ── INPUT ── */}
                 <div className="zc-input-area">
+                  {replyTo && (
+                    <div className="zc-reply-preview">
+                      <div className="zc-reply-preview-text">
+                        <strong>Replying to:</strong> {replyTo.text || replyTo.fileName || "File"}
+                      </div>
+                      <button style={{ background: "none", border: "none", cursor: "pointer", color: "#9aa0ad", fontSize: 18 }} onClick={() => setReplyTo(null)}>×</button>
+                    </div>
+                  )}
                   {selectedFile && (
                     <div className="zc-file-prev">
                       <svg width="13" height="13" fill="none" stroke="#6b7280" strokeWidth="2" viewBox="0 0 24 24"><path d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>

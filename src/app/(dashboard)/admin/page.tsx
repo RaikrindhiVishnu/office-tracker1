@@ -635,11 +635,11 @@ export default function AdminPage() {
 
       {/* SIDEBAR */}
       <aside
-        className={`${sidebarCollapsed ? "lg:w-20" : "lg:w-64"} w-64 bg-[#12334f] text-white fixed inset-y-0 z-40 transform transition-all duration-300 ease-out ${sidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
+        className={`${sidebarCollapsed ? "lg:w-20" : "lg:w-64"} w-64 bg-[#282B3E] text-white fixed inset-y-0 z-40 transform transition-all duration-300 ease-out ${sidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
           } lg:translate-x-0 flex flex-col`}
       >
         {/* Logo */}
-        <div className="h-16 px-6 flex items-center justify-between border-b border-white/10 bg-[#12334f]">
+        <div className="h-16 px-6 flex items-center justify-between border-b border-white/10 bg-[#282B3E]">
           {!sidebarCollapsed ? (
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-[#184199] flex items-center justify-center shadow-lg">
@@ -863,11 +863,11 @@ export default function AdminPage() {
         {/* Logout */}
         <button
           onClick={handleLogout}
-          className="m-3 bg-gray-500 hover:bg-red-700 py-2 px-4 rounded-xl text-sm font-semibold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 group text-white"
+          className="mx-4 mb-6 flex items-center justify-center gap-3 px-4 py-3.5 bg-[#31344A] rounded-xl hover:bg-[#3E425C] transition text-[15px] font-semibold text-white"
           title="Logout"
         >
-          <svg className="w-5 h-5 group-hover:rotate-12 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
           {!sidebarCollapsed && <span>Logout</span>}
         </button>
@@ -1262,7 +1262,7 @@ function NavItem({ icon, label, active = false, onClick, badge, collapsed = fals
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative ${active ? "bg-[#58576358] text-white shadow-md" : "text-slate-300 hover:bg-white/10 hover:text-white"
+      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative ${active ? "bg-white text-[#282B3E] font-bold shadow-md" : "text-[#A0B2C6] hover:bg-white/10 hover:text-white"
         } ${collapsed ? "justify-center" : ""}`}
       title={collapsed ? label : ""}
     >
