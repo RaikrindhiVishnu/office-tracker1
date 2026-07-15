@@ -4,25 +4,28 @@ import { adminMessaging, adminDb } from "@/lib/firebaseAdmin";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { targetUserId, title, body: messageBody, category, priority, clickAction, actionButtons } = body;
+    const { targetUserId, title, body: messageBody, category, priority, clickAction, actionButtons, skipDb, extraData } = body;
 
     if (!targetUserId || !title || !messageBody) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // 1. Save Notification to Firestore
-    const notifRef = adminDb.collection("notifications").doc();
-    await notifRef.set({
-      userId: targetUserId,
-      title,
-      message: messageBody,
-      category: category || "system",
-      priority: priority || "low",
-      clickAction: clickAction || "/mobile",
-      actionButtons: actionButtons || [],
-      isRead: false,
-      createdAt: new Date(),
-    });
+    // 1. Save Notification to Firestore (optional)
+    if (!skipDb) {
+      const notifRef = adminDb.collection("notifications").doc();
+      await notifRef.set({
+        userId: targetUserId,
+        title,
+        message: messageBody,
+        category: category || "system",
+        priority: priority || "low",
+        clickAction: clickAction || "/mobile",
+        actionButtons: actionButtons || [],
+        isRead: false,
+        createdAt: new Date(),
+        ...(extraData || {})
+      });
+    }
 
     // 2. Fetch User's FCM Tokens
     const tokensSnapshot = await adminDb.collection("users").doc(targetUserId).collection("fcmTokens").get();

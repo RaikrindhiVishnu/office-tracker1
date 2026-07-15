@@ -1845,6 +1845,7 @@ export function KanbanBoard({
             key={col.id}
             draggable={canManage && !isCollapsed}
             onDragStart={e => handleDragColumnStart(e, i)}
+            onDragEnd={() => setDraggingColIdx(null)}
             onDragOver={e => {
               e.preventDefault();
               if (canManage && draggingColIdx !== null) {

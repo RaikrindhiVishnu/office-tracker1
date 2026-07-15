@@ -406,7 +406,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                     const now=new Date();
                     const isToday=day===now.getDate()&&m===now.getMonth()&&y===now.getFullYear();
                     const holiday=isHoliday(dateStr);
-                    const isHolDay=isSunday(y,m,day)||isSecondSaturday(y,m,day)||isFourthSaturday(y,m,day)||isFifthSaturday(y,m,day)||holiday;
+                    const isHolDay=isSunday(y,m,day)||new Date(y,m,day).getDay()===6||holiday;
                     const dayBdays=getBdaysForDay(y,m,day);
                     const dayFests=getFestsForDay(dateStr);
                     const dayEvts=getEventsForDay(dateStr);

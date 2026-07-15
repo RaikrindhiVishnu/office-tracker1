@@ -40,4 +40,5 @@ export type View =
   | "feedback"
   | "recruitment"
   | "regularization"
-  | "admin-dashboard";
+  | "admin-dashboard"
+  | "finance";

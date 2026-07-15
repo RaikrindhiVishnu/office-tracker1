@@ -231,6 +231,24 @@ const ProfessionalChatPopup = ({
       createdAt: serverTimestamp(),
     });
 
+    try {
+      fetch("/api/notifications/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetUserId: chatWindow.user.uid,
+          title: user.displayName || user.email || "User",
+          body: text,
+          category: "chat",
+          priority: "high",
+          clickAction: `/mobile?chatId=${chatId}`,
+          skipDb: true
+        })
+      });
+    } catch (err) {
+      console.error("Push error", err);
+    }
+
     setText("");
   };
 
@@ -242,6 +260,24 @@ const ProfessionalChatPopup = ({
       status: "sent",
       createdAt: serverTimestamp(),
     });
+
+    try {
+      fetch("/api/notifications/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetUserId: chatWindow.user.uid,
+          title: user?.displayName || user?.email || "User",
+          body: "Sent an image",
+          category: "chat",
+          priority: "high",
+          clickAction: `/mobile?chatId=${chatId}`,
+          skipDb: true
+        })
+      });
+    } catch (err) {
+      console.error("Push error", err);
+    }
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {

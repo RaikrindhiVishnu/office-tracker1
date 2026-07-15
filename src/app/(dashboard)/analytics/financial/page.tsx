@@ -15,10 +15,18 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import CrossDeptFeed from "@/components/CrossDeptFeed";
 import { db } from "@/lib/firebase";
-
-// ─────────────────────────────────────────────────────────────
-// 1. FIREBASE CONFIG
-// ─────────────────────────────────────────────────────────────
+import {
+  T, PALETTE, EXPENSE_QUICK, fmt, fmtShort,
+  KPICard, TabBtn, Input, Select, AddBtn, DeleteBtn,
+  SectionCard, Table, ChartTooltip, DeptBadge, SalaryTag
+} from "@/components/finance/FinanceUI";
+import { PurchaseRequest, SalaryAdvance, VendorPayment, Budget, Reimbursement } from "@/components/finance/financeTypes";
+import PurchaseRequestsTab from "@/components/finance/PurchaseRequestsTab";
+import SalaryAdvancesTab from "@/components/finance/SalaryAdvancesTab";
+import ApprovalCenterTab from "@/components/finance/ApprovalCenterTab";
+import VendorPaymentsTab from "@/components/finance/VendorPaymentsTab";
+import BudgetManagementTab from "@/components/finance/BudgetManagementTab";
+import ReimbursementsTab from "@/components/finance/ReimbursementsTab";
 // Financial dashboard uses shared Firebase db from @/lib/firebase
 // (Removed standalone Firebase initialization to prevent duplicate app errors)
 
@@ -80,6 +88,8 @@ interface Expense {
   note: string;
   month: string;
   date: string;
+  employeeName?: string;
+  status?: string;
   createdAt?: Timestamp;
 }
 
@@ -220,6 +230,73 @@ export function subscribeAssets(
   });
 }
 
+export function subscribePurchaseRequests(month: string, cb: (items: PurchaseRequest[]) => void) {
+  const q = query(collection(db, "purchaseRequests"), where("month", "==", month));
+  return onSnapshot(q, snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as PurchaseRequest))));
+}
+export async function addPurchaseRequest(data: Omit<PurchaseRequest, "id" | "createdAt" | "month">, month: string) {
+  return addDoc(collection(db, "purchaseRequests"), { ...data, month, createdAt: serverTimestamp() });
+}
+export async function deletePurchaseRequest(id: string) {
+  return deleteDoc(doc(db, "purchaseRequests", id));
+}
+export async function updatePurchaseRequestStatus(id: string, status: string) {
+  return updateDoc(doc(db, "purchaseRequests", id), { status });
+}
+
+export function subscribeSalaryAdvances(month: string, cb: (items: SalaryAdvance[]) => void) {
+  const q = query(collection(db, "salaryAdvances"), where("month", "==", month));
+  return onSnapshot(q, snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as SalaryAdvance))));
+}
+export async function addSalaryAdvance(data: Omit<SalaryAdvance, "id" | "createdAt" | "month">, month: string) {
+  return addDoc(collection(db, "salaryAdvances"), { ...data, month, createdAt: serverTimestamp() });
+}
+export async function deleteSalaryAdvance(id: string) {
+  return deleteDoc(doc(db, "salaryAdvances", id));
+}
+export async function updateSalaryAdvanceStatus(id: string, status: string) {
+  return updateDoc(doc(db, "salaryAdvances", id), { status });
+}
+
+export function subscribeVendorPayments(month: string, cb: (items: VendorPayment[]) => void) {
+  const q = query(collection(db, "vendorPayments"), where("month", "==", month));
+  return onSnapshot(q, snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as VendorPayment))));
+}
+export async function addVendorPayment(data: Omit<VendorPayment, "id" | "createdAt" | "month">, month: string) {
+  return addDoc(collection(db, "vendorPayments"), { ...data, month, createdAt: serverTimestamp() });
+}
+export async function deleteVendorPayment(id: string) {
+  return deleteDoc(doc(db, "vendorPayments", id));
+}
+export async function updateVendorPaymentStatus(id: string, status: string) {
+  return updateDoc(doc(db, "vendorPayments", id), { status });
+}
+
+export function subscribeBudgets(month: string, cb: (items: Budget[]) => void) {
+  const q = query(collection(db, "budgets"), where("month", "==", month));
+  return onSnapshot(q, snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as Budget))));
+}
+export async function addBudget(data: Omit<Budget, "id" | "createdAt" | "month">, month: string) {
+  return addDoc(collection(db, "budgets"), { ...data, month, createdAt: serverTimestamp() });
+}
+export async function deleteBudget(id: string) {
+  return deleteDoc(doc(db, "budgets", id));
+}
+
+export function subscribeReimbursements(month: string, cb: (items: Reimbursement[]) => void) {
+  const q = query(collection(db, "reimbursements"), where("month", "==", month));
+  return onSnapshot(q, snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as Reimbursement))));
+}
+export async function addReimbursement(data: Omit<Reimbursement, "id" | "createdAt" | "month">, month: string) {
+  return addDoc(collection(db, "reimbursements"), { ...data, month, createdAt: serverTimestamp() });
+}
+export async function deleteReimbursement(id: string) {
+  return deleteDoc(doc(db, "reimbursements", id));
+}
+export async function updateReimbursementStatus(id: string, status: string) {
+  return updateDoc(doc(db, "reimbursements", id), { status });
+}
+
 // ─────────────────────────────────────────────────────────────
 // 4. MAIN HOOK
 // ─────────────────────────────────────────────────────────────
@@ -233,13 +310,23 @@ function useFinance(month: string) {
   const [byCategory,    setByCategory]    = useState<Record<string, number>>({});
   const [assets,        setAssets]        = useState<Asset[]>([]);
   const [totalAssets,   setTotalAssets]   = useState(0);
+  const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>([]);
+  const [salaryAdvances, setSalaryAdvances] = useState<SalaryAdvance[]>([]);
+  const [vendorPayments, setVendorPayments] = useState<VendorPayment[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [reimbursements, setReimbursements] = useState<Reimbursement[]>([]);
 
   useEffect(() => {
     const u1 = subscribeEmployees((items, total) => { setEmployees(items); setTotalSalary(total); });
     const u2 = subscribePayroll(month, (items, totals) => { setPayroll(items); setPayrollTotals(totals); });
     const u3 = subscribeExpenses(month, (items, total, bycat) => { setExpenses(items); setTotalManual(total); setByCategory(bycat); });
     const u4 = subscribeAssets(month, (items, total) => { setAssets(items); setTotalAssets(total); });
-    return () => { u1(); u2(); u3(); u4(); };
+    const u5 = subscribePurchaseRequests(month, items => setPurchaseRequests(items));
+    const u6 = subscribeSalaryAdvances(month, items => setSalaryAdvances(items));
+    const u7 = subscribeVendorPayments(month, items => setVendorPayments(items));
+    const u8 = subscribeBudgets(month, items => setBudgets(items));
+    const u9 = subscribeReimbursements(month, items => setReimbursements(items));
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); };
   }, [month]);
 
   const finalSalaryUsed = payrollTotals.totalFinal > 0 ? payrollTotals.totalFinal : totalSalary;
@@ -251,252 +338,14 @@ function useFinance(month: string) {
     payroll, payrollTotals,
     expenses, totalManual, byCategory, categoryData,
     assets, totalAssets,
+    purchaseRequests, salaryAdvances,
+    vendorPayments, budgets, reimbursements,
     grandTotal,
     finalSalaryUsed,
   };
 }
 
-// ─────────────────────────────────────────────────────────────
-// 5. DESIGN TOKENS
-// ─────────────────────────────────────────────────────────────
-const T = {
-  bg:        "#f0f2f8",
-  surface:   "#ffffff",
-  surfaceHi: "#f4f6fb",
-  border:    "#e2e8f0",
-  borderHi:  "#c9d3e0",
-  ink:       "#0f172a",
-  inkMid:    "#475569",
-  inkDim:    "#94a3b8",
-  green:     "#059669",
-  greenBg:   "#ecfdf5",
-  blue:      "#2563eb",
-  blueBg:    "#eff6ff",
-  red:       "#dc2626",
-  redBg:     "#fef2f2",
-  amber:     "#d97706",
-  amberBg:   "#fffbeb",
-  violet:    "#7c3aed",
-  violetBg:  "#f5f3ff",
-  teal:      "#0891b2",
-  tealBg:    "#ecfeff",
-  pink:      "#db2777",
-  pinkBg:    "#fdf2f8",
-};
-
-const PALETTE = [T.blue, T.green, T.violet, T.amber, T.red, T.teal, T.pink, "#ffa657"];
-const EXPENSE_QUICK = ["Rent", "WiFi", "Electricity", "Water", "Furniture", "Transport", "Other"];
-
-function fmt(v: number) {
-  if (v >= 1e7) return `₹${(v / 1e7).toFixed(2)}Cr`;
-  if (v >= 1e5) return `₹${(v / 1e5).toFixed(2)}L`;
-  if (v >= 1e3) return `₹${(v / 1e3).toFixed(1)}K`;
-  return `₹${v.toLocaleString("en-IN")}`;
-}
-function fmtShort(v: number) {
-  if (v >= 1e5) return `${(v / 1e5).toFixed(1)}L`;
-  if (v >= 1e3) return `${(v / 1e3).toFixed(0)}K`;
-  return String(v);
-}
-
-// ─────────────────────────────────────────────────────────────
-// 6. MICRO-COMPONENTS
-// ─────────────────────────────────────────────────────────────
-function KPICard({ icon, label, value, sub, accent = T.blue }: {
-  icon: string; label: string; value: string; sub?: string; accent?: string;
-}) {
-  return (
-    <div style={{
-      background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14,
-      padding: "18px 20px", position: "relative", overflow: "hidden",
-      transition: "border-color 0.2s, transform 0.15s, box-shadow 0.15s", cursor: "default",
-    }}
-      onMouseEnter={e => {
-        const el = e.currentTarget as HTMLDivElement;
-        el.style.borderColor = accent;
-        el.style.transform = "translateY(-2px)";
-        el.style.boxShadow = `0 8px 24px ${accent}22`;
-      }}
-      onMouseLeave={e => {
-        const el = e.currentTarget as HTMLDivElement;
-        el.style.borderColor = T.border;
-        el.style.transform = "translateY(0)";
-        el.style.boxShadow = "none";
-      }}
-    >
-      <div style={{ position: "absolute", top: 0, right: 0, width: 70, height: 70, background: `radial-gradient(circle at 100% 0%, ${accent}28 0%, transparent 70%)` }} />
-      <div style={{ fontSize: 20, marginBottom: 10 }}>{icon}</div>
-      <div style={{ fontSize: 24, fontWeight: 800, color: T.ink, letterSpacing: "-0.5px", marginBottom: 3, fontFamily: "'JetBrains Mono', monospace" }}>{value}</div>
-      <div style={{ fontSize: 10, color: T.inkMid, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>{label}</div>
-      {sub && <div style={{ fontSize: 10, color: accent, fontWeight: 700, marginTop: 4 }}>{sub}</div>}
-    </div>
-  );
-}
-
-function TabBtn({ label, active, onClick, count }: { label: string; active: boolean; onClick: () => void; count?: number }) {
-  return (
-    <button onClick={onClick} style={{
-      padding: "10px 18px", borderRadius: 0, border: "none",
-      background: "transparent",
-      color: active ? T.blue : T.inkMid,
-      fontSize: 13, fontWeight: 700, cursor: "pointer",
-      display: "flex", alignItems: "center", gap: 6,
-      borderBottom: active ? `2px solid ${T.blue}` : "2px solid transparent",
-      transition: "all 0.15s",
-    }}>
-      {label}
-      {count !== undefined && (
-        <span style={{
-          fontSize: 10, fontWeight: 900, padding: "2px 7px", borderRadius: 99,
-          background: active ? T.blueBg : T.surfaceHi,
-          color: active ? T.blue : T.inkMid,
-        }}>{count}</span>
-      )}
-    </button>
-  );
-}
-
-function Input({ label, value, onChange, type = "text", placeholder = "" }: {
-  label: string; value: string | number; onChange: (v: string) => void;
-  type?: string; placeholder?: string;
-}) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-      <label style={{ fontSize: 10, color: T.inkMid, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>{label}</label>
-      <input
-        type={type} value={value} onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        style={{
-          background: T.surfaceHi, border: `1px solid ${T.border}`, borderRadius: 9,
-          padding: "9px 13px", color: T.ink, fontSize: 13, width: "100%",
-          transition: "border-color 0.15s", outline: "none",
-        }}
-        onFocus={e => (e.target.style.borderColor = T.blue)}
-        onBlur={e => (e.target.style.borderColor = T.border)}
-      />
-    </div>
-  );
-}
-
-function Select({ label, value, onChange, options }: {
-  label: string; value: string; onChange: (v: string) => void; options: string[];
-}) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-      <label style={{ fontSize: 10, color: T.inkMid, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>{label}</label>
-      <select value={value} onChange={e => onChange(e.target.value)} style={{
-        background: T.surfaceHi, border: `1px solid ${T.border}`, borderRadius: 9,
-        padding: "9px 13px", color: T.ink, fontSize: 13, width: "100%", cursor: "pointer", outline: "none",
-      }}>
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
-    </div>
-  );
-}
-
-function AddBtn({ onClick, label }: { onClick: () => void; label: string }) {
-  return (
-    <button onClick={onClick} style={{
-      padding: "10px 22px", background: T.blue, color: "#fff", border: "none",
-      borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer",
-      transition: "opacity 0.15s", width: "100%",
-    }}
-      onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.opacity = "0.85")}
-      onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.opacity = "1")}
-    >{label}</button>
-  );
-}
-
-function DeleteBtn({ onClick }: { onClick: () => void }) {
-  return (
-    <button onClick={onClick} style={{
-      padding: "3px 9px", background: T.redBg, color: T.red, border: `1px solid ${T.red}44`,
-      borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer",
-    }}>✕</button>
-  );
-}
-
-function SectionCard({ title, subtitle, children, action }: {
-  title: string; subtitle?: string; children: React.ReactNode; action?: React.ReactNode;
-}) {
-  return (
-    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden" }}>
-      <div style={{ padding: "14px 18px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 800, color: T.ink }}>{title}</div>
-          {subtitle && <div style={{ fontSize: 11, color: T.inkMid, marginTop: 1 }}>{subtitle}</div>}
-        </div>
-        {action}
-      </div>
-      <div style={{ padding: "16px 18px" }}>{children}</div>
-    </div>
-  );
-}
-
-function Table({ headers, rows }: { headers: string[]; rows: React.ReactNode[][] }) {
-  return (
-    <div style={{ overflowX: "auto" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-        <thead>
-          <tr>
-            {headers.map(h => (
-              <th key={h} style={{ padding: "9px 12px", textAlign: "left", color: T.inkMid, fontWeight: 700, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.07em", borderBottom: `1px solid ${T.border}`, whiteSpace: "nowrap" }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr key={i} style={{ borderBottom: `1px solid ${T.border}44`, transition: "background 0.1s" }}
-              onMouseEnter={e => ((e.currentTarget as HTMLTableRowElement).style.background = T.surfaceHi)}
-              onMouseLeave={e => ((e.currentTarget as HTMLTableRowElement).style.background = "transparent")}
-            >
-              {row.map((cell, j) => (
-                <td key={j} style={{ padding: "10px 12px", color: T.ink, verticalAlign: "middle" }}>{cell}</td>
-              ))}
-            </tr>
-          ))}
-          {rows.length === 0 && (
-            <tr><td colSpan={headers.length} style={{ padding: "32px", textAlign: "center", color: T.inkDim, fontSize: 13 }}>No records yet</td></tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: { name: string; value: number; color: string }[]; label?: string }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 10, padding: "10px 14px", fontSize: 12, boxShadow: "0 4px 16px rgba(0,0,0,0.08)" }}>
-      <div style={{ color: T.inkMid, marginBottom: 6, fontWeight: 700 }}>{label}</div>
-      {payload.map(p => (
-        <div key={p.name} style={{ color: p.color, fontWeight: 800 }}>{p.name}: {fmtShort(p.value)}</div>
-      ))}
-    </div>
-  );
-}
-
-function DeptBadge({ dept }: { dept: string }) {
-  const colors: Record<string, [string, string]> = {
-    Engineering: [T.blue, T.blueBg],
-    Sales: [T.green, T.greenBg],
-    HR: [T.pink, T.pinkBg],
-    Operations: [T.amber, T.amberBg],
-    Finance: [T.violet, T.violetBg],
-    Marketing: [T.teal, T.tealBg],
-    IT: [T.ink, T.surfaceHi],
-  };
-  const [color, bg] = colors[dept] ?? [T.inkMid, T.surfaceHi];
-  return (
-    <span style={{ padding: "3px 9px", borderRadius: 99, background: bg, color, fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>{dept}</span>
-  );
-}
-
-function SalaryTag({ v, color = T.green }: { v: number; color?: string }) {
-  return (
-    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 800, color }}>{fmt(v)}</span>
-  );
-}
+// UI components moved to @/components/finance/FinanceUI.tsx
 
 // ─────────────────────────────────────────────────────────────
 // 7. OVERVIEW TAB
@@ -633,6 +482,8 @@ function ExpensesTab({ expenses, month, onAdd, onDelete }: {
   const [category, setCategory] = useState("Rent");
   const [amount,   setAmount]   = useState("");
   const [note,     setNote]     = useState("");
+  const [employeeName, setEmployeeName] = useState("");
+  const [status, setStatus] = useState("N/A");
   const [date,     setDate]     = useState(() => {
     const today = new Date();
     const todayMonth = today.toISOString().slice(0, 7);
@@ -647,8 +498,8 @@ function ExpensesTab({ expenses, month, onAdd, onDelete }: {
 
   const handleAdd = () => {
     if (!amount || !date) return;
-    onAdd({ category, amount: parseFloat(amount), note, date });
-    setAmount(""); setNote("");
+    onAdd({ category, amount: parseFloat(amount), note, date, employeeName, status });
+    setAmount(""); setNote(""); setEmployeeName(""); setStatus("N/A");
   };
 
   return (
@@ -670,6 +521,8 @@ function ExpensesTab({ expenses, month, onAdd, onDelete }: {
           </div>
           <Select label="Category" value={category} onChange={setCategory} options={EXPENSE_QUICK} />
           <Input label="Amount (₹)" value={amount} onChange={setAmount} type="number" placeholder="0" />
+          <Input label="Employee Name (Optional)" value={employeeName} onChange={setEmployeeName} placeholder="For reimbursements" />
+          <Select label="Status" value={status} onChange={setStatus} options={["N/A", "Pending", "Approved", "Reimbursed"]} />
           <Input label="Note" value={note} onChange={setNote} placeholder="Optional note" />
           <Input label="Date" value={date} onChange={setDate} type="date" />
           <AddBtn onClick={handleAdd} label="Add Expense" />
@@ -678,11 +531,13 @@ function ExpensesTab({ expenses, month, onAdd, onDelete }: {
 
       <SectionCard title="Expense Records" subtitle={`${expenses.length} entries this month`}>
         <Table
-          headers={["Date", "Category", "Amount", "Note", ""]}
+          headers={["Date", "Category", "Amount", "Employee", "Status", "Note", ""]}
           rows={expenses.map(e => [
             <span style={{ color: T.inkMid, fontSize: 11 }}>{e.date}</span>,
             <span style={{ padding: "3px 9px", borderRadius: 99, background: T.surfaceHi, color: T.blue, fontSize: 11, fontWeight: 700 }}>{e.category}</span>,
             <SalaryTag v={e.amount} color={T.green} />,
+            <span style={{ color: T.inkMid, fontSize: 12, fontWeight: 700 }}>{e.employeeName || "—"}</span>,
+            <span style={{ color: e.status === "Reimbursed" ? T.green : e.status === "Pending" ? T.amber : T.inkMid, fontSize: 11, fontWeight: 700 }}>{e.status || "—"}</span>,
             <span style={{ color: T.inkMid, fontSize: 12 }}>{e.note || "—"}</span>,
             <DeleteBtn onClick={() => e.id && onDelete(e.id)} />,
           ])}
@@ -1177,7 +1032,7 @@ const MONTH_LABELS: Record<string, string> = {
   "2026-09":"Sep 2026","2026-10":"Oct 2026","2026-11":"Nov 2026","2026-12":"Dec 2026",
 };
 
-type Tab = "overview" | "expenses" | "payroll" | "employees" | "assets" | "firestore";
+type Tab = "overview" | "approvals" | "expenses" | "purchases" | "advances" | "vendors" | "budgets" | "payroll" | "employees" | "assets" | "reimbursements" | "firestore";
 
 export default function FinancialDashboard() {
   const [month, setMonth] = useState(() => {
@@ -1190,18 +1045,46 @@ export default function FinancialDashboard() {
 
   const handleAddExpense = useCallback((d: Omit<Expense,      "id"|"month"|"createdAt">)        => addExpense(d),  []);
   const handleDelExpense = useCallback((id: string)                                               => deleteExpense(id), []);
+  const handleUpdateExpense = useCallback((id: string, status: string) => updateDoc(doc(db, "expenses", id), { status }), []);
+  
   const handleAddPayroll = useCallback((d: Omit<PayrollEntry, "id"|"finalSalary"|"createdAt">) => addPayroll(d),  []);
   const handleDelPayroll = useCallback((id: string)                                               => deletePayroll(id), []);
   const handleAddAsset   = useCallback((d: Omit<Asset,        "id"|"totalCost"|"createdAt">)    => addAsset(d),    []);
   const handleDelAsset   = useCallback((id: string)                                               => deleteAsset(id),  []);
+
+  const handleAddPurchase = useCallback((d: Omit<PurchaseRequest, "id"|"createdAt"|"month">) => addPurchaseRequest(d, month), [month]);
+  const handleDelPurchase = useCallback((id: string) => deletePurchaseRequest(id), []);
+  const handleStatusPurchase = useCallback((id: string, status: string) => updatePurchaseRequestStatus(id, status), []);
+
+  const handleAddAdvance = useCallback((d: Omit<SalaryAdvance, "id"|"createdAt"|"month">) => addSalaryAdvance(d, month), [month]);
+  const handleDelAdvance = useCallback((id: string) => deleteSalaryAdvance(id), []);
+  const handleStatusAdvance = useCallback((id: string, status: string) => updateSalaryAdvanceStatus(id, status), []);
+
+  const handleAddVendor = useCallback((d: Omit<VendorPayment, "id"|"createdAt"|"month">) => addVendorPayment(d, month), [month]);
+  const handleDelVendor = useCallback((id: string) => deleteVendorPayment(id), []);
+  const handleStatusVendor = useCallback((id: string, status: string) => updateVendorPaymentStatus(id, status), []);
+
+  const handleAddBudget = useCallback((d: Omit<Budget, "id"|"createdAt"|"month">) => addBudget(d, month), [month]);
+  const handleDelBudget = useCallback((id: string) => deleteBudget(id), []);
+  
+  const handleAddReimbursement = useCallback((d: Omit<Reimbursement, "id"|"createdAt"|"month">) => addReimbursement(d, month), [month]);
+  const handleDelReimbursement = useCallback((id: string) => deleteReimbursement(id), []);
+  const handleStatusReimbursement = useCallback((id: string, status: string) => updateReimbursementStatus(id, status), []);
+
   const { user } = useAuth();
 
   const TABS: { key: Tab; label: string; count?: number }[] = [
     { key: "overview",  label: "Overview" },
+    { key: "approvals", label: "Approvals",      count: data.purchaseRequests.filter(r => r.status === "Pending").length + data.salaryAdvances.filter(a => a.status === "Pending").length + data.reimbursements.filter(e => e.status === "Pending").length },
     { key: "expenses",  label: "Expenses",       count: data.expenses.length },
-    { key: "payroll",   label: "Payroll",         count: data.payroll.length },
-    { key: "employees", label: "Employees",       count: data.employees.length },
-    { key: "assets",    label: "Assets",          count: data.assets.length },
+    { key: "purchases", label: "Purchases",      count: data.purchaseRequests.length },
+    { key: "advances",  label: "Advances",       count: data.salaryAdvances.length },
+    { key: "vendors",   label: "Vendors",        count: data.vendorPayments.length },
+    { key: "budgets",   label: "Budgets",        count: data.budgets.length },
+    { key: "payroll",   label: "Payroll",        count: data.payroll.length },
+    { key: "employees", label: "Employees",      count: data.employees.length },
+    { key: "assets",    label: "Assets",         count: data.assets.length },
+    { key: "reimbursements", label: "Reimbursements", count: data.reimbursements.length },
   ];
 
   const salarySource = data.payrollTotals.totalFinal > 0 ? "payroll" : "base";
@@ -1286,10 +1169,16 @@ export default function FinancialDashboard() {
       {/* CONTENT */}
       <main style={{ padding: "20px 24px", width: "100%" }}>
         {tab === "overview"  && <><OverviewTab  data={data} /><div style={{marginTop:20}}><CrossDeptFeed role="finance" accentColor="#2563eb" title="Sales & Business Activity" maxItems={8} /></div></>}
+        {tab === "approvals" && <ApprovalCenterTab purchaseRequests={data.purchaseRequests} salaryAdvances={data.salaryAdvances} reimbursements={data.reimbursements} onUpdatePurchase={handleStatusPurchase} onUpdateAdvance={handleStatusAdvance} onUpdateReimbursement={handleStatusReimbursement} />}
         {tab === "expenses"  && <ExpensesTab  expenses={data.expenses} month={month} onAdd={handleAddExpense} onDelete={handleDelExpense} />}
+        {tab === "purchases" && <PurchaseRequestsTab requests={data.purchaseRequests} month={month} onAdd={handleAddPurchase} onDelete={handleDelPurchase} onUpdateStatus={handleStatusPurchase} />}
+        {tab === "advances"  && <SalaryAdvancesTab advances={data.salaryAdvances} month={month} onAdd={handleAddAdvance} onDelete={handleDelAdvance} onUpdateStatus={handleStatusAdvance} />}
+        {tab === "vendors"   && <VendorPaymentsTab payments={data.vendorPayments} month={month} onAdd={handleAddVendor} onDelete={handleDelVendor} onUpdateStatus={handleStatusVendor} />}
+        {tab === "budgets"   && <BudgetManagementTab budgets={data.budgets} month={month} onAdd={handleAddBudget} onDelete={handleDelBudget} />}
         {tab === "payroll"   && <PayrollTab   payroll={data.payroll}    payrollTotals={data.payrollTotals} month={month} employees={data.employees} onAdd={handleAddPayroll} onDelete={handleDelPayroll} />}
         {tab === "employees" && <EmployeesTab employees={data.employees} />}
         {tab === "assets"    && <AssetsTab    assets={data.assets}      totalAssets={data.totalAssets} month={month} onAdd={handleAddAsset} onDelete={handleDelAsset} />}
+        {tab === "reimbursements" && <ReimbursementsTab reimbursements={data.reimbursements} month={month} onAdd={handleAddReimbursement} onDelete={handleDelReimbursement} onUpdateStatus={handleStatusReimbursement} />}
         {tab === "firestore" && <FirestoreTab />}
       </main>
     </div>

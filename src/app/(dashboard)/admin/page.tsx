@@ -37,6 +37,7 @@ import CalendarView from "./calendar";
 import MessagesView from "./meassages";
 import MeetChatApp from "@/components/MeetChatAppUpdated";
 import AccountsDashboard from "./Accounts/AccountsDashboard";
+import FinancialDashboard from "@/app/(dashboard)/analytics/financial/page";
 import AdminBreakView from "@/components/AdminBreakView";
 import AdminDailySheetsView from "./AdminDailySheetsView";
 import AdminRegularizationRequestsView from "./AdminRegularizationRequestsView";
@@ -856,6 +857,12 @@ export default function AdminPage() {
             onClick={() => { setView("regularization"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
           />
 
+          <NavItem
+            icon={<span className="text-[18px]">💰</span>}
+            label="Finance" active={view === "finance"}
+            onClick={() => { setView("finance"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+          />
+
 
 
         </nav>
@@ -1220,6 +1227,7 @@ export default function AdminPage() {
 
           <IncomingCallListener />
           {view === "accounts" && <AccountsDashboard />}
+          {view === "finance" && <FinancialDashboard />}
           {view === "leads" && <LeadsView />}
           {view === "invoices" && <InvoicesView />}
           {view === "it-assets" && <ITAssetsView />}

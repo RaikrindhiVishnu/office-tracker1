@@ -23,7 +23,7 @@ import {
   updatePreferences as savePrefsToDb,
 } from "@/lib/notificationPreferences";
 import { NotificationCategory } from "@/lib/notificationTypes";
-
+import { useDocumentTitleBadge } from "@/hooks/useDocumentTitleBadge";
 export interface ToastItem {
   id: string;
   title: string;
@@ -228,8 +228,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, []);
 
   // Compute unread counts
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
-
+  const unreadCount = notifications.filter((n) => !n.isRead && n.read !== false).length; // Handle both 'isRead' and 'read' field names for compatibility
+  
+  // Update document title badge
+  useDocumentTitleBadge(unreadCount);
   const unreadByCategory = notifications.reduce((acc, n) => {
     if (!n.isRead && n.category) {
       acc[n.category] = (acc[n.category] || 0) + 1;

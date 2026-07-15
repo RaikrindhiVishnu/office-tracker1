@@ -126,10 +126,7 @@ function buildDayStatuses(
     const holiday     = isHoliday(dateStr);
     const isHolidayDay =
       isSunday(year, month, day) ||
-      (dow === 6 && (year > 2026 || (year === 2026 && month >= 6))) ||
-      isSecondSaturday(year, month, day) ||
-      isFourthSaturday(year, month, day) ||
-      isFifthSaturday(year, month, day) ||
+      dow === 6 ||
       !!holiday;
     const isPublicHol = !!holiday && !isSunday(year, month, day);
     const holidayTitle = holiday?.title || null;
@@ -530,9 +527,8 @@ export default function EmployeeAttendanceView() {
                   ? (holidayTitle || "Public Holiday")
                   : dow === 0
                   ? "Sunday"
-                  : isSecondSaturday(year, month, day) ? "2nd Saturday"
-                  : isFourthSaturday(year, month, day) ? "4th Saturday"
-                  : isFifthSaturday(year, month, day) ? "5th Saturday"
+                  : dow === 6
+                  ? "Saturday"
                   : null;
 
                 let rowBg = "transparent";

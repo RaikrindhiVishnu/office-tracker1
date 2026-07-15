@@ -582,7 +582,27 @@ export default function TeamsStyleChat({ users, targetUid, rightHeaderIcons }: {
       }
       await addDoc(collection(db, path), msg);
       const others = selectedChat.participants.filter(p => p !== user.uid);
-      for (const pid of others) await addDoc(collection(db, "notifications"), { fromUid: user.uid, fromName: getUserName(user), toUid: pid, message: text || fn || "Sent a file", chatId, timestamp: serverTimestamp(), read: false });
+      for (const pid of others) {
+        await addDoc(collection(db, "notifications"), { fromUid: user.uid, fromName: getUserName(user), toUid: pid, message: text || fn || "Sent a file", chatId, timestamp: serverTimestamp(), read: false });
+        // Trigger Push Notification
+        try {
+          fetch("/api/notifications/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              targetUserId: pid,
+              title: selectedChat.isGroup ? `${getUserName(user)} in ${selectedChat.name}` : getUserName(user),
+              body: text || fn || "Sent a file",
+              category: "chat",
+              priority: "high",
+              clickAction: selectedChat.isGroup ? `/mobile?groupChatId=${chatId}` : `/mobile?chatId=${chatId}`,
+              skipDb: true
+            })
+          });
+        } catch (err) {
+          console.error("Failed to trigger push notification", err);
+        }
+      }
       const tp = selectedChat.isGroup ? `groupChats/${chatId}/typing` : `chats/${chatId}/typing`;
       await deleteDoc(doc(db, tp, user.uid));
       setText(""); setSelectedFile(null); setReplyTo(null);

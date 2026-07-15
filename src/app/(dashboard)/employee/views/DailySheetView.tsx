@@ -129,8 +129,12 @@ export default function DailySheetView() {
           let effectiveMins = 0;
           sessions.forEach((s: any) => {
             const start = s.checkIn.toDate();
-            const end = s.checkOut ? s.checkOut.toDate() : (data.date === getTodayDateStr() ? new Date() : null);
-            const effEnd = end || new Date();
+            let effEnd = s.checkOut ? s.checkOut.toDate() : new Date();
+            if (!s.checkOut) {
+              const maxEnd = new Date(start);
+              maxEnd.setHours(19, 0, 0, 0);
+              if (data.date !== getTodayDateStr() || effEnd > maxEnd) effEnd = maxEnd;
+            }
             if (effEnd > start) {
               effectiveMins += Math.floor((effEnd.getTime() - start.getTime()) / 60000);
             }
@@ -457,8 +461,12 @@ export default function DailySheetView() {
             let effectiveMins = 0;
             sessions.forEach((s: any) => {
               const start = s.checkIn.toDate();
-              const end = s.checkOut ? s.checkOut.toDate() : (data.date === getTodayDateStr() ? new Date() : null);
-              const effEnd = end || new Date();
+              let effEnd = s.checkOut ? s.checkOut.toDate() : new Date();
+              if (!s.checkOut) {
+                const maxEnd = new Date(start);
+                maxEnd.setHours(19, 0, 0, 0);
+                if (data.date !== getTodayDateStr() || effEnd > maxEnd) effEnd = maxEnd;
+              }
               if (effEnd > start) {
                 effectiveMins += Math.floor((effEnd.getTime() - start.getTime()) / 60000);
               }

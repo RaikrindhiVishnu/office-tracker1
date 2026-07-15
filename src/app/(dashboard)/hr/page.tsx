@@ -31,6 +31,7 @@ import EnhancedProfileView from "@/app/(dashboard)/employee/views/EnhancedProfil
 import ReportBuilder from "./components/ReportBuilder";
 import AIChatBot from "@/app/(dashboard)/employee/views/AIChatBot";
 import PayrollGenerator from "@/app/(dashboard)/admin/Accounts/PayrollGenerator";
+import FinancialDashboard from "@/app/(dashboard)/analytics/financial/page";
 
 import type { AttendanceType } from "@/types/attendance";
 import type { Employee }       from "@/types/Employee";
@@ -38,7 +39,7 @@ import type { Session }        from "@/types/Employee";
 import type { EmployeeRow }    from "@/types/EmployeeRow";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type HRView = "dashboard"|"leave"|"employees"|"employee-overview"|"attendance"|"my-attendance"|"payslips"|"announcements"|"queries"|"lifecycle"|"recruitment"|"daily-sheet"|"regularization"|"daily-report"|"profile";
+type HRView = "dashboard"|"leave"|"employees"|"employee-overview"|"attendance"|"my-attendance"|"payslips"|"announcements"|"queries"|"lifecycle"|"recruitment"|"daily-sheet"|"regularization"|"daily-report"|"profile"|"finance";
 
 interface Notification { id:string; toUid:string; title:string; message:string; read:boolean; createdAt:Timestamp; }
 interface LeaveRequest  { id:string; uid:string; userName:string; userEmail:string; leaveType:string; fromDate:string; toDate:string; reason:string; status:"Pending"|"Approved"|"Rejected"; createdAt:any; }
@@ -554,6 +555,7 @@ function HRDashboard() {
     {key:"regularization" as HRView,label:"Regularization",icon:"⏱️"},
     {key:"announcements" as HRView,label:"Announcements",icon:"📣"},
     {key:"queries"   as HRView,label:"Queries",icon:"💬",badge:queryUnread},
+    {key:"finance" as HRView,label:"Finance",icon:"💰"},
   ];
 
   if (loading) return null;
@@ -1369,6 +1371,8 @@ function HRDashboard() {
               }
             </div>
           )}
+
+          {view==="finance" && <FinancialDashboard />}
         </main>
 
         {/* ── FOOTER ── */}
