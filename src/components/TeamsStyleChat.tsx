@@ -591,7 +591,7 @@ export default function TeamsStyleChat({ users, targetUid, rightHeaderIcons }: {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               targetUserId: pid,
-              title: selectedChat.isGroup ? `${getUserName(user)} in ${selectedChat.name}` : getUserName(user),
+              title: selectedChat.isGroup ? `${getUserName(user)} in ${selectedChat.groupName || "Group"}` : getUserName(user),
               body: text || fn || "Sent a file",
               category: "chat",
               priority: "high",

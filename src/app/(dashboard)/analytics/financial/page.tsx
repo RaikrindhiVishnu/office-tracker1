@@ -1090,12 +1090,9 @@ export default function FinancialDashboard() {
   const salarySource = data.payrollTotals.totalFinal > 0 ? "payroll" : "base";
 
   return (
-    <div style={{ minHeight: "100vh", background: T.bg, fontFamily: "'Sora', 'Segoe UI', sans-serif", color: T.ink }}>
+    <div style={{ background: T.bg, fontFamily: "'Sora', 'Segoe UI', sans-serif", color: T.ink, width: "100%", borderRadius: "16px", overflow: "hidden" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700;800&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
         select option { background: #ffffff; color: #0f172a; }
         input:focus, select:focus { outline: none; }
       `}</style>

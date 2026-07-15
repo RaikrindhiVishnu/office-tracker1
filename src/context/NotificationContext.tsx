@@ -228,7 +228,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, []);
 
   // Compute unread counts
-  const unreadCount = notifications.filter((n) => !n.isRead && n.read !== false).length; // Handle both 'isRead' and 'read' field names for compatibility
+  const unreadCount = notifications.filter((n) => !n.isRead && (n as any).read !== false).length; // Handle both 'isRead' and 'read' field names for compatibility
   
   // Update document title badge
   useDocumentTitleBadge(unreadCount);
