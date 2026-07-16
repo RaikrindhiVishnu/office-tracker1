@@ -230,8 +230,8 @@ export function subscribeAssets(
   });
 }
 
-export function subscribePurchaseRequests(month: string, cb: (items: PurchaseRequest[]) => void) {
-  const q = query(collection(db, "purchaseRequests"), where("month", "==", month));
+export function subscribePurchaseRequests(cb: (items: PurchaseRequest[]) => void) {
+  const q = query(collection(db, "purchaseRequests"));
   return onSnapshot(q, snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() } as PurchaseRequest))));
 }
 export async function addPurchaseRequest(data: Omit<PurchaseRequest, "id" | "createdAt" | "month">, month: string) {
@@ -327,7 +327,15 @@ function useFinance(month: string) {
     const u2 = subscribePayroll(month, (items, totals) => { setPayroll(items); setPayrollTotals(totals); });
     const u3 = subscribeExpenses(month, (items, total, bycat) => { setExpenses(items); setTotalManual(total); setByCategory(bycat); });
     const u4 = subscribeAssets(month, (items, total) => { setAssets(items); setTotalAssets(total); });
-    const u5 = subscribePurchaseRequests(month, items => setPurchaseRequests(items));
+    const u5 = subscribePurchaseRequests(items => {
+      const filtered = items.filter(i => {
+        if (!i.createdAt) return false;
+        const d = i.createdAt.toDate ? i.createdAt.toDate() : new Date(i.createdAt);
+        const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        return mStr === month;
+      });
+      setPurchaseRequests(filtered);
+    });
     const u6 = subscribeSalaryAdvances(month, items => setSalaryAdvances(items));
     const u7 = subscribeVendorPayments(month, items => setVendorPayments(items));
     const u8 = subscribeBudgets(month, items => setBudgets(items));
