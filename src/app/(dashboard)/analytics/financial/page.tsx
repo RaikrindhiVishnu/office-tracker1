@@ -348,8 +348,12 @@ function useFinance(month: string) {
     .filter(c => c.status === "Approved" || c.status === "Reimbursed")
     .reduce((s, c) => s + (c.totalAmount || 0), 0);
 
+  const approvedPRTotal = purchaseRequests
+    .filter(r => r.status === "Approved" || r.status === "Ordered" || r.status === "Delivered")
+    .reduce((s, r) => s + (r.estimatedCost || 0), 0);
+
   const finalSalaryUsed = payrollTotals.totalFinal > 0 ? payrollTotals.totalFinal : totalSalary;
-  const grandTotal = finalSalaryUsed + totalManual + totalAssets + approvedClaimsTotal;
+  const grandTotal = finalSalaryUsed + totalManual + totalAssets + approvedClaimsTotal + approvedPRTotal;
   const categoryData = Object.entries(byCategory).map(([name, value]) => ({ name, value }));
 
   return {
@@ -359,7 +363,7 @@ function useFinance(month: string) {
     assets, totalAssets,
     purchaseRequests, salaryAdvances,
     vendorPayments, budgets, reimbursements,
-    expenseClaims, approvedClaimsTotal,
+    expenseClaims, approvedClaimsTotal, approvedPRTotal,
     grandTotal,
     finalSalaryUsed,
   };
@@ -371,14 +375,14 @@ function useFinance(month: string) {
 // 7. OVERVIEW TAB
 // ─────────────────────────────────────────────────────────────
 function OverviewTab({ data }: { data: ReturnType<typeof useFinance> }) {
-  const { grandTotal, payrollTotals, totalManual, totalAssets, categoryData, employees, assets, finalSalaryUsed, expenseClaims, approvedClaimsTotal, purchaseRequests, salaryAdvances, vendorPayments, budgets, reimbursements } = data;
+  const { grandTotal, payrollTotals, totalManual, totalAssets, categoryData, employees, assets, finalSalaryUsed, expenseClaims, approvedClaimsTotal, approvedPRTotal, purchaseRequests, salaryAdvances, vendorPayments, budgets, reimbursements } = data;
 
   const salarySource = payrollTotals.totalFinal > 0 ? "From Payroll" : "From Employee Base";
 
   const summaryBars = [
     { name: "Salary",   value: finalSalaryUsed, color: T.blue },
     { name: "Expenses", value: totalManual + approvedClaimsTotal, color: T.green },
-    { name: "Assets",   value: totalAssets,      color: T.violet },
+    { name: "Assets",   value: totalAssets + approvedPRTotal,      color: T.violet },
   ];
 
   const payrollBreakdown = [
@@ -394,7 +398,7 @@ function OverviewTab({ data }: { data: ReturnType<typeof useFinance> }) {
         <KPICard icon="💰" label="Grand Total"      value={fmt(grandTotal)}        accent={T.blue}   sub="Salary + Expenses + Assets" />
         <KPICard icon="👥" label="Salary Cost"      value={fmt(finalSalaryUsed)}   accent={T.violet} sub={salarySource} />
         <KPICard icon="🧾" label="Manual Expenses"  value={fmt(totalManual + approvedClaimsTotal)}        accent={T.green}  sub="Includes Emp Claims" />
-        <KPICard icon="🏗️" label="Asset Cost"       value={fmt(totalAssets)}        accent={T.amber}  sub="Purchase + maintenance" />
+        <KPICard icon="🏗️" label="Asset/PR Cost"       value={fmt(totalAssets + approvedPRTotal)}        accent={T.amber}  sub="Includes PRs" />
         <KPICard icon="👤" label="Employees"        value={String(employees.length)} accent={T.teal}  sub="Active headcount" />
         <KPICard icon="📦" label="Assets"           value={String(assets.length)}   accent={T.pink}   sub="Tracked this month" />
       </div>

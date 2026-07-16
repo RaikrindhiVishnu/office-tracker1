@@ -342,6 +342,9 @@ export default function AdminExpenseView() {
   const pendingPRs = purchaseRequests.filter(r => r.status === "Pending").length;
   const approvedPRs = purchaseRequests.filter(r => r.status === "Approved").length;
 
+  const totalPendingPRCost = purchaseRequests.filter(r => r.status === "Pending").reduce((s, r) => s + (r.estimatedCost || 0), 0);
+  const totalApprovedPRCost = purchaseRequests.filter(r => r.status === "Approved" || r.status === "Ordered" || r.status === "Delivered").reduce((s, r) => s + (r.estimatedCost || 0), 0);
+
   return (
     <div style={{ display: "flex", height: "100%", fontFamily: "'Inter','Segoe UI',sans-serif", background: "#f8fafc" }}>
       <div style={{ flex: 1, padding: 24, overflowY: "auto" }}>
@@ -442,15 +445,17 @@ export default function AdminExpenseView() {
 
         {activeTab === "PurchaseRequests" && (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 12, marginBottom: 20 }}>
               {[
                 { label: "Total Requests", v: purchaseRequests.length, color: "#f97316", bg: "#fff7ed" },
                 { label: "Pending", v: pendingPRs, color: "#d97706", bg: "#fffbeb" },
                 { label: "Approved", v: approvedPRs, color: "#059669", bg: "#f0fdf4" },
-                { label: "Ordered / Delivered", v: purchaseRequests.filter(r => r.status === "Ordered" || r.status === "Delivered").length, color: "#7c3aed", bg: "#ede9fe" },
+                { label: "Ordered/Deliv", v: purchaseRequests.filter(r => r.status === "Ordered" || r.status === "Delivered").length, color: "#7c3aed", bg: "#ede9fe" },
+                { label: "Pending Amt", v: fmtCur(totalPendingPRCost), color: "#ea580c", bg: "#fff7ed", isStr: true },
+                { label: "Approved Amt", v: fmtCur(totalApprovedPRCost), color: "#10b981", bg: "#ecfdf5", isStr: true },
               ].map(s => (
                 <div key={s.label} style={{ background: s.bg, borderRadius: 12, padding: "14px 16px", border: `1px solid ${s.color}20` }}>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.v}</div>
+                  <div style={{ fontSize: (s as any).isStr ? 14 : 22, fontWeight: 800, color: s.color }}>{s.v}</div>
                   <div style={{ fontSize: 11, color: "#64748b", fontWeight: 500, marginTop: 2 }}>{s.label}</div>
                 </div>
               ))}

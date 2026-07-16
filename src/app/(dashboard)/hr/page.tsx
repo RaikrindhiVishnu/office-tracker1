@@ -32,7 +32,7 @@ import ReportBuilder from "./components/ReportBuilder";
 import AIChatBot from "@/app/(dashboard)/employee/views/AIChatBot";
 import PayrollGenerator from "@/app/(dashboard)/admin/Accounts/PayrollGenerator";
 import FinancialDashboard from "@/app/(dashboard)/analytics/financial/page";
-import EmployeeTasksView from "@/app/(dashboard)/employee/views/EmployeeTasksView";
+import DailySheetView from "@/app/(dashboard)/employee/views/DailySheetView";
 
 import type { AttendanceType } from "@/types/attendance";
 import type { Employee }       from "@/types/Employee";
@@ -1024,7 +1024,7 @@ function HRDashboard() {
 
           {view==="my-timesheet" && (
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden min-h-screen">
-              <EmployeeTasksView user={user} />
+              <DailySheetView />
             </div>
           )}
 
