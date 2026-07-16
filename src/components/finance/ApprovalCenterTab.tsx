@@ -33,7 +33,7 @@ export default function ApprovalCenterTab({
           <Table
             headers={["Item", "Cost", "Actions"]}
             rows={pendingPurchases.map(r => [
-              <span style={{ fontWeight: 700, color: T.ink }}>{r.item}</span>,
+              <span style={{ fontWeight: 700, color: T.ink }}>{r.itemName}</span>,
               <SalaryTag v={r.estimatedCost} color={T.amber} />,
               <div style={{ display: "flex", gap: 6 }}>
                 <button onClick={() => r.id && onUpdatePurchase(r.id, "Approved")} style={{ padding: "4px 8px", background: T.green, color: "#fff", border: "none", borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: "pointer" }}>Approve</button>
