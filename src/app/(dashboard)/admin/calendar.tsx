@@ -25,6 +25,9 @@ interface CompanyEvent {
   rsvpLink?: string; sendAnnouncementEmail?: boolean;
   reminderDaysBefore?: number; announcementSentOn?: string; reminderSentOn?: string;
 }
+interface CalendarReminder {
+  id: string; date: string; note: string;
+}
 interface GreetingLog {
   id: string; type: string; recipientEmail: string;
   recipientName?: string; subject: string;
@@ -88,6 +91,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   const [birthdays,  setBirthdays]  = useState<BirthdayRecord[]>([]);
   const [festivals,  setFestivals]  = useState<Festival[]>([]);
   const [events,     setEvents]     = useState<CompanyEvent[]>([]);
+  const [reminders,  setReminders]  = useState<CalendarReminder[]>([]);
   const [logs,       setLogs]       = useState<GreetingLog[]>([]);
   const [tab,        setTab]        = useState<Tab>("calendar");
   const [sending,    setSending]    = useState<string|null>(null);
@@ -117,6 +121,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({
   const [eventForm,     setEventForm]     = useState(emptyEvent);
   const [eventErr,      setEventErr]      = useState<Record<string,string>>({});
 
+  const [showReminderForm, setShowReminderForm] = useState(false);
+  const [savingReminder,   setSavingReminder]   = useState(false);
+  const [reminderForm,     setReminderForm]     = useState({ date: "", note: "" });
+
   useEffect(()=>{
     if (!showCalendar) return;
     const u1=onSnapshot(collection(db,"birthdays"),s=>setBirthdays(s.docs.map(d=>({id:d.id,...d.data()} as BirthdayRecord))));
@@ -131,7 +139,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({
       } as CompanyEvent;
     })));
     const u4=onSnapshot(query(collection(db,"greetingLogs"),orderBy("sentAt","desc"),limit(200)),s=>setLogs(s.docs.map(d=>({id:d.id,...d.data()} as GreetingLog))));
-    return ()=>{u1();u2();u3();u4();};
+    const u5=onSnapshot(collection(db,"calendarReminders"),s=>setReminders(s.docs.map(d=>({id:d.id,...d.data()} as CalendarReminder))));
+    return ()=>{u1();u2();u3();u4();u5();};
   },[showCalendar]);
 
   if (!showCalendar) return null;
@@ -243,8 +252,23 @@ const CalendarView: React.FC<CalendarViewProps> = ({
     }catch{showToast("Save failed",false);}finally{setSavingEvent(false);}
   };
   const handleDeleteEvent = async (id:string,title:string)=>{
-    if(!confirm(`Delete "${title}"?`))return; setDeleting(id);
+    if(!confirm(`Delete event "${title}"?`))return; setDeleting(id);
     try{await deleteDoc(doc(db,"companyEvents",id));showToast(`${title} deleted.`);}catch{showToast("Delete failed",false);}finally{setDeleting(null);}
+  };
+
+  // Reminder CRUD
+  const handleSaveReminder = async ()=>{
+    if(!reminderForm.note.trim()) return;
+    setSavingReminder(true);
+    try {
+      await addDoc(collection(db,"calendarReminders"), {
+        date: reminderForm.date,
+        note: reminderForm.note.trim(),
+        createdAt: serverTimestamp(),
+      });
+      setReminderForm({date:"",note:""}); setShowReminderForm(false);
+      showToast("🔔 Reminder added!");
+    } catch { showToast("Save failed", false); } finally { setSavingReminder(false); }
   };
 
   return (
@@ -410,19 +434,28 @@ const CalendarView: React.FC<CalendarViewProps> = ({
                     const dayBdays=getBdaysForDay(y,m,day);
                     const dayFests=getFestsForDay(dateStr);
                     const dayEvts=getEventsForDay(dateStr);
+                    const dayReminders=reminders.filter(r=>r.date===dateStr);
                     const bg=isToday?"bg-green-50 border-green-400":dayBdays.length?"bg-purple-50 border-purple-300":dayFests.length?"bg-amber-50 border-amber-300":dayEvts.length?"bg-indigo-50 border-indigo-300":isHolDay?"bg-rose-50 border-rose-300":"bg-white border-slate-200";
                     return (
-                      <div key={day} className={`h-24 border-2 rounded-lg p-1 text-xs overflow-hidden hover:shadow-md transition-shadow ${bg}`}>
+                      <div key={day} 
+                        className={`h-24 border-2 rounded-lg p-1 text-xs overflow-hidden hover:shadow-md transition-shadow relative group ${bg}`}
+                        onClick={()=>{setReminderForm({date:dateStr,note:""});setShowReminderForm(true);}}
+                        style={{ cursor: "pointer" }}
+                      >
                         <div className={`font-bold text-sm leading-none mb-0.5 ${isToday?"text-green-700":dayBdays.length?"text-purple-700":""}`}>{day}</div>
                         {holiday&&<div className="text-[9px] text-rose-600 truncate">{holiday.title}</div>}
                         {dayBdays.map(b=>(
                           <div key={b.id}>
                             <span className="cm-bday-pill" title={b.name}>🎂 {b.name.split(" ")[0]}</span>
-                            {b.birthMonthDay===todayMD&&<button className={`cm-wish-btn${b.lastWishSentOn===todayISO?" sent":""}`} disabled={sending===b.id} onClick={e=>sendWish(e,b)}>{sending===b.id?"…":b.lastWishSentOn===todayISO?"✓ Sent":"Send Wish"}</button>}
+                            {b.birthMonthDay===todayMD&&<button className={`cm-wish-btn${b.lastWishSentOn===todayISO?" sent":""}`} disabled={sending===b.id} onClick={e=>{e.stopPropagation(); sendWish(e,b)}}>{sending===b.id?"…":b.lastWishSentOn===todayISO?"✓ Sent":"Send Wish"}</button>}
                           </div>
                         ))}
                         {dayFests.map(f=><span key={f.id} className="cm-fest-pill" style={{background:f.bannerColor||"#f59e0b"}} title={f.title}>{f.bannerEmoji} {f.title}</span>)}
                         {dayEvts.map(ev=><span key={ev.id} className="cm-event-pill" style={{background:ev.color||"#6366f1"}} title={ev.title}>📌 {ev.title}</span>)}
+                        {dayReminders.map(r=><span key={r.id} className="cm-event-pill" style={{background:"#fca5a5",color:"#7f1d1d"}} title={r.note} onClick={e=>{e.stopPropagation();setDeleting(r.id);deleteDoc(doc(db,"calendarReminders",r.id)).then(()=>setDeleting(null))}}>🔔 {deleting===r.id?"...":r.note}</span>)}
+                        <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                          <span className="text-[10px] font-bold text-slate-600 bg-white/80 px-2 rounded-full">+ Note</span>
+                        </div>
                       </div>
                     );
                   })}
@@ -687,6 +720,23 @@ const CalendarView: React.FC<CalendarViewProps> = ({
             <div className="cm-field"><label className="cm-label">Colour</label><div className="cm-color-grid">{EVENT_COLORS.map(c=><div key={c.hex} className={`cm-color-dot${eventForm.color===c.hex?" sel":""}`} style={{background:c.hex}} title={c.label} onClick={()=>setEventForm({...eventForm,color:c.hex})}/>)}</div></div>
             <div className="cm-field"><div className="flex items-center gap-2 cursor-pointer" onClick={()=>setEventForm({...eventForm,sendAnnouncementEmail:!eventForm.sendAnnouncementEmail})}><div className={`cm-toggle-track${eventForm.sendAnnouncementEmail?" on":""}`}><div className="cm-toggle-thumb"/></div><span className="text-sm text-slate-600 font-medium">Send automated announcement emails</span></div></div>
             <div className="cm-modal-btns"><button className="cm-cancel-btn" onClick={()=>{setShowEventForm(false);setEditEvent(null);}}>Cancel</button><button className="cm-save-btn" disabled={savingEvent} onClick={handleSaveEvent}>{savingEvent?"Saving…":editEvent?"Save Changes":"Add Event"}</button></div>
+          </div>
+        </div>
+      )}
+
+      {/* REMINDER MODAL */}
+      {showReminderForm&&(
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" onClick={e=>e.target===e.currentTarget&&setShowReminderForm(false)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col p-5">
+            <div className="font-bold text-lg mb-4 text-slate-800">🔔 Add Reminder for {reminderForm.date}</div>
+            <div className="cm-field">
+              <label className="cm-label">Reminder Note *</label>
+              <input autoFocus className="cm-input" placeholder="e.g. Pay Office Rent" value={reminderForm.note} onChange={e=>setReminderForm({...reminderForm,note:e.target.value})} onKeyDown={e=>e.key==="Enter"&&handleSaveReminder()} />
+            </div>
+            <div className="flex gap-2 justify-end mt-4">
+              <button className="cm-cancel-btn" onClick={()=>setShowReminderForm(false)}>Cancel</button>
+              <button className="cm-save-btn bg-indigo-600 text-white" disabled={savingReminder||!reminderForm.note.trim()} onClick={handleSaveReminder}>{savingReminder?"Saving…":"Save"}</button>
+            </div>
           </div>
         </div>
       )}
