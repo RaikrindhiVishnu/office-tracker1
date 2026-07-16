@@ -1,5 +1,5 @@
 import React from "react";
-import { T, SectionCard, KPICard, Table, fmt } from "./FinanceUI";
+import { T, fmt } from "./FinanceUI";
 
 export default function FinalSheetTab({ data }: { data: any }) {
   const {
@@ -12,7 +12,6 @@ export default function FinalSheetTab({ data }: { data: any }) {
     employees,
     assets,
     reimbursements,
-    grandTotal,
     payrollTotals,
     totalManual,
     totalAssets,
@@ -35,58 +34,107 @@ export default function FinalSheetTab({ data }: { data: any }) {
     .reduce((s: number, v: any) => s + (v.amount || 0), 0);
 
   const summaryData = [
-    { category: "Expenses (Manual + Claims)", count: expenses.length, amount: totalManual + approvedClaimsTotal },
-    { category: "Purchase Requests (Approved)", count: purchaseRequests.length, amount: approvedPRTotal },
-    { category: "Salary Advances (Approved)", count: salaryAdvances.length, amount: totalAdvances },
-    { category: "Vendor Payments (Paid)", count: vendorPayments.length, amount: totalVendors },
-    { category: "Budgets (Tracked)", count: budgets.length, amount: budgets.reduce((s: number, b: any) => s + b.used, 0) },
-    { category: "Payroll (Processed or Base)", count: payroll.length > 0 ? payroll.length : employees.length, amount: totalPayroll },
-    { category: "Assets (Added)", count: assets.length, amount: totalAssets },
-    { category: "Reimbursements (Approved/Paid)", count: reimbursements.length, amount: totalReimbursements },
-  ];
+    { category: "Payroll & Salaries", amount: totalPayroll },
+    { category: "Manual Expenses & Employee Claims", amount: totalManual + approvedClaimsTotal },
+    { category: "Purchase Requests", amount: approvedPRTotal },
+    { category: "Salary Advances", amount: totalAdvances },
+    { category: "Vendor Payments", amount: totalVendors },
+    { category: "Budgets (Tracked)", amount: budgets.reduce((s: number, b: any) => s + b.used, 0) },
+    { category: "Assets Purchased", amount: totalAssets },
+    { category: "Reimbursements", amount: totalReimbursements },
+  ].filter(row => row.amount > 0);
 
   const actualTotalExpenditure = summaryData.reduce((s, row) => s + row.amount, 0);
-  const revenue = 0; // Hardcoded for now since there's no revenue tracking yet
-  const profitAndLoss = revenue - actualTotalExpenditure;
+  const totalRevenue = 0; // Hardcoded for now
+  const netProfit = totalRevenue - actualTotalExpenditure;
+
+  const currentMonthName = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-        <KPICard icon="📉" label="Total Expenditure" value={fmt(actualTotalExpenditure)} accent={T.red} sub="Sum of all categories below" />
-        <KPICard icon="💰" label="Net Profit & Loss" value={profitAndLoss < 0 ? `-${fmt(Math.abs(profitAndLoss))}` : fmt(profitAndLoss)} accent={profitAndLoss < 0 ? T.red : T.green} sub={profitAndLoss < 0 ? "Net Loss" : "Net Profit"} />
-        <KPICard icon="📊" label="Grand Total (Overview)" value={fmt(grandTotal)} accent={T.blue} sub="Salary + Expenses + Assets" />
-        <KPICard icon="👥" label="Total Employees" value={String(employees.length)} accent={T.teal} sub="Active headcount" />
-      </div>
-
-      <SectionCard title="Consolidated Financial Statement (Profit & Loss / Expenditure View)" subtitle="Breakdown of all counts and actual monetary outflows.">
-        <Table
-          headers={["Category", "Entries Count", "Total Amount"]}
-          rows={summaryData.map((row) => [
-            <span key="1" style={{ fontWeight: 600, color: T.ink }}>{row.category}</span>,
-            <span key="2" style={{ color: T.inkMid, fontWeight: 700 }}>{row.count} entries</span>,
-            <span key="3" style={{ fontWeight: 800, color: T.red, fontFamily: "'JetBrains Mono', monospace" }}>{fmt(row.amount)}</span>,
-          ])}
-        />
+    <div style={{ display: "flex", justifyContent: "center", padding: "10px 0" }}>
+      <div style={{
+        width: "100%",
+        maxWidth: 900,
+        background: "#ffffff",
+        borderRadius: 8,
+        boxShadow: "0 4px 20px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.02)",
+        padding: "40px 60px",
+        fontFamily: "'Inter', 'Segoe UI', sans-serif",
+        color: "#333",
+      }}>
         
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20, paddingTop: 16, borderTop: `2px dashed ${T.border}` }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: T.inkMid }}>Total Revenue:</span>
-              <span style={{ fontSize: 16, fontWeight: 800, color: T.green, fontFamily: "'JetBrains Mono', monospace" }}>{fmt(revenue)}</span>
+        {/* HEADER */}
+        <div style={{ textAlign: "center", marginBottom: 40 }}>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: "#1a1a1a", letterSpacing: "-0.5px" }}>Profit and Loss</h1>
+          <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>For the period of {currentMonthName}</div>
+        </div>
+
+        {/* P&L TABLE */}
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          
+          {/* OPERATING INCOME */}
+          <div style={{ marginBottom: 30 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", borderBottom: "1px solid #eaeaea", paddingBottom: 8, marginBottom: 8 }}>
+              Operating Income
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: T.inkMid }}>Total Outflow / Expenditure:</span>
-              <span style={{ fontSize: 18, fontWeight: 900, color: T.red, fontFamily: "'JetBrains Mono', monospace" }}>{fmt(actualTotalExpenditure)}</span>
+            
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 16px", fontSize: 14, color: "#444" }}>
+              <span>Sales / Revenue</span>
+              <span>{fmt(totalRevenue)}</span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 4, paddingTop: 8, borderTop: `1px solid ${T.border}` }}>
-              <span style={{ fontSize: 15, fontWeight: 800, color: T.ink }}>Net Profit & Loss:</span>
-              <span style={{ fontSize: 24, fontWeight: 900, color: profitAndLoss < 0 ? T.red : T.green, fontFamily: "'JetBrains Mono', monospace" }}>
-                {profitAndLoss < 0 ? `-${fmt(Math.abs(profitAndLoss))}` : fmt(profitAndLoss)}
-              </span>
+
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 16px", fontSize: 14, fontWeight: 700, color: "#1a1a1a", borderTop: "1px solid #eaeaea", borderBottom: "1px solid #eaeaea", marginTop: 8, background: "#f9fafb" }}>
+              <span>Total Operating Income</span>
+              <span>{fmt(totalRevenue)}</span>
             </div>
           </div>
+
+          {/* OPERATING EXPENSES */}
+          <div style={{ marginBottom: 30 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", borderBottom: "1px solid #eaeaea", paddingBottom: 8, marginBottom: 8 }}>
+              Operating Expenses
+            </div>
+
+            {summaryData.length > 0 ? (
+              summaryData.map((row, idx) => (
+                <div key={idx} style={{ 
+                  display: "flex", justifyContent: "space-between", padding: "8px 16px", fontSize: 14, color: "#444",
+                  borderBottom: idx === summaryData.length - 1 ? "none" : "1px solid #f5f5f5",
+                  transition: "background 0.2s",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "#f8fafc"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                >
+                  <span>{row.category}</span>
+                  <span>{fmt(row.amount)}</span>
+                </div>
+              ))
+            ) : (
+              <div style={{ padding: "8px 16px", fontSize: 13, color: "#999", fontStyle: "italic" }}>No operating expenses recorded.</div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 16px", fontSize: 14, fontWeight: 700, color: "#1a1a1a", borderTop: "1px solid #eaeaea", borderBottom: "1px solid #eaeaea", marginTop: 8, background: "#f9fafb" }}>
+              <span>Total Operating Expenses</span>
+              <span>{fmt(actualTotalExpenditure)}</span>
+            </div>
+          </div>
+
+          {/* OPERATING PROFIT */}
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 16px", fontSize: 14, fontWeight: 700, color: "#1a1a1a" }}>
+            <span>Operating Profit</span>
+            <span>{netProfit < 0 ? `-${fmt(Math.abs(netProfit))}` : fmt(netProfit)}</span>
+          </div>
+
+          <div style={{ height: 1, background: "#eaeaea", margin: "10px 0" }} />
+
+          {/* NET PROFIT */}
+          <div style={{ display: "flex", justifyContent: "space-between", padding: "16px 16px", fontSize: 16, fontWeight: 800, color: netProfit < 0 ? "#dc2626" : "#16a34a", background: netProfit < 0 ? "#fef2f2" : "#f0fdf4", borderTop: netProfit < 0 ? "2px solid #fca5a5" : "2px solid #86efac", borderBottom: netProfit < 0 ? "2px solid #fca5a5" : "2px solid #86efac", marginTop: 20 }}>
+            <span>Net Profit / (Loss)</span>
+            <span>{netProfit < 0 ? `-${fmt(Math.abs(netProfit))}` : fmt(netProfit)}</span>
+          </div>
+
         </div>
-      </SectionCard>
+      </div>
     </div>
   );
 }
