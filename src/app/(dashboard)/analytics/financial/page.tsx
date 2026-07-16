@@ -467,47 +467,6 @@ function OverviewTab({ data }: { data: ReturnType<typeof useFinance> }) {
           )}
         </SectionCard>
       </div>
-
-      {/* Employee Financial Details Table */}
-      <SectionCard
-        title="Employee Financial Details"
-        subtitle={`${employees.length} employees · live from users collection`}
-      >
-        <Table
-          headers={["Photo", "Name", "Designation", "Monthly Salary", "Bank", "Account No"]}
-          rows={employees.map(e => [
-            <div style={{ width: 28, height: 28, borderRadius: 7, overflow: "hidden", background: T.surfaceHi, border: `1px solid ${T.border}` }}>
-              {e.profilePhoto
-                ? <img src={e.profilePhoto} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: T.blue, background: T.blueBg }}>
-                    {(e.name || "?")[0].toUpperCase()}
-                  </div>
-              }
-            </div>,
-            <div>
-              <div style={{ fontWeight: 700, color: T.ink, fontSize: 13 }}>{e.name}</div>
-              <div style={{ fontSize: 11, color: T.inkDim }}>{e.email || ""}</div>
-            </div>,
-            <span style={{ color: T.inkMid, fontSize: 12 }}>{e.designation || e.role || "—"}</span>,
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 800, color: T.green, fontSize: 13 }}>{e.salary ? fmt(e.salary) : "—"}</span>,
-            <span style={{ color: T.inkMid, fontSize: 12 }}>{e.bankName || "—"}</span>,
-            <span style={{ color: T.inkMid, fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>
-              {e.accountNumber ? `••••${String(e.accountNumber).slice(-4)}` : "—"}
-            </span>,
-          ])}
-        />
-        {employees.length > 0 && (
-          <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${T.border}` }}>
-            <span style={{ fontSize: 12, color: T.inkMid, fontWeight: 700 }}>Total Monthly Salary:</span>
-            <span style={{ fontSize: 16, fontWeight: 900, color: T.blue, fontFamily: "'JetBrains Mono', monospace" }}>
-              {fmt(employees.reduce((s, e) => s + (e.salary || 0), 0))}
-            </span>
-            <span style={{ fontSize: 11, padding: "3px 10px", background: T.blueBg, color: T.blue, borderRadius: 99, fontWeight: 700 }}>
-              {payrollTotals.totalFinal > 0 ? "⚡ Payroll overrides this" : "✅ Used in Grand Total"}
-            </span>
-          </div>
-        )}
-      </SectionCard>
     </div>
   );
 }

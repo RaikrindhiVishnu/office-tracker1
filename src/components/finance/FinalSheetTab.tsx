@@ -46,11 +46,14 @@ export default function FinalSheetTab({ data }: { data: any }) {
   ];
 
   const actualTotalExpenditure = summaryData.reduce((s, row) => s + row.amount, 0);
+  const revenue = 0; // Hardcoded for now since there's no revenue tracking yet
+  const profitAndLoss = revenue - actualTotalExpenditure;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
         <KPICard icon="📉" label="Total Expenditure" value={fmt(actualTotalExpenditure)} accent={T.red} sub="Sum of all categories below" />
+        <KPICard icon="💰" label="Net Profit & Loss" value={profitAndLoss < 0 ? `-${fmt(Math.abs(profitAndLoss))}` : fmt(profitAndLoss)} accent={profitAndLoss < 0 ? T.red : T.green} sub={profitAndLoss < 0 ? "Net Loss" : "Net Profit"} />
         <KPICard icon="📊" label="Grand Total (Overview)" value={fmt(grandTotal)} accent={T.blue} sub="Salary + Expenses + Assets" />
         <KPICard icon="👥" label="Total Employees" value={String(employees.length)} accent={T.teal} sub="Active headcount" />
       </div>
@@ -66,9 +69,21 @@ export default function FinalSheetTab({ data }: { data: any }) {
         />
         
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20, paddingTop: 16, borderTop: `2px dashed ${T.border}` }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: T.inkMid }}>Total Loss / Outflow:</span>
-            <span style={{ fontSize: 24, fontWeight: 900, color: T.red, fontFamily: "'JetBrains Mono', monospace" }}>{fmt(actualTotalExpenditure)}</span>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: T.inkMid }}>Total Revenue:</span>
+              <span style={{ fontSize: 16, fontWeight: 800, color: T.green, fontFamily: "'JetBrains Mono', monospace" }}>{fmt(revenue)}</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: T.inkMid }}>Total Outflow / Expenditure:</span>
+              <span style={{ fontSize: 18, fontWeight: 900, color: T.red, fontFamily: "'JetBrains Mono', monospace" }}>{fmt(actualTotalExpenditure)}</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 4, paddingTop: 8, borderTop: `1px solid ${T.border}` }}>
+              <span style={{ fontSize: 15, fontWeight: 800, color: T.ink }}>Net Profit & Loss:</span>
+              <span style={{ fontSize: 24, fontWeight: 900, color: profitAndLoss < 0 ? T.red : T.green, fontFamily: "'JetBrains Mono', monospace" }}>
+                {profitAndLoss < 0 ? `-${fmt(Math.abs(profitAndLoss))}` : fmt(profitAndLoss)}
+              </span>
+            </div>
           </div>
         </div>
       </SectionCard>
