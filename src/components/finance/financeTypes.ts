@@ -5,7 +5,7 @@ export interface PurchaseRequest {
   item: string;
   estimatedCost: number;
   reason: string;
-  status: "Pending" | "Approved" | "Rejected";
+  status: "Pending" | "Approved" | "Ordered" | "Delivered" | "Rejected";
   month: string;
   createdAt?: Timestamp;
 }
