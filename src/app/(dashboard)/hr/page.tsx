@@ -32,6 +32,7 @@ import ReportBuilder from "./components/ReportBuilder";
 import AIChatBot from "@/app/(dashboard)/employee/views/AIChatBot";
 import PayrollGenerator from "@/app/(dashboard)/admin/Accounts/PayrollGenerator";
 import FinancialDashboard from "@/app/(dashboard)/analytics/financial/page";
+import EmployeeTasksView from "@/app/(dashboard)/employee/views/EmployeeTasksView";
 
 import type { AttendanceType } from "@/types/attendance";
 import type { Employee }       from "@/types/Employee";
@@ -39,7 +40,7 @@ import type { Session }        from "@/types/Employee";
 import type { EmployeeRow }    from "@/types/EmployeeRow";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type HRView = "dashboard"|"leave"|"employees"|"employee-overview"|"attendance"|"my-attendance"|"payslips"|"announcements"|"queries"|"lifecycle"|"recruitment"|"daily-sheet"|"regularization"|"daily-report"|"profile"|"finance";
+type HRView = "dashboard"|"leave"|"employees"|"employee-overview"|"attendance"|"my-attendance"|"payslips"|"announcements"|"queries"|"lifecycle"|"recruitment"|"daily-sheet"|"regularization"|"daily-report"|"profile"|"finance"|"my-timesheet";
 
 interface Notification { id:string; toUid:string; title:string; message:string; read:boolean; createdAt:Timestamp; }
 interface LeaveRequest  { id:string; uid:string; userName:string; userEmail:string; leaveType:string; fromDate:string; toDate:string; reason:string; status:"Pending"|"Approved"|"Rejected"; createdAt:any; }
@@ -549,6 +550,7 @@ function HRDashboard() {
     {key:"employees" as HRView,label:"Employees",icon:"👥"},
     {key:"employee-overview" as HRView,label:"Employee Overview",icon:"📊"},
     {key:"my-attendance" as HRView,label:"My Attendance",icon:"🕒"},
+    {key:"my-timesheet" as HRView,label:"My Timesheet",icon:"✍️"},
     {key:"attendance"as HRView,label:"Team Attendance",icon:"🏢"},
     {key:"payslips"  as HRView,label:"Payroll",icon:"₹"},
     {key:"daily-sheet" as HRView,label:"Time Sheets",icon:"📅"},
@@ -1017,6 +1019,12 @@ function HRDashboard() {
           {view==="my-attendance" && (
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden min-h-screen">
               <EmployeeAttendanceView />
+            </div>
+          )}
+
+          {view==="my-timesheet" && (
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden min-h-screen">
+              <EmployeeTasksView user={user} />
             </div>
           )}
 
