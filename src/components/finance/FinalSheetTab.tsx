@@ -15,129 +15,155 @@ export default function FinalSheetTab({ data }: { data: any }) {
     payrollTotals,
   } = data;
 
-  // Flatten all transactions into a single array
-  const transactions: { id: string; name: string; type: string; amount: number; date: string }[] = [];
+  // 1. Payroll / Salaries
+  const payrollList = payrollTotals.totalFinal > 0 
+    ? payroll.filter((p: any) => p.finalSalary > 0).map((p: any) => ({ name: p.employeeName, details: "Processed Payroll", amount: p.finalSalary }))
+    : employees.filter((e: any) => e.salary > 0).map((e: any) => ({ name: e.name, details: "Base Salary", amount: e.salary }));
+  const payrollTotal = payrollList.reduce((s: number, i: any) => s + i.amount, 0);
 
-  expenses.forEach((e: any, i: number) => {
-    if (e.amount > 0) transactions.push({ id: `exp-${i}`, name: e.category + (e.note ? ` - ${e.note}` : ''), type: "Expense", amount: e.amount, date: e.date || "-" });
-  });
+  // 2. Expenses
+  const expList = expenses.filter((e: any) => e.amount > 0).map((e: any) => ({ name: e.category, details: e.note || "Manual Expense", amount: e.amount }));
+  const expTotal = expList.reduce((s: number, i: any) => s + i.amount, 0);
 
-  purchaseRequests.filter((r: any) => r.status === "Approved" || r.status === "Ordered" || r.status === "Delivered").forEach((r: any, i: number) => {
-    if (r.estimatedCost > 0) transactions.push({ id: `pr-${i}`, name: r.itemName || "Purchase Req", type: "Purchase", amount: r.estimatedCost, date: "-" });
-  });
+  // 3. Purchase Requests
+  const prList = purchaseRequests.filter((r: any) => r.status === "Approved" || r.status === "Ordered" || r.status === "Delivered" || r.status === "Pending")
+    .map((r: any) => ({ name: r.employeeName || "Admin", item: r.itemName, details: r.reason || "-", status: r.status, amount: r.estimatedCost }));
+  const prTotal = prList.reduce((s: number, i: any) => s + i.amount, 0);
 
-  salaryAdvances.filter((a: any) => a.status === "Approved").forEach((a: any, i: number) => {
-    if (a.amount > 0) transactions.push({ id: `adv-${i}`, name: a.employeeName || "Advance", type: "Advance", amount: a.amount, date: "-" });
-  });
+  // 4. Salary Advances
+  const advList = salaryAdvances.filter((a: any) => a.status === "Approved").map((a: any) => ({ name: a.employeeName, details: "Approved Advance", amount: a.amount }));
+  const advTotal = advList.reduce((s: number, i: any) => s + i.amount, 0);
 
-  vendorPayments.filter((v: any) => v.status === "Paid").forEach((v: any, i: number) => {
-    if (v.amount > 0) transactions.push({ id: `ven-${i}`, name: v.vendorName || "Vendor", type: "Vendor", amount: v.amount, date: "-" });
-  });
+  // 5. Vendor Payments
+  const venList = vendorPayments.filter((v: any) => v.status === "Paid").map((v: any) => ({ name: v.vendorName, details: "Vendor Payment", amount: v.amount }));
+  const venTotal = venList.reduce((s: number, i: any) => s + i.amount, 0);
 
-  budgets.forEach((b: any, i: number) => {
-    if (b.used > 0) transactions.push({ id: `bud-${i}`, name: b.department || "Budget", type: "Budget", amount: b.used, date: "-" });
-  });
+  // 6. Budgets
+  const budList = budgets.filter((b: any) => b.used > 0).map((b: any) => ({ name: b.department, details: "Tracked Budget Used", amount: b.used }));
+  const budTotal = budList.reduce((s: number, i: any) => s + i.amount, 0);
 
-  assets.forEach((a: any, i: number) => {
-    if (a.totalCost > 0) transactions.push({ id: `ast-${i}`, name: a.name || "Asset", type: "Asset", amount: a.totalCost, date: "-" });
-  });
+  // 7. Assets
+  const astList = assets.filter((a: any) => a.totalCost > 0).map((a: any) => ({ name: a.name, details: "Asset Purchased", amount: a.totalCost }));
+  const astTotal = astList.reduce((s: number, i: any) => s + i.amount, 0);
 
-  reimbursements.filter((r: any) => r.status === "Approved" || r.status === "Reimbursed").forEach((r: any, i: number) => {
-    if (r.cost > 0) transactions.push({ id: `reim-${i}`, name: r.employeeName || "Reimb.", type: "Reimbursement", amount: r.cost, date: "-" });
-  });
+  // 8. Reimbursements
+  const remList = reimbursements.filter((r: any) => r.status === "Approved" || r.status === "Reimbursed").map((r: any) => ({ name: r.employeeName, details: "Approved Reimbursement", amount: r.cost }));
+  const remTotal = remList.reduce((s: number, i: any) => s + i.amount, 0);
 
-  if (payrollTotals.totalFinal > 0) {
-    payroll.forEach((p: any, i: number) => {
-      if (p.finalSalary > 0) transactions.push({ id: `pay-${i}`, name: p.employeeName || "Payroll", type: "Payroll", amount: p.finalSalary, date: "-" });
-    });
-  } else {
-    employees.forEach((e: any, i: number) => {
-      if (e.salary > 0) transactions.push({ id: `sal-${i}`, name: e.name || "Employee", type: "Salary", amount: e.salary, date: "-" });
-    });
-  }
+  const summaryData = [
+    { category: "Payroll & Salaries", count: payrollList.length, amount: payrollTotal },
+    { category: "Manual Expenses", count: expList.length, amount: expTotal },
+    { category: "Purchase Requests", count: prList.length, amount: prTotal },
+    { category: "Salary Advances", count: advList.length, amount: advTotal },
+    { category: "Vendor Payments", count: venList.length, amount: venTotal },
+    { category: "Budgets (Used)", count: budList.length, amount: budTotal },
+    { category: "Assets", count: astList.length, amount: astTotal },
+    { category: "Reimbursements", count: remList.length, amount: remTotal },
+  ];
 
-  const grandTotal = transactions.reduce((sum, t) => sum + t.amount, 0);
-  const currentMonthName = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+  const grandTotal = summaryData.reduce((s, row) => s + row.amount, 0);
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      
-      {/* Header Section */}
-      <div style={{
-        background: "#ffffff", borderRadius: 12, padding: "30px 40px", 
-        border: "1px solid #e2e8f0", boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05)",
-        display: "flex", justifyContent: "space-between", alignItems: "flex-end"
-      }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 28, fontWeight: 900, color: "#0f172a", letterSpacing: "-0.5px" }}>Itemized Financial Statement</h1>
-          <div style={{ fontSize: 14, color: "#64748b", marginTop: 6, fontWeight: 500 }}>Comprehensive Ledger for {currentMonthName}</div>
-          <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 4 }}>Each and every rupee accounted for.</div>
-        </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 13, color: "#64748b", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px" }}>Total Outflow</div>
-          <div style={{ fontSize: 36, fontWeight: 900, color: "#dc2626", fontFamily: "'JetBrains Mono', monospace", lineHeight: 1 }}>{fmt(grandTotal)}</div>
-          <div style={{ fontSize: 13, color: "#64748b", marginTop: 6, fontWeight: 600 }}>{transactions.length} Total Entries</div>
+  const CategorySection = ({ title, list, total }: { title: string; list: any[]; total: number }) => (
+    <div style={{ background: "#ffffff", borderRadius: 12, border: "1px solid #e2e8f0", boxShadow: "0 2px 4px rgba(0,0,0,0.02)", overflow: "hidden", marginBottom: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 24px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: "#0f172a" }}>{title}</h3>
+        <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+          <span style={{ fontSize: 13, color: "#64748b", fontWeight: 600 }}>{list.length} entries</span>
+          <span style={{ fontSize: 16, fontWeight: 900, color: "#dc2626", fontFamily: "'JetBrains Mono', monospace" }}>{fmt(total)}</span>
         </div>
       </div>
-
-      {/* Full Width Ledger Table */}
-      <div style={{
-        background: "#ffffff", borderRadius: 12, border: "1px solid #e2e8f0", 
-        boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05)", overflow: "hidden"
-      }}>
+      
+      {list.length > 0 ? (
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
             <thead>
-              <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
-                <th style={{ padding: "16px 24px", fontSize: 12, fontWeight: 700, color: "#475569", textTransform: "uppercase", width: "5%" }}>S.No</th>
-                <th style={{ padding: "16px 24px", fontSize: 12, fontWeight: 700, color: "#475569", textTransform: "uppercase", width: "15%" }}>Date</th>
-                <th style={{ padding: "16px 24px", fontSize: 12, fontWeight: 700, color: "#475569", textTransform: "uppercase", width: "15%" }}>Category / Type</th>
-                <th style={{ padding: "16px 24px", fontSize: 12, fontWeight: 700, color: "#475569", textTransform: "uppercase", width: "45%" }}>Description</th>
-                <th style={{ padding: "16px 24px", fontSize: 12, fontWeight: 700, color: "#475569", textTransform: "uppercase", width: "20%", textAlign: "right" }}>Amount (₹)</th>
+              <tr style={{ background: "#ffffff", borderBottom: "2px solid #f1f5f9" }}>
+                <th style={{ padding: "12px 24px", fontSize: 12, fontWeight: 700, color: "#475569", textTransform: "uppercase", width: "30%" }}>{title === "Purchase Requests" ? "Employee" : "Name / Category"}</th>
+                {title === "Purchase Requests" && <th style={{ padding: "12px 24px", fontSize: 12, fontWeight: 700, color: "#475569", textTransform: "uppercase", width: "20%" }}>Item</th>}
+                <th style={{ padding: "12px 24px", fontSize: 12, fontWeight: 700, color: "#475569", textTransform: "uppercase", width: title === "Purchase Requests" ? "25%" : "50%" }}>Details / Reason</th>
+                {title === "Purchase Requests" && <th style={{ padding: "12px 24px", fontSize: 12, fontWeight: 700, color: "#475569", textTransform: "uppercase", width: "10%" }}>Status</th>}
+                <th style={{ padding: "12px 24px", fontSize: 12, fontWeight: 700, color: "#475569", textTransform: "uppercase", width: "20%", textAlign: "right" }}>Cost (₹)</th>
               </tr>
             </thead>
             <tbody>
-              {transactions.map((t, idx) => (
-                <tr key={t.id} style={{ borderBottom: "1px solid #f1f5f9", transition: "background 0.2s" }} onMouseEnter={e => e.currentTarget.style.background = "#f8fafc"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                  <td style={{ padding: "16px 24px", fontSize: 14, color: "#64748b", fontWeight: 600 }}>{idx + 1}</td>
-                  <td style={{ padding: "16px 24px", fontSize: 13, color: "#64748b" }}>{t.date}</td>
-                  <td style={{ padding: "16px 24px" }}>
-                    <span style={{ 
-                      padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700, 
-                      background: "#f1f5f9", color: "#334155" 
-                    }}>
-                      {t.type}
-                    </span>
-                  </td>
-                  <td style={{ padding: "16px 24px", fontSize: 14, color: "#0f172a", fontWeight: 500 }}>{t.name}</td>
-                  <td style={{ padding: "16px 24px", fontSize: 15, color: "#0f172a", fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", textAlign: "right" }}>
-                    {t.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {list.map((item, idx) => (
+                <tr key={idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                  <td style={{ padding: "12px 24px", fontSize: 14, color: "#0f172a", fontWeight: 600 }}>{item.name}</td>
+                  {title === "Purchase Requests" && <td style={{ padding: "12px 24px", fontSize: 13, color: "#0f172a", fontWeight: 700 }}>{item.item}</td>}
+                  <td style={{ padding: "12px 24px", fontSize: 13, color: "#64748b" }}>{item.details}</td>
+                  {title === "Purchase Requests" && <td style={{ padding: "12px 24px", fontSize: 12, color: T.blue, fontWeight: 700 }}>{item.status}</td>}
+                  <td style={{ padding: "12px 24px", fontSize: 14, color: "#0f172a", fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", textAlign: "right" }}>
+                    {item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                 </tr>
               ))}
-              {transactions.length === 0 && (
-                <tr>
-                  <td colSpan={5} style={{ padding: "40px", textAlign: "center", color: "#94a3b8", fontSize: 14, fontStyle: "italic" }}>
-                    No transactions found for this period.
-                  </td>
-                </tr>
-              )}
             </tbody>
-            {transactions.length > 0 && (
-              <tfoot>
-                <tr style={{ background: "#f8fafc", borderTop: "2px solid #cbd5e1" }}>
-                  <td colSpan={4} style={{ padding: "20px 24px", fontSize: 16, fontWeight: 800, color: "#0f172a", textAlign: "right" }}>
-                    GRAND TOTAL CALCULATED:
-                  </td>
-                  <td style={{ padding: "20px 24px", fontSize: 20, fontWeight: 900, color: "#dc2626", fontFamily: "'JetBrains Mono', monospace", textAlign: "right" }}>
-                    ₹ {grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </td>
-                </tr>
-              </tfoot>
-            )}
           </table>
         </div>
+      ) : (
+        <div style={{ padding: "24px", textAlign: "center", color: "#94a3b8", fontSize: 13, fontStyle: "italic", background: "#ffffff" }}>
+          No entries for this category (0 items).
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      
+      {/* HEADER */}
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: "#0f172a", letterSpacing: "-0.5px" }}>Category-Wise Final Sheet</h1>
+        <div style={{ fontSize: 14, color: "#64748b", marginTop: 4 }}>Full details for every transaction, broken down by category.</div>
       </div>
+
+      {/* CATEGORY TABLES */}
+      <CategorySection title="Payroll & Salaries" list={payrollList} total={payrollTotal} />
+      <CategorySection title="Purchase Requests" list={prList} total={prTotal} />
+      <CategorySection title="Manual Expenses" list={expList} total={expTotal} />
+      <CategorySection title="Salary Advances" list={advList} total={advTotal} />
+      <CategorySection title="Vendor Payments" list={venList} total={venTotal} />
+      <CategorySection title="Budgets (Used)" list={budList} total={budTotal} />
+      <CategorySection title="Assets" list={astList} total={astTotal} />
+      <CategorySection title="Reimbursements" list={remList} total={remTotal} />
+
+      {/* FINAL SUMMARY TABLE */}
+      <div style={{ background: "#ffffff", borderRadius: 12, border: "2px solid #e2e8f0", boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)", overflow: "hidden", marginTop: 20 }}>
+        <div style={{ padding: "20px 24px", background: "#1e293b", color: "#fff" }}>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>Financial Summary (All Categories)</h2>
+        </div>
+        <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+          <thead>
+            <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
+              <th style={{ padding: "16px 24px", fontSize: 13, fontWeight: 700, color: "#475569", textTransform: "uppercase" }}>Category</th>
+              <th style={{ padding: "16px 24px", fontSize: 13, fontWeight: 700, color: "#475569", textTransform: "uppercase", textAlign: "right" }}>Entries Count</th>
+              <th style={{ padding: "16px 24px", fontSize: 13, fontWeight: 700, color: "#475569", textTransform: "uppercase", textAlign: "right" }}>Total Amount (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {summaryData.map((row, idx) => (
+              <tr key={idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                <td style={{ padding: "16px 24px", fontSize: 15, color: "#0f172a", fontWeight: 700 }}>{row.category}</td>
+                <td style={{ padding: "16px 24px", fontSize: 14, color: "#64748b", fontWeight: 600, textAlign: "right" }}>{row.count} entries</td>
+                <td style={{ padding: "16px 24px", fontSize: 15, color: "#0f172a", fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", textAlign: "right" }}>
+                  {row.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr style={{ background: "#fef2f2", borderTop: "3px solid #fca5a5" }}>
+              <td colSpan={2} style={{ padding: "24px", fontSize: 18, fontWeight: 900, color: "#991b1b", textAlign: "right", textTransform: "uppercase" }}>
+                Grand Total Outflow:
+              </td>
+              <td style={{ padding: "24px", fontSize: 24, fontWeight: 900, color: "#dc2626", fontFamily: "'JetBrains Mono', monospace", textAlign: "right" }}>
+                ₹ {grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
     </div>
   );
 }
