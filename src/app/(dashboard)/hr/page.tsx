@@ -585,7 +585,14 @@ function HRDashboard() {
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto hide-scrollbar">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3 mb-2">Main Menu</p>
           {navItems.map(n=>(
-            <SideNavItem key={n.key} label={n.label} icon={n.icon} active={view===n.key} onClick={()=>{setView(n.key);setSidebarOpen(false);}} badge={n.badge}/>
+            <SideNavItem key={n.key} label={n.label} icon={n.icon} active={view===n.key} onClick={()=>{
+              if (n.key === "finance") {
+                window.open("/analytics/financial", "_blank");
+              } else {
+                setView(n.key);
+                setSidebarOpen(false);
+              }
+            }} badge={n.badge}/>
           ))}
 
 <div className="pt-4">

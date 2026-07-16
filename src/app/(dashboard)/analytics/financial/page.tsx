@@ -27,6 +27,7 @@ import ApprovalCenterTab from "@/components/finance/ApprovalCenterTab";
 import VendorPaymentsTab from "@/components/finance/VendorPaymentsTab";
 import BudgetManagementTab from "@/components/finance/BudgetManagementTab";
 import ReimbursementsTab from "@/components/finance/ReimbursementsTab";
+import FinalSheetTab from "@/components/finance/FinalSheetTab";
 // Financial dashboard uses shared Firebase db from @/lib/firebase
 // (Removed standalone Firebase initialization to prevent duplicate app errors)
 
@@ -1073,7 +1074,7 @@ const MONTH_LABELS: Record<string, string> = {
   "2026-09":"Sep 2026","2026-10":"Oct 2026","2026-11":"Nov 2026","2026-12":"Dec 2026",
 };
 
-type Tab = "overview" | "approvals" | "expenses" | "purchases" | "advances" | "vendors" | "budgets" | "payroll" | "employees" | "assets" | "reimbursements" | "firestore";
+type Tab = "overview" | "approvals" | "expenses" | "purchases" | "advances" | "vendors" | "budgets" | "payroll" | "employees" | "assets" | "reimbursements" | "firestore" | "final-sheet";
 
 export default function FinancialDashboard() {
   const [month, setMonth] = useState(() => {
@@ -1115,6 +1116,7 @@ export default function FinancialDashboard() {
   const { user } = useAuth();
 
   const TABS: { key: Tab; label: string; count?: number }[] = [
+    { key: "final-sheet",  label: "Final Sheet (P&L)" },
     { key: "overview",  label: "Overview" },
     { key: "approvals", label: "Approvals",      count: data.purchaseRequests.filter(r => r.status === "Pending").length + data.salaryAdvances.filter(a => a.status === "Pending").length + data.reimbursements.filter(e => e.status === "Pending").length },
     { key: "expenses",  label: "Expenses",       count: data.expenses.length },
@@ -1206,6 +1208,7 @@ export default function FinancialDashboard() {
 
       {/* CONTENT */}
       <main style={{ padding: "20px 24px", width: "100%" }}>
+        {tab === "final-sheet" && <FinalSheetTab data={data} />}
         {tab === "overview"  && <><OverviewTab  data={data} /><div style={{marginTop:20}}><CrossDeptFeed role="finance" accentColor="#2563eb" title="Sales & Business Activity" maxItems={8} /></div></>}
         {tab === "approvals" && <ApprovalCenterTab purchaseRequests={data.purchaseRequests} salaryAdvances={data.salaryAdvances} reimbursements={data.reimbursements} onUpdatePurchase={handleStatusPurchase} onUpdateAdvance={handleStatusAdvance} onUpdateReimbursement={handleStatusReimbursement} />}
         {tab === "expenses"  && <ExpensesTab  expenses={data.expenses} month={month} onAdd={handleAddExpense} onDelete={handleDelExpense} />}

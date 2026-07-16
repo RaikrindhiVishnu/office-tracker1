@@ -860,7 +860,7 @@ export default function AdminPage() {
           <NavItem
             icon={<span className="text-[18px]">💰</span>}
             label="Finance" active={view === "finance"}
-            onClick={() => { setView("finance"); setSidebarOpen(false); }} collapsed={sidebarCollapsed}
+            onClick={() => { window.open("/analytics/financial", "_blank"); }} collapsed={sidebarCollapsed}
           />
 
 

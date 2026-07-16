@@ -15,7 +15,7 @@ export default function PurchaseRequestsTab({ requests, month, onAdd, onDelete, 
 
   const handleAdd = () => {
     if (!item || !estimatedCost) return;
-    onAdd({ item, estimatedCost: parseFloat(estimatedCost), reason, status: "Pending" });
+    onAdd({ itemName: item, estimatedCost: parseFloat(estimatedCost), reason, status: "Pending" } as any);
     setItem(""); setEstimatedCost(""); setReason("");
   };
 
@@ -32,9 +32,10 @@ export default function PurchaseRequestsTab({ requests, month, onAdd, onDelete, 
 
       <SectionCard title="Purchase Requests" subtitle={`${requests.length} requests this month`}>
         <Table
-          headers={["Item", "Cost", "Reason", "Status", "Actions", ""]}
+          headers={["Employee", "Item", "Cost", "Reason", "Status", "Actions", ""]}
           rows={requests.map(r => [
-            <span style={{ fontWeight: 700, color: T.ink }}>{r.item}</span>,
+            <span style={{ fontWeight: 600, color: T.ink }}>{r.employeeName || "Admin"}</span>,
+            <span style={{ fontWeight: 700, color: T.ink }}>{r.itemName || "—"}</span>,
             <SalaryTag v={r.estimatedCost} color={T.amber} />,
             <span style={{ color: T.inkMid, fontSize: 12 }}>{r.reason || "—"}</span>,
             <span style={{

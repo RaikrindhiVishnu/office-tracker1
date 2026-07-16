@@ -2,7 +2,8 @@ import { Timestamp } from "firebase/firestore";
 
 export interface PurchaseRequest {
   id?: string;
-  item: string;
+  itemName: string;
+  employeeName?: string;
   estimatedCost: number;
   reason: string;
   status: "Pending" | "Approved" | "Ordered" | "Delivered" | "Rejected";
