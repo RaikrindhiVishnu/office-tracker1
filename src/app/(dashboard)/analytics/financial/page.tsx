@@ -297,6 +297,11 @@ export async function updateReimbursementStatus(id: string, status: string) {
   return updateDoc(doc(db, "reimbursements", id), { status });
 }
 
+export function subscribeExpenseClaims(cb: (items: any[]) => void) {
+  const q = query(collection(db, "expenseClaims"));
+  return onSnapshot(q, snap => cb(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+}
+
 // ─────────────────────────────────────────────────────────────
 // 4. MAIN HOOK
 // ─────────────────────────────────────────────────────────────
@@ -315,6 +320,7 @@ function useFinance(month: string) {
   const [vendorPayments, setVendorPayments] = useState<VendorPayment[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [reimbursements, setReimbursements] = useState<Reimbursement[]>([]);
+  const [expenseClaims, setExpenseClaims] = useState<any[]>([]);
 
   useEffect(() => {
     const u1 = subscribeEmployees((items, total) => { setEmployees(items); setTotalSalary(total); });
@@ -326,11 +332,24 @@ function useFinance(month: string) {
     const u7 = subscribeVendorPayments(month, items => setVendorPayments(items));
     const u8 = subscribeBudgets(month, items => setBudgets(items));
     const u9 = subscribeReimbursements(month, items => setReimbursements(items));
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); };
+    const u10 = subscribeExpenseClaims(items => {
+      const filtered = items.filter(i => {
+        if (!i.createdAt) return false;
+        const d = i.createdAt.toDate ? i.createdAt.toDate() : new Date(i.createdAt);
+        const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        return mStr === month;
+      });
+      setExpenseClaims(filtered);
+    });
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); u9(); u10(); };
   }, [month]);
 
+  const approvedClaimsTotal = expenseClaims
+    .filter(c => c.status === "Approved" || c.status === "Reimbursed")
+    .reduce((s, c) => s + (c.totalAmount || 0), 0);
+
   const finalSalaryUsed = payrollTotals.totalFinal > 0 ? payrollTotals.totalFinal : totalSalary;
-  const grandTotal = finalSalaryUsed + totalManual + totalAssets;
+  const grandTotal = finalSalaryUsed + totalManual + totalAssets + approvedClaimsTotal;
   const categoryData = Object.entries(byCategory).map(([name, value]) => ({ name, value }));
 
   return {
@@ -340,6 +359,7 @@ function useFinance(month: string) {
     assets, totalAssets,
     purchaseRequests, salaryAdvances,
     vendorPayments, budgets, reimbursements,
+    expenseClaims, approvedClaimsTotal,
     grandTotal,
     finalSalaryUsed,
   };
@@ -351,13 +371,13 @@ function useFinance(month: string) {
 // 7. OVERVIEW TAB
 // ─────────────────────────────────────────────────────────────
 function OverviewTab({ data }: { data: ReturnType<typeof useFinance> }) {
-  const { grandTotal, payrollTotals, totalManual, totalAssets, categoryData, employees, assets, finalSalaryUsed } = data;
+  const { grandTotal, payrollTotals, totalManual, totalAssets, categoryData, employees, assets, finalSalaryUsed, expenseClaims, approvedClaimsTotal, purchaseRequests, salaryAdvances, vendorPayments, budgets, reimbursements } = data;
 
   const salarySource = payrollTotals.totalFinal > 0 ? "From Payroll" : "From Employee Base";
 
   const summaryBars = [
     { name: "Salary",   value: finalSalaryUsed, color: T.blue },
-    { name: "Expenses", value: totalManual,      color: T.green },
+    { name: "Expenses", value: totalManual + approvedClaimsTotal, color: T.green },
     { name: "Assets",   value: totalAssets,      color: T.violet },
   ];
 
@@ -373,10 +393,19 @@ function OverviewTab({ data }: { data: ReturnType<typeof useFinance> }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12 }}>
         <KPICard icon="💰" label="Grand Total"      value={fmt(grandTotal)}        accent={T.blue}   sub="Salary + Expenses + Assets" />
         <KPICard icon="👥" label="Salary Cost"      value={fmt(finalSalaryUsed)}   accent={T.violet} sub={salarySource} />
-        <KPICard icon="🧾" label="Manual Expenses"  value={fmt(totalManual)}        accent={T.green}  sub="Rent, WiFi, utilities…" />
+        <KPICard icon="🧾" label="Manual Expenses"  value={fmt(totalManual + approvedClaimsTotal)}        accent={T.green}  sub="Includes Emp Claims" />
         <KPICard icon="🏗️" label="Asset Cost"       value={fmt(totalAssets)}        accent={T.amber}  sub="Purchase + maintenance" />
         <KPICard icon="👤" label="Employees"        value={String(employees.length)} accent={T.teal}  sub="Active headcount" />
         <KPICard icon="📦" label="Assets"           value={String(assets.length)}   accent={T.pink}   sub="Tracked this month" />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12 }}>
+        <KPICard icon="📝" label="Emp Claims" value={String(expenseClaims.length)} accent={T.blue} sub="Expense Claims" />
+        <KPICard icon="🛒" label="Purchase Reqs" value={String(purchaseRequests.length)} accent={T.violet} sub="Purchase Requests" />
+        <KPICard icon="💵" label="Salary Adv" value={String(salaryAdvances.length)} accent={T.amber} sub="Salary Advances" />
+        <KPICard icon="💳" label="Vendor Pay" value={String(vendorPayments.length)} accent={T.pink} sub="Vendor Payments" />
+        <KPICard icon="📈" label="Budgets" value={String(budgets.length)} accent={T.teal} sub="Budgets Tracked" />
+        <KPICard icon="🔄" label="Reimbursements" value={String(reimbursements.length)} accent={T.green} sub="Reimbursements" />
       </div>
 
       {/* Charts Row */}
