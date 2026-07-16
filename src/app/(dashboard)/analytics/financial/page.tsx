@@ -330,7 +330,7 @@ function useFinance(month: string) {
     const u5 = subscribePurchaseRequests(items => {
       const filtered = items.filter(i => {
         if (!i.createdAt) return false;
-        const d = i.createdAt.toDate ? i.createdAt.toDate() : new Date(i.createdAt);
+        const d = (i.createdAt as any).toDate ? (i.createdAt as any).toDate() : new Date(i.createdAt as any);
         const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
         return mStr === month;
       });
@@ -343,7 +343,7 @@ function useFinance(month: string) {
     const u10 = subscribeExpenseClaims(items => {
       const filtered = items.filter(i => {
         if (!i.createdAt) return false;
-        const d = i.createdAt.toDate ? i.createdAt.toDate() : new Date(i.createdAt);
+        const d = i.createdAt.toDate ? i.createdAt.toDate() : new Date(i.createdAt as any);
         const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
         return mStr === month;
       });
