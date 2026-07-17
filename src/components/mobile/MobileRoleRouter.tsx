@@ -4,6 +4,7 @@ import React, { Suspense } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { MobileDashboard } from "./MobileDashboard";
 import { MobileAdminDashboard } from "./MobileAdminDashboard";
+import { MobileHRDashboard } from "./MobileHRDashboard";
 
 export function MobileRoleRouter() {
   const { userRole, isSuperAdmin, loading } = useAuth();
@@ -16,7 +17,11 @@ export function MobileRoleRouter() {
     );
   }
 
-  const isAdminView = isSuperAdmin || userRole === "admin" || userRole === "superadmin" || userRole === "hr";
+  const isAdminView = isSuperAdmin || userRole === "admin" || userRole === "superadmin";
+
+  if (userRole === "hr") {
+    return <MobileHRDashboard />;
+  }
 
   if (isAdminView) {
     return <MobileAdminDashboard />;

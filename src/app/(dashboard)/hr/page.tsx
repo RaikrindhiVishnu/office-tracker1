@@ -24,6 +24,7 @@ import EmployeeLifecycle from "./EmployeeLifecycle";
 import RecruitmentATS from "./RecruitmentATS";
 import AdminDailySheetsView from "@/app/(dashboard)/admin/AdminDailySheetsView";
 import AdminRegularizationRequestsView from "@/app/(dashboard)/admin/AdminRegularizationRequestsView";
+import RegularizationView from "@/app/(dashboard)/employee/views/RegularizationView";
 import EmployeeAttendanceView from "@/app/(dashboard)/employee/views/EmployeeAttendanceView";
 import { checkIn, checkOut, getTodayAttendance } from "@/lib/attendance";
 import NavbarBreakStatus from "@/components/NavbarBreakStatus";
@@ -40,7 +41,7 @@ import type { Session }        from "@/types/Employee";
 import type { EmployeeRow }    from "@/types/EmployeeRow";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type HRView = "dashboard"|"leave"|"employees"|"employee-overview"|"attendance"|"my-attendance"|"payslips"|"announcements"|"queries"|"lifecycle"|"recruitment"|"daily-sheet"|"regularization"|"daily-report"|"profile"|"finance"|"my-timesheet";
+type HRView = "dashboard"|"leave"|"employees"|"employee-overview"|"attendance"|"my-attendance"|"payslips"|"announcements"|"queries"|"lifecycle"|"recruitment"|"daily-sheet"|"regularization"|"my-regularization"|"daily-report"|"profile"|"finance"|"my-timesheet";
 
 interface Notification { id:string; toUid:string; title:string; message:string; read:boolean; createdAt:Timestamp; }
 interface LeaveRequest  { id:string; uid:string; userName:string; userEmail:string; leaveType:string; fromDate:string; toDate:string; reason:string; status:"Pending"|"Approved"|"Rejected"; createdAt:any; }
@@ -555,6 +556,7 @@ function HRDashboard() {
     {key:"payslips"  as HRView,label:"Payroll",icon:"₹"},
     {key:"daily-sheet" as HRView,label:"Time Sheets",icon:"📅"},
     {key:"regularization" as HRView,label:"Regularization",icon:"⏱️"},
+    {key:"my-regularization" as HRView,label:"My Regularization",icon:"⏱️"},
     {key:"announcements" as HRView,label:"Announcements",icon:"📣"},
     {key:"queries"   as HRView,label:"Queries",icon:"💬",badge:queryUnread},
     {key:"finance" as HRView,label:"Finance",icon:"💰"},
@@ -1020,6 +1022,12 @@ function HRDashboard() {
           {view==="regularization" && (
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden min-h-screen p-6">
               <AdminRegularizationRequestsView />
+            </div>
+          )}
+
+          {view==="my-regularization" && (
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden min-h-screen">
+              <RegularizationView user={user} />
             </div>
           )}
 

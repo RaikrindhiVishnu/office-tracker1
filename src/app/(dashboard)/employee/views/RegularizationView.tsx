@@ -87,11 +87,6 @@ export default function RegularizationView({ user }: { user: any }) {
 
     const diffTime = Math.abs(today.getTime() - selectedDate.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-    
-    if (diffDays > 3) {
-      setErrorMsg("You cannot request regularization for dates older than 3 days.");
-      return;
-    }
 
     // Check if request already exists for this date
     const existing = requests.find(r => r.attendanceDate === date);
@@ -204,7 +199,7 @@ export default function RegularizationView({ user }: { user: any }) {
                   onChange={(e) => setDate(e.target.value)}
                   className="w-full border-gray-300 rounded-lg p-2 border focus:ring-blue-500 focus:border-blue-500"
                 />
-                <p className="text-xs text-gray-500 mt-1">Maximum 3 days back. No future dates.</p>
+                <p className="text-xs text-gray-500 mt-1">Any past date in the month. No future dates.</p>
               </div>
               
               <div>
