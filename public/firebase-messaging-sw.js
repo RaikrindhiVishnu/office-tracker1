@@ -29,8 +29,8 @@ if (firebaseConfig.projectId) {
     
     const notificationOptions = {
       body: payload.notification?.body || payload.data?.body || "",
-      icon: "/logo-black.png",
-      badge: "/logo-black.png",
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
       data: {
         clickAction: payload.data?.clickAction || "/mobile",
         category: payload.data?.category,

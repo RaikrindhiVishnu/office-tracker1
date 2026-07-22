@@ -446,6 +446,23 @@ export default function TeamsStyleCalls({ users }: { users: User[] }) {
         startTime: serverTimestamp(),
       });
 
+      // Trigger Push Notification for Incoming Call
+      try {
+        fetch("/api/notifications/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            targetUserId: receiver.uid,
+            title: `Incoming ${type === "video" ? "Video" : "Audio"} Call`,
+            body: `${getUserName(user)} is calling you`,
+            category: "call",
+            priority: "emergency",
+            clickAction: "/mobile?tab=calls",
+            skipDb: true
+          })
+        }).catch(err => console.error("Push notification failed:", err));
+      } catch (e) {}
+
       const offerCandidatesCol  = collection(db, "calls", callDoc.id, "offerCandidates");
       const answerCandidatesCol = collection(db, "calls", callDoc.id, "answerCandidates");
 

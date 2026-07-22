@@ -733,6 +733,17 @@ export default function TeamsStyleChat({ users, targetUid, rightHeaderIcons }: {
       const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: type === "video" });
       await pc.setLocalDescription(offer);
       const cd = await addDoc(collection(db, "calls"), { callerId: user.uid, callerName: getUserName(user), receiverId: rid, type, status: "ringing", offer: { type: offer.type, sdp: offer.sdp }, startTime: serverTimestamp() });
+      try {
+        fetch("/api/notifications/send", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            targetUserId: rid,
+            title: `Incoming ${type === "video" ? "Video" : "Audio"} Call`,
+            body: `${getUserName(user)} is calling you`,
+            category: "call", priority: "emergency", clickAction: "/mobile", skipDb: true
+          })
+        }).catch(() => {});
+      } catch(e) {}
       const oc = collection(db, "calls", cd.id, "offerCandidates");
       const ac = collection(db, "calls", cd.id, "answerCandidates");
       pc.onicecandidate = async e => { if (e.candidate) await addDoc(oc, e.candidate.toJSON()); };
