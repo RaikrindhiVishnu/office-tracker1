@@ -75,7 +75,7 @@ export default function MeetPanel({ users }: Props) {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               targetUserId: uid,
-              title: `Incoming ${mode === "video" ? "Video" : "Audio"} Meeting`,
+              title: `Incoming Meeting`,
               body: `${user.email?.split("@")[0] || "User"} is starting a meeting`,
               category: "call", priority: "emergency", clickAction: meetUrl, skipDb: true
             })
