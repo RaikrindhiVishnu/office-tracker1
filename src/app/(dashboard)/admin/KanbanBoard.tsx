@@ -768,12 +768,14 @@ export function TaskModal({
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" />
             </div>
           </div>
-          {f.ticketType === "bug" && (
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Bug Screenshot</label>
-              </div>
-              <div className="flex gap-4 items-stretch">
+          {/* Image Upload */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                {f.ticketType === "bug" ? "Bug Screenshot" : "Attachments / Screenshots"}
+              </label>
+            </div>
+            <div className="flex gap-4 items-stretch">
                 {(() => {
                   const displayImages = f.images?.length ? f.images : f.imageUrl ? [{url: f.imageUrl, name: "Screenshot"}] : [];
                   if (displayImages.length === 0) return null;
@@ -881,7 +883,6 @@ export function TaskModal({
                 </div>
               </div>
             </div>
-          )}
           <div>
             <label className="text-xs font-medium text-gray-500 block mb-1">Tags <span className="text-gray-300">(comma-separated)</span></label>
             <input value={f.tags} onChange={e => setF({ ...f, tags: e.target.value })} placeholder="design, frontend, api"

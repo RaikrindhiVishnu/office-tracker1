@@ -1157,13 +1157,14 @@ function TaskModal({
             <textarea value={form.description || ""} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Add details, acceptance criteria, steps to reproduce..." rows={8} className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-vertical" />
           </div>
 
-          {/* Bug Image Upload */}
-          {form.ticketType === "bug" && (
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Bug Screenshot</label>
-              </div>
-              <div className="flex gap-4 items-stretch">
+          {/* Image Upload */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                {form.ticketType === "bug" ? "Bug Screenshot" : "Attachments / Screenshots"}
+              </label>
+            </div>
+            <div className="flex gap-4 items-stretch">
                 {(() => {
                   const displayImages = form.images?.length ? form.images : form.imageUrl ? [{ url: form.imageUrl, name: "Screenshot" }] : [];
                   if (displayImages.length === 0) return null;
@@ -1271,7 +1272,6 @@ function TaskModal({
                 </div>
               </div>
             </div>
-          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
