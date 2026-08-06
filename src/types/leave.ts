@@ -2,11 +2,10 @@
 
 import { Timestamp } from "firebase/firestore";
 
-export type LeaveType   = "annual" | "sick" | "casual" | "Work From Home" | "Half Day" | "Comp Off";
+export type LeaveType   = "sick" | "casual" | "Work From Home" | "Half Day" | "Comp Off";
 export type LeaveStatus = "pending" | "approved" | "rejected";
 
 export interface LeaveBalance {
-  annual  : number;
   sick    : number;
   casual  : number;
 }

@@ -248,7 +248,7 @@ export const MobileAttendance: React.FC = () => {
         });
       } else {
         await uploadSelfie(user.uid);
-        await checkIn(user.uid);
+        await checkIn(user.uid, location);
         triggerHaptic();
         showToast({
           title: "Checked In Successfully! ✓",

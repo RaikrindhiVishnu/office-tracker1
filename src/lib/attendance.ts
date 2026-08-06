@@ -6,6 +6,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { isInsideOffice } from "@/lib/location";
 
 /** YYYY-MM-DD */
 function today(): string {
@@ -41,6 +42,13 @@ export async function getTodayAttendance(userId: string) {
 
 /** Check In */
 export async function checkIn(userId: string, location: { lat: number, lng: number } | null = null, photoUrl: string | null = null) {
+  if (!location) {
+    throw new Error("Location access is required to check in.");
+  }
+  if (!isInsideOffice(location.lat, location.lng)) {
+    throw new Error("Check-in is only allowed from within the office premises.");
+  }
+
   const dateStr = today();
   if (await isPayrollLocked(dateStr)) {
     throw new Error("Attendance is locked for this month (Payroll generated)");

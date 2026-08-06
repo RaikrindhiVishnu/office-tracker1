@@ -9,11 +9,11 @@ import { useAuth } from "@/context/AuthContext";
 import { triggerEmailNotification, triggerPushNotification } from "@/lib/notifications";
 import { Palmtree, Thermometer, Plane, Home, Scale, Clock } from "lucide-react";
 
-type LeaveType = "Casual" | "Sick" | "Annual" | "Work From Home" | "Comp Off" | "Half Day";
+type LeaveType = "Casual" | "Sick" | "Work From Home" | "Comp Off" | "Half Day";
 type HalfDaySlot = "AM" | "PM";
 type Status = "Pending" | "Approved" | "Rejected" | "Cancelled";
 
-interface LeaveBalance { casual: number; sick: number; annual: number; compOff: number; }
+interface LeaveBalance { casual: number; sick: number; compOff: number; }
 interface LeaveRequest {
   id: string;
   uid: string;
@@ -50,11 +50,10 @@ function statusColor(s?: string) {
   }
 }
 
-const LEAVE_TYPES: LeaveType[] = ["Casual", "Sick", "Annual", "Work From Home", "Comp Off", "Half Day"];
+const LEAVE_TYPES: LeaveType[] = ["Casual", "Sick", "Work From Home", "Comp Off", "Half Day"];
 const LEAVE_ICONS: Record<string, React.ReactNode> = {
   Casual: <Palmtree size={16} />,
   Sick: <Thermometer size={16} />,
-  Annual: <Plane size={16} />,
   "Work From Home": <Home size={16} />,
   "Comp Off": <Scale size={16} />,
   "Half Day": <Clock size={16} />
@@ -63,7 +62,7 @@ const LEAVE_ICONS: Record<string, React.ReactNode> = {
 export default function EnhancedLeaveRequestView({ user }: { user: any }) {
   const [tab, setTab] = useState<"request" | "history">("request");
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
-  const [balance, setBalance] = useState<LeaveBalance>({ casual: 12, sick: 6, annual: 15, compOff: 0 });
+  const [balance, setBalance] = useState<LeaveBalance>({ casual: 12, sick: 12, compOff: 0 });
   const [loading, setLoading] = useState(true);
 
   // Form state
@@ -93,10 +92,9 @@ export default function EnhancedLeaveRequestView({ user }: { user: any }) {
       if (snap.exists()) {
         const d = snap.data();
         setBalance({
-          casual: d.casual ?? 12,
-          sick: d.sick ?? 6,
-          annual: d.annual ?? 15,
-          compOff: d.compOff ?? 0,
+          casual: typeof d.casual === "object" ? (d.casual?.quota ?? 12) : (typeof d.casual === "number" ? d.casual : 12),
+          sick: typeof d.sick === "object" ? (d.sick?.quota ?? 12) : (typeof d.sick === "number" ? d.sick : 12),
+          compOff: typeof d.compOff === "object" ? (d.compOff?.quota ?? 0) : (typeof d.compOff === "number" ? d.compOff : 0),
         });
       }
     });
@@ -258,7 +256,6 @@ export default function EnhancedLeaveRequestView({ user }: { user: any }) {
               {[
                 { label: "Casual", total: balance.casual, type: "Casual" as LeaveType, color: "#2563eb", bg: "#eff6ff" },
                 { label: "Sick", total: balance.sick, type: "Sick" as LeaveType, color: "#ea580c", bg: "#fff7ed" },
-                { label: "Annual", total: balance.annual, type: "Annual" as LeaveType, color: "#7c3aed", bg: "#ede9fe" },
                 { label: "Comp Off", total: balance.compOff, type: "Comp Off" as LeaveType, color: "#0891b2", bg: "#ecfeff" },
               ].map(b => {
                 const used = usedBalance(b.type);

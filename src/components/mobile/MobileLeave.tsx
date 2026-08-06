@@ -21,7 +21,6 @@ interface LeaveRecord {
 const LEAVE_TYPES = [
   { id: "casual", label: "Casual Leave", icon: "🧑🏻‍💻", color: "bg-blue-50 text-blue-600 border-blue-200" },
   { id: "sick", label: "Sick Leave", icon: "🤒", color: "bg-orange-50 text-orange-600 border-orange-200" },
-  { id: "annual", label: "Annual Leave", icon: "🏖️", color: "bg-cyan-50 text-cyan-600 border-cyan-200" },
   { id: "Work From Home", label: "Work From Home", icon: "🏠", color: "bg-green-50 text-green-600 border-green-200" },
 ];
 

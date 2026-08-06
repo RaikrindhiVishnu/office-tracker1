@@ -8,10 +8,10 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import type { LeaveType } from "@/types/leave";
 
-const LEAVE_TYPES: LeaveType[] = ["annual", "sick", "casual", "Work From Home"];
+const LEAVE_TYPES: LeaveType[] = ["sick", "casual", "Work From Home"];
 
 interface ApplyLeaveFormProps {
-  leaveBalance ?: { annual: number; sick: number; casual: number };
+  leaveBalance ?: { sick: number; casual: number };
   onSuccess    ?: () => void;
   onCancel     ?: () => void;
 }
@@ -39,7 +39,7 @@ export default function ApplyLeaveForm({
 }: ApplyLeaveFormProps) {
   const { user, userData } = useAuth();
 
-  const [leaveType,  setLeaveType]  = useState<LeaveType>("annual");
+  const [leaveType,  setLeaveType]  = useState<LeaveType>("sick");
   const [fromDate,   setFromDate]   = useState<string>("");
   const [toDate,     setToDate]     = useState<string>("");
   const [reason,     setReason]     = useState<string>("");
@@ -51,7 +51,6 @@ export default function ApplyLeaveForm({
 
   // Balance for selected type
   const balanceMap: Record<string, number | undefined> = {
-    annual : leaveBalance?.annual,
     sick   : leaveBalance?.sick,
     casual : leaveBalance?.casual,
   };
@@ -123,7 +122,7 @@ export default function ApplyLeaveForm({
         {/* Balance pills */}
         {leaveBalance && (
           <div style={styles.balanceRow}>
-            {(["annual", "sick", "casual"] as const).map((t) => (
+            {(["sick", "casual"] as const).map((t) => (
               <div key={t} style={{
                 ...styles.balancePill,
                 background  : leaveType === t ? "#143d3d" : "#f1f5f9",
