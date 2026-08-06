@@ -552,7 +552,7 @@ export default function AdminLeaveRequests() {
           const empSnap = await getDoc(empRef);
 
           if (empSnap.exists()) {
-            const current = empSnap.data().leaveBalance ?? { annual: 18, sick: 12, casual: 6 };
+            const current = empSnap.data().leaveBalance ?? { sick: 12, casual: 12 };
             const updated = {
               ...current,
               [balanceKey]: Math.max(0, (current[balanceKey] ?? 0) - days),
@@ -563,7 +563,7 @@ export default function AdminLeaveRequests() {
             const userRef  = doc(db, "users", req.uid);
             const userSnap = await getDoc(userRef);
             if (userSnap.exists()) {
-              const current = userSnap.data().leaveBalance ?? { annual: 18, sick: 12, casual: 6 };
+              const current = userSnap.data().leaveBalance ?? { sick: 12, casual: 12 };
               const updated = {
                 ...current,
                 [balanceKey]: Math.max(0, (current[balanceKey] ?? 0) - days),

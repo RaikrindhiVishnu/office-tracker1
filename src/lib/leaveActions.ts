@@ -18,7 +18,6 @@ import type { LeaveRequest, LeaveBalance, LeaveType } from "@/types/leave";
 
 // ── Leave type → balance key mapping ─────────────────────────────
 const BALANCE_KEY: Partial<Record<LeaveType, keyof LeaveBalance>> = {
-  annual: "annual",
   sick: "sick",
   casual: "casual",
 };
