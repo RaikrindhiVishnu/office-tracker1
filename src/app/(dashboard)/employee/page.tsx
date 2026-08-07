@@ -1014,6 +1014,7 @@ export default function ZohoStyleEmployeeDashboard() {
       `}</style>
 
       <IncomingCallListener />
+      <LocationPromptModal />
     </div>
   );
 }
@@ -1039,8 +1040,6 @@ function ReportsView({ user, attendance }: any) {
           ))}
         </div>
       </div>
-      
-      <LocationPromptModal />
     </div>
   );
 }
