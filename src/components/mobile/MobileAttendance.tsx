@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { checkIn, checkOut } from "@/lib/attendance";
+import { useLocationPrompt } from "@/hooks/useLocationPrompt";
 import { startBreak, endBreak, calcTotalBreakMinutes, getActiveBreak, getTodayDateStr } from "@/lib/breakTracking";
 import { queueOfflineAction } from "@/lib/offlineSync";
 import { storage, db } from "@/lib/firebase";
@@ -126,28 +127,21 @@ export const MobileAttendance: React.FC = () => {
     }
   };
 
-  // Location request helper
-  const requestLocation = () => {
-    if (typeof window === "undefined" || !navigator.geolocation) {
-      setLocError("GPS is not supported by this browser");
-      return;
-    }
+  const { getGeoLocationWithPrompt, LocationPromptModal } = useLocationPrompt();
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocation({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-        });
-        setLocError(null);
-      },
-      (err) => {
-        console.warn("GPS Error:", err.message || "Unknown error");
-        setLocError("Could not capture GPS location. Enable access.");
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+  // Location request helper
+  const requestLocation = async () => {
+    const loc = await getGeoLocationWithPrompt();
+    if (loc) {
+      setLocation({
+        lat: loc.lat,
+        lng: loc.lng,
+        accuracy: loc.accuracy,
+      });
+      setLocError(null);
+    } else {
+      setLocError("Could not capture GPS location. Enable access.");
+    }
   };
 
   // Setup camera stream
@@ -497,6 +491,8 @@ export const MobileAttendance: React.FC = () => {
           <canvas ref={canvasRef} className="hidden" />
         </div>
       )}
+
+      <LocationPromptModal />
     </div>
   );
 };

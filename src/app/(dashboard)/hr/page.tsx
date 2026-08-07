@@ -27,6 +27,7 @@ import AdminRegularizationRequestsView from "@/app/(dashboard)/admin/AdminRegula
 import RegularizationView from "@/app/(dashboard)/employee/views/RegularizationView";
 import EmployeeAttendanceView from "@/app/(dashboard)/employee/views/EmployeeAttendanceView";
 import { checkIn, checkOut, getTodayAttendance } from "@/lib/attendance";
+import { useLocationPrompt } from "@/hooks/useLocationPrompt";
 import NavbarBreakStatus from "@/components/NavbarBreakStatus";
 import EnhancedProfileView from "@/app/(dashboard)/employee/views/EnhancedProfileView";
 import ReportBuilder from "./components/ReportBuilder";
@@ -396,22 +397,17 @@ function HRDashboard() {
     }
   }, [hrAttendance, todayBreaks]);
 
-  const getGeoLocation = async (): Promise<{ lat: number, lng: number } | null> => {
-    return new Promise((resolve) => {
-      if (typeof navigator === "undefined" || !navigator.geolocation) return resolve(null);
-      navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => resolve(null),
-        { timeout: 5000, enableHighAccuracy: true }
-      );
-    });
-  };
+  const { getGeoLocationWithPrompt, LocationPromptModal } = useLocationPrompt();
 
   const doCheckIn = async () => { 
     if (!user) return; 
     setBusyAttendance(true); 
     try {
-      const loc = await getGeoLocation();
+      const loc = await getGeoLocationWithPrompt();
+      if (!loc) {
+        setBusyAttendance(false);
+        return;
+      }
       await checkIn(user.uid, loc, null); 
       await loadHrAttendance(); 
     } catch (error: any) {
@@ -425,7 +421,11 @@ function HRDashboard() {
     if (!user) return; 
     setBusyAttendance(true); 
     try {
-      const loc = await getGeoLocation();
+      const loc = await getGeoLocationWithPrompt();
+      if (!loc) {
+        setBusyAttendance(false);
+        return;
+      }
       await checkOut(user.uid, loc, null); 
       await loadHrAttendance(); 
     } catch (error: any) {
@@ -1458,6 +1458,8 @@ function HRDashboard() {
           tr { page-break-inside: avoid; }
         }
       `}</style>
+      
+      <LocationPromptModal />
     </div>
   );
 }

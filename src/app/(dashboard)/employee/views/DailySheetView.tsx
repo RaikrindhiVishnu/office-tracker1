@@ -273,6 +273,22 @@ export default function DailySheetView() {
     const finalProject = project === "Other / Custom Entry" ? customProject.trim() : project.trim();
     if (!finalProject || !taskTitle.trim()) { alert("Project and Task Title are required."); return; }
     if (!isDraft && hours === "") { alert("Hours are required to submit an entry."); return; }
+    
+    // Prevent adding tasks for absent days
+    const att = monthAttendance[entryDate];
+    const checkedIn = !!(att && att.in && att.in !== "--:--");
+    const isWeekend = isWeekendOrHoliday(entryDate);
+    const existingForDate = monthEntries.find(e => e.dateStr === entryDate);
+    const hasEntry = !!existingForDate;
+    const isHoliday = hasEntry ? !!existingForDate.isHoliday : false;
+    const isToday = entryDate === todayStr;
+    const pastDeadline = entryDate < todayStr || (isToday && new Date().getHours() >= 19);
+
+    if (!hasEntry && !isWeekend && !isHoliday && !checkedIn && pastDeadline) {
+      alert("You cannot add tasks for a date when you were absent.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const monthStr = entryDate.substring(0, 7);

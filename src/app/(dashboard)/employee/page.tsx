@@ -12,6 +12,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useAuth } from "@/context/AuthContext";
 import { auth, db, storage } from "@/lib/firebase";
 import { checkIn, checkOut, getTodayAttendance } from "@/lib/attendance";
+import { useLocationPrompt } from "@/hooks/useLocationPrompt";
 import { saveDailyUpdate } from "@/lib/dailyUpdates";
 import { triggerEmailNotification, triggerWhatsAppNotification } from "@/lib/notifications";
 import EmployeeAttendanceView from "./views/EmployeeAttendanceView";
@@ -568,28 +569,19 @@ export default function ZohoStyleEmployeeDashboard() {
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   };
 
-  const getGeoLocation = async (): Promise<{ lat: number, lng: number } | null> => {
-    return new Promise((resolve) => {
-      if (!navigator.geolocation) return resolve(null);
-      navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => resolve(null),
-        { timeout: 5000, enableHighAccuracy: true }
-      );
-    });
-  };
+  const { getGeoLocationWithPrompt, LocationPromptModal } = useLocationPrompt();
 
   const doCheckIn = async () => {
     setBusy(true);
-    const loc = await getGeoLocation();
-    await checkIn(user.uid, loc, null);
+    const loc = await getGeoLocationWithPrompt();
+    if (loc) await checkIn(user.uid, loc, null);
     setBusy(false);
   };
 
   const doCheckOut = async () => {
     setBusy(true);
-    const loc = await getGeoLocation();
-    await checkOut(user.uid, loc, null);
+    const loc = await getGeoLocationWithPrompt();
+    if (loc) await checkOut(user.uid, loc, null);
     setBusy(false);
   };
   const handleSetLeaveType = (v: LeaveType) => setLeaveType(v);
@@ -1047,6 +1039,8 @@ function ReportsView({ user, attendance }: any) {
           ))}
         </div>
       </div>
+      
+      <LocationPromptModal />
     </div>
   );
 }

@@ -55,6 +55,7 @@ import { doc, onSnapshot, getDocs, query, collection, orderBy, addDoc, serverTim
 import { db } from "@/lib/firebase";
 import { LeaveType } from "@/types/leave";
 import { checkIn, checkOut } from "@/lib/attendance";
+import { useLocationPrompt } from "@/hooks/useLocationPrompt";
 
 const AnimatedSearchPlaceholder = () => {
   const words = ["people", "tasks", "projects", "updates", "attendance", "leaves", "messages"];
@@ -563,22 +564,18 @@ export const MobileDashboard: React.FC = () => {
   const [shiftSeconds, setShiftSeconds] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  const getGeoLocation = async (): Promise<{ lat: number, lng: number } | null> => {
-    return new Promise((resolve) => {
-      if (typeof navigator === "undefined" || !navigator.geolocation) return resolve(null);
-      navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => resolve(null),
-        { timeout: 5000, enableHighAccuracy: true }
-      );
-    });
-  };
+  const { getGeoLocationWithPrompt, LocationPromptModal } = useLocationPrompt();
 
   const handleHomeCheckInOut = async () => {
     if (!user) return;
     setIsSyncing(true);
     try {
-      const loc = await getGeoLocation();
+      const loc = await getGeoLocationWithPrompt();
+      if (!loc) {
+        setIsSyncing(false);
+        return; // User denied location or it failed
+      }
+      
       const isCheckedIn = attendance?.sessions?.length > 0 && attendance.sessions[attendance.sessions.length - 1].checkOut === null;
       if (isCheckedIn) {
         await checkOut(user.uid, loc, null);
@@ -2274,6 +2271,8 @@ export const MobileDashboard: React.FC = () => {
       {showOrgChart && (
         <OrgChart employees={users} onClose={() => setShowOrgChart(false)} />
       )}
+      
+      <LocationPromptModal />
     </div>
   );
 };
