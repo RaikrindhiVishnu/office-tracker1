@@ -396,8 +396,44 @@ function HRDashboard() {
     }
   }, [hrAttendance, todayBreaks]);
 
-  const doCheckIn = async () => { if (!user) return; setBusyAttendance(true); await checkIn(user.uid); await loadHrAttendance(); setBusyAttendance(false); };
-  const doCheckOut = async () => { if (!user) return; setBusyAttendance(true); await checkOut(user.uid); await loadHrAttendance(); setBusyAttendance(false); };
+  const getGeoLocation = async (): Promise<{ lat: number, lng: number } | null> => {
+    return new Promise((resolve) => {
+      if (typeof navigator === "undefined" || !navigator.geolocation) return resolve(null);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => resolve(null),
+        { timeout: 5000, enableHighAccuracy: true }
+      );
+    });
+  };
+
+  const doCheckIn = async () => { 
+    if (!user) return; 
+    setBusyAttendance(true); 
+    try {
+      const loc = await getGeoLocation();
+      await checkIn(user.uid, loc, null); 
+      await loadHrAttendance(); 
+    } catch (error: any) {
+      alert(error.message || "Failed to check in");
+    } finally {
+      setBusyAttendance(false); 
+    }
+  };
+
+  const doCheckOut = async () => { 
+    if (!user) return; 
+    setBusyAttendance(true); 
+    try {
+      const loc = await getGeoLocation();
+      await checkOut(user.uid, loc, null); 
+      await loadHrAttendance(); 
+    } catch (error: any) {
+      alert(error.message || "Failed to check out");
+    } finally {
+      setBusyAttendance(false); 
+    }
+  };
 
   const formatTimer = (seconds: number) => {
     const h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60), s = seconds % 60;

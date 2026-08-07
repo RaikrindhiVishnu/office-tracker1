@@ -344,19 +344,31 @@ export const MobileAdminDashboard: React.FC = () => {
   const [shiftSeconds, setShiftSeconds] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
 
+  const getGeoLocation = async (): Promise<{ lat: number, lng: number } | null> => {
+    return new Promise((resolve) => {
+      if (typeof navigator === "undefined" || !navigator.geolocation) return resolve(null);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => resolve(null),
+        { timeout: 5000, enableHighAccuracy: true }
+      );
+    });
+  };
+
   const handleHomeCheckInOut = async () => {
     if (!user) return;
     setIsSyncing(true);
     try {
+      const loc = await getGeoLocation();
       const isCheckedIn = attendance?.sessions?.length > 0 && attendance.sessions[attendance.sessions.length - 1].checkOut === null;
       if (isCheckedIn) {
-        await checkOut(user.uid);
+        await checkOut(user.uid, loc, null);
       } else {
-        await checkIn(user.uid);
+        await checkIn(user.uid, loc, null);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Home Check-In Error:", error);
-      alert("Failed to update status.");
+      alert(error.message || "Failed to update status.");
     } finally {
       setIsSyncing(false);
     }
