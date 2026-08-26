@@ -41,4 +41,5 @@ export type View =
   | "recruitment"
   | "regularization"
   | "admin-dashboard"
+  | "daily-reflections"
   | "finance";

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 import ChatBot from "@/components/ChatBot";
+import DailyReflectionModal from "@/components/DailyReflectionModal";
 
 export default function EmployeeLayout({
   children,
@@ -38,6 +39,7 @@ export default function EmployeeLayout({
     <>
       {children}
       <ChatBot />
+      <DailyReflectionModal />
     </>
   );
 }
